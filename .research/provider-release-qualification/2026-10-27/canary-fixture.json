@@ -10,6 +10,19 @@
     {"name": "missing-form", "path": ["verdicts", "codex/resume/hooks"], "delete": true, "expected": ["invalid"]},
     {"name": "unrecognized-verdict", "path": ["verdicts", "codex/exec/hooks", "verdict"], "value": "qualified", "expected": ["invalid"]},
     {"name": "admission-injection", "path": ["admitted"], "value": true, "expected": ["invalid"]},
-    {"name": "missing-evidence", "path": ["verdicts", "claude/exec/project-mcp", "evidence"], "value": "", "expected": ["invalid"]}
+    {"name": "missing-evidence", "path": ["verdicts", "claude/exec/project-mcp", "evidence"], "value": "", "expected": ["invalid"]},
+    {"name": "blank-evidence", "path": ["verdicts", "claude/exec/project-mcp", "evidence"], "value": " \n\t ", "expected": ["invalid"], "error": "blank evidence reference"},
+    {"name": "dangling-evidence", "path": ["verdicts", "claude/exec/project-mcp", "evidence"], "value": "evidence/nonexistent-proof.json", "expected": ["invalid"], "error": "unbound evidence reference: evidence/nonexistent-proof.json"}
+  ],
+  "bundle_cases": [
+    {"name": "blank", "action": "blank", "error": "blank evidence reference"},
+    {"name": "dangling", "action": "dangling", "error": "unbound evidence reference: evidence/nonexistent-proof.json"},
+    {"name": "missing-directory", "action": "missing-directory", "error": "missing evidence directory"},
+    {"name": "missing-baseline-directory", "action": "missing-directory", "target": "baseline", "error": "missing evidence directory"},
+    {"name": "missing-artifact", "action": "missing-artifact", "error": "missing evidence artifact: evidence/loader-observations.json"},
+    {"name": "altered-artifact", "action": "altered-artifact", "error": "evidence artifact hash mismatch: evidence/loader-observations.json"},
+    {"name": "missing-manifest", "action": "missing-manifest", "error": "missing evidence manifest"},
+    {"name": "altered-manifest", "action": "altered-manifest", "error": "evidence manifest hash mismatch"},
+    {"name": "escaping-reference", "action": "escaping-reference", "error": "invalid evidence path"}
   ]
 }

@@ -237,6 +237,7 @@ were not repeated after the interrupted session.
 | `startup.py` | Bounded private-PTY and headless entry smoke | scratch `observations.json`, raw output and PIDs |
 | `publish.py` | `python3 .research/provider-release-qualification/2026-10-27/publish.py --scratch .tmp/TASK-261027-pu2vvu` | sanitized `evidence/` only |
 | `canary.py` | Commands below | JSON disposition; no policy/board writes |
+| `check_canary.py` | Paired CLI evidence controls; command below | fresh `.tmp` bundles and `results.json`; no vendor execution |
 
 Reproduce from the repository root with privately prepared read-only binary
 copies named `codex`, `claude`, `muse` in `FROZEN_BINARIES`. Use a fresh scratch
@@ -265,6 +266,19 @@ malformed verdicts or evidence and admission injection refuse with exit 3.
 The comparison matrix is a separately reviewed observation input, not an
 assertion that version/help output can infer behavior.
 
+Each cell's `evidence` is now an exact relative artifact path;
+the earlier explanatory text is preserved in `reason`. Blank-after-trimming
+and dangling references are invalid. `evidence_manifest_sha256` pins the
+reviewed bytes of `evidence/manifest.json`, which in turn pins every required
+artifact. The canary verifies all manifest entries, not only the sole pass
+cell's proof. Missing directories, manifests or artifacts, changed hashes,
+and paths escaping the bundle yield exit 3, `qualification_required: true`
+and `admitted: false` before any no-drift result, including in binary-only
+mode. Baseline and candidate resolve proofs relative to their own JSON
+file's directory; a copied candidate must bring its complete evidence bundle.
+There is no fallback to the script's evidence when a candidate's proof is
+absent. Manifest pins must be updated only with the reviewed evidence bytes.
+
 Exit 0 means only no observed drift (or successful self-controls). Every mode
 emits `admitted: false`, including an all-pass candidate. No mode edits product
 tables, native homes or baseline, installs anything, creates a scheduler or
@@ -276,6 +290,7 @@ Future candidate bytes need an explicit research pin/review before replay.
 python3 "$R/canary.py" --self-test
 python3 "$R/canary.py" --binaries "$FROZEN_BINARIES"
 python3 "$R/canary.py" --candidate "$R/baseline.json"
+python3 "$R/check_canary.py" --scratch .tmp/qualification/canary-controls-01
 ```
 
 [Canary fixtures](canary-fixture.json) cover unchanged input, changed bytes,
@@ -283,5 +298,13 @@ new version/same verdicts, unknown/fail-to-pass, pass-to-fail/unknown, missing
 form/evidence, invalid verdict and admission injection. The self-control also
 checks that an all-pass matrix never admits. [Control receipts](evidence/canary-controls.json)
 and [same-byte observations](evidence/canary-same-bytes.json) are persisted.
+The [paired CLI receipts](evidence/canary-proof-controls.json) address PR187
+review P2: blank, dangling, missing-directory, missing-artifact, missing-manifest,
+hash corruption and escaping-path cases each produce the exact expected
+refusal. Every case has intact and repaired exit-0 controls, with admission
+false throughout. The dangling-reference repair supplies the previously
+absent artifact plus its manifest entry and pin; it does not merely suppress
+the failing check. Both baseline and candidate absence are exercised. These
+controls use isolated copies and do not rerun or alter native probe evidence.
 Remaining decisions and limits are tracked in
 [UNRESOLVED_QUESTIONS.md](UNRESOLVED_QUESTIONS.md).
