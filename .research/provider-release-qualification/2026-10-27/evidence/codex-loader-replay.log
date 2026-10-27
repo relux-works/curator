@@ -1,0 +1,34 @@
+=== RUN   TestOfflineBoundary
+--- PASS: TestOfflineBoundary (3.52s)
+=== RUN   TestConfigLayers
+=== RUN   TestConfigLayers/trusted
+    replay_test.go:355: fixture child pid=24681
+=== RUN   TestConfigLayers/untrusted
+    replay_test.go:355: fixture child pid=25259
+--- PASS: TestConfigLayers (11.66s)
+    --- PASS: TestConfigLayers/trusted (3.97s)
+    --- PASS: TestConfigLayers/untrusted (7.69s)
+=== RUN   TestResumeApprovedRoot
+=== RUN   TestResumeApprovedRoot/32768
+    replay_test.go:355: fixture child pid=26149
+=== RUN   TestResumeApprovedRoot/0
+    replay_test.go:355: fixture child pid=26907
+--- PASS: TestResumeApprovedRoot (8.17s)
+    --- PASS: TestResumeApprovedRoot/32768 (3.99s)
+    --- PASS: TestResumeApprovedRoot/0 (4.17s)
+=== RUN   TestMCPRuntime
+=== RUN   TestMCPRuntime/trusted/false
+    replay_test.go:355: fixture child pid=27524
+=== RUN   TestMCPRuntime/trusted/true
+    replay_test.go:355: fixture child pid=28266
+=== RUN   TestMCPRuntime/untrusted/false
+    replay_test.go:355: fixture child pid=29058
+=== RUN   TestMCPRuntime/untrusted/true
+    replay_test.go:355: fixture child pid=29579
+--- PASS: TestMCPRuntime (15.88s)
+    --- PASS: TestMCPRuntime/trusted/false (3.21s)
+    --- PASS: TestMCPRuntime/trusted/true (4.51s)
+    --- PASS: TestMCPRuntime/untrusted/false (3.40s)
+    --- PASS: TestMCPRuntime/untrusted/true (4.76s)
+PASS
+ok  	github.com/relux-works/curator/.tmp/TASK-261027-pu2vvu/codex-loader-01/stage	39.521s

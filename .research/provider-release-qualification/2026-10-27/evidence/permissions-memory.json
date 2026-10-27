@@ -1,0 +1,1971 @@
+{
+  "format": "permissions-memory-observations-v1",
+  "interpretation": "Bounded exact-build facts only. Unknown and refused mandatory atoms prevent native-project certification. No whole prompt, API header or real credential is projected.",
+  "runs": {
+    "measured": [
+      {
+        "case": "TestCodexDedicatedMemory_read_on-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "5784a379e8b2ecdb7eea9778264d85042aa9affce042799a9d37310806f24e38"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "49bc19b83d270cb0ea11edc579cb06007b587a274e7ef28333f26d7ddc06f843"
+          }
+        ],
+        "sha256_sanitized_record": "c278aa7ee7452a08f36a7c2c6d80eba7c075f03c866ce8a82c497612c6aebb64"
+      },
+      {
+        "case": "TestCodexDedicatedMemory_read_on-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "27dc6a6755e5b46271faf9bd87377fcd16ac2342ee0dfe0df54f3483ee18fc92",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexDedicatedMemory_read_on-false",
+        "observation": {
+          "atom": "dedicated-memory-read",
+          "forbidden_effect": false,
+          "limit": "manual memory tool only; trusted project; no automatic-write or child qualification",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "70f915018667c5a111766d0f67bc303f769c0130203c47aa7ba2d8de62f1a920"
+      },
+      {
+        "case": "TestCodexDedicatedMemory_read_on-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "8a87bb936dc496bd0571dae2e80bdb4661202269dfcee839c1b4d8ca761b775e"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "3644af111f0cf6cdf12218122feb126f1a50b35b9851deaa73745647ac5043be"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": true,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "347b1b001abe5424ff5f698aca14e860761eee6c5036bc802a8b421b10efe588"
+          }
+        ],
+        "sha256_sanitized_record": "0e189b16121fa0165eabcced3758088bd257657c1829a20545e42b535a275f6c"
+      },
+      {
+        "case": "TestCodexDedicatedMemory_read_on-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "61839153b3866491e7992973ae564021c9e3e01927481e6eef9a17255b29b8f4",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexDedicatedMemory_write_on-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "fcbd423d2c1a625648d7e935f995738444cca98493d6fd991c0a305c89cdb3f2"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": true,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "6dcb246d4a1abc55b25172bb02bf4cd5dd77a0e91b3ffaa5bf6117289939143d"
+          }
+        ],
+        "sha256_sanitized_record": "08abb4293586e36cbae6e35edba106b409f33a6428205c348b2fc465b728ebf4"
+      },
+      {
+        "case": "TestCodexDedicatedMemory_write_on-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "f2648afe54bc651e738da4c580d3bd9dc70a6009a1b6bd51e14caa055c730774",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexDedicatedMemory_write_on-false",
+        "observation": {
+          "atom": "dedicated-memory-write",
+          "forbidden_effect": false,
+          "limit": "manual memory tool only; trusted project; no automatic-write or child qualification",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "5100d77d386be18a78f7aadfcfdb91b42e845aa918045eb6eb478746fd65e8e6"
+      },
+      {
+        "case": "TestCodexDedicatedMemory_write_on-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "6b42a03c3f10066a504ab92938822fab9dfb897a4d1be1a3166eb0a5fcb8530a"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "e69c2420b14b6363afd3ea8e146fbeb6fe2a568cb400acba43b7c2674b1d43cf"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": true,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "88c5d81dd51292912ddb30c89d7b3dee48066f62b4d562034e14e6bf16699945"
+          }
+        ],
+        "sha256_sanitized_record": "189909b3ed142a55c8747b040ba32a1ad9bb6345cc87712bd2def193ffc8ab7f"
+      },
+      {
+        "case": "TestCodexDedicatedMemory_write_on-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "c34215eafda05bef8b48ca42fe62aea81a13723d08890a1d788866752f1617df",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMCPDefaultPrompt_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "4707a96d5007efe022fd4773babf2b916b66c7f8e018e3c5644cb8ed099f4b97"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": true,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "4e7deb81a119ad9c8ca3c261c60d39d345b9ed12dff14ae78fcec9a6b082840e"
+          }
+        ],
+        "sha256_sanitized_record": "85031d8bb764dd57b106e9595e7c525acdca87dedc462fb2399663d8182456e6"
+      },
+      {
+        "case": "TestCodexMCPDefaultPrompt_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "a4bf9f8475d35d507ef73e41ca3dc0e75c5874776ed0775d234f54eb60893be7",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMCPDefaultPrompt_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "7c97098c209c7172d53bd24448b21aaf277fae0fd3ee5b66c4ceb6836fd45f02"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "992d3e8b734da8c3854bb771452bc10d13ac484d86d025b6b4015d7ee25e1f8c"
+          }
+        ],
+        "sha256_sanitized_record": "6a71f958c3a0f98c575c03cd01d4d260ca8528c3b26d77da10aecf35a4a46787"
+      },
+      {
+        "case": "TestCodexMCPDefaultPrompt_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "18b12e44bb18c15c04ad5885ec5f9bfdc748a39dc151c680252a506603e25564",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": true,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMCPDefaultPrompt_disabled-true",
+        "observation": {
+          "atom": "MCP-default-prompt",
+          "forbidden_effect": false,
+          "limit": "default_tools_approval_mode prompt rejects one annotated MCP tool under approval never; no all-tool or lifecycle certificate",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "bb6c5c96353dfa23cff1a54b37889904c3767937e7feb256008cf1f1b7844a53"
+      },
+      {
+        "case": "TestCodexMCPDenial_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "a57ae6049da794dc240adcb95b40c22e139ac3842cf233dd2802ffe9e4ffbdd7"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": true,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "2b1d470ea9bfea0046efc3aa9be1ae427397f068e37c5431de74ff4dd15e5a91"
+          }
+        ],
+        "sha256_sanitized_record": "f19360778d884bba0eea597f3f4eb8c69ff65bd218fb45414adc6466fea10050"
+      },
+      {
+        "case": "TestCodexMCPDenial_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "150b66107576839ada256d1983088440c48976294f467842d55e42ffc51055ea",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMCPDenial_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "7483b5765cab7aaae225b8b56e5c83165f69876f2c8dee79432ed60835808ce7"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "ebbf27cf70acef4dda7f99a8549b8da2ae851aaaee8661ad376f4aaf48c1a186"
+          }
+        ],
+        "sha256_sanitized_record": "73be74ddb8520311b500bde2afbd601f56b28cb4267e341e2acff91db35eb509"
+      },
+      {
+        "case": "TestCodexMCPDenial_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "32c980f9e9a7576fcf35c4f21abfa344634bd9a684c2ae12eb14fc935cb2f6d0",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": true
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMCPDenial_disabled-true",
+        "observation": {
+          "atom": "MCP-explicit-disabled-tool",
+          "forbidden_effect": false,
+          "limit": "explicit disabled_tools only; approval=never/read-only positive allows MCP; no default-deny certificate",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "0ce4f30e0d7a829f4a87b54fd291f18b6a71a897e5ea4edf1fd48a6baa55bd73"
+      },
+      {
+        "case": "TestCodexMemoryRead_enabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "dec362a95363e86120c17d72d40a2fcedb33c9029250f16e3d47d0add39196fa"
+          }
+        ],
+        "sha256_sanitized_record": "77c8d98b0c2f267d0729f1346cf4baf124e9c3827dd8ee7f2660c03cec0775fd"
+      },
+      {
+        "case": "TestCodexMemoryRead_enabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "5bec85143d533b3901e44141c0b8172133954d1829c97147fd470874e37844ef",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMemoryRead_enabled-false",
+        "observation": {
+          "atom": "memory-prompt-read",
+          "forbidden_effect": false,
+          "limit": "seeded summary probe only; no positive means unknown; auto-writes/resume/child unqualified",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "2a910b08e245c439a9f931923339e9bbcdb057be3ae167251eb30690529be4cc"
+      },
+      {
+        "case": "TestCodexMemoryRead_enabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "c53356488f380d313f34d167807c6b3ca844d5908cfab9c1985850ca8eafde62"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": true,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "fe28c07bd6ad265d03d73b84ae01ed1f1bdc86b4190bde2765dbf3cf2cf2e3ad"
+          }
+        ],
+        "sha256_sanitized_record": "5054270c919c331ed2e1b1cac913c3bc2857e546f115ec86f027b5b39736b646"
+      },
+      {
+        "case": "TestCodexMemoryRead_enabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "f9254a39e75507dc360358f8e7b86a2800c7bca3261cccd4efe52d4ee8659ac8",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMemoryResume",
+        "record": "initial-requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "613504bc1c40db95694447ae3f75ee7b7cbd26749ca5a0b004cea2fa4d5055a5"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": true,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "978c36ac52aca095bf9cf30ae6d8b95cfc9643cc29dde991945a512c156a9da1"
+          }
+        ],
+        "sha256_sanitized_record": "acd19a8fb8e80312d3fa9c457aedfdd50b0f0c4cf5da2dd28605f3d587a8b8ba"
+      },
+      {
+        "case": "TestCodexMemoryResume",
+        "exit": 0,
+        "record": "initial.json",
+        "sha256_sanitized_record": "3a1e7987f4b71678f576eecee9c7d480fa3112c540d247d22fc60119e38e2d61",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMemoryResume",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": true,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "6f21bca7fb37272afe0b1f28c651414b29a1d2ff290ab6c5300311ce580c8f63"
+          }
+        ],
+        "sha256_sanitized_record": "55d201f77d63617b6e6a4269eb18802b97e23976ce485fc43dfb24be639b2a86"
+      },
+      {
+        "case": "TestCodexMemoryResume",
+        "exit": 0,
+        "record": "resume.json",
+        "sha256_sanitized_record": "80389ee61645499aafa705c26ad0d2f6f525c105256a6f5c2de0dec53f3c74e6",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexMemoryResume",
+        "observation": {
+          "atom": "tainted-history-resume",
+          "forbidden_effect": true,
+          "limit": "actual enabled-memory assistant history resumed with all five off flags; fresh off read is tested separately; history is not new memory discovery",
+          "positive_effect": true,
+          "specific_denial": false,
+          "verdict": "refused"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "2ea3baa8c1e083ff0e312a45b1eda082ce157bcdbfefa6d9d9321c9a35fe3dd9"
+      },
+      {
+        "case": "TestCodexShellDenial_read-only",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "9efe80df033ca26a4a807b818baff4b870a8aac5654a48b41c134ffafb3d4851"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "2cc4879015edd294edca403b29b8804c9c2b0c848bdb57f8637edecb2b203fe5"
+          }
+        ],
+        "sha256_sanitized_record": "b14d163b4975673553fa8c09eef0ec22516d2521ac9a2cbe42dd6abe526509bb"
+      },
+      {
+        "case": "TestCodexShellDenial_read-only",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "cefa8c32027a7262f923894c10f2f5dd1123a09b72242b884d1ed44acd2460ac",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestCodexShellDenial_read-only",
+        "observation": {
+          "atom": "shell-write-read-only",
+          "forbidden_effect": false,
+          "limit": "exec startup only; no arbitrary tool, approval escalation, resume or child claim",
+          "positive_effect": false,
+          "specific_denial": false,
+          "verdict": "unknown"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "a03032af67d8d7369585404d3d123b081661ca8032651e7674b0adeb87a71703"
+      },
+      {
+        "case": "TestCodexShellDenial_workspace-write",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "df1bd9027f9fb68e6c981e6ee98218f92fd2db7eaa30ca0b149757b7cc64b3a2"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": true,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": true
+            },
+            "sha256": "093b5b7b5d5feb88828ef44695de85831f76cdc54cad5448099beb091ce74898"
+          }
+        ],
+        "sha256_sanitized_record": "d3b93220aeeb0f5933a75e651209e36d29e43f2c2f21d1c47e37f0c1423dd438"
+      },
+      {
+        "case": "TestCodexShellDenial_workspace-write",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "5abea0882bc18462f17eb3f4d169094489590d4ea3f552fe2b051837a6154031",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseConfigHelp",
+        "exit": 0,
+        "record": "config-help.json",
+        "sha256_sanitized_record": "845ccf5f9806ab2678c603763345273c8c5884f1738f36b783f3e98758b7c182",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseConfigHelp",
+        "exit": 0,
+        "record": "config-status.json",
+        "sha256_sanitized_record": "d2d2291f63eebe25617a9c60bc98665dd960ef77cfa9215de9bdfd31e565f9d2",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseConfigHelp",
+        "exit": 1,
+        "record": "foreign-profile.json",
+        "sha256_sanitized_record": "e2197c05da30dcba85dc7c9f036ba8e4b858cfb13a0f755be5454c80a6412820",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseConfigHelp",
+        "exit": 0,
+        "record": "init-dry.json",
+        "sha256_sanitized_record": "ace67d961eaa6f319d8572f373b010a608bdd683b6819955f68ff453fc22f907",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseConfigHelp",
+        "exit": 0,
+        "record": "init-help.json",
+        "sha256_sanitized_record": "5853332e5a5ddabf42179cd58fc28db469069a9ffbd7a2c1973caf41d73feb8d",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseLocalBaseline",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseLocalBaseline",
+        "exit": 0,
+        "record": "local-turn.json",
+        "sha256_sanitized_record": "5045b85ce6ecc1e310dda8a17c9fc1f2e67369cdd4a9db5c7b10231e23870d53",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseLocalBaseline",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "b4a998e859b7c1ceef63bc5aa6954b01beb42ad4b0de451302d71d6cd922ee31"
+          }
+        ],
+        "sha256_sanitized_record": "22a5958083101f9d02ba17de9a3a9cde5bf0a72bef0f5f28a79aec1cfb596d3a"
+      },
+      {
+        "case": "TestMuseMemoryConfigCandidate",
+        "observation": {
+          "accepted": false,
+          "exit": 2,
+          "interpretation": "bounded parser candidate only; no dedicated-memory-off qualification",
+          "providerRequests": 0
+        },
+        "record": "candidate.json",
+        "sha256_sanitized_record": "b4e2e8ccddbcdf5cf2d6604f5656f476a69bb5d4241e37679b6584aaef167d1d"
+      },
+      {
+        "case": "TestMuseMemoryConfigCandidate",
+        "exit": 2,
+        "record": "memory-config.json",
+        "sha256_sanitized_record": "4c844000a4f16cea8f0475aa08a39d175627d5fd3c1ff199e44c896e118d743f",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseMemoryReentry",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseMemoryReentry",
+        "record": "initial-requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "277a6a0534cc5223d9b935fabefa520df53e9523ec7c60c4faee14674e9c1b77"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": true,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "c1278c48dbe99ea682aadceb95ea924a21cf8bbac6e9205e448cedbebe24b20b"
+          }
+        ],
+        "sha256_sanitized_record": "7ad79eea6ff38ed8d303c181dd0d100590b96a79f7532c3c487feee0f6340c66"
+      },
+      {
+        "case": "TestMuseMemoryReentry",
+        "exit": 0,
+        "record": "initial.json",
+        "sha256_sanitized_record": "9c19fa45da6262c7819624c48ba7e0fd2ce7fc243ff814d3f56f5ad524844513",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseMemoryReentry",
+        "exit": 0,
+        "record": "reentry.json",
+        "sha256_sanitized_record": "bf64daea1625aa60652996585aa1c92771d676b99ae278f03ad41369db1ab8b1",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseMemoryReentry",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": true,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "c5af2581ebd091e0b8aaff7817e15b67a9498eb9dbc6b2c9bee17cba1d3bcbb4"
+          }
+        ],
+        "sha256_sanitized_record": "b97b013e225954cce6fcafb1b81feb7113110437e4c769585a89f10813e0aecb"
+      },
+      {
+        "case": "TestMuseMemoryReentry",
+        "observation": {
+          "atom": "Muse-same-id-memory-reentry",
+          "forbidden_effect": true,
+          "limit": "source removed after real tool read; same-ID exec only; canonical resume/TUI and child entries unqualified",
+          "positive_effect": true,
+          "specific_denial": false,
+          "verdict": "refused"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "24060451f4d5552c381bd747e9678f8b6264fbf5c898d68d6e6b18fcdc56ac27"
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "ad1a3c070a0bd7234d430952571e9c130ff6c91ab69c1e01ca3eb19710076abd"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": true,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "bb9f8d5c69703a972057b547430c1c275317f8c7328b86fb72fc5a6aa08828ec"
+          }
+        ],
+        "sha256_sanitized_record": "629d6f560431b146e48ab67114f4666afb3ba58ba0435ac9a0e560155c78fe1c"
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "7026eddc0a183a496b9ac650aef127f13925c98528a66cbaf5b66d48b7bc5780",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "b65d85521613eb30cc4cd1d40d26302671c23646f17e64dcef87942a0f59a972"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": true,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "1db2ee00c856fa0da0ec74b7669d591009d5e71d79e128f43c373cf5b5afd7d2"
+          }
+        ],
+        "sha256_sanitized_record": "e5b8a902a11ce75e5c822ab61f932b5e986581ab0a95ccfd189f4b9deb3310c3"
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "8aef07e72ebf61ce1a4afda36ea3b3d0942fca06f14028a484f58e888328ceae",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_add_memory_disabled-true",
+        "observation": {
+          "atom": "Muse-add_memory",
+          "forbidden_effect": false,
+          "limit": "explicit startup flag with approval disabled in both siblings; manual memory only, no automatic memory-off",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "557feaeae9265c04f56e76a08eddd4548a0ab8d21d6b26c09ee36db54b8bc58d"
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "c051fa47dbc6c69596bec73487c5d684ecb094ec60c4005d19975c9005948104"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "4e9ed2c0ebef962829023fc359c7fac347f8fef41b0e840913744c61a5144c18"
+          }
+        ],
+        "sha256_sanitized_record": "3160bec1119d50f7412a7c5c0cf8e284c2d29f04a672ed2117d00d57cac75fe1"
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "bc874f4a867a54f2f18c0b1d99afb59069e970d08c5e0ac7299f5b0b2f1fb26d",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": true,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "184d66d000867bb92537618dbcac88cc7f959658973dba7e46be13419748e310"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "8906802c6bf9893233ed5699167e618bb645d65d198847f5f4c5f290f1c63d3a"
+          }
+        ],
+        "sha256_sanitized_record": "03c5e08b823b4433d5b5213a39822a8c14b25c0f2e2e15cef1665da33742e31c"
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "bdf3b5fbf2df391f16164200672dd47fbe6639cbf79dfefd42d4a323653d817c",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_bash_disabled-true",
+        "observation": {
+          "atom": "Muse-bash",
+          "forbidden_effect": false,
+          "limit": "explicit startup flag with approval disabled in both siblings; manual memory only, no automatic memory-off",
+          "positive_effect": false,
+          "specific_denial": true,
+          "verdict": "unknown"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "532d1b775566d866facd25ec466b93e89155d95bf871e2f678d411668985be37"
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "eb674d0945cf87460b0034c1ae88052878cb16ca17c985372de66c770dde3cef"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "df8887ce9b3d42091906bc581c1355ea9e3a60bcfe4ab13027f37320fefc095a"
+          }
+        ],
+        "sha256_sanitized_record": "443986b5378a570db9dc8b572a376f18dd2b8f5d09d647c374d7a02946418bba"
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "2fc8c58b098d50c791d2de7a8ddd07d0adfd0c8379617e5b0c388ccfe040a390",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "4da2982a59bf472fb8d797d0e274636f3e3a71f6451060cf8381d1f988735737"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "b56c0a1d97592fc0351c4bca7601e3cb47893d3a3579fa4626b560101aaa9dfe"
+          }
+        ],
+        "sha256_sanitized_record": "b709676c6a8a218c1c3fa64c61651e745b786a99403bec9560d3fa65349e04bd"
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "62f2a961916e0255edf83312831f0cf9b603113448e73d74630183ef701f729f",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_edit_file_disabled-true",
+        "observation": {
+          "atom": "Muse-edit_file",
+          "forbidden_effect": false,
+          "limit": "explicit startup flag with approval disabled in both siblings; manual memory only, no automatic memory-off",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "a7088e0564a6baadeee23d9ee3971320a79570ab2515ba02f39dd5cc27237cc7"
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "9f79ffcb2cf943c14b9a9fd997cd9db84fa278af2f192cfe41312774d73f7b30"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "e95a3a4f5ec363d8de787ea4f967209bb556032b19d84baf4ece7c249643613c"
+          }
+        ],
+        "sha256_sanitized_record": "f42d07a525665574236ae5aab6a48937b8a9f70a585d346804b0b724fa83ae5e"
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "deda2458dc11b71689406eadabc8924e4b084a073121a886937b082f2b271d32",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "42959f77d6fcf7cddc577fdaac0644a8047b4a4657de93a1600d37e98fcb4456"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "1cb7e1d09e6f160dbe4273337883aa5b628f1c08016696d69c52039667be3625"
+          }
+        ],
+        "sha256_sanitized_record": "d65c9575d84b58403349b966d9b5c184fee1d29b760d78720b89a53f6f188f8b"
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "cba089298484ffc05cf7407fed961e22b35f9f278166285f45029f9b7d9960eb",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_legacy-bash_disabled-true",
+        "observation": {
+          "atom": "Muse-legacy-bash",
+          "forbidden_effect": false,
+          "limit": "legacy shell under --enable-shell-tool --disable-sandbox; outer privacy fence intact; --disable-shell gate only, not managed-shell sandbox",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "5c57cb164f953266fb0526409e8b680d7f10298a4009512781191de9bb9c0207"
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "e5e0a17f99ebfd21d7739ea974ba08bda3452451e83613a040b9eda080ff7121"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": true,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "132d3a84cdaac00daf82c4fb7c0289364fb26f776344908cfa3da009bcfdacd8"
+          }
+        ],
+        "sha256_sanitized_record": "72fc2be7a2771b7ab4b2cf75d62e972da8c0ca13cf223ab900c4f45f6924742d"
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "713f5c3d34522705946e79d5e9f925a80ea8b9ec759bb3d2281e1da4c8b41b9e",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "360e6ffcfbf2d8e2ba60e7dd5f87926e22ba4acde26a4d6951bf765581e483a8"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": true,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "0e5377ff108b9e090f3eeb42cf224de7c8ab394f8abbd58e53cc898e9fe58eb2"
+          }
+        ],
+        "sha256_sanitized_record": "a4ed8b2a845e9c55184be75632343e4d695fdc6dca2dd55a52fdbcde4a929271"
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "a63e38d383d3541996abab11c9d9b3dd4b465b46322ccae51005b4b8ed9f5ede",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_read_memory_disabled-true",
+        "observation": {
+          "atom": "Muse-read_memory",
+          "forbidden_effect": true,
+          "limit": "explicit startup flag with approval disabled in both siblings; manual memory only, no automatic memory-off",
+          "positive_effect": true,
+          "specific_denial": false,
+          "verdict": "refused"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "cf6ba8deab4457f4d0c71c204d10d94b080ecb8e8181c82d241dd778047ca7f1"
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "811a3f09450de5cd04b253cc54344140c7f397d948affd7ac875b46d0938b3d8"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "9f473605241f8d602911551623c57fdb38c0c94bd514351620c85d3621b3ed4d"
+          }
+        ],
+        "sha256_sanitized_record": "d1cebe6aa9f0b616c255c9978368aeb125c810bec3900be0a338960bc10ae7be"
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "9876a8ada4f9c92bb767e505da5828f759fdbc804aee00c367ec157f4d1d7ce6",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "abd3d2a15f62b5762097eda53f07ae1377e9e00248df9ce13eeeb1b1d0c7ebcd"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "321edb1a8bc6562b544e66cc6535c8ee46fc1fe67c7da6d5d486f1cf615e7f33"
+          }
+        ],
+        "sha256_sanitized_record": "4f4d1007e00ac78a376756ddceafc3eafa3c68f6ecf56a0d13bce7e59d7f6602"
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "4b9051524a29d17325fd09df6988f629be93c7d99ec28bce9a2a73b86f2d6c89",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_web_fetch_disabled-true",
+        "observation": {
+          "atom": "Muse-web_fetch",
+          "forbidden_effect": false,
+          "limit": "explicit startup flag with approval disabled in both siblings; manual memory only, no automatic memory-off",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "7a90d1322fe92cca22a24e74ed98bafbeabb51a4e9cec4ff3bc22c5d4362f1be"
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-false",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-false",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "a21a10ba50b3d0bc7bfb62227612c5a5909ad2285397bbdcee94854e194fb72c"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "c1fe0445eaaf293bf2ce93e2d707b85cdf2341dcfd03f2f42f464f538504ac14"
+          }
+        ],
+        "sha256_sanitized_record": "411e4feeaae927079833b4410cd8ec5262f33ad52f8a81bcb2fdc83d43ba6f94"
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-false",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "5a785817584fb85e1991bcb930ad090138e9012e6589cb5af0d153b0ff98fc80",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-true",
+        "observation": {
+          "method": "GET",
+          "path": "/muse-code/models"
+        },
+        "record": "catalog-route.json",
+        "sha256_sanitized_record": "fbdbc5e5c54a469f6805b0d0e45f35bd48dc6c0640e097d90015abdb87069da8"
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-true",
+        "record": "requests.json",
+        "requests": [
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "1391e75ed7fad8c6a7dc9526b4005826ce8e2dafa8b3ff39f090150932e1b783"
+          },
+          {
+            "markers": {
+              "MCP_TOOL_SENTINEL": false,
+              "QUAL_CODEX_MEMORY_CANARY": false,
+              "QUAL_CODEX_MEMORY_WRITE": false,
+              "QUAL_CODEX_PROFILE": false,
+              "QUAL_MUSE_MEMORY_READ": false,
+              "QUAL_MUSE_MEMORY_WRITE": false,
+              "QUAL_PROJECT_DISCOVERY": false
+            },
+            "sha256": "28f4098ef975a0549769091e948371822f92975d353575652a59b24cea7c4532"
+          }
+        ],
+        "sha256_sanitized_record": "962c9faad5fdee2ff0b5b91b116c544f54d77a011d4a6e4e87cae158effab466"
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-true",
+        "exit": 0,
+        "record": "turn.json",
+        "sha256_sanitized_record": "60936d3aa4d3417e40702cd27a54ce4b247601b8aca9d8adf68d2ec71cd81fcf",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": true,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestMuseToolDenials_write_file_disabled-true",
+        "observation": {
+          "atom": "Muse-write_file",
+          "forbidden_effect": false,
+          "limit": "explicit startup flag with approval disabled in both siblings; manual memory only, no automatic memory-off",
+          "positive_effect": true,
+          "specific_denial": true,
+          "verdict": "qualified"
+        },
+        "record": "verdict.json",
+        "sha256_sanitized_record": "b6942ef88c5018cdb17e07206ef56fd42d0f353384621ba92cc060690e721e5e"
+      },
+      {
+        "case": "TestNativeIntrospection_codex",
+        "exit": 0,
+        "record": "exec-help.json",
+        "sha256_sanitized_record": "26edcdaa2aeeb40ac33e1e2dd8284008f8f30368f36d34945951cb59a4a2b52b",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_codex",
+        "exit": 0,
+        "record": "help.json",
+        "sha256_sanitized_record": "84a6dc9d2de3cf60ce25b9c3f8ad5718d553acc329ef58c20822530b9504409f",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_codex",
+        "observation": {
+          "platform": "darwin/arm64",
+          "runtime": "codex",
+          "sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+          "version": "WARNING: proceeding, even though we could not create PATH aliases: CODEX_HOME points to \"$RUN/codex\", but that path does not exist\ncodex-cli 0.163.0\n"
+        },
+        "record": "identity.json",
+        "sha256_sanitized_record": "7b59cd7f8cce892e69bcc4e5c855ddd62dd49ae2649716392880328e736b9327"
+      },
+      {
+        "case": "TestNativeIntrospection_codex",
+        "exit": 0,
+        "record": "resume-help.json",
+        "sha256_sanitized_record": "fef8a445a3170f5f99b140f7ef53e7277843c3d09d95df2368fbb667fa58e719",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_codex",
+        "exit": 0,
+        "record": "version.json",
+        "sha256_sanitized_record": "75dde04a76cdc5f385c72c0c84bb4a9866ee9385c4e0eb12a4bbfc11b64a446f",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_muse",
+        "exit": 0,
+        "record": "echo.json",
+        "sha256_sanitized_record": "034abb3fc7cef1e99f98d0141ea3521b1f10269675da32fe395a1891d0c60142",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_muse",
+        "exit": 0,
+        "record": "exec-help.json",
+        "sha256_sanitized_record": "2e047cbe663caacd8124448d1e03cbbe91212afd57570f28e82292fc67911bd3",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_muse",
+        "exit": 0,
+        "record": "help.json",
+        "sha256_sanitized_record": "0846b77eb2534e34a0c9a8aa069de3d9f04b67c71d46982794264987fbce546d",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_muse",
+        "observation": {
+          "platform": "darwin/arm64",
+          "runtime": "muse",
+          "sha256": "9fd40ae9c6dfb847e3ef58b61405c004d0ebbf19ceb0297be966f750b3b84aa0",
+          "version": "Muse Code 1.4.13 (1.4.13-R6996.1)\n"
+        },
+        "record": "identity.json",
+        "sha256_sanitized_record": "3754c8b60d3a505dab36ff166bdde102b7c21d1c1be3740db05037b96a5d4a4b"
+      },
+      {
+        "case": "TestNativeIntrospection_muse",
+        "exit": 0,
+        "record": "resume-help.json",
+        "sha256_sanitized_record": "be3b2ebb9d54e79b1a2872119b6bb732d33169f7b56c2582d43653cf295a7f56",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNativeIntrospection_muse",
+        "exit": 0,
+        "record": "version.json",
+        "sha256_sanitized_record": "7cb13e724a9d00d3491d75c67cfea90f3448497007554c44ecaf7b29a1fab789",
+        "signals": {
+          "MCP tool call requires approval, but approval policy is never": false,
+          "QUAL_MUSE_LOCAL_OK": false,
+          "failed to bind managed network proxy": false,
+          "sandbox_apply: Operation not permitted": false,
+          "unsupported call: mcp__approvedsentinel": false
+        },
+        "timeout": false
+      },
+      {
+        "case": "TestNestedSandboxControl",
+        "observation": {
+          "allAllowNestedDenied": true,
+          "interpretation": "environment nesting only; not a manager policy verdict",
+          "outerWrite": true
+        },
+        "record": "environment.json",
+        "sha256_sanitized_record": "ce5ce4c290ad8127d35db22572a51a9d1a1ff9f91e7412c02d4e062ff951cbbf"
+      }
+    ]
+  }
+}
