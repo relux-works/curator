@@ -19,6 +19,10 @@ const supervisorPID = "CURATOR_TEST_HOME_GUARD_SUPERVISOR"
 // homes. Ambient Git/HOME isolation belongs exclusively to testgitenv.
 func Supervise(fixtureChild bool) (int, bool) {
 	if os.Getenv(supervisorPID) == strconv.Itoa(os.Getppid()) {
+		if err := verifyObserver(); err != nil {
+			fmt.Fprintln(os.Stderr, "testhomeguard: live observer handoff required")
+			return 2, true
+		}
 		return 0, false
 	}
 	g, err := start(!fixtureChild)
@@ -27,20 +31,40 @@ func Supervise(fixtureChild bool) (int, bool) {
 		return 2, true
 	}
 	cmd := exec.Command(os.Args[0], os.Args[1:]...)
+	observer, err := newObserver()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "testhomeguard: cannot establish observer handoff")
+		return 2, true
+	}
+	defer observer.Close()
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
-		if key != supervisorPID {
+		if key != supervisorPID && key != observerAddress && key != observerKey {
 			cmd.Env = append(cmd.Env, entry)
 		}
 	}
 	cmd.Env = append(cmd.Env, supervisorPID+"="+strconv.Itoa(os.Getpid()))
+	cmd.Env = append(cmd.Env, observerAddress+"="+observer.Addr().String(), observerKey+"="+observer.key)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	code := 0
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, "testhomeguard: cannot start observed child")
+		return g.Finish(2), true
+	}
+	authenticated := make(chan error, 1)
+	go func() { authenticated <- observer.authenticate(cmd.Process.Pid) }()
+	stopSignals := forwardDiagnosticSignals(cmd.Process)
+	defer stopSignals()
+	if err := cmd.Wait(); err != nil {
 		code = 2
 		if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() >= 0 {
 			code = exit.ExitCode()
 		}
+	}
+	_ = observer.Close()
+	if err := <-authenticated; err != nil {
+		fmt.Fprintln(os.Stderr, "testhomeguard: child observer handoff not verified")
+		code = 2
 	}
 	return g.Finish(code), true
 }

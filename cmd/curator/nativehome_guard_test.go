@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/testgitenv"
 	"github.com/relux-works/curator/internal/testhomeguard"
 	"os"
 	"os/exec"
@@ -11,6 +12,37 @@ import (
 	"testing"
 	"time"
 )
+
+// testgitenv remains the only isolation implementation. A fixture helper's
+// selected roots are deliberate per-test overrides, restored before any test
+// or production resolver runs; Git config/agent selectors stay neutralized.
+func isolateCLIProcess(fixture bool) func() {
+	type value struct {
+		text string
+		set  bool
+	}
+	roots := map[string]value{}
+	if fixture {
+		for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+			text, set := os.LookupEnv(key)
+			roots[key] = value{text, set}
+		}
+	}
+	cleanup := testgitenv.Isolate()
+	for key, v := range roots {
+		var err error
+		if v.set {
+			err = os.Setenv(key, v.text)
+		} else {
+			err = os.Unsetenv(key)
+		}
+		if err != nil {
+			cleanup()
+			os.Exit(2)
+		}
+	}
+	return cleanup
+}
 
 // The outer supervisor checks even direct os.Exit and test-goroutine panics.
 func exitGuardedTests(code int) { os.Exit(code) }
