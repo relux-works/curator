@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,8 +30,16 @@ func init() {
 // ordinary private Go compiler/receipt path before record publication. Invalid
 // Go and post-receipt artifact replacement each refuse with the old lock and
 // routing intact. This proves preparation only, not command/PATH adoption.
+// Native execution controls are allocated only for macOS and Windows. Other
+// hosts must report unavailable execution controls without reaching the staged
+// receipt callback or changing lock/routing preimages; they cannot provide the
+// native positive compilation witness.
 func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
-	for _, mode := range []string{"success", "compiler-failure", "artifact-tamper"} {
+	modes := []string{"success", "compiler-failure", "artifact-tamper"}
+	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+		modes = []string{"unsupported-host"}
+	}
+	for _, mode := range modes {
 		t.Run(mode, func(t *testing.T) {
 			e := newEnv(t)
 			e.buildSkill("compiler", "profile-tool")
@@ -89,14 +98,22 @@ func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
 				return nil
 			}})
 			after, _ := os.ReadFile(lockPath)
-			if mode == "success" {
+			switch mode {
+			case "unsupported-host":
+				if err == nil || !strings.Contains(err.Error(), "profile_skill_compile_failed") || !strings.Contains(err.Error(), "build_execution_control_unavailable") {
+					t.Fatalf("intended unsupported-host refusal: %v", err)
+				}
+				if called || !bytes.Equal(old, after) {
+					t.Fatal("unsupported host staged an artifact or published a lock")
+				}
+			case "success":
 				if err != nil {
 					t.Fatal(err)
 				}
 				if !called || bytes.Equal(old, after) || result.Lock.SchemaVersion != 5 {
 					t.Fatal("compiled plan not published")
 				}
-			} else {
+			default:
 				want := "profile_skill_compile_failed"
 				if mode == "artifact-tamper" {
 					want = "profile_skill_plan_binding_invalid"
