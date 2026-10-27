@@ -55,14 +55,22 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
 		exitGuardedTests(runNativeBuildWorker())
 	}
-	var guardErr error
-	testNativeHomeGuard, guardErr = testhomeguard.Start()
-	if guardErr != nil {
-		fmt.Fprintln(os.Stderr, guardErr)
-		exitGuardedTests(2)
+	fixtureChild := (os.Getenv(cliHelperProcess) == "1" || os.Getenv(cliPathChild) == "1") && !testhomeguard.ControlProcess()
+	if code, parent := testhomeguard.Supervise(fixtureChild); parent {
+		os.Exit(code)
 	}
-	// Before any branch that runs tests: a CLI helper child runs git too.
-	restoreGitEnv := testgitenv.Isolate()
+	// Ambient isolation runs once. Fixture children inherit the parent's Git
+	// boundary and their deliberately supplied native HOME and provider roots.
+	restoreGitEnv := func() {}
+	if !fixtureChild {
+		previousHome, _ := os.UserHomeDir()
+		restoreGitEnv = testgitenv.Isolate()
+		if err := testhomeguard.CheckIsolation(previousHome); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			restoreGitEnv()
+			os.Exit(2)
+		}
+	}
 	if os.Getenv(cliHelperProcess) == "1" {
 		code := m.Run()
 		restoreGitEnv()

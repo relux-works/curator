@@ -53,10 +53,8 @@ func TestMain(m *testing.M) {
 	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
 		os.Exit(runMissingPinGit())
 	}
-	guard, err := testhomeguard.Start()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	if code, parent := testhomeguard.Supervise(false); parent {
+		os.Exit(code)
 	}
 	dir, err := os.MkdirTemp("", "curator-test-noconfig-*")
 	if err == nil {
@@ -64,10 +62,16 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("CURATOR_CONFIG", filepath.Join(dir, "config.json"))
 		_ = os.Setenv("CURATOR_SYSTEM_CONFIG", "")
 	}
+	previousHome, _ := os.UserHomeDir()
 	restoreGitEnv := testgitenv.Isolate()
+	if err := testhomeguard.CheckIsolation(previousHome); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		restoreGitEnv()
+		os.Exit(2)
+	}
 	code := m.Run()
 	restoreGitEnv()
-	os.Exit(guard.Finish(code))
+	os.Exit(code)
 }
 
 // gitIdentities serves local git repositories under fake canonical network
