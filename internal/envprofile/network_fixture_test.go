@@ -1,7 +1,9 @@
 package envprofile
 
 import (
+	"fmt"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testhomeguard"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,6 +53,11 @@ func TestMain(m *testing.M) {
 	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
 		os.Exit(runMissingPinGit())
 	}
+	guard, err := testhomeguard.Start()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	dir, err := os.MkdirTemp("", "curator-test-noconfig-*")
 	if err == nil {
 		// Never created: the loader maps an absent file to an empty policy.
@@ -60,7 +67,7 @@ func TestMain(m *testing.M) {
 	restoreGitEnv := testgitenv.Isolate()
 	code := m.Run()
 	restoreGitEnv()
-	os.Exit(code)
+	os.Exit(guard.Finish(code))
 }
 
 // gitIdentities serves local git repositories under fake canonical network
