@@ -90,6 +90,9 @@ func ParseSkillPlan(payload []byte) (*SkillPlan, error) {
 		return nil, fmt.Errorf("profile_skill_plan_invalid: %w", err)
 	}
 	var plan SkillPlan
+	if err := validateExactJSONKeys(payload, &plan); err != nil {
+		return nil, fmt.Errorf("profile_skill_plan_invalid: %w", err)
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&plan); err != nil {

@@ -332,11 +332,11 @@ func skillPlanDrift(home string, nodes []*closure.Node, direct []manifest.Decl) 
 		unreadable := "unreadable"
 		observed := &unreadable
 		entry := filepath.Join(home, "global", "skills", decl.Name)
-		info, err := os.Lstat(entry)
-		if os.IsNotExist(err) {
+		metadata, err := stateread.Lstat(entry)
+		if err == nil && metadata.Kind == stateread.KindAbsent {
 			state = "drift"
 			observed = nil
-		} else if err == nil && info.IsDir() {
+		} else if err == nil && metadata.Kind == stateread.KindPresent && metadata.Info.IsDir() {
 			recorded, _, readErr := marker.ReadState(entry)
 			if readErr == nil && recorded != nil {
 				state = "drift"

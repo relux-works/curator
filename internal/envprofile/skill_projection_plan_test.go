@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 type preparationFixture struct {
@@ -294,6 +295,53 @@ func TestSkillPlanLegacyWritersRefusePreparedLock(t *testing.T) {
 			after, _ := os.ReadFile(lockPath(f.home, "profile"))
 			if !bytes.Equal(old, after) {
 				t.Fatal("legacy writer changed v5 lock")
+			}
+		})
+	}
+}
+
+// PSR02: a missing leaf under a real directory is proven absence; the same
+// lookup behind a broken parent symlink stays unknown and never repairs it.
+func TestSkillPlanDriftBrokenAncestor(t *testing.T) {
+	for _, broken := range []bool{false, true} {
+		name := "real-parent"
+		if broken {
+			name = "broken-parent-link"
+		}
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			parent := filepath.Join(home, "global", "skills")
+			if err := os.MkdirAll(filepath.Dir(parent), 0700); err != nil {
+				t.Fatal(err)
+			}
+			target := filepath.Join(home, "missing")
+			if broken {
+				if err := os.Symlink(target, parent); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := os.Mkdir(parent, 0700); err != nil {
+				t.Fatal(err)
+			}
+			metadata, readErr := stateread.Lstat(filepath.Join(parent, "other"))
+			got := skillPlanDrift(home, nil, []manifest.Decl{{Name: "other"}})
+			if len(got) != 1 {
+				t.Fatalf("drift rows: %+v", got)
+			}
+			if broken {
+				if metadata.Kind != stateread.KindUnreadable || readErr == nil || !strings.Contains(readErr.Error(), stateread.DiagUnreadable) {
+					t.Fatalf("probe did not reach unreadable parent: %+v %v", metadata, readErr)
+				}
+				if got[0].State != "unknown" || got[0].Observed == nil || *got[0].Observed != "unreadable" {
+					t.Fatalf("unreadable parent reported as proven absence: %+v", got)
+				}
+				if after, err := os.Readlink(parent); err != nil || after != target {
+					t.Fatalf("parent repaired: %q %v", after, err)
+				}
+			} else if metadata.Kind != stateread.KindAbsent || readErr != nil || got[0].State != "drift" || got[0].Observed != nil {
+				t.Fatalf("valid absence control: %+v %+v %v", got, metadata, readErr)
+			}
+			if _, err := os.Lstat(target); !os.IsNotExist(err) {
+				t.Fatalf("missing target changed: %v", err)
 			}
 		})
 	}
