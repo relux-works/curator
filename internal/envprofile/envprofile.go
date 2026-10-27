@@ -971,6 +971,10 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	if oldLock != nil && oldLock.SchemaVersion == contextlock.SchemaVersion5 {
+		return Info{}, false, false, RefuseSkillPlanAdoption()
+	}
+
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, false, false, err
 	}
@@ -1237,6 +1241,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	if err != nil {
 		return Info{}, false, err
 	}
+	if oldLock != nil && oldLock.SchemaVersion == contextlock.SchemaVersion5 {
+		return Info{}, false, RefuseSkillPlanAdoption()
+	}
+
 	// Establish that the named profile's recorded evidence is readable before
 	// ensureDefault can publish any state. An unreadable lock makes update
 	// read-only: no other profile or generation is created as a side effect.
