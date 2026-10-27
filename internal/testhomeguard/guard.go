@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -171,7 +172,7 @@ func snapshot(roots []string) (map[string]identity, error) {
 				return nil, err
 			}
 		}
-		for _, name := range []string{"skills", ".agent-environment-backup"} {
+		for _, name := range []string{"skills", ".agent-environment-backup", ".agent-context"} {
 			if err := captureTree(out, root, filepath.Join(root, name), 0, &bytes); err != nil {
 				return nil, err
 			}
@@ -252,17 +253,42 @@ func captureTree(out map[string]identity, root, path string, depth int, bytes *i
 	return nil
 }
 
-// The session skill projector updates these two coordination files, not skill
-// payloads. Exclude only this exact depth; nested manifests and SKILL.md remain
-// protected, as do every file in ordinary copied skill trees and env backups.
+// The native runtime registers UUID-pair buckets using a sibling .bucket-<id>
+// regular file. Both that registration and the bucket directory remain in the
+// protected snapshot. A copied skill named synced has its own SKILL.md and
+// never acquires this exception, even if payload names mimic a registered ID.
+var runtimeBucketID = regexp.MustCompile(`^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}_[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$`)
+
 func runtimeSkillMetadata(root, path string) bool {
 	rel, err := filepath.Rel(root, path)
 	if err != nil {
 		return false
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
-	return len(parts) == 4 && parts[0] == "skills" && parts[1] == "synced" &&
-		(parts[3] == "manifest.json" || parts[3] == ".last-complete-round")
+	if len(parts) != 4 || parts[0] != "skills" || parts[1] != "synced" ||
+		!runtimeBucketID.MatchString(parts[2]) ||
+		(parts[3] != "manifest.json" && parts[3] != ".last-complete-round") {
+		return false
+	}
+	namespace := filepath.Join(root, "skills", "synced")
+	if _, err := os.Lstat(filepath.Join(namespace, "SKILL.md")); !os.IsNotExist(err) {
+		return false // Includes unreadable or linked copied-skill roots.
+	}
+	// Lstat only: a directory or symlink bearing a coordination name is payload,
+	// not a runtime leaf. Unknown/unregistered layouts stay protected too.
+	for _, name := range []string{namespace, filepath.Dir(path)} {
+		i, err := os.Lstat(name)
+		if err != nil || !i.IsDir() {
+			return false
+		}
+	}
+	for _, name := range []string{filepath.Join(namespace, ".bucket-"+parts[2]), path} {
+		i, err := os.Lstat(name)
+		if err != nil || !i.Mode().IsRegular() {
+			return false
+		}
+	}
+	return true
 }
 
 // Optional private JSONL evidence contains paths and lstat/link metadata only.

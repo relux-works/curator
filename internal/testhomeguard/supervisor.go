@@ -47,22 +47,39 @@ func Supervise(fixtureChild bool) (int, bool) {
 	cmd.Env = append(cmd.Env, observerAddress+"="+observer.Addr().String(), observerKey+"="+observer.key)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	code := 0
-	if err := cmd.Start(); err != nil {
+	terminate, closeDomain, err := launchObserved(cmd)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "testhomeguard: cannot start observed child")
 		return g.Finish(2), true
 	}
+	defer closeDomain()
 	authenticated := make(chan error, 1)
 	go func() { authenticated <- observer.authenticate(cmd.Process.Pid) }()
 	stopSignals := forwardDiagnosticSignals(cmd.Process)
 	defer stopSignals()
-	if err := cmd.Wait(); err != nil {
+	waited := make(chan error, 1)
+	go func() { waited <- cmd.Wait() }()
+	var waitErr, authErr error
+	select {
+	case authErr = <-authenticated:
+		if authErr != nil {
+			_ = terminate() // Own process group/job; never the caller's group.
+		}
+		waitErr = <-waited
+	case waitErr = <-waited:
+		_ = observer.Close() // Wake an unconnected listener after an early exit.
+		authErr = <-authenticated
+		if authErr != nil {
+			_ = terminate() // An early unauthenticated exit may leave descendants.
+		}
+	}
+	if waitErr != nil {
 		code = 2
-		if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() >= 0 {
+		if exit, ok := waitErr.(*exec.ExitError); ok && exit.ExitCode() >= 0 {
 			code = exit.ExitCode()
 		}
 	}
-	_ = observer.Close()
-	if err := <-authenticated; err != nil {
+	if authErr != nil {
 		fmt.Fprintln(os.Stderr, "testhomeguard: child observer handoff not verified")
 		code = 2
 	}

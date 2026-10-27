@@ -25,7 +25,8 @@ const handoffTimeout = 5 * time.Second
 // Capabilities and wire messages are never printed or written to diagnostics.
 type liveObserver struct {
 	*net.TCPListener
-	key string
+	key      string
+	deadline time.Time
 }
 
 func newObserver() (*liveObserver, error) {
@@ -33,8 +34,9 @@ func newObserver() (*liveObserver, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = l.SetDeadline(time.Now().Add(handoffTimeout))
-	return &liveObserver{TCPListener: l, key: randomChallenge(32)}, nil
+	deadline := time.Now().Add(handoffTimeout)
+	_ = l.SetDeadline(deadline)
+	return &liveObserver{TCPListener: l, key: randomChallenge(32), deadline: deadline}, nil
 }
 
 func randomChallenge(n int) string {
@@ -52,7 +54,11 @@ func proof(key, role, tuple string) string {
 }
 
 func readHandoff(c net.Conn) ([]string, error) {
-	_ = c.SetDeadline(time.Now().Add(handoffTimeout))
+	return readHandoffUntil(c, time.Now().Add(handoffTimeout))
+}
+
+func readHandoffUntil(c net.Conn, deadline time.Time) ([]string, error) {
+	_ = c.SetDeadline(deadline)
 	s, err := bufio.NewReader(io.LimitReader(c, 512)).ReadString('\n')
 	if err != nil {
 		return nil, err
@@ -66,7 +72,7 @@ func (o *liveObserver) authenticate(childPID int) error {
 		return err
 	}
 	defer func() { _ = c.Close() }()
-	parts, err := readHandoff(c)
+	parts, err := readHandoffUntil(c, o.deadline)
 	if err != nil || len(parts) != 3 || parts[0] != strconv.Itoa(childPID) || len(parts[1]) != 32 {
 		return fmt.Errorf("invalid handoff")
 	}
