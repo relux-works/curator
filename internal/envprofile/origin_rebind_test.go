@@ -46,6 +46,31 @@ func TestProvisioningOriginManagedGroupRebind(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
+			captures := map[string][]byte{envregistry.CodexCLI: raw, envregistry.Pi: piRaw}
+			// Add the ambient/keychain and XDG-child adapters to the same actual
+			// lock transition. Single-home Muse success alone cannot qualify its
+			// inactive rebind or preserve its distinct runtime-directory layout.
+			for _, id := range []string{envregistry.ClaudeCode, envregistry.OpenCode, envregistry.Muse} {
+				if id == envregistry.Muse {
+					native := filepath.Join(fx.xdg, "muse")
+					if e := os.MkdirAll(native, 0700); e != nil {
+						t.Fatal(e)
+					}
+					if e := os.WriteFile(filepath.Join(native, "auth.json"), nil, 0600); e != nil {
+						t.Fatal(e)
+					}
+				}
+				request := fx.request(id)
+				request.Repair = true
+				if result, e := Resolve(request); e != nil || result == nil || len(result.Document) == 0 {
+					t.Fatalf("initial %s owner for full group: %v", id, e)
+				}
+				capture, e := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, id), envorigin.Name))
+				if e != nil {
+					t.Fatal(e)
+				}
+				captures[id] = capture
+			}
 			if e := SetCurrent(fx.home, "independent-fixture-selection"); e != nil {
 				t.Fatal(e)
 			}
@@ -87,11 +112,8 @@ func TestProvisioningOriginManagedGroupRebind(t *testing.T) {
 				if e != nil {
 					t.Fatalf("actual group publication: %v", e)
 				}
-				for _, item := range []struct {
-					id      string
-					capture []byte
-				}{{envregistry.CodexCLI, raw}, {envregistry.Pi, piRaw}} {
-					home := ManagedHomeDir(fx.home, fx.profile, item.id)
+				for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.OpenCode, envregistry.Pi, envregistry.Muse} {
+					home := ManagedHomeDir(fx.home, fx.profile, id)
 					marker, e := envmarker.Read(home)
 					if e != nil {
 						t.Fatal(e)
@@ -100,11 +122,11 @@ func TestProvisioningOriginManagedGroupRebind(t *testing.T) {
 					if marker.Profile.LockSHA256 != strings.TrimPrefix(hash, "sha256:") {
 						t.Fatal("inactive adapter marker was not rebound")
 					}
-					_, after, e := envorigin.Read(fx.home, envorigin.Binding{Profile: fx.profile, LockSHA256: "sha256:" + strings.TrimPrefix(hash, "sha256:"), ManagedTarget: home}, item.id)
+					_, after, e := envorigin.Read(fx.home, envorigin.Binding{Profile: fx.profile, LockSHA256: "sha256:" + strings.TrimPrefix(hash, "sha256:"), ManagedTarget: home}, id)
 					if e != nil {
 						t.Fatal(e)
 					}
-					a, _ := envorigin.CaptureFacts(item.capture)
+					a, _ := envorigin.CaptureFacts(captures[id])
 					b, _ := envorigin.CaptureFacts(after)
 					if !bytes.Equal(a, b) {
 						t.Fatal("group rebind recaptured origin")
