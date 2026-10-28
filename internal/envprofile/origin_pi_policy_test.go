@@ -34,7 +34,9 @@ func piOriginRequest(t *testing.T, live, isolated bool, label string) (*managedF
 		req.Machine.Isolation = map[string]map[string]string{fx.profile: {"pi": envregistry.IsolationIsolated}}
 	}
 	req.originAccountLookup = func() (envorigin.Account, error) {
-		return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: anchor}, nil
+		identity, err := envorigin.LookupIdentity()
+		identity.Home = anchor
+		return identity, err
 	}
 	return fx, req, agent
 }

@@ -329,14 +329,14 @@ func Current(home string) (string, error) {
 }
 
 // SetCurrent records the machine current profile.
-func SetCurrent(home, name string) error {
+func SetCurrent(home, name string) (resultErr error) {
 	op, err := beginOperationValidated(home, func() error {
 		return envauthority.SelectedLifecycle(home, name)
 	})
 	if err != nil {
 		return err
 	}
-	defer op.close()
+	defer finishPublicationCleanup(&resultErr, op.close)
 	return op.publish(map[string][]byte{CurrentFile(home): []byte(name + "\n")})
 }
 
@@ -375,7 +375,7 @@ func ScopedCurrents(home string) (map[string]string, error) {
 }
 
 // SetScoped records (or with clear=true, drops) a scope's current profile.
-func SetScoped(home, scope, name string, clearScope bool) error {
+func SetScoped(home, scope, name string, clearScope bool) (resultErr error) {
 	// Scope keys name direct records, never paths into another namespace.
 	if scope == "" || scope == "." || scope == ".." || strings.ContainsAny(scope, "/\\") {
 		return fmt.Errorf("%s: invalid scope key", DiagSourceInvalid)
@@ -389,7 +389,7 @@ func SetScoped(home, scope, name string, clearScope bool) error {
 	if err != nil {
 		return err
 	}
-	defer op.close()
+	defer finishPublicationCleanup(&resultErr, op.close)
 	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
 	files := map[string][]byte{}
 	if !clearScope {
@@ -1083,17 +1083,17 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	if err := op.publish(map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}); err != nil {
+	activate, err := reinstallActivation(home, name, options.Use)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	activation, err := publishUpdatedScopes(op, home, name, source, result.Lock, map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}, activate, policy)
+	if err != nil {
 		return Info{}, false, false, err
 	}
 	hash := contextlock.HashBytes(canonical)
-	if activate, err := reinstallActivation(home, name, options.Use); err != nil {
-		return Info{}, false, false, err
-	} else if activate {
-		return activateReinstall(op, home, name, source, result.Lock, hash, warnings, surfacing, policy)
-	}
-	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
-		return Info{}, false, false, err
+	if activate {
+		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: true, Warnings: warnings, Surfacing: surfacing, Activation: activation}, true, true, nil
 	}
 	machine, err := Current(home)
 	if err != nil {
@@ -1120,15 +1120,10 @@ func reinstallActivation(home, name string, use bool) (bool, error) {
 	return use && machine != name, nil
 }
 
-// activateReinstall runs the install row's activation for a reinstall: the
-// §9.2 machine-scope switch through useLocked — with the operation's
-// takeover flag and under the locked require_current_profile gate — then
-// the resync of every scoped current already on the profile. A partial
-// switch leaves the recorded current unchanged and returns the switch
-// error, exactly as a fresh install does; the lock work (published above
-// when the pin moved) still stands.
+// activateReinstall enlists unchanged-lock activation and every existing scope
+// in one group. A later scope refusal cannot leave an earlier scope committed.
 func activateReinstall(op *operation, home, name string, source Source, lock *contextlock.Lock, hash string, warnings, surfacing []string, policy Policy) (Info, bool, bool, error) {
-	results, switchErr := useLocked(op, home, name, "", "", false, policy)
+	results, switchErr := publishUpdatedScopes(op, home, name, source, lock, map[string][]byte{}, true, policy)
 	machine, err := Current(home)
 	if err != nil {
 		return Info{}, false, true, err
@@ -1137,14 +1132,6 @@ func activateReinstall(op *operation, home, name string, source Source, lock *co
 	if switchErr != nil {
 		return info, false, true, switchErr
 	}
-	if err := resyncScopedScopes(op, home, name, policy); err != nil {
-		return info, false, true, err
-	}
-	machine, err = Current(home)
-	if err != nil {
-		return Info{}, false, true, err
-	}
-	info.Current = machine == name
 	return info, true, true, nil
 }
 
@@ -1392,13 +1379,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	// The old lock is retained beside the new one until the next garbage
 	// collection so that a stale managed home can still be identified
 	// (environments §9.2).
-	if err := op.publish(map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}); err != nil {
+	if _, err := publishUpdatedScopes(op, home, name, source, result.Lock, map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}, false, policy); err != nil {
 		return Info{}, false, err
 	}
 	hash := contextlock.HashBytes(canonical)
-	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
-		return Info{}, false, err
-	}
 	machine, err := Current(home)
 	if err != nil {
 		return Info{}, false, err
@@ -2182,41 +2166,4 @@ func loadMachinePolicy() (Policy, error) {
 		return Policy{}, fmt.Errorf("%s: read the machine configuration: %v", DiagSourceInvalid, err)
 	}
 	return PolicyFromConfig(cfg), nil
-}
-
-// resyncCurrentScopes re-materializes every scope whose current profile is
-// name after its lock moved, under the held operation lock.
-func resyncCurrentScopes(op *operation, home, name string, policy Policy) error {
-	machine, err := Current(home)
-	if err != nil {
-		return err
-	}
-	if machine == name {
-		if _, err := useLocked(op, home, name, "", "", false, policy); err != nil {
-			return err
-		}
-	}
-	return resyncScopedScopes(op, home, name, policy)
-}
-
-// resyncScopedScopes re-materializes every scoped current already on profile
-// name, under the held operation lock. It is the scoped half of
-// resyncCurrentScopes, split out so a reinstall activation — which switches
-// the machine scope itself through useLocked — still converges the scoped
-// currents without re-materializing the machine scope a second time.
-func resyncScopedScopes(op *operation, home, name string, policy Policy) error {
-	scoped, err := ScopedCurrents(home)
-	if err != nil {
-		return err
-	}
-	for scope, current := range scoped {
-		if current != name {
-			continue
-		}
-		environment, target := splitScope(scope)
-		if _, err := useLocked(op, home, name, environment, target, false, policy); err != nil {
-			return err
-		}
-	}
-	return nil
 }

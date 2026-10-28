@@ -24,7 +24,11 @@ func TestProvisioningOriginRequiresWholeUnit(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer op.close()
+			defer func() {
+				if err := op.close(); err != nil {
+					t.Error(err)
+				}
+			}()
 			e = op.publish(map[string][]byte{filepath.Join(home, leaf): []byte("forbidden direct publication")})
 			if e == nil || !strings.Contains(e.Error(), envorigin.DiagInvalid) {
 				t.Fatalf("generic publisher bypassed whole-unit admission: %v", e)
@@ -61,16 +65,26 @@ func TestProvisioningOriginRejectsPartialLockUnit(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer os.Remove(file.Name())
+	defer func() {
+		if err := os.Remove(file.Name()); err != nil {
+			t.Error(err)
+		}
+	}()
 	if _, e := file.Write(raw); e != nil {
 		t.Fatal(e)
 	}
-	file.Close()
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
 	op, e := beginOperation(fx.home)
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	path := lockPath(fx.home, fx.profile)
 	digest, e := transaction.DigestPath(path)
 	if e != nil {
@@ -99,7 +113,11 @@ func TestProvisioningOriginUnchangedLockPublication(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if e = op.publish(map[string][]byte{lockPath(fx.home, fx.profile): raw}); e != nil {
 		t.Fatal(e)
 	}

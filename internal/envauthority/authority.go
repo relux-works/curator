@@ -41,6 +41,12 @@ func validate(home string, intent *envunit.Unit) error {
 	if err != nil {
 		return err
 	}
+	// A disjoint legacy quarantine is available only to one fully bound adopt
+	// intent (or its verified durable journal), never a generic continuation.
+	adoptIntent, err := adoptionQuarantine(home, intent, pending)
+	if err != nil {
+		return err
+	}
 	lifecycle, err := inspectLifecycle(home, pending)
 	if err != nil {
 		return err
@@ -116,7 +122,7 @@ func validate(home string, intent *envunit.Unit) error {
 			}
 			if !lifecycle.retained[target] {
 				if _, isPending := pending.Homes[target]; !isPending {
-					if err := validateRecorded(home, profile.Name(), adapter.ID, target, marker, intent); err != nil {
+					if err := validateRecorded(home, profile.Name(), adapter.ID, target, marker, adoptIntent); err != nil {
 						return err
 					}
 				}

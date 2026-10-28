@@ -243,7 +243,11 @@ func TestProvisioningOriginGlobalRollbackConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
+	defer func() {
+		if err := lock.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	planted := errors.New("planted joined publication failure")
 	path := filepath.Join(fx.native["codex_cli"], envmarker.Name)
 	saved := newOperationEngine

@@ -142,7 +142,7 @@ func UseWithPolicy(home, name, environment, target string, clearScope bool, poli
 }
 
 // useLocked switches under the held operation lock.
-func useLocked(op *operation, home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
+func useLocked(op *operation, home, name, environment, target string, clearScope bool, policy Policy) (_ []EntryResult, resultErr error) {
 	profileToValidate := name
 	if clearScope {
 		current, err := Current(home)
@@ -248,7 +248,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 	}
 	g := newHomePublicationGroup()
-	defer g.close()
+	defer finishPublicationCleanup(&resultErr, g.close)
 	op.publicationGroup = g
 	defer func() { op.publicationGroup = nil }()
 	results, err := materializeScope(op, home, effective, environment, policy)
@@ -392,7 +392,7 @@ func Sync(home string) ([]EntryResult, error) {
 
 // SyncWithPolicy syncs under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
-func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
+func SyncWithPolicy(home string, policy Policy) (_ []EntryResult, resultErr error) {
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 		machine = DefaultProfile
 	}
 	g := newHomePublicationGroup()
-	defer g.close()
+	defer finishPublicationCleanup(&resultErr, g.close)
 	op.publicationGroup = g
 	defer func() { op.publicationGroup = nil }()
 	var results []EntryResult
@@ -652,7 +652,17 @@ func preflightInPlaceObserved(home, profile, environment string, policy Policy, 
 				}
 			}
 			if !policy.Takeover {
-				image, err := envunit.ObserveTarget(full, "owned-bytes")
+				class := "owned-bytes"
+				if metadata.Info.IsDir() {
+					class = "owned-tree"
+				}
+				// A directory conflict proof may inspect only the exact skill leaf.
+				// Neither a marker label nor a directory at AGENTS.md grants tree custody.
+				scope := envunit.Unit{Native: []envunit.Native{{Adapter: adapter.ID, Root: native}}}
+				if err := scope.ValidateReadScope(class, full); err != nil {
+					return err
+				}
+				image, err := envunit.ObserveTarget(full, class)
 				if err != nil {
 					return err
 				}
@@ -887,182 +897,6 @@ func removeManagedTree(root, rel string) error {
 		return err
 	}
 	return nil
-}
-
-// openBackup copies every file the operation will replace into the next
-// versioned generation and prunes beyond the retention count. A next
-// generation that already exists fails with environment_backup_exists.
-func openBackup(root, homeRel string, want map[string]bool) (int, error) {
-	return openBackupWithDirectoryRead(root, homeRel, want, nil)
-}
-
-func openBackupWithDirectoryRead(root, homeRel string, want map[string]bool, readDirectory func(string) (stateread.Directory, error)) (int, error) {
-	if readDirectory == nil {
-		readDirectory = stateread.ReadDir
-	}
-	baseRel := managedJoin(homeRel, ".agent-environment-backup")
-	base, err := managedDirectory(root, baseRel)
-	if err != nil {
-		return 0, err
-	}
-	listing, err := readDirectory(base)
-	highest := 0
-	if err != nil {
-		return 0, err
-	}
-	if listing.Kind == stateread.KindAbsent {
-		return 0, stateread.AbsentError(base)
-	}
-	for _, entry := range listing.Entries {
-		var n int
-		if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil && n > highest {
-			highest = n
-		}
-	}
-	next := highest + 1
-	generationRel := managedJoin(baseRel, fmt.Sprintf("%d", next))
-	generation := filepath.Join(base, fmt.Sprintf("%d", next))
-	generationState, err := stateread.Lstat(generation)
-	if err != nil {
-		return 0, err
-	}
-	if generationState.Kind == stateread.KindPresent && generationState.Info.Mode()&os.ModeSymlink != 0 {
-		return 0, fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, generation)
-	} else if generationState.Kind == stateread.KindPresent {
-		return 0, fmt.Errorf("%s: generation %d exists", DiagBackupExists, next)
-	}
-	if _, err := managedDirectory(root, generationRel); err != nil {
-		return 0, err
-	}
-	paths := make([]string, 0, len(want))
-	for path := range want {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	for _, path := range paths {
-		sourceRel := managedJoin(homeRel, path)
-		full, err := managedPath(root, sourceRel, false)
-		if err != nil {
-			_ = removeManagedTree(root, generationRel)
-			return 0, err
-		}
-		state, err := stateread.Lstat(full)
-		if err != nil {
-			_ = removeManagedTree(root, generationRel)
-			return 0, err
-		}
-		if state.Kind == stateread.KindAbsent {
-			continue
-		}
-		targetRel := managedJoin(generationRel, path)
-		if state.Kind != stateread.KindPresent || state.Info == nil {
-			_ = removeManagedTree(root, generationRel)
-			return 0, fmt.Errorf("%s: backup source %s is unreadable", DiagUnmanagedConflict, path)
-		}
-		info := state.Info
-		if !info.Mode().IsRegular() && !info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
-			continue
-		}
-		if err := copyManagedEntry(root, sourceRel, targetRel); err != nil {
-			_ = removeManagedTree(root, generationRel)
-			return 0, err
-		}
-	}
-	pruneBackups(base, highest+1)
-	return next, nil
-}
-
-// copyManagedEntry backs up a surface without following links. Each source
-// read and destination write is confined by managedPath; files and links are
-// published through the atomic managed writers.
-func copyManagedEntry(root, sourceRel, targetRel string) error {
-	source, err := managedPath(root, sourceRel, false)
-	if err != nil {
-		return err
-	}
-	state, err := stateread.Lstat(source)
-	if err != nil {
-		return err
-	}
-	if state.Kind == stateread.KindAbsent {
-		return nil
-	}
-	if state.Kind != stateread.KindPresent || state.Info == nil {
-		return fmt.Errorf("%s: backup source %s is unreadable", DiagUnmanagedConflict, sourceRel)
-	}
-	info := state.Info
-	if info.Mode()&os.ModeSymlink != 0 {
-		link, err := stateread.Readlink(source)
-		if err != nil || link.Kind != stateread.KindPresent {
-			return fmt.Errorf("%s: backup symlink %s cannot be read: %v", DiagUnmanagedConflict, sourceRel, err)
-		}
-		return atomicManagedLink(root, targetRel, link.Target)
-	}
-	if info.IsDir() {
-		if _, err := managedDirectory(root, targetRel); err != nil {
-			return err
-		}
-		listing, err := stateread.ReadDir(source)
-		if err != nil || listing.Kind != stateread.KindPresent {
-			return fmt.Errorf("%s: backup directory %s cannot be read: %v", DiagUnmanagedConflict, sourceRel, err)
-		}
-		for _, entry := range listing.Entries {
-			if err := copyManagedEntry(root, managedJoin(sourceRel, entry.Name()), managedJoin(targetRel, entry.Name())); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	if !info.Mode().IsRegular() {
-		return nil
-	}
-	payload, present, err := readManagedRegular(root, sourceRel)
-	if err == nil && !present {
-		err = stateread.AbsentError(source)
-	}
-	if err != nil {
-		return err
-	}
-	return atomicManagedFile(root, targetRel, payload, info.Mode().Perm())
-}
-
-// pruneBackups removes the oldest generations beyond the retention count.
-// Backups are otherwise never removed: never modified, never collected.
-func pruneBackups(base string, newest int) {
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	var generations []int
-	for _, entry := range entries {
-		var n int
-		if _, err := fmt.Sscanf(entry.Name(), "%d", &n); err == nil {
-			generations = append(generations, n)
-		}
-	}
-	sort.Ints(generations)
-	for len(generations) > BackupRetention {
-		oldest := generations[0]
-		generations = generations[1:]
-		_ = os.RemoveAll(filepath.Join(base, fmt.Sprintf("%d", oldest)))
-	}
-	_ = newest
-}
-
-// writeStoreDocument stores the rendered document for link targets.
-func writeStoreDocument(home, profile string, adapter Adapter, document []byte) (string, error) {
-	root := ProfilesDir(home)
-	rel := filepath.ToSlash(filepath.Join(profile, "rendered", adapter.ID, filepath.FromSlash(adapter.Target)))
-	path := filepath.Join(root, filepath.FromSlash(rel))
-	if err := atomicManagedFile(root, rel, document, 0o644); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-// replaceLink atomically replaces a managed surface entry with its store link.
-func replaceLink(native, rel, storeFile string) error {
-	return atomicManagedLink(native, rel, storeFile)
 }
 
 // splitScope splits a scope key into environment and target.

@@ -76,7 +76,7 @@ func ValidateUnit(j *Journal, manager string) error {
 			continue
 		}
 		image, ok := byPath[target.LivePath]
-		if !ok || image.Class != target.Class || target.Identifier != target.LivePath || (target.Kind != KindEntry && !(target.Kind == KindBytes && (target.PrivateFile || u.LegacyOwns(target.Class, target.LivePath)))) || target.ExpectedGeneration != "" || target.GenerationPath != "" {
+		if !ok || image.Class != target.Class || target.Identifier != target.LivePath || (target.Kind != KindEntry && (target.Kind != KindBytes || (!target.PrivateFile && !u.LegacyOwns(target.Class, target.LivePath)))) || target.ExpectedGeneration != "" || target.GenerationPath != "" {
 			return unitError("file target binding differs")
 		}
 		if target.PreimageDigest == "" || (image.Before.Kind == "absent") != (target.PreimageDigest == "absent") || (image.After.Kind == "absent") != (target.DesiredDigest == "absent") {

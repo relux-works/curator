@@ -16,12 +16,14 @@ func TestProvisioningOriginAccountPolicy(t *testing.T) {
 	if err := os.Mkdir(anchor, 0700); err != nil {
 		t.Fatal(err)
 	}
-	real, effective, err := processAccountIdentity()
+	realUID, effective, err := processAccountIdentity()
 	if err != nil {
 		t.Fatal(err)
 	}
 	account := func() (Account, error) {
-		return Account{UID: effective, RealUID: real, EffectiveUID: effective, Home: anchor}, nil
+		a, err := LookupIdentity()
+		a.Home = anchor
+		return a, err
 	}
 	cases := []struct{ id, key, selector, want, defaultWant string }{
 		{"codex_cli", "CODEX_HOME", filepath.Join(root, "a"), filepath.Join(root, "a"), filepath.Join(anchor, ".codex")},
@@ -40,12 +42,13 @@ func TestProvisioningOriginAccountPolicy(t *testing.T) {
 			}
 			for _, state := range []string{"absent", "present-empty", "managed"} {
 				t.Run(state, func(t *testing.T) {
-					if state == "absent" {
+					switch state {
+					case "absent":
 						t.Setenv(tc.key, "unused")
 						_ = os.Unsetenv(tc.key)
-					} else if state == "present-empty" {
+					case "present-empty":
 						t.Setenv(tc.key, "")
-					} else {
+					default:
 						t.Setenv(tc.key, ManagedTarget(manager, "other", tc.id))
 					}
 					r, err := Select(manager, b, tc.id, account)
@@ -68,7 +71,7 @@ func TestProvisioningOriginAccountPolicy(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(root, "poison"))
 	b := Binding{Profile: "p", LockSHA256: "sha256:" + strings.Repeat("a", 64), ManagedTarget: ManagedTarget(manager, "p", "codex_cli")}
 	bad := func() (Account, error) {
-		return Account{UID: effective, RealUID: real + 1, EffectiveUID: effective, Home: anchor}, nil
+		return Account{UID: effective, RealUID: realUID + 1, EffectiveUID: effective, Home: anchor}, nil
 	}
 	if _, err := Select(manager, b, "codex_cli", bad); err == nil {
 		t.Fatal("ambiguous account identity accepted")

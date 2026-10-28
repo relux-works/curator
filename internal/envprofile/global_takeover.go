@@ -46,7 +46,7 @@ func observeRetainedOrigin(req *ResolveRequest, marker *envmarker.Marker, retain
 // A sync/use takeover is one complete L1 convergence, never an L2 retry. The
 // receipt's complete native set controls its own writes; today's selector does
 // not silently move a retained in-place target to another account/home.
-func continueRetainedGlobals(op *operation, home, selected string, policy Policy, activation *scopePublication) ([]EntryResult, bool, error) {
+func continueRetainedGlobals(op *operation, home, selected string, policy Policy, activation *scopePublication) (_ []EntryResult, _ bool, resultErr error) {
 	identity, err := envunit.ObserveManager(home)
 	if err != nil {
 		return nil, false, err
@@ -86,7 +86,7 @@ func continueRetainedGlobals(op *operation, home, selected string, policy Policy
 	op.retained = retained
 	defer func() { op.retained = nil }()
 	g := newHomePublicationGroup()
-	defer g.close()
+	defer finishPublicationCleanup(&resultErr, g.close)
 	op.publicationGroup = g
 	defer func() { op.publicationGroup = nil }()
 	files := map[string][]byte{}

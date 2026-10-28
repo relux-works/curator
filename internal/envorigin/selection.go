@@ -12,7 +12,10 @@ import (
 type Account struct {
 	UID, RealUID, EffectiveUID uint64
 	Home                       string
+	SID                        string
 }
+
+// AccountLookup supplies raw account evidence, never a final authority decision.
 type AccountLookup func() (Account, error)
 
 // Select is initial provisioning only. Existing homes must use Read and never
@@ -43,12 +46,12 @@ type provisioningSelection struct {
 // selectProvisioningNative applies account/physical policy only for initial credential-origin discovery.
 // A raw-account seam supplies no path selection or final authority verdict.
 func selectProvisioningNative(manager, adapter string, lookup AccountLookup) (*provisioningSelection, error) {
-	real, effective, err := processAccountIdentity()
+	realUID, effective, err := processAccountIdentity()
 	if err != nil {
 		return nil, err
 	}
-	if real != effective {
-		return nil, invalid("ambiguous real/effective process identity")
+	if realUID != effective {
+		return nil, invalid("ambiguous realUID/effective process identity")
 	}
 	if lookup == nil {
 		lookup = LookupAccount
@@ -57,7 +60,7 @@ func selectProvisioningNative(manager, adapter string, lookup AccountLookup) (*p
 	if err != nil {
 		return nil, invalid("trusted account lookup unavailable: %v", err)
 	}
-	if a.UID != effective || a.RealUID != real || a.EffectiveUID != effective || !cleanAbsolute(a.Home) {
+	if !accountMatchesProcess(a, realUID, effective) || !cleanAbsolute(a.Home) {
 		return nil, invalid("ambiguous account identity or invalid account home")
 	}
 	if err := ValidateExternal(manager, a.Home); err != nil {

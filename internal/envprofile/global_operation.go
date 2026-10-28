@@ -1,7 +1,6 @@
 package envprofile
 
 import (
-	"errors"
 	"fmt"
 	"github.com/relux-works/curator/internal/envlifecycle"
 	"github.com/relux-works/curator/internal/transaction"
@@ -20,12 +19,4 @@ func (lock borrowedGlobalLock) AssertCurrent() error {
 type globalInPlaceConflict struct {
 	error
 	capture envlifecycle.ConflictReceipt
-}
-
-func globalInPlaceError(err error) error {
-	var conflict *globalInPlaceConflict
-	if errors.As(err, &conflict) {
-		return conflict
-	}
-	return err
 }

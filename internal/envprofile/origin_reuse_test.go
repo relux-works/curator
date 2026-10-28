@@ -105,7 +105,9 @@ func TestProvisioningOriginPurgedNameReuse(t *testing.T) {
 				if _, err := os.Lstat(target); !os.IsNotExist(err) {
 					t.Fatalf("mutation preceded fresh capture: %v", err)
 				}
-				return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: b}, nil
+				identity, err := envorigin.LookupIdentity()
+				identity.Home = b
+				return identity, err
 			}
 			result, err := Resolve(req)
 			if err != nil || result == nil || len(result.Document) == 0 || captures != 1 {

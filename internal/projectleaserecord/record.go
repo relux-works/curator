@@ -33,6 +33,8 @@ var ErrPendingRecovery = errors.New("pending project lease transaction; recover 
 
 // Busy identifies a project view retained by a live or uncertain lease.
 const Busy = "project_view_busy"
+
+// MaxRecord bounds the private project lease record decoder.
 const MaxRecord = 1 << 20
 
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
@@ -150,12 +152,16 @@ func tagged(ref, tag string) bool {
 	return strings.HasPrefix(ref, tag+":") && len(ref) <= 96 && idPattern.MatchString(strings.TrimPrefix(ref, tag+":"))
 }
 func validEnvironment(s string) bool { return s == "claude_code" || s == "codex_cli" || s == "muse" }
+
+// Validate checks the exact project lease binding fields.
 func (b Binding) Validate() error {
 	if b.Kind != "project-lease/1" || !idPattern.MatchString(b.LeaseID) || !tagged(b.ContextRef, "composition") || !hexPattern.MatchString(b.ContextSHA256) || !idPattern.MatchString(b.CheckoutID) || !validEnvironment(b.Environment) || !tagged(b.HomeRef, "home") || !tagged(b.OwnerRef, "principal") || !tagged(b.SessionRef, "session") || b.Generation < 1 || b.Generation > protocoljson.MaxSafeInteger {
 		return fmt.Errorf("invalid project-lease/1 binding")
 	}
 	return nil
 }
+
+// Validate checks the closed composition identity and members.
 func (c Composition) Validate() error {
 	if !tagged(c.Ref, "composition") || !hexPattern.MatchString(c.SHA256) || !idPattern.MatchString(c.CheckoutID) || !identifiers.Valid(c.Profile) || !validEnvironment(c.Environment) || !tagged(c.HomeRef, "home") || c.BuildKeys == nil || c.RuntimeEntries == nil || c.Generated == nil {
 		return fmt.Errorf("invalid protected composition projection")
@@ -200,9 +206,13 @@ func (c Composition) Validate() error {
 	}
 	return nil
 }
+
+// HomeRelative returns a validated manager-relative lease path.
 func HomeRelative(c Composition) string {
 	return filepath.Join("environments", "project-views", c.CheckoutID, c.Profile, c.Environment)
 }
+
+// Canonical encodes a stable project lease record.
 func Canonical(v any) ([]byte, error) {
 	raw, err := json.Marshal(v)
 	if err != nil {
@@ -217,6 +227,8 @@ func Canonical(v any) ([]byte, error) {
 	}
 	return protocoljson.MarshalCanonical(object)
 }
+
+// Digest returns the untagged SHA256 identity of record bytes.
 func Digest(raw []byte) string { h := sha256.Sum256(raw); return hex.EncodeToString(h[:]) }
 
 // ParseBinding reads an exact, bounded CCJ-1 binding before authority lookup.
@@ -240,26 +252,33 @@ func ParseBinding(raw []byte) (Binding, error) {
 	return b, nil
 }
 
+// FoldPath normalizes path spelling for namespace comparisons.
 func FoldPath(path string) string {
 	return cases.Fold().String(norm.NFC.String(filepath.ToSlash(path)))
 }
 
+// Entry binds a project lease identity to its installed authority.
 type Entry struct {
 	Binding           Binding     `json:"binding"`
 	Composition       Composition `json:"composition"`
 	State             Phase       `json:"state"`
 	ProcessGeneration string      `json:"process_generation"`
 }
+
+// View describes the materialized project composition.
 type View struct {
 	Composition Composition        `json:"composition"`
 	Surfaces    map[string]Surface `json:"surfaces"`
 }
+
+// Ledger records project leases and their materialized views.
 type Ledger struct {
 	Kind   string           `json:"kind"`
 	Leases map[string]Entry `json:"leases"`
 	Views  map[string]View  `json:"views"`
 }
 
+// DecodeLedger decodes the bounded closed project lease ledger.
 func DecodeLedger(raw []byte) (*Ledger, error) {
 	if len(raw) > MaxRecord {
 		return nil, fmt.Errorf("project lease state exceeds record limit")
@@ -308,11 +327,19 @@ func matches(b Binding, c Composition) bool {
 	return b.ContextRef == c.Ref && b.ContextSHA256 == c.SHA256 && b.CheckoutID == c.CheckoutID && b.Environment == c.Environment && b.HomeRef == c.HomeRef
 }
 
+// SafeSurface validates a projection path without granting credential custody.
 func SafeSurface(path string) bool {
 	return identifiers.PortablePath(path) && !strings.ContainsAny(path, "*?[]") && len(path) <= 240 && len(strings.Split(path, "/")) <= 32
 }
 
-func ValidID(s string) bool          { return idPattern.MatchString(s) }
-func ValidHex(s string) bool         { return hexPattern.MatchString(s) }
-func Tagged(s, tag string) bool      { return tagged(s, tag) }
+// ValidID checks the bounded identifier grammar.
+func ValidID(s string) bool { return idPattern.MatchString(s) }
+
+// ValidHex checks an untagged SHA256 spelling.
+func ValidHex(s string) bool { return hexPattern.MatchString(s) }
+
+// Tagged checks a bounded reference with the required tag.
+func Tagged(s, tag string) bool { return tagged(s, tag) }
+
+// ValidEnvironment checks a registered environment identifier.
 func ValidEnvironment(s string) bool { return validEnvironment(s) }

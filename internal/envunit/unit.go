@@ -400,7 +400,7 @@ func (u *Unit) Validate() error {
 		}
 		targets[t.Path] = t
 		switch t.Class {
-		case "parent", "home-directory", "owned-bytes", "owned-tree", "marker", "origin", "credential-entry", "activation", "profile-record", "installed-profile", "quarantine", BackupQuarantine, "native-marker", "reference-record":
+		case "profile-mcp", "parent", "home-directory", "owned-bytes", "owned-tree", "marker", "origin", "credential-entry", "activation", "profile-record", "installed-profile", "quarantine", BackupQuarantine, "native-marker", "reference-record":
 		default:
 			if !u.LegacyOwns(t.Class, t.Path) {
 				return invalid("unknown target class")

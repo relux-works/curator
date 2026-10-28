@@ -34,7 +34,9 @@ func TestProvisioningOriginFirstMutationJournaled(t *testing.T) {
 				if _, err := os.Lstat(EnvRoot(fx.home)); !os.IsNotExist(err) {
 					t.Fatalf("managed parent appeared before capture: %v", err)
 				}
-				return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: anchor}, nil
+				identity, err := envorigin.LookupIdentity()
+				identity.Home = anchor
+				return identity, err
 			}
 			planted := errors.New("first-mutation-journal-fault")
 			req.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{Fault: func(e transaction.Event) error {
@@ -114,7 +116,9 @@ func TestProvisioningOriginParentProtectionJournaled(t *testing.T) {
 			req.Repair = true
 			anchor := t.TempDir()
 			req.originAccountLookup = func() (envorigin.Account, error) {
-				return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: anchor}, nil
+				identity, err := envorigin.LookupIdentity()
+				identity.Home = anchor
+				return identity, err
 			}
 			hit := false
 			planted := errors.New("parent-protection-fault")

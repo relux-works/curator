@@ -3,6 +3,7 @@ package envprofile
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -30,10 +31,12 @@ type homePublicationGroup struct {
 
 func isActivationPath(home, path string) bool { return envunit.ActivationPath(home, path) }
 
-func (g *homePublicationGroup) close() {
+func (g *homePublicationGroup) close() error {
+	var result error
 	for _, p := range g.publications {
-		_ = p.close()
+		result = errors.Join(result, p.close())
 	}
+	return result
 }
 func (g *homePublicationGroup) add(plan transaction.Plan, pub *homePublication) error {
 	if g.unit == nil {
@@ -107,7 +110,7 @@ func (g *homePublicationGroup) add(plan transaction.Plan, pub *homePublication) 
 // managed homes. It plans every adapter (including inactive homes) from L0,
 // preserves captured authority, then commits L1 and all homes in one journal.
 // No current/scoped selection can shrink that materialized target inventory.
-func (op *operation) publishManagedRebind(home string, files map[string][]byte, removals []string, boundaries *staging.Boundaries, validate func() error) (bool, error) {
+func (op *operation) publishManagedRebind(home string, files map[string][]byte, removals []string, boundaries *staging.Boundaries, validate func() error) (_ bool, resultErr error) {
 	profiles := []string{}
 	for path := range files {
 		if filepath.Base(path) == "lock.json" && filepath.Dir(filepath.Dir(path)) == ProfilesDir(home) {
@@ -144,7 +147,7 @@ func (op *operation) publishManagedRebind(home string, files map[string][]byte, 
 		g = newHomePublicationGroup()
 	}
 	if !collecting {
-		defer g.close()
+		defer finishPublicationCleanup(&resultErr, g.close)
 	}
 	for _, profile := range profiles {
 		old, oldHash, err := readLock(home, profile)
@@ -269,7 +272,7 @@ func (op *operation) publishManagedRebind(home string, files map[string][]byte, 
 	return true, op.commitHomeGroup(home, g, files, removals, boundaries, validate)
 }
 
-func (op *operation) commitHomeGroup(home string, g *homePublicationGroup, files map[string][]byte, removals []string, boundaries *staging.Boundaries, validate func() error) error {
+func (op *operation) commitHomeGroup(home string, g *homePublicationGroup, files map[string][]byte, removals []string, boundaries *staging.Boundaries, validate func() error) (resultErr error) {
 	if g == nil || g.unit == nil {
 		return nil
 	}
@@ -277,7 +280,7 @@ func (op *operation) commitHomeGroup(home string, g *homePublicationGroup, files
 	if err != nil {
 		return err
 	}
-	defer recordPub.close()
+	defer finishPublicationCleanup(&resultErr, recordPub.close)
 	for path, payload := range files {
 		class := "profile-record"
 		if isActivationPath(home, path) {

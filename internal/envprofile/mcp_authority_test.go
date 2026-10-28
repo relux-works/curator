@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/envauthority"
-	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectmcpstate"
@@ -17,21 +16,26 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
-// A real schema-valid orphan marker covers manager-wide authority rather than
-// only the selected profile. The paired per-home carrier is accepted by the
-// same production validator. No credential material is created or inspected.
+// A real installed, recorded neighbor supplies per-home authority. A node
+// carrier is planted only after valid provisioning, never an orphan exemption.
 func mcpAuthorityCarrier(t *testing.T, home string, node bool) {
 	t.Helper()
-	fx, _, _ := claudeRepairFixture(t, envregistry.FormReferenced)
+	source := t.TempDir()
+	writePackage(t, source, "authority-neighbor", "1.0.0", "fixture\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: source}); err != nil {
+		t.Fatal(err)
+	}
+	native := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", native)
+	fx := &managedFixture{home: home, profile: "authority-neighbor", native: map[string]string{"claude_code": native}, launch: t.TempDir(), xdg: t.TempDir(), accountAnchor: t.TempDir()}
+	req := fx.request(envregistry.ClaudeCode)
+	req.Repair = true
+	if _, err := Resolve(req); err != nil {
+		t.Fatal(err)
+	}
 	if node {
 		writeNodeAuthorityMarker(t, fx)
 	}
-	body := nativeRead(t, filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode), envmarker.Name))
-	if _, err := envmarker.Parse(body); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(ManagedHomeDir(home, "orphan", envregistry.ClaudeCode), envmarker.Name)
-	nativeWrite(t, path, body)
 	err := envauthority.Validate(home)
 	if node {
 		requireMCPError(t, err, envregistry.DiagCredentialInjectionUnavailable)
@@ -156,7 +160,11 @@ func TestProfileMCPCredentialPublicationBoundary(t *testing.T) {
 			lockBytes := nativeRead(t, activeLock)
 			var expected map[string]claudeRefusalEntry
 			req.beforePublish = func() {
-				mcpAuthorityCarrier(t, fx.home, node)
+				// The admitted neighbor already exists. Plant only its authority
+				// transition under the held lock; never recursively Install here.
+				if node {
+					writeNodeAuthorityMarker(t, &managedFixture{home: fx.home, profile: "authority-neighbor"})
+				}
 				var err error
 				expected, err = claudeFreshnessSnapshot(fx.home, activeLock)
 				if err != nil {

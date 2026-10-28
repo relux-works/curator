@@ -35,10 +35,11 @@ type manifest struct {
 }
 
 type event struct {
-	Action  string
-	Package string
-	Test    string
-	Elapsed float64
+	ImportPath string
+	Action     string
+	Package    string
+	Test       string
+	Elapsed    float64
 }
 
 func shardFor(name string) int {
@@ -209,6 +210,32 @@ func validatePackageStream(data []byte, tests []string, packageName string, marg
 		}
 		if err != nil {
 			return 0, fmt.Errorf("invalid test JSON: %w", err)
+		}
+		// Go 1.24+ build JSON has ImportPath and no Package. Admit only the
+		// selected package/test binary variants; build output is not completion.
+		if strings.HasPrefix(e.Action, "build-") {
+			if e.Test != "" || e.Package != "" || e.ImportPath == "" {
+				return 0, fmt.Errorf("invalid build event")
+			}
+			valid := e.ImportPath == packageName || e.ImportPath == packageName+".test" || e.ImportPath == packageName+" ["+packageName+".test]" || e.ImportPath == packageName+"_test ["+packageName+".test]"
+			if !valid {
+				return 0, fmt.Errorf("unexpected build import %q", e.ImportPath)
+			}
+			if e.Action == "build-fail" {
+				return 0, fmt.Errorf("build failure: %s", e.ImportPath)
+			}
+			if e.Action != "build-output" {
+				return 0, fmt.Errorf("unsupported event action %q", e.Action)
+			}
+			continue
+		}
+		if e.ImportPath != "" {
+			return 0, fmt.Errorf("unexpected build import on test event")
+		}
+		switch e.Action {
+		case "start", "run", "pause", "cont", "output", "pass", "skip", "fail":
+		default:
+			return 0, fmt.Errorf("unsupported event action %q", e.Action)
 		}
 		if e.Package != packageName {
 			return 0, fmt.Errorf("unexpected package %q", e.Package)

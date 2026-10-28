@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
+// Name and the associated constants define the closed private origin carrier.
 const (
 	Name           = ".agent-provisioning-origin.json"
 	Version        = "provisioning-origin/1"
@@ -31,21 +32,28 @@ const (
 var profilePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 var lockPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
+// Selector preserves original environment-variable presence independently of its value.
 type Selector struct {
 	Name  string  `json:"name"`
 	State string  `json:"state"`
 	Value *string `json:"value,omitempty"`
 }
+
+// Capture records how original provisioning authority was established.
 type Capture struct {
 	Method    string `json:"method"`
 	Authority string `json:"authority"`
 	Time      string `json:"time"`
 }
+
+// Binding ties authority to one installed profile, lock and managed target.
 type Binding struct {
 	Profile       string `json:"profile"`
 	LockSHA256    string `json:"lock_sha256"`
 	ManagedTarget string `json:"managed_target"`
 }
+
+// Record is the private immutable provisioning-origin capture and current binding.
 type Record struct {
 	Record       string   `json:"record"`
 	Adapter      string   `json:"adapter"`
@@ -261,7 +269,7 @@ func ReadOwnedRecord(manager, path string, limit int64) ([]byte, bool, error) {
 	return readOwnedRecord(manager, path, limit, false)
 }
 
-func readOwnedRecord(manager, path string, limit int64, private bool) ([]byte, bool, error) {
+func readOwnedRecord(manager, path string, limit int64, private bool) (data []byte, exists bool, resultErr error) {
 	if !cleanAbsolute(manager) || !cleanAbsolute(path) || !below(manager, path) || path == manager || limit <= 0 || limit > 16<<20 {
 		return nil, false, invalid("private authority namespace/size")
 	}
@@ -295,7 +303,13 @@ func readOwnedRecord(manager, path string, limit int64, private bool) ([]byte, b
 	if err != nil {
 		return nil, false, invalid("authority open: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			data = nil
+			exists = false
+			resultErr = errors.Join(resultErr, err)
+		}
+	}()
 	opened, err := f.Stat()
 	if err != nil || !os.SameFile(info, opened) || !singleLink(path, opened) || (private && !privateMode(path, opened)) {
 		return nil, false, invalid("authority entry changed while opening")

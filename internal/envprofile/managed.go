@@ -849,15 +849,6 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 	return bundle, nil
 }
 
-// writeStoreDoc publishes manager-authored bytes as a store document.
-func writeStoreDoc(root, path string, document []byte) error {
-	rel, err := managedRelative(root, path)
-	if err != nil {
-		return err
-	}
-	return atomicManagedFile(root, rel, document, managedStoreDocumentMode)
-}
-
 // claudeSeedPlan holds validated output; nil payload preserves the existing
 // configuration bytes, inode and mtime.
 type claudeSeedPlan struct {
@@ -1570,73 +1561,6 @@ func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
 	return true
 }
 
-// ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
-// §10.1): an absent link path is linked, a symlink still targeting the
-// declared native store is left alone, and an empty directory is replaced
-// by the link — none of which moves credential ownership. A recorded
-// symlink to any other target — the mis-targeted state, including a Pi
-// home still linked at the pre-0017 native root — is never re-pointed
-// here: repair refuses with environment_credential_conflict naming the
-// path and points at the explicit migration (migrateCmd). A regular
-// file, an unrecorded symlink to an unexpected target, a non-empty
-// directory, or a link whose state cannot be established refuses the
-// same way, removing nothing. Native bytes are never touched.
-func ensureCredentialLink(root, homeRel, path, target string, recorded bool, migrateCmd string) error {
-	rel := managedJoin(homeRel, path)
-	full, err := managedPath(root, rel, false)
-	if err != nil {
-		return err
-	}
-	metadata, err := stateread.Lstat(full)
-	if err != nil {
-		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
-	}
-	if metadata.Kind == stateread.KindAbsent {
-		if err := atomicManagedLink(root, rel, target); err != nil {
-			return fmt.Errorf("passthrough %s: %v", path, err)
-		}
-		return nil
-	}
-	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
-	}
-	info := metadata.Info
-	if info.Mode()&os.ModeSymlink != 0 {
-		link, err := stateread.Readlink(full)
-		if err != nil {
-			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
-		}
-		got := link.Target
-		if !filepath.IsAbs(got) {
-			got = filepath.Join(filepath.Dir(full), got)
-		}
-		if filepath.Clean(got) == filepath.Clean(target) {
-			return nil
-		}
-		if !recorded {
-			return fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it; remove the unrecorded link out of band and re-run", envregistry.DiagCredentialConflict, full, got, target)
-		}
-		return fmt.Errorf("%s: %s links to %s, expected %s: migration needed: re-point the recorded link with `%s`; refusing to re-point it here", envregistry.DiagCredentialConflict, full, got, target, migrateCmd)
-	}
-	if info.IsDir() {
-		entries, err := os.ReadDir(full)
-		if err != nil {
-			return fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
-		}
-		if len(entries) != 0 {
-			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
-		}
-		if err := removeManagedEntry(root, rel); err != nil {
-			return err
-		}
-		if err := atomicManagedLink(root, rel, target); err != nil {
-			return fmt.Errorf("passthrough %s: %v", path, err)
-		}
-		return nil
-	}
-	return fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, target)
-}
-
 // removeStaleCredentialLinks refuses recorded credential links the
 // effective set no longer wants — the shared→isolated turn, or a native
 // store gone ambient (§7.4, §10.1): a mode change that leaves a recorded
@@ -1741,15 +1665,6 @@ func shadowWarnings(req *ResolveRequest, plan *homePlan, recorded []string) []st
 }
 
 func sortedKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedKeysBytes(values map[string][]byte) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)
@@ -2873,7 +2788,7 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 // the fragment (§10.1). A current home emits without touching any state;
 // repair restores managed bytes from the store and never adopts candidate
 // bytes found in the home.
-func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source) (*ResolveResult, error) {
+func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source Source) (result *ResolveResult, resultErr error) {
 	op, err := req.beginRepairOperation()
 	if err != nil {
 		return nil, err
@@ -2922,7 +2837,12 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
 	group := newHomePublicationGroup()
-	defer group.close()
+	defer func() {
+		finishPublicationCleanup(&resultErr, group.close)
+		if resultErr != nil {
+			result = nil
+		}
+	}()
 	op.publicationGroup = group
 	req.publicationGroup = group
 	defer func() { op.publicationGroup = nil; req.publicationGroup = nil }()
@@ -3115,7 +3035,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	}
 	warnings := append([]string{}, after.warnings...)
 	warnings = append(warnings, seeds.warnings...)
-	result := &ResolveResult{Document: document, Warnings: warnings, Provisioned: provisioned}
+	result = &ResolveResult{Document: document, Warnings: warnings, Provisioned: provisioned}
 	if provisioned {
 		result.Notice = firstResolveNotice(adapter, plan)
 	}

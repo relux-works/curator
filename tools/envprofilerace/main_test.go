@@ -77,18 +77,45 @@ func TestStreamControls(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, tc := range map[string]struct{ data, want string }{
-		"missing":       {string(fixtureStream(tests[:1])), "missing completed test TestTwo"},
-		"duplicate":     {strings.Split(good, "\n")[0] + "\n" + good, "duplicate test TestOne"},
-		"unselected":    {strings.ReplaceAll(good, "TestTwo", "TestOther"), "unexpected or duplicate test TestOther"},
-		"no-package":    {strings.Join(strings.Split(good, "\n")[:2], "\n"), "want one passing package"},
-		"failed":        {strings.Replace(good, "pass", "fail", 1), "failed test/package TestOne"},
-		"invalid-json":  {good + "broken", "invalid test JSON"},
-		"slow":          {strings.Replace(good, ":42", ":1800", 1), "outside (0,1800)s margin"},
-		"wrong-package": {strings.ReplaceAll(good, pkg, "other"), "unexpected package"},
-		"twice-package": {good + strings.Split(good, "\n")[2], "want one passing package"},
+		"missing":         {string(fixtureStream(tests[:1])), "missing completed test TestTwo"},
+		"duplicate":       {strings.Split(good, "\n")[0] + "\n" + good, "duplicate test TestOne"},
+		"unselected":      {strings.ReplaceAll(good, "TestTwo", "TestOther"), "unexpected or duplicate test TestOther"},
+		"no-package":      {strings.Join(strings.Split(good, "\n")[:2], "\n"), "want one passing package"},
+		"failed":          {strings.Replace(good, "pass", "fail", 1), "failed test/package TestOne"},
+		"invalid-json":    {good + "broken", "invalid test JSON"},
+		"slow":            {strings.Replace(good, ":42", ":1800", 1), "outside (0,1800)s margin"},
+		"wrong-package":   {strings.ReplaceAll(good, pkg, "other"), "unexpected package"},
+		"twice-package":   {good + strings.Split(good, "\n")[2], "want one passing package"},
+		"package-skipped": {strings.Replace(good, `"Action":"pass","Package":"`+pkg+`","Elapsed"`, `"Action":"skip","Package":"`+pkg+`","Elapsed"`, 1), "want one passing package"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := validateStream([]byte(tc.data), tests); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
+	}
+}
+
+// Build-output uses ImportPath rather than Package. Only the selected test
+// package's compiler/linker output is admitted; it is never test completion.
+func TestBuildEventControls(t *testing.T) {
+	good := string(fixtureStream([]string{"TestOne"}))
+	build := fmt.Sprintf(`{"Action":"build-output","ImportPath":%q,"Output":"linker warning\n"}`+"\n", pkg)
+	if _, err := validateStream([]byte(build+good), []string{"TestOne"}); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct{ data, want string }{
+		"missing-import":   {strings.Replace(build, `"ImportPath":`+fmt.Sprintf("%q", pkg), `"ImportPath":""`, 1) + good, "invalid build event"},
+		"mixed-package":    {strings.TrimSuffix(build, "}\n") + `,"Package":` + fmt.Sprintf("%q", pkg) + "}\n" + good, "invalid build event"},
+		"test-with-import": {strings.TrimSuffix(strings.Split(good, "\n")[0], "}") + `,"ImportPath":` + fmt.Sprintf("%q", pkg) + "}\n" + good, "unexpected build import on test event"},
+		"foreign-import":   {strings.Replace(build, pkg, "foreign/package", 1) + good, "unexpected build import"},
+		"build-fail":       {strings.Replace(build, "build-output", "build-fail", 1) + good, "build failure"},
+		"build-test":       {strings.TrimSuffix(build, "}\n") + `,"Test":"TestOne"}` + "\n" + good, "invalid build event"},
+		"missing-test":     {build + string(fixtureStream(nil)), "missing completed test"},
+		"unknown-action":   {strings.Replace(build, "build-output", "build-skip", 1) + good, "unsupported event action"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := validateStream([]byte(tc.data), []string{"TestOne"}); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("got %v, want %s", err, tc.want)
 			}
 		})

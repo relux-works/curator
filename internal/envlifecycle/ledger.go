@@ -16,25 +16,35 @@ import (
 	"github.com/relux-works/curator/internal/staging"
 )
 
+// Version identifies the closed private lifecycle carrier.
 const Version = "environment-lifecycle/1"
+
+// MaxBytes bounds the private lifecycle decoder.
 const MaxBytes = 8 << 20
 
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 var hashPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
+// Commit binds a lifecycle outcome to its durable transaction identity.
 type Commit struct {
 	Unit     string `json:"unit"`
 	Evidence string `json:"evidence"`
 }
+
+// OwnedRecord retains an exact installed-record preimage.
 type OwnedRecord struct {
 	Path  string              `json:"path"`
 	Image envunit.RecordImage `json:"image"`
 }
+
+// Revocation binds removal to the references it revoked.
 type Revocation struct {
 	Path   string              `json:"path"`
 	Before envunit.RecordImage `json:"before"`
 	After  envunit.RecordImage `json:"after"`
 }
+
+// ConflictReceipt binds the one handled global conflict to its phase and entry.
 type ConflictReceipt struct {
 	Code          string        `json:"code"`
 	Phase         string        `json:"phase"`
@@ -48,6 +58,7 @@ type ConflictReceipt struct {
 	Sequence      uint64        `json:"sequence"`
 }
 
+// GlobalRetained retains L1 and the complete old-home recovery baseline.
 type GlobalRetained struct {
 	ID                 string                      `json:"id"`
 	Kind               string                      `json:"kind"`
@@ -63,6 +74,8 @@ type GlobalRetained struct {
 	ConflictReceipt    ConflictReceipt             `json:"conflict_receipt"`
 	ContinuationCut    string                      `json:"continuation_cut"`
 }
+
+// RemovedRetained records intentional nonlaunchable home retention after removal.
 type RemovedRetained struct {
 	ID                   string                      `json:"id"`
 	Kind                 string                      `json:"kind"`
@@ -77,6 +90,8 @@ type RemovedRetained struct {
 	ReferenceRevocations []Revocation                `json:"reference_revocations"`
 	RemovalCommit        Commit                      `json:"removal_commit"`
 }
+
+// Purged records terminal verified absence and its name-reuse binding.
 type Purged struct {
 	ID               string          `json:"id"`
 	Kind             string          `json:"kind"`
@@ -97,6 +112,8 @@ type Entry struct {
 	Removed *RemovedRetained
 	Purged  *Purged
 }
+
+// Ledger is a bounded collection of private action-specific lifecycle entries.
 type Ledger struct {
 	Record   string
 	Manager  envunit.Manager
@@ -113,6 +130,8 @@ type wireLedger struct {
 func invalid(format string, args ...any) error {
 	return fmt.Errorf(envorigin.DiagInvalid+": lifecycle: "+format, args...)
 }
+
+// Path returns the fixed private lifecycle carrier path.
 func Path(manager string) string {
 	return filepath.Join(manager, ".state", "environment-lifecycle.json")
 }
@@ -170,6 +189,8 @@ func ParseEntry(raw []byte, manager envunit.Manager) (Entry, error) {
 	}
 	return e, nil
 }
+
+// Marshal encodes a validated private lifecycle entry.
 func (e Entry) Marshal() ([]byte, error) {
 	n := 0
 	var v any
@@ -190,6 +211,8 @@ func (e Entry) Marshal() ([]byte, error) {
 	}
 	return json.Marshal(v)
 }
+
+// ID returns the action-specific durable entry identity.
 func (e Entry) ID() string {
 	if e.Global != nil {
 		return e.Global.ID
@@ -202,6 +225,8 @@ func (e Entry) ID() string {
 	}
 	return ""
 }
+
+// Profiles returns the complete profile names bound by this entry.
 func (e Entry) Profiles() []string {
 	if e.Purged != nil {
 		return []string{e.Purged.ProfileName}
@@ -219,6 +244,8 @@ func (e Entry) Profiles() []string {
 	}
 	return names
 }
+
+// Targets returns the exact managed homes bound by this entry.
 func (e Entry) Targets() []string {
 	if e.Purged != nil {
 		return append([]string(nil), e.Purged.TargetNamespaces...)
@@ -237,6 +264,7 @@ func (e Entry) Targets() []string {
 	return out
 }
 
+// Parse decodes and validates the closed private lifecycle ledger.
 func Parse(raw []byte, manager envunit.Manager) (*Ledger, error) {
 	if len(raw) == 0 || len(raw) > MaxBytes {
 		return nil, invalid("ledger bounds")
@@ -261,6 +289,8 @@ func Parse(raw []byte, manager envunit.Manager) (*Ledger, error) {
 	}
 	return l, nil
 }
+
+// Marshal validates and encodes a canonical private ledger.
 func (l *Ledger) Marshal() ([]byte, error) {
 	if err := l.Validate(); err != nil {
 		return nil, err
@@ -279,6 +309,8 @@ func (l *Ledger) Marshal() ([]byte, error) {
 	}
 	return raw, err
 }
+
+// Validate checks closed entry, revision and identity invariants.
 func (l *Ledger) Validate() error {
 	if l == nil || l.Record != Version || l.Revision == 0 || len(l.Entries) > 1024 {
 		return invalid("header/revision/bounds")

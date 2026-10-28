@@ -20,6 +20,7 @@ type pendingEffect struct {
 
 type Pending struct {
 	LeaseJournals []*envjournal.Journal
+	OtherJournals int
 	Effects       map[string][]pendingEffect
 	Units         map[string]*envunit.Unit
 	Homes         map[string]envunit.Home
@@ -65,6 +66,7 @@ func PendingUnits(manager string) (*Pending, error) {
 		// Legacy journals are still handled by the engine's existing validation.
 		// They cannot exempt a home or create a provisioning-origin exception.
 		if journal.Unit == nil {
+			result.OtherJournals++
 			if journal.ProjectIdentity == "project-leases" {
 				if entry.Name() != journal.TransactionID+".json" {
 					return nil, fmt.Errorf("%s: lease journal filename differs", envorigin.DiagInvalid)

@@ -16,7 +16,7 @@ import (
 // exact purged receipt in one CAS unit. It neither provisions a home nor grants
 // launch authority. Subsequent Resolve performs genuine initial capture after
 // the old namespace's permanent absence has been validated and retired.
-func (op *operation) publishPurgedReuse(files map[string][]byte, removals []string, boundaries *staging.Boundaries, validate func() error) (bool, error) {
+func (op *operation) publishPurgedReuse(files map[string][]byte, removals []string, boundaries *staging.Boundaries, validate func() error) (_ bool, resultErr error) {
 	home := op.engine.Home()
 	identity, err := envunit.ObserveManager(home)
 	if err != nil {
@@ -67,7 +67,7 @@ func (op *operation) publishPurgedReuse(files map[string][]byte, removals []stri
 		// installed records may precede a later genuine provisioning capture.
 		g := newHomePublicationGroup()
 		g.unit = unit
-		defer g.close()
+		defer finishPublicationCleanup(&resultErr, g.close)
 		previous := op.publishPlan
 		op.publishPlan = func(plan transaction.Plan) error {
 			plan.Lifecycle = &envlifecycle.Change{Prior: prior}

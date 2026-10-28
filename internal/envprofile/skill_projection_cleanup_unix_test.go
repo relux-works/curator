@@ -14,7 +14,8 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
-// Both publishers report staging cleanup failures, including alongside a
+// The actual shared-store projection publisher and a historical standalone
+// fallback oracle report staging cleanup failures, including alongside a
 // transaction refusal. A clean success removes staging; cleanup failure after
 // commit preserves the complete published tree, and refusal publishes nothing.
 // Permission fault injection is limited to the test's own staging directory.
@@ -42,8 +43,8 @@ func TestSkillProjectionCleanupErrors(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				root, rel := EnvRoot(home), "sample/codex_cli/skills/guide"
-				live, pattern := skill.root, filepath.Join(filepath.Dir(skill.root), ".projection-*")
+				root, rel := t.TempDir(), "skills/guide"
+				live, pattern := skill.root, filepath.Join(os.TempDir(), ".projection-*")
 				if publisher == "fallback" {
 					live = filepath.Join(root, rel)
 					if err := os.MkdirAll(filepath.Dir(live), 0700); err != nil {
@@ -91,7 +92,7 @@ func TestSkillProjectionCleanupErrors(t *testing.T) {
 				if publisher == "projection" {
 					err = publishSkillProjection(op, home, skill)
 				} else {
-					err = publishSkillFallback(op, root, rel, source)
+					err = legacyPublishSkillFallback(op, root, rel, source)
 				}
 				if stage == "" || errors.Is(err, fs.ErrPermission) != (mode != "clean") || errors.Is(err, fault) != (mode == "combined-error") {
 					t.Fatalf("cleanup error identity lost: %v stage=%q", err, stage)

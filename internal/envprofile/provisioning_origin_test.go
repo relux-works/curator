@@ -58,7 +58,9 @@ func recordedOriginSkillsFixture(t *testing.T, label string, five bool) (*manage
 	req := fx.request("codex_cli")
 	req.Repair = true
 	req.originAccountLookup = func() (envorigin.Account, error) {
-		return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: anchor}, nil
+		a, err := envorigin.LookupIdentity()
+		a.Home = anchor
+		return a, err
 	}
 	if result, err := Resolve(req); err != nil || result == nil || len(result.Document) == 0 {
 		t.Fatalf("recorded fixture provisioning: %v %v", result, err)

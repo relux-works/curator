@@ -25,7 +25,7 @@ type AdoptOriginRequest struct {
 // AdoptOrigin publishes only missing historical authority. It never replaces
 // an existing differing record or rerenders a surface, repairs a credential
 // link, refreshes a seed or touches native session/credential contents.
-func AdoptOrigin(request AdoptOriginRequest) error {
+func AdoptOrigin(request AdoptOriginRequest) (resultErr error) {
 	attestation := request.Attestation
 	if attestation.Binding.Profile == "" || attestation.Adapter == "" {
 		return fmt.Errorf("%s: explicit installed profile and adapter required", envorigin.DiagInvalid)
@@ -118,7 +118,7 @@ func AdoptOrigin(request AdoptOriginRequest) error {
 	if err != nil {
 		return err
 	}
-	defer op.close()
+	defer finishPublicationCleanup(&resultErr, op.close)
 	if err := validate(); err != nil {
 		return op.recoveryRefusal(err)
 	}
@@ -129,7 +129,7 @@ func AdoptOrigin(request AdoptOriginRequest) error {
 	if err != nil {
 		return err
 	}
-	defer pub.close()
+	defer finishPublicationCleanup(&resultErr, pub.close)
 	if err := pub.file(filepath.Join(attestation.Binding.ManagedTarget, envorigin.Name), "origin", originRaw, 0600, true); err != nil {
 		return err
 	}

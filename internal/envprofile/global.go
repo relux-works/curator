@@ -111,7 +111,7 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 	return globalResolvedSkillOperation(op, home, profile, source, oldLock, oldHash, policy, machine, addition, nativeHomeOf)
 }
 
-func globalResolvedSkillOperation(op *operation, home, profile string, source Source, oldLock *contextlock.Lock, oldHash string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error)) (Info, error) {
+func globalResolvedSkillOperation(op *operation, home, profile string, source Source, oldLock *contextlock.Lock, oldHash string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error)) (_ Info, resultErr error) {
 	manager := newGitManager(home).withPolicy(policy)
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, err
@@ -141,7 +141,7 @@ func globalResolvedSkillOperation(op *operation, home, profile string, source So
 	newHash := contextlock.HashBytes(canonical)
 	info := Info{Name: profile, Source: source, Lock: result.Lock, LockHash: newHash, Current: true, Warnings: warnings}
 	g := newHomePublicationGroup()
-	defer g.close()
+	defer finishPublicationCleanup(&resultErr, g.close)
 	op.publicationGroup = g
 	defer func() { op.publicationGroup = nil }()
 	records := map[string][]byte{}

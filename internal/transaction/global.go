@@ -56,7 +56,17 @@ func (engine *Engine) commitGlobalRetention(j *Journal) error {
 		}
 		return engine.commitRemainingTargets(j)
 	}
-	actual, err := envunit.ObserveTarget(j.Global.Conflict.Target, "owned-bytes")
+	// ValidateGlobal binds the conflict to one exact typed unit preimage.
+	// Directory digests must use the same closed tree representation at capture
+	// and confirmation; observing just the directory entry loses that binding.
+	class := ""
+	for _, target := range j.Unit.Targets {
+		if target.Path == j.Global.Conflict.Target {
+			class = target.Class
+			break
+		}
+	}
+	actual, err := envunit.ObserveTarget(j.Global.Conflict.Target, class)
 	if err != nil {
 		return engine.rollbackGlobal(j, err)
 	}

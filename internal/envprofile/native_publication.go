@@ -34,7 +34,7 @@ func planNativePublication(op *operation, home, native, profile string, source S
 	}
 	defer func() {
 		if !pub.deferred {
-			_ = pub.close()
+			finishPublicationCleanup(&resultErr, pub.close)
 		}
 	}()
 	pub.readScope.Native = []envunit.Native{{Adapter: adapter.ID, Root: native}}
@@ -218,7 +218,7 @@ func planNativePublication(op *operation, home, native, profile string, source S
 	own := group == nil
 	if own {
 		group = newHomePublicationGroup()
-		defer group.close()
+		defer finishPublicationCleanup(&resultErr, group.close)
 	}
 	if err := group.add(plan, pub); err != nil {
 		return err

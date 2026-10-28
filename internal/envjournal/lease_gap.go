@@ -47,7 +47,7 @@ func LeaseReferenceGap(j *Journal, manager string) (before, after []byte, gap bo
 		if present {
 			return nil, nil, false, nil
 		}
-		if target.State != StatePending && target.State != StateBackedUp && !(j.Phase == PhaseRollingBack && target.State == StateCommitted) {
+		if target.State != StatePending && target.State != StateBackedUp && (j.Phase != PhaseRollingBack || target.State != StateCommitted) {
 			return nil, nil, false, unitError("lease replacement phase differs")
 		}
 		read := func(candidate, digest string) ([]byte, error) {

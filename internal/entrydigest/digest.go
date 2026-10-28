@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 )
 
+// DigestAbsent denotes a proven absent entry without a payload.
 const DigestAbsent = "absent"
 
 func validText(value string) bool { return utf8.ValidString(value) && !strings.ContainsRune(value, 0) }
@@ -77,7 +78,7 @@ func DigestTarget(kind string, path string) (string, error) {
 	return DigestPath(path)
 }
 
-// digestLinkDestination digests a symbolic link by its destination string. The
+// DigestLinkDestination digests a symbolic link by its destination string. The
 // recorded mode is deliberately zero: Lstat reports a platform-chosen
 // permission for a link, and the destination is the link's entire content.
 func DigestLinkDestination(destination string) (string, error) {
@@ -203,6 +204,7 @@ func writeDigestEntry(writer io.Writer, kind byte, rel string, mode os.FileMode,
 	return binary.Write(writer, binary.BigEndian, size)
 }
 
+// ShortIdentity returns the bounded suffix used for private transaction artifacts.
 func ShortIdentity(value string) string {
 	digest := sha256.Sum256([]byte("curator-transaction-sidecar-v1\x00" + value))
 	return hex.EncodeToString(digest[:16])

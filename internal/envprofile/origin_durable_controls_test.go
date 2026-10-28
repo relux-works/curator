@@ -16,6 +16,7 @@ import (
 // overlays never change source on disk. Historical callback-model plants are
 // separately labelled and provide no runtime/restart qualification.
 func TestProvisioningOriginDurableNarrowingControls(t *testing.T) {
+	isolateDetectorParent(t)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)

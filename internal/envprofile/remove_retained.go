@@ -21,7 +21,7 @@ import (
 // removeRetained commits installed-record absence and durable nonlaunchable
 // custody in one unit. Retained homes are observed only through their exact
 // authority files and directory metadata: sessions and credentials are opaque.
-func removeRetained(op *operation, manager, profile string) error {
+func removeRetained(op *operation, manager, profile string) (resultErr error) {
 	identity, err := envunit.ObserveManager(manager)
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ func removeRetained(op *operation, manager, profile string) error {
 		if e != nil {
 			return e
 		}
-		defer pub.close()
+		defer finishPublicationCleanup(&resultErr, pub.close)
 		if e = pub.file(references.Path, "reference-record", references.After, 0600, true); e != nil {
 			return e
 		}

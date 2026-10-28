@@ -26,9 +26,9 @@ import (
 // LookupAccount uses the numeric effective UID's native account/NSS record,
 // never os/user.Current, HOME, USER, LOGNAME or os.UserHomeDir.
 func LookupAccount() (Account, error) {
-	real, effective := os.Getuid(), os.Geteuid()
-	if real != effective {
-		return Account{}, fmt.Errorf("real/effective UID mismatch")
+	realUID, effective := os.Getuid(), os.Geteuid()
+	if realUID != effective {
+		return Account{}, fmt.Errorf("realUID/effective UID mismatch")
 	}
 	for size := 1024; size <= 1<<20; size *= 2 {
 		buf := C.malloc(C.size_t(size))
@@ -48,7 +48,7 @@ func LookupAccount() (Account, error) {
 		home := C.GoString(pw.pw_dir)
 		uid := uint64(pw.pw_uid)
 		C.free(unsafe.Pointer(buf))
-		return Account{UID: uid, RealUID: uint64(real), EffectiveUID: uint64(effective), Home: home}, nil
+		return Account{UID: uid, RealUID: uint64(realUID), EffectiveUID: uint64(effective), Home: home}, nil
 	}
 	return Account{}, fmt.Errorf("native account record exceeds bound")
 }

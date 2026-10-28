@@ -36,7 +36,9 @@ func TestProvisioningOriginMusePublication(t *testing.T) {
 			req := fx.request(envregistry.Muse)
 			req.Repair = true
 			req.originAccountLookup = func() (envorigin.Account, error) {
-				return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: anchor}, nil
+				identity, err := envorigin.LookupIdentity()
+				identity.Home = anchor
+				return identity, err
 			}
 			fault := errors.New("fixture Muse metadata publication fault")
 			reached := false

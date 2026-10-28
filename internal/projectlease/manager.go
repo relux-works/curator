@@ -132,7 +132,7 @@ func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lo
 	if err = consistentHome(l, c); err != nil {
 		return err
 	}
-	b := Binding{"project-lease/1", r.LeaseID, c.Ref, c.SHA256, c.CheckoutID, c.Environment, c.HomeRef, r.OwnerRef, r.SessionRef, r.Generation}
+	b := Binding{Kind: "project-lease/1", LeaseID: r.LeaseID, ContextRef: c.Ref, ContextSHA256: c.SHA256, CheckoutID: c.CheckoutID, Environment: c.Environment, HomeRef: c.HomeRef, OwnerRef: r.OwnerRef, SessionRef: r.SessionRef, Generation: r.Generation}
 	if err = b.Validate(); err != nil {
 		return err
 	}

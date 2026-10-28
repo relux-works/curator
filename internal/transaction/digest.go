@@ -15,7 +15,5 @@ func DigestRegularPayload(payload []byte, mode os.FileMode) (string, error) {
 func digestRegularPayload(payload []byte, mode os.FileMode) (string, error) {
 	return entrydigest.DigestRegularPayload(payload, mode)
 }
-func digestLinkDestination(destination string) (string, error) {
-	return entrydigest.DigestLinkDestination(destination)
-}
+
 func shortIdentity(value string) string { return entrydigest.ShortIdentity(value) }

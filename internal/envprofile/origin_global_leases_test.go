@@ -168,7 +168,11 @@ func exerciseRetainedLeaseGap(t *testing.T, fx *managedFixture, before *projectl
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer held.Close()
+	defer func() {
+		if err := held.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	hit := false
 	engine, err := transaction.New(fx.home, transaction.WithCommitCheck(projectlease.TransactionCheck(fx.home)), transaction.WithHooks(transaction.Hooks{Fault: func(e transaction.Event) error {
 		if e.Point == transaction.PointAfterBackup && e.LivePath == path {

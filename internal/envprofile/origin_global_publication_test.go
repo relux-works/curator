@@ -49,7 +49,11 @@ func TestProvisioningOriginGlobalCallbackSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer held.Close()
+	defer func() {
+		if err := held.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	saved := newOperationEngine
 	calls := 0
 	newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
@@ -126,7 +130,11 @@ func TestProvisioningOriginJoinedGlobalPublication(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer held.Close()
+			defer func() {
+				if err := held.Close(); err != nil {
+					t.Error(err)
+				}
+			}()
 			saved := newOperationEngine
 			hit := false
 			if mode == "legacy-returned" || mode == "marker-stop" {

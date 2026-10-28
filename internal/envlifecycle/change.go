@@ -20,6 +20,7 @@ type Change struct {
 	Revocations    []Revocation
 }
 
+// Bind attaches this structured ledger CAS to the complete environment unit.
 func (c *Change) Bind(unit *envunit.Unit) error {
 	if unit == nil || (unit.Action != envunit.Remove && unit.Action != envunit.Purge && unit.Action != envunit.GlobalExtend && unit.Action != envunit.Takeover && unit.Action != envunit.Reuse) {
 		return invalid("unsupported terminal change action")
@@ -62,6 +63,7 @@ func (c *Change) Bind(unit *envunit.Unit) error {
 	return nil
 }
 
+// ParseOrAbsent decodes a ledger or initializes its explicit absent baseline.
 func ParseOrAbsent(raw []byte, manager envunit.Manager) (*Ledger, error) {
 	if len(raw) == 0 {
 		return &Ledger{Record: Version, Manager: manager, Entries: []Entry{}}, nil
@@ -69,6 +71,7 @@ func ParseOrAbsent(raw []byte, manager envunit.Manager) (*Ledger, error) {
 	return Parse(raw, manager)
 }
 
+// Build constructs the next ledger from the captured revision and entry set.
 func (c *Change) Build(unit *envunit.Unit, preparedSources map[string][]byte) ([]byte, error) {
 	if unit == nil || (unit.Action != envunit.Remove && unit.Action != envunit.Purge && unit.Action != envunit.GlobalExtend && unit.Action != envunit.Takeover && unit.Action != envunit.Reuse) {
 		return nil, invalid("unsupported terminal change action")

@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/pathboundary"
@@ -56,10 +57,10 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 		if fallback == nil {
 			continue
 		}
-		if target.Kind != KindEntry || target.PrivateFile || target.PrivateTree || target.StagedSource == "" || target.Class != "owned-bytes" && target.Class != staging.ClassAdapterLedger {
+		if target.Kind != KindEntry || target.PrivateFile || target.PrivateTree || target.StagedSource == "" || target.Class != "owned-bytes" && target.Class != "owned-tree" && target.Class != staging.ClassAdapterLedger {
 			return nil, journalf("link fallback outside declared projection")
 		}
-		if target.Class == "owned-bytes" && (plan.Unit == nil || fallback.MarkerPath == "") || target.Class == staging.ClassAdapterLedger && fallback.MarkerPath != "" {
+		if (target.Class == "owned-bytes" || target.Class == "owned-tree") && (plan.Unit == nil || fallback.MarkerPath == "") || target.Class == staging.ClassAdapterLedger && fallback.MarkerPath != "" {
 			return nil, journalf("link fallback marker binding is missing or unexpected")
 		}
 		if plan.Unit != nil {
@@ -218,7 +219,7 @@ func selectCopyMarker(plan *Plan, live string, fallback LinkFallback) (string, e
 
 // Read only the exact enumerated private marker: bounded, no-follow, and pinned
 // before/after the read. No native credential or unrelated home tree is read.
-func readFallbackMarker(path string) ([]byte, error) {
+func readFallbackMarker(path string) (data []byte, resultErr error) {
 	if err := privatedir.ValidateFile(path); err != nil {
 		return nil, err
 	}
@@ -233,7 +234,12 @@ func readFallbackMarker(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			data = nil
+			resultErr = errors.Join(resultErr, err)
+		}
+	}()
 	opened, err := file.Stat()
 	if err != nil || !os.SameFile(before, opened) {
 		return nil, journalf("fallback marker entry changed")

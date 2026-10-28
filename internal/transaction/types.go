@@ -17,7 +17,11 @@ import (
 )
 
 const (
-	journalSchema = "curator-install-transaction-v1"
+	// PointBeforeStagingFinalMode observes a private writable sidecar before final protection.
+	PointBeforeStagingFinalMode Point = "before_staging_final_mode"
+	// PointAfterStagingFinalMode observes final protection with the original writer still open.
+	PointAfterStagingFinalMode Point = "after_staging_final_mode"
+	journalSchema                    = "curator-install-transaction-v1"
 	// DigestAbsent is the canonical digest token for an absent target.
 	DigestAbsent = "absent"
 )

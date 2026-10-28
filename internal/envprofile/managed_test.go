@@ -169,7 +169,9 @@ func (fx *managedFixture) request(envID string) ResolveRequest {
 	}
 	return ResolveRequest{
 		originAccountLookup: func() (envorigin.Account, error) {
-			return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: fx.accountAnchor}, nil
+			a, err := envorigin.LookupIdentity()
+			a.Home = fx.accountAnchor
+			return a, err
 		},
 		codexSeedRevisionForTest: revision,
 		Home:                     fx.home,

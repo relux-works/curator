@@ -127,7 +127,8 @@ func ReadCompletedLegacyMigration(manager string) (*LegacyMigration, error) {
 			return refuse("has duplicate entries")
 		}
 		seen[path] = true
-		if op.Kind == "unlink" {
+		switch op.Kind {
+		case "unlink":
 			if op.To != "" {
 				return refuse("has an invalid unlink")
 			}
@@ -141,7 +142,7 @@ func ReadCompletedLegacyMigration(manager string) (*LegacyMigration, error) {
 					}
 				}
 			}
-		} else if op.Kind == "relink" {
+		case "relink":
 			originRaw, _, err := envorigin.ReadPrivateAuthority(manager, filepath.Join(target, envorigin.Name), envorigin.MaxRecordBytes)
 			if err != nil {
 				return refuse("origin cannot be verified")
@@ -158,7 +159,7 @@ func ReadCompletedLegacyMigration(manager string) (*LegacyMigration, error) {
 			if err != nil || got != op.To {
 				return refuse("link postimage differs")
 			}
-		} else {
+		default:
 			return refuse("has an unknown operation")
 		}
 	}

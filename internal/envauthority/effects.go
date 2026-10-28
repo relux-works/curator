@@ -159,7 +159,7 @@ func consumesOrCreates(entry envlifecycle.Entry, unit *envunit.Unit) (bool, erro
 	if unit.RetainedEntry.Digest != envorigin.Digest(raw) || !bytes.Equal(unit.RetainedEntry.Serialized, raw) {
 		return false, fmt.Errorf("%s: consumption receipt binding changed", envorigin.DiagInvalid)
 	}
-	if unit.LedgerPublication == nil || !((entry.Removed != nil && unit.Action == envunit.Purge) || (entry.Global != nil && unit.Action == envunit.Takeover) || (entry.Purged != nil && unit.Action == envunit.Reuse)) {
+	if unit.LedgerPublication == nil || (entry.Removed == nil || unit.Action != envunit.Purge) && (entry.Global == nil || unit.Action != envunit.Takeover) && (entry.Purged == nil || unit.Action != envunit.Reuse) {
 		return false, fmt.Errorf("%s: lifecycle action cannot consume receipt", envorigin.DiagInvalid)
 	}
 	if err := unit.Validate(); err != nil {

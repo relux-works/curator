@@ -9,6 +9,7 @@ import (
 	"syscall"
 )
 
+// Unavailable classifies only supported filesystem link-capability errors.
 func Unavailable(err error) bool {
 	return errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.ENOSYS)
 }

@@ -19,10 +19,16 @@ not append another `agent`.
 The owner-private, regular, no-follow `.agent-provisioning-origin.json` record
 uses `provisioning-origin/1`. Its binding names the exact profile, lock and
 managed target. It contains provenance and locators, never credential contents.
-The account lookup transport is implemented for Darwin/Linux with cgo. Other
-target/toolchain combinations refuse initial capture; changing `HOME` does not
-provide an account-lookup substitute. Fixture account lookup tests are not real
-OS account or native provider qualification.
+The production account transport supports Darwin/Linux cgo account-database
+calls and CGO-disabled builds using the absolute OS account utilities
+(`/usr/bin/id -P` on Darwin; `/usr/bin/getent passwd` on Linux). The latter
+requires a root-owned, non-writable regular executable, a bounded record and
+matching real/effective numeric UID. Lookup failures refuse capture; HOME and
+selectors never supply the account anchor. Windows binds the process and
+effective token SID and obtains the profile directory from that process token.
+Unsupported transports refuse initial capture. Synthetic lookup controls do
+not qualify an actual account, release artifact or Windows ACL behavior; those
+platform gates remain separate.
 
 Existing homes use only their independently verified recorded native root A,
 even when today's caller selects B. Maintenance does not infer authority from

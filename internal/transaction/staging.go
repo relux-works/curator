@@ -110,7 +110,9 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 		if err != nil {
 			return err
 		}
-		if err := file.Chmod(os.FileMode(entry.Mode)); err != nil {
+		// Keep the not-yet-copied private sidecar writable. The opened writer
+		// applies the final mode before any payload write, retaining its handle.
+		if err := file.Chmod(0600); err != nil {
 			_ = file.Close()
 			return err
 		}
@@ -179,6 +181,19 @@ func (engine *Engine) copyStagingFile(journal *Journal, targetIndex int, entry R
 		return err
 	}
 	defer func() { result = errors.Join(result, destination.Close()) }()
+	if err := engine.emit(journal, targetIndex, PointBeforeStagingFinalMode); err != nil {
+		return err
+	}
+	if err := destination.Chmod(os.FileMode(entry.Mode)); err != nil {
+		return err
+	}
+	if err := destination.Sync(); err != nil {
+		return err
+	}
+	if err := engine.emit(journal, targetIndex, PointAfterStagingFinalMode); err != nil {
+		return err
+	}
+
 	buffer := make([]byte, stagingCopyChunkSize)
 	prefix := sha256.New()
 	_, _ = prefix.Write(stagingPrefixDigestDomain)
@@ -399,7 +414,11 @@ func validateActiveStagingEntry(target *TargetRecord, path string, info os.FileI
 		}
 		return nil
 	}
-	if uint32(info.Mode().Perm()) != entry.Mode {
+	// Before the first byte write, durable preparation can own either the
+	// private writable sidecar or its final mode (including 0400). No other
+	// mode/size/progress combination is admitted. Recovery only discards it.
+	writable := info.Mode().Perm() == 0600 && info.Size() == 0 && target.StagingBytes == 0 && target.StagingWriteBytes == 0
+	if uint32(info.Mode().Perm()) != entry.Mode && !writable {
 		return corruptionf("preparing target contains changed active staging mode %s", path)
 	}
 	source := stagingEntryPath(target.StagedSource, entry.RelativePath)

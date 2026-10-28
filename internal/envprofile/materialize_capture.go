@@ -11,8 +11,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/relux-works/curator/internal/envlifecycle"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/envunit"
 )
 
 // Snapshot capture diagnostics preserve the normative refusal names.
@@ -47,11 +50,12 @@ type CapturedMaterialization struct {
 
 // MaterializeCapture binds the closure to the verified inputs under the lock.
 type MaterializeCapture struct {
-	Request  ResolveRequest
-	Fragment []byte
-	ctx      context.Context
-	objects  []captureObject
-	total    int64
+	Request          ResolveRequest
+	Fragment         []byte
+	ctx              context.Context
+	objects          []captureObject
+	total            int64
+	privateAuthority map[string]envunit.Image
 }
 
 type captureObject struct {
@@ -108,7 +112,46 @@ func (c *MaterializeCapture) close() {
 	}
 }
 
+// pinPrivateAuthority retains only local authority, never portable content.
+func (c *MaterializeCapture) pinPrivateAuthority(path string, required bool) error {
+	before, err := envunit.ObserveEntry(path, false)
+	if err != nil {
+		return captureDrift()
+	}
+	raw, present, err := envorigin.ReadPrivateAuthority(c.Request.Home, path, 16<<20)
+	if err != nil || (required && !present) {
+		return captureDrift()
+	}
+	if present {
+		file, err := openReadNoFollow(path)
+		if err != nil {
+			return captureDrift()
+		}
+		pinned, err := c.ReadObject(path, file)
+		if err != nil || !bytes.Equal(raw, pinned) {
+			return captureDrift()
+		}
+	}
+	after, err := envunit.ObserveEntry(path, false)
+	if err != nil || before != after {
+		return captureDrift()
+	}
+	c.privateAuthority[path] = after
+	return nil
+}
+
 func (c *MaterializeCapture) revalidateObjects() error {
+	for path, expected := range c.privateAuthority {
+		_, present, err := envorigin.ReadPrivateAuthority(c.Request.Home, path, 16<<20)
+		if err != nil || present != (expected.Kind != "absent") {
+			return captureDrift()
+		}
+		actual, err := envunit.ObserveEntry(path, false)
+		if err != nil || actual != expected {
+			return captureDrift()
+		}
+	}
+
 	for _, object := range c.objects {
 		if c.ctx.Err() != nil {
 			return captureDrift()
@@ -175,13 +218,9 @@ func CaptureMaterialize(req MaterializeCaptureRequest) (result *CapturedMaterial
 	if err != nil {
 		return nil, err
 	}
-	verified, err := resolveVerified(selected, verifyHomeContent)
-	if err != nil {
-		return nil, err
-	}
-	c := &MaterializeCapture{Request: selected, Fragment: append([]byte(nil), verified.Document...), ctx: ctx}
+	c := &MaterializeCapture{Request: selected, ctx: ctx, privateAuthority: make(map[string]envunit.Image)}
 	defer c.close()
-	// Retain identity as well as bytes for the records that authorize capture.
+	// Pin authorizing records before verification as well as after capture.
 	for _, path := range []string{sourcePath(selected.Home, selected.Profile), lockPath(selected.Home, selected.Profile), filepath.Join(ManagedHomeDir(selected.Home, selected.Profile, selected.EnvID), envmarker.Name)} {
 		file, err := openReadNoFollow(path)
 		if err != nil {
@@ -190,6 +229,20 @@ func CaptureMaterialize(req MaterializeCaptureRequest) (result *CapturedMaterial
 		if _, err := c.ReadObject(path, file); err != nil {
 			return nil, err
 		}
+	}
+	if err := c.pinPrivateAuthority(filepath.Join(ManagedHomeDir(selected.Home, selected.Profile, selected.EnvID), envorigin.Name), true); err != nil {
+		return nil, err
+	}
+	if err := c.pinPrivateAuthority(envlifecycle.Path(selected.Home), false); err != nil {
+		return nil, err
+	}
+	verified, err := resolveVerified(selected, verifyHomeContent)
+	if err != nil {
+		return nil, err
+	}
+	c.Fragment = append([]byte(nil), verified.Document...)
+	if err := c.revalidateObjects(); err != nil {
+		return nil, err
 	}
 	// Copy policy values: a callback must not make a changed map compare equal by
 	// mutating the original machine object in place.

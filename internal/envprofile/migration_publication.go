@@ -68,7 +68,7 @@ func (m *identityMigration) bindMigration(home, id string) (*envunit.Unit, map[s
 		after := before
 		next := old
 		if stage, ok := m.targets[lockPath(home, profile)]; ok {
-			raw, e := os.ReadFile(stage)
+			raw, e := os.ReadFile(stage) // #nosec G304 -- stage is the enumerated private identity-migration payload.
 			if e != nil {
 				return nil, nil, e
 			}
@@ -130,13 +130,13 @@ func (m *identityMigration) bindMigration(home, id string) (*envunit.Unit, map[s
 			if e = rr.observeOrigin(adapter.ID, marker); e != nil {
 				return nil, nil, e
 			}
-			prior, e := os.ReadFile(markerPath)
+			prior, e := os.ReadFile(markerPath) // #nosec G304 -- exact managed marker path was boundary/authority checked above.
 			if e != nil {
 				return nil, nil, e
 			}
 			desired := prior
 			if targeted {
-				desired, e = os.ReadFile(staged)
+				desired, e = os.ReadFile(staged) // #nosec G304 -- staged marker is an enumerated private migration payload.
 				if e != nil {
 					return nil, nil, e
 				}

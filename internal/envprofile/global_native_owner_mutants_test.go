@@ -20,6 +20,7 @@ import (
 // requires the named assertion and exit 1; setup, build failures, crashes and
 // missing tests do not count. Children execute one package at a time.
 func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
+	isolateDetectorParent(t)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)

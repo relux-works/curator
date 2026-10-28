@@ -61,7 +61,9 @@ func recordedGlobalOriginFixture(t *testing.T) (*managedFixture, func(string) (s
 		req := fx.request(id)
 		req.Repair = true
 		req.originAccountLookup = func() (envorigin.Account, error) {
-			return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: anchor}, nil
+			identity, err := envorigin.LookupIdentity()
+			identity.Home = anchor
+			return identity, err
 		}
 		if result, e := Resolve(req); e != nil || result == nil || len(result.Document) == 0 {
 			t.Fatalf("synthetic recorded %s provisioning: %v", id, e)

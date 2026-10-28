@@ -7,6 +7,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/mcpnative"
 )
 
 // ValidateReadScope runs before any executor preimage digest. A target label
@@ -14,6 +15,41 @@ import (
 // Recursive images are confined to exact skill projection leaves (or their
 // fixed versioned backup locations), independently of caller marker contents.
 func (u *Unit) ValidateReadScope(class, path string) error {
+	if class == "profile-mcp" {
+		if u.Action != Maintain {
+			return invalid("MCP publication must preserve installed authority")
+		}
+		for _, home := range u.Homes {
+			if !bytesEqualHome(home.Before, home.After) {
+				return invalid("MCP publication changes home authority")
+			}
+			if path == filepath.Join(home.Target, filepath.FromSlash(mcpnative.Path(home.Adapter))) && mcpnative.Path(home.Adapter) != "" {
+				return nil
+			}
+			if path == filepath.Join(u.Manager.Path, "mcp-native-v1", "ownership", mcpnative.Key(home.Profile, home.Adapter, mcpnative.Path(home.Adapter))+".json") {
+				return nil
+			}
+			adapter, err := envregistry.ByID(home.Adapter)
+			if err != nil {
+				return err
+			}
+			skillRoot := filepath.Join(home.Target, adapter.SkillsDir)
+			if adapter.SkillsDir != "" && within(skillRoot, path) {
+				rel, err := filepath.Rel(skillRoot, path)
+				parts := strings.Split(filepath.ToSlash(rel), "/")
+				if err == nil && len(parts) > 1 && identifier.MatchString(parts[0]) {
+					return nil
+				}
+			}
+		}
+		for _, p := range u.Profiles {
+			if p.OldLock.Digest == p.NewLock.Digest && path == filepath.Join(u.Manager.Path, "profiles", p.Name, "lock.json") {
+				return nil
+			}
+		}
+		return invalid("MCP target outside fixed settings/ownership/skill slots")
+	}
+
 	if class == "installed-profile" {
 		if u.Action == Remove {
 			for _, profile := range u.Profiles {
@@ -206,4 +242,8 @@ func managedOwnedLeaf(adapterID, root, path string) bool {
 		return rel == "SYSTEM.md" || rel == "APPEND_SYSTEM.md"
 	}
 	return false
+}
+
+func bytesEqualHome(a, b HomeImage) bool {
+	return a.Kind == b.Kind && string(a.Marker) == string(b.Marker) && string(a.Origin) == string(b.Origin)
 }

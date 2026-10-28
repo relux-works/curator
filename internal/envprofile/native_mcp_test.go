@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/relux-works/curator/internal/envorigin"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -62,6 +63,28 @@ func nativeWriterFixture(t *testing.T) (*managedFixture, ProfileMCPRequest) {
 	fx.lockHash, err = contextlock.Write(lockPath(fx.home, fx.profile), lock)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The first MCP installation is distinct from first home provisioning.
+	// Establish the real recorded homes through Resolve, with only fixture account
+	// evidence. ProfileMCP must preserve this authority rather than invent it.
+	for _, id := range []string{"claude_code", "codex_cli"} {
+		resolve := fx.request(id)
+		resolve.Repair = true
+		if _, err := Resolve(resolve); err != nil {
+			t.Fatal(err)
+		}
+		// The operator may remove an owned generated MCP alias before enrolling the
+		// separate native writer. Fixture setup never follows or copies that alias.
+		if err := os.Remove(nativeWriterPath(fx, id)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		adapter, _ := envregistry.ByID(id)
+		leaf := filepath.Join(ManagedHomeDir(fx.home, fx.profile, id), adapter.SkillsDir, "myskill")
+		if info, err := os.Lstat(leaf); err == nil && info.Mode()&os.ModeSymlink != 0 {
+			if err := os.Remove(leaf); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	return fx, ProfileMCPRequest{Home: fx.home, Profile: fx.profile, Scope: "profile", Mode: "install", Environments: []string{"claude_code", "codex_cli"}, qualified: func(string) bool { return true }}
 }
@@ -526,6 +549,8 @@ func TestProfileMCPChangedInputsRefuse(t *testing.T) {
 				if err == nil {
 					t.Fatal("changed parent accepted")
 				}
+			} else if kind == "lock" {
+				requireMCPError(t, err, envorigin.DiagInvalid)
 			} else {
 				requireMCPError(t, err, "transaction_input_changed")
 			}
@@ -1017,9 +1042,40 @@ func TestProfileMCPMultipleRecords(t *testing.T) {
 			pin := writeGitStoreFixture(t, fx.home, "mcp", "second-tool", source, map[string]string{"agent-mcp.json": `{"schema_version":1,"name":"second-tool","version":"1.2.0","server":{"transport":"stdio","command":"fixture-mcp","args":[],"environments":["claude_code","codex_cli"]}}`})
 			lock.Members = append(lock.Members, contextlock.Member{Kind: contextlock.KindMCP, Name: "second-tool", Source: source, Version: "1.2.0", Commit: pin, RequiredBy: []string{fx.profile}})
 			lock.Sort()
-			if _, err = contextlock.Write(lockPath(fx.home, fx.profile), lock); err != nil {
-				t.Fatal(err)
+			canonical, e := lock.Canonical()
+			if e != nil {
+				t.Fatal(e)
 			}
+			// Preserve captured origin while changing only this fixture's installed
+			// declaration. Deliberate wrong-lock refusal is tested separately.
+			old, oldHash, e := readLock(fx.home, fx.profile)
+			_ = old
+			if e != nil {
+				t.Fatal(e)
+			}
+			for _, id := range []string{"claude_code", "codex_cli"} {
+				target := ManagedHomeDir(fx.home, fx.profile, id)
+				marker, e := envmarker.Read(target)
+				if e != nil {
+					t.Fatal(e)
+				}
+				raw := nativeRead(t, filepath.Join(target, envorigin.Name))
+				before := envorigin.Binding{Profile: fx.profile, LockSHA256: "sha256:" + strings.TrimPrefix(oldHash, "sha256:"), ManagedTarget: target}
+				after := before
+				after.LockSHA256 = "sha256:" + strings.TrimPrefix(contextlock.HashBytes(canonical), "sha256:")
+				rebound, e := envorigin.Rebind(raw, before, after, id, fx.home)
+				if e != nil {
+					t.Fatal(e)
+				}
+				marker.Profile.LockSHA256 = strings.TrimPrefix(after.LockSHA256, "sha256:")
+				body, e := marker.Marshal()
+				if e != nil {
+					t.Fatal(e)
+				}
+				nativeWrite(t, filepath.Join(target, envmarker.Name), body)
+				nativeWrite(t, filepath.Join(target, envorigin.Name), rebound)
+			}
+			nativeWrite(t, lockPath(fx.home, fx.profile), canonical)
 			result, err := ProfileMCP(req)
 			if err != nil || !result.Published || len(result.Rows) != 4 {
 				t.Fatalf("multiple records: %+v %v", result, err)
@@ -1416,5 +1472,41 @@ func TestProfileMCPLedgerParentPermissionRace(t *testing.T) {
 	info, err := os.Lstat(parent)
 	if err != nil || info.Mode().Perm() != 0o755 {
 		t.Fatalf("refusal repaired external mode: %v", err)
+	}
+}
+
+// Invalid private authority refuses at the real owner before parent allocation
+// or protection, including an inactive adapter. This pairs the actual first-
+// install successes above, rather than treating an early generic error as proof.
+func TestProfileMCPOriginBeforeParents(t *testing.T) {
+	for _, state := range []string{"missing", "malformed", "inactive"} {
+		t.Run(state, func(t *testing.T) {
+			fx, req := nativeWriterFixture(t)
+			id := "codex_cli"
+			if state == "inactive" {
+				req.Environments = []string{"claude_code"}
+			}
+			path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, id), envorigin.Name)
+			if state == "missing" {
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				nativeWrite(t, path, []byte("{}"))
+			}
+			before := nativeSnapshot(t, fx.home)
+			calls := 0
+			req.qualified = func(string) bool { calls++; return true }
+			req.beforePublish = func() { calls++ }
+			result, err := ProfileMCP(req)
+			want := envorigin.DiagInvalid
+			if state == "missing" {
+				want = envorigin.DiagRequired
+			}
+			requireMCPError(t, err, want)
+			if calls != 0 || result.Published || nativeSnapshot(t, fx.home) != before {
+				t.Fatal("invalid origin reached MCP effects/qualification")
+			}
+		})
 	}
 }
