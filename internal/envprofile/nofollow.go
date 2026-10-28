@@ -10,9 +10,34 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
+
+// plannedManagedPath permits only a proven absent environments root below an
+// existing, owned manager parent. It creates and protects nothing. The actual
+// parent entries and every target are pinned by the complete unit journal.
+func plannedManagedPath(root, rel string) (string, error) {
+	parts, err := managedPathParts(rel)
+	if err != nil {
+		return "", err
+	}
+	state, err := stateread.Lstat(root)
+	if err != nil {
+		return "", err
+	}
+	if state.Kind == stateread.KindAbsent {
+		if err := pathboundary.ValidateRoot(filepath.Dir(root)); err != nil {
+			return "", err
+		}
+		return filepath.Join(append([]string{root}, parts...)...), nil
+	}
+	if err := pathboundary.ValidateRoot(root); err != nil {
+		return "", err
+	}
+	return managedPath(root, rel, false)
+}
 
 // managedPath joins a path below root after checking each existing parent
 // component with lstat semantics. Components at or above root are allowed to

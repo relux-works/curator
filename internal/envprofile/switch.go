@@ -14,12 +14,10 @@
 // Serialization and durability (see lock.go): every switch holds the
 // manager-home mutation lock, and the manager-home records it moves — the
 // current and scope pointers — commit through the internal/transaction
-// journal. The per-entry agent-home payloads are not transaction targets in
-// this stage: one Plan commits all-or-nothing with rollback, while §9.2
-// requires partial success persisted, and the engine's sidecar backups
-// cannot produce the specified §8.3 versioned generations. Entries stay
-// direct writes under the held lock; re-running profile use converges the
-// scope from the lock, which is the specified recovery path.
+// journal. Each in-place entry uses an enumerated durable publication unit,
+// including its versioned backups and marker. Successful earlier entries may
+// remain on a partial scope result (§9.2). Managed repair instead joins its
+// participating native skills and managed home in one complete unit.
 //
 // Every replaced file is backed up into a versioned generation
 // .agent-environment-backup/<n>/ beside the marker (environments §8.3),
@@ -35,7 +33,6 @@
 package envprofile
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,8 +44,10 @@ import (
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envlifecycle"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/opaquescan"
@@ -96,40 +95,6 @@ func adapterByID(id string) (Adapter, bool) {
 	return Adapter{}, false
 }
 
-// NativeHome resolves the adapter's native default home. The mechanism
-// variable names the home, except for opencode where it names the XDG
-// parent and the tool reads the opencode child (environments §7.1). The
-// four defaults below the user home are implementation choices the
-// specification's mechanism implies but does not spell; every test pins
-// homes through the variables instead.
-func NativeHome(adapter Adapter) (string, error) {
-	if adapter.ID == "opencode" {
-		if value := os.Getenv(adapter.EnvVar); value != "" {
-			return filepath.Join(value, "opencode"), nil
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("no home directory for %s: set %s", adapter.ID, adapter.EnvVar)
-		}
-		return filepath.Join(home, ".config", "opencode"), nil
-	}
-	if value := os.Getenv(adapter.EnvVar); value != "" {
-		return value, nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("no home directory for %s: set %s", adapter.ID, adapter.EnvVar)
-	}
-	return filepath.Join(home, adapter.DefaultDir), nil
-}
-
-func resolveNativeHome(adapter Adapter, resolver func(string) (string, error)) (string, error) {
-	if resolver != nil {
-		return resolver(adapter.ID)
-	}
-	return NativeHome(adapter)
-}
-
 // EntryResult is the per-adapter outcome of a switch. Notice carries the
 // section 9.5 takeover notice for the entry; Warnings carries the
 // non-blocking onboarding findings (the dotfile-manager heuristic).
@@ -140,6 +105,7 @@ type EntryResult struct {
 	Detail   string
 	Notice   string
 	Warnings []string
+	cause    error
 }
 
 // Use switches the machine scope (environment and target both empty) or one
@@ -255,6 +221,15 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			return nil, err
 		}
 	}
+	activation, err := planScopePublication(home, scope, effective, clearScope)
+	if err != nil {
+		return nil, err
+	}
+	if !clearScope {
+		if results, handled, err := continueRetainedGlobals(op, home, name, policy, &activation); handled || err != nil {
+			return results, err
+		}
+	}
 	if hashing.WriteVersion() == hashing.VersionV2 {
 		lock, _, err := readLock(home, effective)
 		if err != nil {
@@ -272,6 +247,10 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			}
 		}
 	}
+	g := newHomePublicationGroup()
+	defer g.close()
+	op.publicationGroup = g
+	defer func() { op.publicationGroup = nil }()
 	results, err := materializeScope(op, home, effective, environment, policy)
 	if err != nil {
 		return results, err
@@ -283,39 +262,61 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 	}
 	if failed {
-		return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
+		return results, fmt.Errorf("%s: scope planning refused; surfaces and current are unchanged", DiagUsePartial)
 	}
-	// The recorded current moves only after the whole scope materialized,
-	// and it moves through the operation journal, so a crash here recovers
-	// to either the old current (journal resumes) or the new one — never a
-	// half-written pointer. A journal failure after switched entries is
-	// itself a partial switch: the entries no longer match the recorded
-	// current.
+	if g.unit != nil {
+		if err := op.commitHomeGroup(home, g, activation.files, activation.removals, nil, nil); err != nil {
+			return results, err
+		}
+	} else if err := op.publish(activation.files, activation.removals...); err != nil {
+		return results, err
+	}
+	return results, nil
+}
+
+type scopePublication struct {
+	files    map[string][]byte
+	removals []string
+}
+
+// Current pointers are planned before any home publication, then enlisted in
+// the same whole-scope unit. Clearing includes both supported filename forms.
+func planScopePublication(home, scope, effective string, clear bool) (scopePublication, error) {
+	publication := scopePublication{files: map[string][]byte{}}
 	if scope == "" {
 		removals, err := scopeRecordsEqualToProfile(home, effective)
 		if err != nil {
-			return results, err
+			return publication, err
 		}
-		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(effective + "\n")}, removals...); err != nil {
-			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
-		}
-	} else {
-		machine, err := Current(home)
-		if err != nil {
-			return results, err
-		}
-		if clearScope || effective == machine {
-			// A scope-clear is one unlink under the held lock: crash
-			// before it retries the clear, crash after it has converged.
-			// It is not journaled as an absence target in this stage.
-			if err := SetScoped(home, scope, "", true); err != nil {
-				return results, err
+		publication.files[CurrentFile(home)] = []byte(effective + "\n")
+		publication.removals = removals
+		return publication, nil
+	}
+	machine, err := Current(home)
+	if err != nil {
+		return publication, err
+	}
+	path := filepath.Join(ScopedDir(home), scopeFileName(scope))
+	if !clear && effective != machine {
+		publication.files[path] = []byte(effective + "\n")
+	}
+	for _, spelling := range []string{scopeFileName(scope), scope} {
+		candidate := filepath.Join(ScopedDir(home), spelling)
+		if _, err := os.Lstat(candidate); err == nil {
+			if _, written := publication.files[candidate]; !written {
+				found := false
+				for _, prior := range publication.removals {
+					found = found || prior == candidate
+				}
+				if !found {
+					publication.removals = append(publication.removals, candidate)
+				}
 			}
-		} else if err := op.publish(map[string][]byte{filepath.Join(ScopedDir(home), scopeFileName(scope)): []byte(effective + "\n")}); err != nil {
-			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
+		} else if !os.IsNotExist(err) {
+			return publication, err
 		}
 	}
-	return results, nil
+	return publication, nil
 }
 
 // scopeRecordsEqualToProfile returns every on-disk spelling of each scope
@@ -397,6 +398,9 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
+	if results, handled, err := continueRetainedGlobals(op, home, "", policy, nil); handled || err != nil {
+		return results, err
+	}
 	if err := preflightCurrentPathSources(home, policy); err != nil {
 		return nil, err
 	}
@@ -410,6 +414,10 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 	if machine == "" {
 		machine = DefaultProfile
 	}
+	g := newHomePublicationGroup()
+	defer g.close()
+	op.publicationGroup = g
+	defer func() { op.publicationGroup = nil }()
 	var results []EntryResult
 	machineResults, err := materializeScope(op, home, machine, "", policy)
 	if err != nil {
@@ -432,6 +440,14 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 			return append(results, scopeResults...), err
 		}
 		results = append(results, scopeResults...)
+	}
+	for _, row := range results {
+		if !row.OK {
+			return results, fmt.Errorf("%s: scope planning refused; all surfaces are unchanged", DiagUsePartial)
+		}
+	}
+	if err := op.commitHomeGroup(home, g, nil, nil, nil, nil); err != nil {
+		return results, err
 	}
 	return results, nil
 }
@@ -458,6 +474,11 @@ func materializeScopeWithNativeHome(op *operation, home, profile, environment st
 	if err != nil {
 		return nil, err
 	}
+	return materializeScopeObserved(op, home, profile, environment, policy, nativeHomeOf, source, lock, hash)
+}
+
+func materializeScopeObserved(op *operation, home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error), source Source, lock *contextlock.Lock, hash string) ([]EntryResult, error) {
+	var err error
 	if err := validateProfilePathSources(profile, source, policy); err != nil {
 		return nil, err
 	}
@@ -511,6 +532,11 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 	if err != nil {
 		return err
 	}
+	return preflightInPlaceObserved(home, profile, environment, policy, nativeHomeOf, source, lock, hash)
+}
+
+func preflightInPlaceObserved(home, profile, environment string, policy Policy, nativeHomeOf func(string) (string, error), source Source, lock *contextlock.Lock, hash string) error {
+	var err error
 	if err := validateProfilePathSources(profile, source, policy); err != nil {
 		return err
 	}
@@ -543,7 +569,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 		}
 	}
 	for _, adapter := range adapters {
-		native, err := resolveNativeHome(adapter, nativeHomeOf)
+		native, err := resolveNativeHome(home, adapter, nativeHomeOf)
 		if err != nil {
 			return err
 		}
@@ -583,7 +609,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 		for _, skill := range skills {
 			want[filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))] = true
 		}
-		ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
+		ledger, err := inPlaceSkillsLedger(home, native, adapter, skills, recorded)
 		if err != nil {
 			return err
 		}
@@ -626,7 +652,11 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 				}
 			}
 			if !policy.Takeover {
-				return fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, inPlaceConflictPath(path))
+				image, err := envunit.ObserveTarget(full, "owned-bytes")
+				if err != nil {
+					return err
+				}
+				return &globalInPlaceConflict{error: fmt.Errorf("%s: %s exists and no marker records it", DiagUnmanagedConflict, inPlaceConflictPath(path)), capture: envlifecycle.ConflictReceipt{Code: DiagUnmanagedConflict, Phase: "profile_in_place", Profile: profile, Adapter: adapter.ID, Target: full, Surface: path, Entry: image, Publication: "sha256:" + strings.TrimPrefix(hash, "sha256:"), Sequence: 1}}
 			}
 		}
 	}
@@ -689,24 +719,12 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 // rather than overwrite.
 func materializeOne(op *operation, home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, skills []skillOf, adapter Adapter, policy Policy, nativeHomeOf func(string) (string, error)) (out EntryResult) {
 	takeover := policy.Takeover
-	native, err := resolveNativeHome(adapter, nativeHomeOf)
+	native, err := resolveNativeHome(home, adapter, nativeHomeOf)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
 	}
 	document, written, err := contextmaterialize.Monolithic(lock, hash, precedence, adapter.ID, packages)
 	if err != nil {
-		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-	}
-	if err := op.captureNative(native, adapter, skills); err != nil {
-		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
-	}
-	defer func() {
-		if err := op.recordHomePostimages(native); err != nil {
-			out.OK = false
-			out.Detail = fmt.Sprintf("%s; record native postimage: %v", out.Detail, err)
-		}
-	}()
-	if err := os.MkdirAll(native, 0o755); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
 	if err := checkManagedPrivateTarget(native, envmarker.Name); err != nil {
@@ -728,12 +746,12 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	if written {
 		want[adapter.Target] = true
 	}
-	ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
+	ledger, err := inPlaceSkillsLedger(home, native, adapter, skills, recorded)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 	}
 	for path := range recorded {
-		if _, err := managedPath(native, path, false); err != nil {
+		if _, err := nativeSurfacePath(home, native, path); err != nil {
 			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 		}
 		if ledgerSkillPath(adapter, path, ledger) {
@@ -756,7 +774,7 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 		want[path] = true
 	}
 	for path := range want {
-		if _, err := managedPath(native, path, false); err != nil {
+		if _, err := nativeSurfacePath(home, native, path); err != nil {
 			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 		}
 	}
@@ -773,7 +791,7 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 		if recorded[path] {
 			continue
 		}
-		full, err := managedPath(native, path, false)
+		full, err := nativeSurfacePath(home, native, path)
 		if err != nil {
 			result.OK = false
 			result.Detail = err.Error()
@@ -827,160 +845,11 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	if hint := foreignManagerHint(); hint != "" && len(taken) > 0 {
 		result.Warnings = append(result.Warnings, DiagForeignSuspect+": "+hint+" appears to manage this machine and will overwrite managed surfaces on its next apply")
 	}
-	generation := 0
-	if len(want) > 0 {
-		backupWant := map[string]bool{}
-		for path := range want {
-			full, err := managedPath(native, path, false)
-			if err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-			state, err := stateread.Lstat(full)
-			if err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-			if state.Kind == stateread.KindAbsent {
-				continue
-			}
-			info := state.Info
-			if info.Mode().IsRegular() || info.Mode().IsDir() || info.Mode()&os.ModeSymlink != 0 {
-				backupWant[path] = true
-			}
-		}
-		if len(backupWant) > 0 {
-			generation, err = openBackupWithDirectoryRead(native, "", backupWant, policy.backupReadDirectory)
-			if err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-		}
+	if err := planNativePublication(op, home, native, profile, source, lock, hash, precedence, order, skills, adapter, prior, recorded, want, skillLinks, skillHashes, skillPaths, document, written); err != nil {
+		result.Detail = err.Error()
+		result.cause = err
+		return result
 	}
-	// Remove recorded files the new profile no longer wants.
-	if prior != nil {
-		for path := range recorded {
-			if !want[path] {
-				if err := removeManagedTree(native, path); err != nil {
-					return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
-				}
-			}
-		}
-	}
-	surface := envmarker.Surface{Paths: []string{}, Form: "monolithic"}
-	copies := []envmarker.Copy{}
-	if written {
-		if adapter.ID == "claude_code" {
-			if err := atomicManagedFile(native, adapter.Target, document, 0o644); err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-			copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonClaudeCodeRootContext})
-		} else {
-			storeFile, err := writeStoreDocument(home, profile, adapter, document)
-			if err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-			if err := op.recordPostimages(storeFile); err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
-			}
-			if err := replaceLink(native, adapter.Target, storeFile); err != nil {
-				// Copy fallback uses the same atomic replacement
-				// discipline as a linked surface.
-				if writeErr := atomicManagedFile(native, adapter.Target, document, 0o644); writeErr != nil {
-					return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: writeErr.Error()}
-				}
-				copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonSymlinkFallback})
-			}
-		}
-		surface.Paths = []string{adapter.Target}
-		surface.ContentSHA256 = func() string {
-			digest, _ := contextmaterialize.SurfaceHashWithVersion(map[string][]byte{adapter.Target: document}, lock.ContentHashVersion())
-			return digest
-		}()
-	}
-	surface.Copies = &copies
-	marker := &envmarker.Marker{
-		Version: 1,
-		Profile: envmarker.Profile{
-			Name: profile, Root: lock.Root, Kind: markerKind(source),
-			LockSHA256: strings.TrimPrefix(hash, "sha256:"),
-			Source:     markerSource(source), Requirement: markerRequirement(source),
-			Directory: source.Directory, SourcePath: markerSourcePath(source),
-			ImportedFromNative: source.ImportedFromNative,
-		},
-		Precedence: envmarker.Precedence{Winner: precedence.Winner, Placement: precedence.Placement},
-		Mode:       envmarker.ModeLinked,
-		Surfaces:   map[string]envmarker.Surface{},
-	}
-	if lock.ContentHashVersion() == 2 {
-		marker.Version = envmarker.VersionV3
-		marker.HashVersion = 2
-	}
-	for _, member := range order {
-		entry := envmarker.Member{Name: member.Name, Version: member.Version, Weight: member.Weight, Overlay: member.Overlay}
-		if member.Commit != "" {
-			entry.Commit = member.Commit
-		} else {
-			entry.StateSHA256 = member.StateHash
-		}
-		marker.Members = append(marker.Members, entry)
-	}
-	if written {
-		marker.Surfaces[envmarker.SurfaceRootContext] = surface
-	}
-	for _, skill := range skills {
-		if err := publishSkillProjection(op, home, skill); err != nil {
-			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
-		}
-	}
-	sort.Strings(skillPaths)
-	skillCopies := []envmarker.Copy{}
-	for _, path := range skillPaths {
-		full, err := managedPath(native, path, false)
-		if err != nil {
-			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-		}
-		state, err := stateread.Lstat(full)
-		if err != nil {
-			return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-		}
-		if state.Kind == stateread.KindPresent && state.Info != nil && state.Info.IsDir() && state.Info.Mode()&os.ModeSymlink == 0 {
-			if err := removeManagedTree(native, path); err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-		}
-		if err := replaceLink(native, path, skillLinks[path]); err != nil {
-			var unavailable *errSymlinkUnavailable
-			if !errors.As(err, &unavailable) {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: fmt.Sprintf("link %s: %v", path, err)}
-			}
-			if err := removeManagedTree(native, path); err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-			}
-			if err := copyTree(skillLinks[path], native, path); err != nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: fmt.Sprintf("link %s: %v; copy fallback: %v", path, unavailable, err)}
-			}
-			skillCopies = append(skillCopies, envmarker.Copy{Path: path, Reason: envmarker.ReasonSymlinkFallback})
-		}
-	}
-	if len(skillPaths) > 0 {
-		marker.Surfaces[envmarker.SurfaceSkills] = envmarker.Surface{
-			Paths: skillPaths, ContentSHA256: func() string {
-				digest, _ := contextmaterialize.SurfaceHashWithVersion(skillHashes, lock.ContentHashVersion())
-				return digest
-			}(), Copies: &skillCopies,
-		}
-	}
-	payload, err := marker.Marshal()
-	if err != nil {
-		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-	}
-	// The marker is curator-owned state: never follow a link to it either.
-	if err := atomicManagedFile(native, envmarker.Name, payload, 0o644); err != nil {
-		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
-	}
-	_ = generation
-	// Every file the entry replaced was copied into the next backup
-	// generation before the first write above (openBackup fails with
-	// environment_backup_exists when that generation already exists), so
-	// a takeover that reaches this line always has its backup.
 	result.OK = true
 	return result
 }
@@ -1194,50 +1063,6 @@ func writeStoreDocument(home, profile string, adapter Adapter, document []byte) 
 // replaceLink atomically replaces a managed surface entry with its store link.
 func replaceLink(native, rel, storeFile string) error {
 	return atomicManagedLink(native, rel, storeFile)
-}
-
-// purgeHomes removes the in-place surfaces, markers, and backup generations
-// of every home whose marker names profile, and the profile's managed
-// homes with their markers and backups after the notice (environments
-// §9.2). Retained homes without a profile are orphans env status reports.
-func purgeHomes(home, profile string) error {
-	type purgeTarget struct {
-		native string
-		marker *envmarker.Marker
-	}
-	var targets []purgeTarget
-	for _, adapter := range Adapters {
-		native, err := NativeHome(adapter)
-		if err != nil {
-			continue
-		}
-		marker, err := envmarker.Read(native)
-		if err != nil {
-			// Inspect every marker before the first write. A failed read is
-			// not evidence that this home has no surfaces for the profile.
-			return err
-		}
-		if marker == nil || marker.Profile.Name != profile {
-			continue
-		}
-		targets = append(targets, purgeTarget{native: native, marker: marker})
-	}
-	for _, target := range targets {
-		for _, surface := range target.marker.Surfaces {
-			for _, path := range surface.Paths {
-				_ = os.Remove(filepath.Join(target.native, path))
-			}
-		}
-		_ = os.Remove(filepath.Join(target.native, envmarker.Name))
-		_ = os.RemoveAll(filepath.Join(target.native, ".agent-environment-backup"))
-	}
-	// Managed homes hold the operator's session data and are retained
-	// unless purged; a purge removes the profile's environments directory
-	// with every home, marker, and backup generation. The profile name is
-	// the only profile-derived component below the environments root, so
-	// the directory holds exactly this profile's homes.
-	_ = os.RemoveAll(filepath.Join(EnvRoot(home), profile))
-	return nil
 }
 
 // splitScope splits a scope key into environment and target.

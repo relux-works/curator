@@ -186,7 +186,7 @@ func importLocked(op *operation, home string, options ImportOptions) (Info, bool
 }
 
 // importNativeHome resolves the native default home of one environment.
-func importNativeHome(options ImportOptions, id string) (string, error) {
+func importNativeHome(home string, options ImportOptions, id string) (string, error) {
 	if options.NativeHomeOf != nil {
 		return options.NativeHomeOf(id)
 	}
@@ -194,7 +194,7 @@ func importNativeHome(options ImportOptions, id string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%s: unregistered environment %q", DiagUnknownEnvironment, id)
 	}
-	return NativeHome(adapter)
+	return resolveNativeHome(home, adapter, nil)
 }
 
 // importSkillsDir resolves the skills surface one adapter's detected
@@ -228,7 +228,7 @@ func detectNative(home string, options ImportOptions) ([]detectedRoot, []detecte
 	var skills []detectedSkill
 	var losses []ImportLoss
 	for _, adapter := range Adapters {
-		native, err := importNativeHome(options, adapter.ID)
+		native, err := importNativeHome(home, options, adapter.ID)
 		if err != nil || native == "" {
 			continue
 		}

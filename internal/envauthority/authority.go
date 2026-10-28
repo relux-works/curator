@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -29,7 +31,23 @@ func RequirePerHome(marker *envmarker.Marker) error {
 // payloads, native homes and credential stores are never walked.
 // Callers revalidate under their mutation lock and after recovery. Absence is
 // allowed for first provisioning; unreadable or unsafe authority fails closed.
-func Validate(home string) error {
+func Validate(home string) error { return validate(home, nil) }
+
+func validate(home string, intent *envunit.Unit) error {
+	if _, err := ReadCompletedLegacyMigration(home); err != nil {
+		return err
+	}
+	pending, err := PendingUnits(home)
+	if err != nil {
+		return err
+	}
+	lifecycle, err := inspectLifecycle(home, pending)
+	if err != nil {
+		return err
+	}
+	if err := validateLeaseReferences(home, lifecycle, pending); err != nil {
+		return err
+	}
 	root := filepath.Join(home, "environments")
 	state, err := stateread.Lstat(root)
 	if err != nil {
@@ -47,12 +65,36 @@ func Validate(home string) error {
 		return err
 	}
 	for _, profile := range profiles.Entries {
-		if !profile.IsDir() && profile.Type().IsRegular() {
+		if pending.Artifacts[filepath.Join(root, profile.Name())] {
+			continue
+		}
+		if !profile.IsDir() {
+			return fmt.Errorf("%s: unknown environment namespace entry", envorigin.DiagInvalid)
+		}
+		// Project views have a separate composition/lease owner and directory
+		// grammar; they are not profile × adapter managed-home namespaces.
+		if profile.Name() == "project-views" {
 			continue
 		}
 		dir := filepath.Join(root, profile.Name())
 		if err := pathboundary.ValidateRouteWithOwner(root, dir, owner); err != nil {
 			return boundary(err)
+		}
+		listing, err := stateread.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		known := map[string]bool{}
+		for _, adapter := range envregistry.Registry {
+			known[adapter.ID] = true
+		}
+		for _, child := range listing.Entries {
+			if pending.Artifacts[filepath.Join(dir, child.Name())] {
+				continue
+			}
+			if !known[child.Name()] || !child.IsDir() {
+				return fmt.Errorf("%s: unknown managed adapter namespace", envorigin.DiagInvalid)
+			}
 		}
 		for _, adapter := range envregistry.Registry {
 			target := filepath.Join(dir, adapter.ID)
@@ -60,18 +102,35 @@ func Validate(home string) error {
 				target = filepath.Join(target, "opencode")
 			}
 			markerPath := filepath.Join(target, envmarker.Name)
-			if err := pathboundary.ValidateRouteWithOwner(root, markerPath, owner); err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					continue
-				}
+			if err := pathboundary.ValidateRouteWithOwner(root, markerPath, owner); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return boundary(err)
 			}
+			// Missing marker is still inspected for an orphan origin sidecar.
+			// It does not skip authority validation for the adapter namespace.
 			marker, err := envmarker.Read(target)
 			if err != nil {
 				return err
 			}
 			if err := RequirePerHome(marker); err != nil {
 				return err
+			}
+			if !lifecycle.retained[target] {
+				if _, isPending := pending.Homes[target]; !isPending {
+					if err := validateRecorded(home, profile.Name(), adapter.ID, target, marker, intent); err != nil {
+						return err
+					}
+				}
+			}
+			if marker != nil && !lifecycle.retained[target] {
+				if _, pending := pending.Homes[target]; !pending {
+					_, present, err := envorigin.ReadOwnedRecord(home, filepath.Join(home, "profiles", profile.Name(), "source.json"), 16<<20)
+					if err != nil {
+						return err
+					}
+					if !present {
+						return fmt.Errorf("%s: unexplained orphan managed home", envorigin.DiagInvalid)
+					}
+				}
 			}
 		}
 	}

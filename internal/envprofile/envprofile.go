@@ -44,6 +44,7 @@ import (
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envauthority"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
@@ -189,14 +190,13 @@ func validProfileName(name string) bool { return identifiers.Valid(name) }
 // readSource loads a profile's install record.
 func readSource(home, name string) (Source, error) {
 	path := sourcePath(home, name)
-	result, err := stateread.ReadFile(path) // #nosec G304 -- profile name validated by callers
+	payload, present, err := envorigin.ReadOwnedRecord(home, path, 16<<20)
 	if err != nil {
-		return Source{}, err
+		return Source{}, fmt.Errorf("%s: %w", DiagSourceInvalid, stateread.UnusableError(path, err))
 	}
-	if result.Kind == stateread.KindAbsent {
+	if !present {
 		return Source{}, fmt.Errorf("%s: %w: no installed profile %q", DiagNotFound, stateread.AbsentError(path), name)
 	}
-	payload := result.Bytes
 	if err := protocoljson.Validate(payload); err != nil {
 		return Source{}, fmt.Errorf("%s: %w: profile %q source is malformed: %v", DiagSourceInvalid, stateread.UnusableError(path, err), name, err)
 	}
@@ -330,13 +330,14 @@ func Current(home string) (string, error) {
 
 // SetCurrent records the machine current profile.
 func SetCurrent(home, name string) error {
-	if err := envauthority.Validate(home); err != nil {
+	op, err := beginOperationValidated(home, func() error {
+		return envauthority.SelectedLifecycle(home, name)
+	})
+	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(ProfilesDir(home), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(CurrentFile(home), []byte(name+"\n"), 0o644)
+	defer op.close()
+	return op.publish(map[string][]byte{CurrentFile(home): []byte(name + "\n")})
 }
 
 // ScopedCurrents returns the per-scope current map (scope key to profile).
@@ -375,36 +376,40 @@ func ScopedCurrents(home string) (map[string]string, error) {
 
 // SetScoped records (or with clear=true, drops) a scope's current profile.
 func SetScoped(home, scope, name string, clearScope bool) error {
-	if err := envauthority.Validate(home); err != nil {
-		return err
+	// Scope keys name direct records, never paths into another namespace.
+	if scope == "" || scope == "." || scope == ".." || strings.ContainsAny(scope, "/\\") {
+		return fmt.Errorf("%s: invalid scope key", DiagSourceInvalid)
 	}
-	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
-	if clearScope {
-		err := os.Remove(file)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		// A pre-encoding literal record superseded by the encoded one
-		// must not resurrect the scope: drop it best-effort. It can only
-		// exist where a colon is a legal filename, so any error here is
-		// not the record's absence on this platform — but the encoded
-		// record above is authoritative, and a stale scratch-home file
-		// must never fail a clear.
-		if legacy := filepath.Join(ScopedDir(home), scope); legacy != file {
-			_ = os.Remove(legacy)
+	op, err := beginOperationValidated(home, func() error {
+		if !clearScope {
+			return envauthority.SelectedLifecycle(home, name)
 		}
 		return nil
-	}
-	if err := os.MkdirAll(ScopedDir(home), 0o755); err != nil {
+	})
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(file, []byte(name+"\n"), 0o644); err != nil {
-		return err
+	defer op.close()
+	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
+	files := map[string][]byte{}
+	if !clearScope {
+		files[file] = []byte(name + "\n")
 	}
-	if legacy := filepath.Join(ScopedDir(home), scope); legacy != file {
-		_ = os.Remove(legacy)
+	var removals []string
+	for _, candidate := range []string{file, filepath.Join(ScopedDir(home), scope)} {
+		if _, written := files[candidate]; written {
+			continue
+		}
+		if len(removals) > 0 && removals[0] == candidate {
+			continue
+		}
+		if _, err := os.Lstat(candidate); err == nil {
+			removals = append(removals, candidate)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
 	}
-	return nil
+	return op.publish(files, removals...)
 }
 
 // InUseByAnyScope reports whether name is current in any scope.
@@ -437,6 +442,7 @@ func InUseByAnyScope(home, name string) (bool, error) {
 // regardless of any enabled flag — an advisory profile install does not
 // exist.
 type Policy struct {
+	EnvironmentMachine   envregistry.MachineConfig
 	AllowedSources       []string
 	MCPAllowlist         []string
 	SourceSigners        map[string][]contextresolve.Signer
@@ -607,6 +613,7 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 		return Policy{OverlaysAllowed: true, OverlayDefaultWeight: config.DefaultOverlayWeight}
 	}
 	policy := Policy{
+		EnvironmentMachine:      MachineFromConfig(cfg),
 		AllowedSources:          cfg.AllowedSources,
 		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
 		SourceSigners:           make(map[string][]contextresolve.Signer, len(cfg.Env.SourceSigners)),
@@ -723,6 +730,7 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 
 // installLocked installs under the held operation lock.
 func installLocked(op *operation, home string, options InstallOptions) (Info, bool, bool, error) {
+	op.policy = options.Policy
 	kind := installOperandKind(options.Operand)
 	if kind == identity.SourceInvalid {
 		return Info{}, false, false, sourceKindRefusal("operand", options.Operand)
@@ -1205,6 +1213,7 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 
 // updateLocked re-resolves under the held operation lock.
 func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+	op.policy = policy
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
 	}
@@ -1422,18 +1431,28 @@ func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
 	return nil
 }
 
-// Remove deletes a profile that is current in no scope and an overlay of
-// none. With purge, in-place surfaces recorded by its markers, the markers,
-// and the backup generations are removed too. Remove holds the
-// manager-home mutation lock; the profile directory goes with one RemoveAll
-// under it, which is already atomic at the granularity the manager
-// observes, so no journal is needed for the removal itself.
+// Remove deletes installed records for a profile that is current in no scope
+// and an overlay of none. Managed homes, markers, origins and backup generations
+// remain in nonlaunchable custody by default; native in-place surfaces have a
+// separate unmanage owner. Installed records and the private removal receipt
+// commit together. Purge then quarantines only receipt-bound managed homes and
+// resumes committed cleanup, including a later absent-source purge.
 func Remove(home, name string, purge bool) error {
 	op, err := beginOperation(home)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = op.close() }()
+	if purge {
+		if handled, err := purgeRetained(op, home, name); handled || err != nil {
+			return err
+		}
+	}
+	if !purge {
+		if recorded, e := removedProfileRecorded(home, name); recorded || e != nil {
+			return e
+		}
+	}
 	if _, err := readSource(home, name); err != nil {
 		return err
 	}
@@ -1455,11 +1474,13 @@ func Remove(home, name string, purge bool) error {
 		return fmt.Errorf("%s: profile %q is named as an overlay of installed profile %q", DiagInUse, name, owner)
 	}
 	if purge {
-		if err := purgeHomes(home, name); err != nil {
+		if err := removeRetained(op, home, name); err != nil {
 			return err
 		}
+		_, err := purgeRetained(op, home, name)
+		return err
 	}
-	return os.RemoveAll(ProfileDir(home, name))
+	return removeRetained(op, home, name)
 }
 
 // overlayOwner reports whether the root package of profile name is an
@@ -2016,40 +2037,47 @@ func ensureDefault(op *operation, home string, policy Policy) error {
 	} else if !isStateAbsent(err) {
 		return err
 	}
-	staging, err := os.MkdirTemp("", "curator-default-root-*")
+	lock, sourcePayload, err := planDefault(home, policy)
 	if err != nil {
 		return err
+	}
+	canonical, err := lock.Canonical()
+	if err != nil {
+		return err
+	}
+	return op.publish(map[string][]byte{lockPath(home, DefaultProfile): canonical, sourcePath(home, DefaultProfile): sourcePayload})
+}
+
+// planDefault admits immutable snapshots only. Installed source/lock publication
+// belongs to the caller's real transaction, including first-use global failure.
+func planDefault(home string, policy Policy) (*contextlock.Lock, []byte, error) {
+	staging, err := os.MkdirTemp("", "curator-default-root-*")
+	if err != nil {
+		return nil, nil, err
 	}
 	defer func() { _ = os.RemoveAll(staging) }()
 	if err := os.WriteFile(filepath.Join(staging, contextpkg.ManifestName), []byte(defaultManifest), 0o644); err != nil {
-		return err
+		return nil, nil, err
 	}
 	_, key, err := contextstore.EnsureState(home, contextlock.KindContext, DefaultProfile, staging)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	members := []contextlock.Member{
 		{Kind: contextlock.KindContext, Name: DefaultProfile, StateHash: key, Version: "0.0.0"},
 	}
 	skills, err := migrateGlobalSkills(home, policy)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	members = append(members, skills...)
 	lock := &contextlock.Lock{Root: DefaultProfile, Members: members}
 	lock.Sort()
-	canonical, err := lock.Canonical()
-	if err != nil {
-		return err
-	}
 	sourcePayload, err := marshalSource(Source{Kind: KindLocal})
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	return op.publish(map[string][]byte{
-		lockPath(home, DefaultProfile):   canonical,
-		sourcePath(home, DefaultProfile): sourcePayload,
-	})
+	return lock, sourcePayload, nil
 }
 
 // migrateGlobalSkills snapshots the machine's global skill set at migration

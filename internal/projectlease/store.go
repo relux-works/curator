@@ -12,29 +12,18 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
-	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/projectleaserecord"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
-type entry struct {
-	Binding           Binding     `json:"binding"`
-	Composition       Composition `json:"composition"`
-	State             Phase       `json:"state"`
-	ProcessGeneration string      `json:"process_generation"`
-}
-type view struct {
-	Composition Composition        `json:"composition"`
-	Surfaces    map[string]Surface `json:"surfaces"`
-}
-type ledger struct {
-	Kind   string           `json:"kind"`
-	Leases map[string]entry `json:"leases"`
-	Views  map[string]view  `json:"views"`
-}
+type entry = projectleaserecord.Entry
+type view = projectleaserecord.View
+type ledger = projectleaserecord.Ledger
 
 // Manager is read-only until an operation acquires the shared mutation lock.
 // No background worker, TTL collector or launcher-exit hook owns these leases.
@@ -153,53 +142,7 @@ func load(home string) (*ledger, error) {
 	return l, nil
 }
 
-func decodeLedger(raw []byte) (*ledger, error) {
-	if len(raw) > maxRecord {
-		return nil, fmt.Errorf("project lease state exceeds record limit")
-	}
-	var l ledger
-	if err := protocoljson.UnmarshalCanonical(raw, &l); err != nil {
-		return nil, err
-	}
-	if l.Kind != "project-lease-state/1" || l.Leases == nil || l.Views == nil {
-		return nil, fmt.Errorf("invalid project lease state")
-	}
-	for id, e := range l.Leases {
-		if err := e.Binding.validate(); err != nil {
-			return nil, err
-		}
-		if id != e.Binding.LeaseID || e.Composition.validate() != nil || !matches(e.Binding, e.Composition) {
-			return nil, fmt.Errorf("project lease identity mismatch")
-		}
-		if e.State != Prepared && e.State != Active && e.State != Unknown && e.State != Released {
-			return nil, fmt.Errorf("invalid project lease phase")
-		}
-		if e.State == Active && e.ProcessGeneration == "" {
-			return nil, fmt.Errorf("active project lease lacks runner identity")
-		}
-		if len(e.ProcessGeneration) > 256 {
-			return nil, fmt.Errorf("invalid process generation")
-		}
-	}
-	for key, v := range l.Views {
-		if v.Composition.validate() != nil || key != homeRelative(v.Composition) || v.Surfaces == nil {
-			return nil, fmt.Errorf("invalid project view identity")
-		}
-		for path, file := range v.Surfaces {
-			if !safeSurface(path) || !hexPattern.MatchString(file.SHA256) || file.Size < 0 || file.Size > 16<<20 || (file.Mode != 0600 && file.Mode != 0700) {
-				return nil, fmt.Errorf("invalid generated surface inventory")
-			}
-		}
-	}
-	roundtrip, er := canonical(l)
-	if er != nil || string(roundtrip) != string(raw) {
-		return nil, fmt.Errorf("project lease state has missing or null fields")
-	}
-	return &l, nil
-}
-func matches(b Binding, c Composition) bool {
-	return b.ContextRef == c.Ref && b.ContextSHA256 == c.SHA256 && b.CheckoutID == c.CheckoutID && b.Environment == c.Environment && b.HomeRef == c.HomeRef
-}
+func decodeLedger(raw []byte) (*ledger, error) { return projectleaserecord.DecodeLedger(raw) }
 func nonce() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -209,6 +152,9 @@ func nonce() string {
 }
 
 func (m *Manager) locked(ctx context.Context, fn func(*ledger, *managerlock.HomeLock, *transaction.Engine) error) error {
+	if err := envauthority.Validate(m.home); err != nil {
+		return err
+	}
 	lm, err := managerlock.New(m.home)
 	if err != nil {
 		return err
@@ -236,6 +182,9 @@ func (m *Manager) locked(ctx context.Context, fn func(*ledger, *managerlock.Home
 	return fn(l, lock, engine)
 }
 func (m *Manager) publish(l *ledger, lock *managerlock.HomeLock, engine *transaction.Engine, files map[string][]byte, removals []string) error {
+	if err := m.admitLedger(l); err != nil {
+		return err
+	}
 	raw, err := canonical(l)
 	if err != nil {
 		return err
@@ -245,9 +194,6 @@ func (m *Manager) publish(l *ledger, lock *managerlock.HomeLock, engine *transac
 	}
 	files[statePath(m.home)] = raw
 	if err = checkedRoute(m.home, statePath(m.home)); err != nil {
-		return err
-	}
-	if err = privatedir.MakeAll(filepath.Dir(statePath(m.home))); err != nil {
 		return err
 	}
 	plan := transaction.Plan{TransactionID: "project-lease-" + nonce(), ProjectIdentity: "project-leases"}
@@ -270,16 +216,13 @@ func (m *Manager) publish(l *ledger, lock *managerlock.HomeLock, engine *transac
 		if err = checkedRoute(m.home, path); err != nil {
 			return err
 		}
-		if err = privatedir.MakeAll(filepath.Dir(path)); err != nil {
-			return err
-		}
 		pre, er := transaction.DigestTarget(transaction.KindBytes, path)
 		if er != nil {
 			return er
 		}
 		t := transaction.Target{Class: "project-lease", Identifier: path, LivePath: path, PreimageDigest: pre}
 		if payload, ok := files[path]; ok {
-			f, er := privatedir.CreateTemp(filepath.Dir(statePath(m.home)), "stage-*")
+			f, er := privatedir.CreateTemp("", "curator-lease-stage-*")
 			if er != nil {
 				return er
 			}
@@ -301,9 +244,22 @@ func (m *Manager) publish(l *ledger, lock *managerlock.HomeLock, engine *transac
 			if er != nil {
 				return er
 			}
+			info, er := os.Lstat(f.Name())
+			if er != nil {
+				return er
+			}
+			// Executable view projections retain their declared mode; ledger and
+			// immutable binding records use durable owner-only file publication.
+			t.PrivateFile = info.Mode().Perm() == 0600
 			t.StagedSource = f.Name()
 		}
 		plan.Targets = append(plan.Targets, t)
+	}
+	// Parent entries are part of the durable transaction, including the first
+	// ledger/binding allocation. Staging never creates a live lease namespace.
+	plan.Directories, err = engine.PublicationDirectories(paths...)
+	if err != nil {
+		return err
 	}
 	if err = lock.AssertCurrent(); err != nil {
 		return err

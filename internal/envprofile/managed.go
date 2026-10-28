@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -34,7 +33,9 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/mcpnative"
@@ -121,6 +122,14 @@ type ResolveRequest struct {
 	// NativeHomeOf resolves native homes; nil means the process homes.
 	// A test seam: production never sets it.
 	NativeHomeOf func(id string) (string, error)
+	// originAccountLookup supplies raw account evidence only in source fixtures.
+	// Production leaves it nil; it can never return a native root or verdict.
+	originAccountLookup envorigin.AccountLookup
+	origin              *originObservation
+	originBefore        []byte
+	rebindLock          *contextlock.Lock
+	publicationGroup    *homePublicationGroup
+	pendingOrigin       *envunit.Home
 	// OperatorXDG is the operator's effective XDG config home; empty
 	// means resolve it from the process environment.
 	OperatorXDG string
@@ -134,13 +143,14 @@ type ResolveRequest struct {
 	borrowedOperation *operation
 	// passthroughLstat and passthroughReadlink inject entry inspection errors
 	// in tests. Production requests leave them nil and use the shared reader.
-	passthroughLstat     func(string) (os.FileInfo, error)
-	passthroughReadlink  func(string) (string, error)
-	museTargetStat       func(string) (os.FileInfo, error)
-	readStateFile        func(string) (stateread.File, error)
-	readRegularFile      func(string) (stateread.File, error)
-	boundaryOwnerLookup  pathboundary.OwnerLookup
-	storeRepairAttempted bool
+	passthroughLstat      func(string) (os.FileInfo, error)
+	passthroughReadlink   func(string) (string, error)
+	passthroughTargetStat func(string) (os.FileInfo, error)
+	museTargetStat        func(string) (os.FileInfo, error)
+	readStateFile         func(string) (stateread.File, error)
+	readRegularFile       func(string) (stateread.File, error)
+	boundaryOwnerLookup   pathboundary.OwnerLookup
+	storeRepairAttempted  bool
 	// credentialRelease scopes policy derivation to caller-supplied evidence.
 	// Nil permits vendor observation; content verification supplies unknown.
 	credentialRelease *string
@@ -591,27 +601,6 @@ func storeModuleLink(req *ResolveRequest, lock *contextlock.Lock, member, module
 	return filepath.Join(packageRoot(entry, found.Directory), contextpkg.ContextDir, filepath.FromSlash(module)), nil
 }
 
-// publishDocs publishes the plan's manager-authored store documents. It
-// runs only under the mutation lock: assembly itself is pure so that
-// lock-free verification recomputes expected link targets without
-// writing (environments §10.1, §12).
-func (p *homePlan) publishDocs(op *operation) error {
-	paths := make([]string, 0, len(p.docs))
-	for path := range p.docs {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	for _, path := range paths {
-		if err := writeStoreDoc(p.storeRoot, path, p.docs[path]); err != nil {
-			return err
-		}
-		if err := op.recordPostimages(path); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // codexCredentialStore resolves the operator's native codex credential
 // store: the top-level cli_auth_credentials_store selector when the
 // native config.toml carries one, else the platform default file — an
@@ -975,21 +964,29 @@ func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form 
 
 func readClaudeSeedInput(root, homeRel string) (*claudeSeedPlan, error) {
 	path := managedJoin(homeRel, ".claude.json")
+	full, err := plannedManagedPath(root, path)
+	if err != nil {
+		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
+	}
+	state, err := stateread.Lstat(full)
+	if err != nil {
+		return nil, fmt.Errorf("%s: managed .claude.json: %w", envregistry.DiagSeedUnreadable, err)
+	}
+	if state.Kind == stateread.KindAbsent {
+		return &claudeSeedPlan{}, nil
+	}
+	if state.Info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("%s: %s", DiagWriteWouldFollowLink, full)
+	}
+	if !state.Info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s: managed .claude.json is not a regular file", envregistry.DiagSeedUnreadable)
+	}
 	payload, present, err := readManagedRegular(root, path)
 	if err != nil {
 		if strings.Contains(err.Error(), DiagWriteWouldFollowLink) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
-	}
-	if !present {
-		if full, pathErr := managedPath(root, path, false); pathErr != nil {
-			return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, pathErr)
-		} else if state, statErr := stateread.Lstat(full); statErr != nil {
-			return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, statErr)
-		} else if state.Kind == stateread.KindPresent && !state.Info.Mode().IsRegular() {
-			return nil, fmt.Errorf("%s: managed .claude.json is not a regular file", envregistry.DiagSeedUnreadable)
-		}
 	}
 	return &claudeSeedPlan{input: payload, present: present}, nil
 }
@@ -1329,16 +1326,13 @@ func inventoryUnmanaged(homeDir string, want map[string]bool, storeRoot string) 
 // private marker destination before an operation writes store documents,
 // backups, surfaces, or the marker.
 func preflightManagedWriteTargets(root, homeRel string, want map[string]bool) error {
-	if err := privatedir.MakeAll(root); err != nil {
-		return err
-	}
-	if err := pathboundary.ValidateRoot(root); err != nil {
-		return boundaryDiagnostic("environments root", boundaryCheck(err), err)
-	}
 	for path := range want {
-		if _, err := managedPath(root, managedJoin(homeRel, path), false); err != nil {
+		if _, err := plannedManagedPath(root, managedJoin(homeRel, path)); err != nil {
 			return err
 		}
+	}
+	if _, err := plannedManagedPath(root, managedJoin(homeRel, envmarker.Name)); err != nil {
+		return err
 	}
 	return checkManagedPrivateTarget(root, managedJoin(homeRel, envmarker.Name))
 }
@@ -1356,180 +1350,8 @@ func sameStoreTree(target, storeRoot string) bool {
 // store documents, copies, links (with copy fallback for files), seed
 // files, and the marker. Managed paths the plan no longer wants are
 // removed; files the marker does not record are never touched.
-func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) (resultErr error) {
-	root := EnvRoot(req.Home)
-	homeRel, err := managedRelative(root, plan.homeDir)
-	if err != nil {
-		return err
-	}
-	if err := op.captureManaged(plan, seeds, recorded); err != nil {
-		return err
-	}
-	defer func() {
-		if err := op.recordHomePostimages(plan.homeDir); err != nil {
-			resultErr = errors.Join(resultErr, err)
-		}
-	}()
-	// Validate Claude state before directory protection, backups, context writes
-	// or link replacement. Staging/rename I/O errors after this boundary are
-	// not an all-or-nothing home transaction (see atomicManagedFile).
-	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		seeds.claudePrepared, err = refreshClaudeSeed(op.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
-		if err != nil {
-			return op.recoveryRefusal(err)
-		}
-	}
-	want := map[string]bool{}
-	for path := range plan.copies {
-		want[path] = true
-	}
-	for path := range plan.links {
-		want[path] = true
-	}
-	if seeds.claudeInit {
-		want[".claude.json"] = true
-	}
-	for seed := range seeds.files {
-		want[seed] = true
-	}
-	// A new member can add a managed path beneath an already-provisioned
-	// home. Until the marker records that path it remains unmanaged, including
-	// during a repair of an otherwise managed home.
-	unmanaged := unmanagedPlanTargets(plan, recorded)
-	if len(unmanaged) > 0 {
-		if _, err := inventoryUnmanaged(plan.homeDir, unmanaged, contextstore.Root(req.Home)); err != nil {
-			if !req.Policy.Takeover {
-				return err
-			}
-			if prior != nil {
-				plan.warnings = append(plan.warnings, "taking over unmanaged files for "+plan.adapter.ID+
-					": native global context files are being replaced by managed ones; backups land in "+
-					filepath.Join(plan.homeDir, ".agent-environment-backup")+"/")
-			}
-		}
-	}
-	if err := preflightManagedWriteTargets(root, homeRel, want); err != nil {
-		return err
-	}
-	if plan.adapter.ID == envregistry.Muse {
-		for _, directory := range []string{"config/muse", "data/muse", "state", "cache"} {
-			if _, err := managedDirectory(root, managedJoin(homeRel, directory)); err != nil {
-				return err
-			}
-		}
-	}
-	if _, err := managedDirectory(root, homeRel); err != nil {
-		return err
-	}
-	for _, skill := range plan.skillProjections {
-		if err := publishSkillProjection(op, req.Home, skill); err != nil {
-			return err
-		}
-	}
-	if err := plan.publishDocs(op); err != nil {
-		return err
-	}
-	// Versioned generations preserve replaced regular-file bytes (§8.3,
-	// §9.5) before the first write. An authorized takeover also backs up a
-	// replaced unmanaged symlink as a symlink, preserving its link text;
-	// manager-recorded links are re-derived from the lock and are not backed
-	// up. A next generation that already exists fails with
-	// environment_backup_exists.
-	replacing := map[string]bool{}
-	for path := range want {
-		full, err := managedPath(root, managedJoin(homeRel, path), false)
-		if err != nil {
-			return err
-		}
-		state, err := stateread.Lstat(full)
-		if err != nil {
-			return err
-		}
-		if state.Kind == stateread.KindAbsent {
-			continue
-		}
-		info := state.Info
-		if info.Mode()&os.ModeSymlink != 0 {
-			if provisioned && req.Policy.Takeover && !recorded[path] {
-				replacing[path] = true
-			}
-			continue
-		}
-		if info.Mode().IsRegular() {
-			replacing[path] = true
-		}
-	}
-	if len(replacing) > 0 {
-		if _, err := openBackup(root, homeRel, replacing); err != nil {
-			return err
-		}
-	}
-	// Remove recorded files the plan no longer wants.
-	for path := range recorded {
-		if !want[path] && !isSeedPath(plan, path) {
-			if err := removeManagedEntry(root, managedJoin(homeRel, path)); err != nil {
-				return err
-			}
-		}
-	}
-	// Writes run in sorted path order: the fresh-home provisioning order
-	// (§8.1) is deterministic even though the plan accumulates maps. Each
-	// destination is replaced from a private same-directory entry, so the
-	// existing surface path is never opened through a symlink.
-	for _, path := range sortedKeysBytes(plan.copies) {
-		document := plan.copies[path]
-		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, managedAuthoredFileMode); err != nil {
-			return err
-		}
-	}
-	for _, path := range sortedKeys(plan.links) {
-		target := plan.links[path]
-		rel := managedJoin(homeRel, path)
-		if recordedSkillFallback(prior, path) {
-			if err := publishSkillFallback(op, root, rel, target); err != nil {
-				return err
-			}
-			recordLinkFallback(plan, path)
-			continue
-		}
-		if err := atomicManagedLink(root, rel, target); err != nil {
-			var unavailable *errSymlinkUnavailable
-			if !errors.As(err, &unavailable) {
-				return fmt.Errorf("link %s: %v", path, err)
-			}
-			// Copy fallback where the platform takes no symlink: record
-			// the copy with its reason so hash drift applies to it.
-			if err := copyLinkFallback(root, rel, target, path, plan); err != nil {
-				return err
-			}
-		}
-	}
-	// Copy seeds are written at provisioning only: after that the tool
-	// owns them, so repair never refreshes them (§7.4).
-	if provisioned {
-		for seed, file := range seeds.files {
-			if err := atomicManagedFile(root, managedJoin(homeRel, seed), file.payload, file.mode); err != nil {
-				return err
-			}
-		}
-	}
-	provenance := "repaired"
-	if provisioned {
-		provenance = "provisioned"
-	}
-	marker, err := finalizeMarker(op, req, plan, seeds, prior, provenance)
-	if err != nil {
-		return op.recoveryRefusal(err)
-	}
-	payload, err := marker.Marshal()
-	if err != nil {
-		return err
-	}
-	markerPath := filepath.Join(plan.homeDir, envmarker.Name)
-	if prior != nil && prior.Version == envmarker.VersionV1 && legacyMarkerProjectionMatches(prior, marker) {
-		return nil
-	}
-	return op.publish(map[string][]byte{markerPath: payload})
+func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
+	return publishManagedHome(op, req, plan, seeds, recorded, prior, provisioned)
 }
 
 // isSeedPath reports whether a recorded path is seed-owned tool state the
@@ -1552,7 +1374,7 @@ func isSeedPath(plan *homePlan, path string) bool {
 // entries are seeded and recorded, recorded seeds whose target is gone are
 // removed, and unrecorded entries shadowing allowlisted operator entries
 // warn environment_seed_shadowed and are never touched (§7.1, §7.4).
-func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string) (*envmarker.Marker, error) {
+func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, prior *envmarker.Marker, provenance string, publication *homePublication) (*envmarker.Marker, error) {
 	root := EnvRoot(req.Home)
 	homeRel, err := managedRelative(root, plan.homeDir)
 	if err != nil {
@@ -1593,45 +1415,16 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 	if err != nil {
 		return nil, err
 	}
-	native, err := req.nativeHome(plan.adapter.ID)
+	native, err := req.credentialNativeRoot(plan.adapter.ID)
 	if err != nil {
 		return nil, err
 	}
-	recordedLinks := map[string]bool{}
-	if prior != nil && prior.Passthrough != nil {
-		for _, entry := range *prior.Passthrough {
-			if entry.Path != "" {
-				recordedLinks[entry.Path] = true
-			}
-		}
-	}
-	if op.undo != nil {
-		paths := []string{}
-		for path := range links {
-			paths = append(paths, filepath.Join(plan.homeDir, filepath.FromSlash(path)))
-		}
-		for path := range recordedLinks {
-			paths = append(paths, filepath.Join(plan.homeDir, filepath.FromSlash(path)))
-		}
-		for name := range seeds.xdg {
-			paths = append(paths, filepath.Join(plan.parent, name))
-		}
-		if prior != nil {
-			for _, name := range prior.SeedLinks {
-				paths = append(paths, filepath.Join(plan.parent, name))
-			}
-		}
-		if err := op.capture(paths...); err != nil {
-			return nil, err
-		}
-	}
-	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, plan.adapter.ID, req.Profile, plan.adapter.ID)
 	for _, path := range sortedKeys(links) {
-		if err := ensureCredentialLink(root, homeRel, path, links[path], recordedLinks[path], migrateCmd); err != nil {
+		if err := publication.link(filepath.Join(plan.homeDir, filepath.FromSlash(path)), "credential-entry", links[path]); err != nil {
 			return nil, err
 		}
 	}
-	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, migrateCmd); err != nil {
+	if err := removeStaleCredentialLinks(plan.adapter, plan.homeDir, native, prior, links, "curator env migrate --plan"); err != nil {
 		return nil, err
 	}
 	passthrough, err := req.credentialRecords(plan.adapter, provenance)
@@ -1658,9 +1451,14 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		prepared, err := publishClaudeSeed(seeds.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
+		prepared, err := refreshClaudeSeed(seeds.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
 		if err != nil {
 			return nil, err
+		}
+		if prepared.payload != nil {
+			if err := publication.file(filepath.Join(plan.homeDir, ".claude.json"), "owned-bytes", prepared.payload, managedAuthoredFileMode, false); err != nil {
+				return nil, err
+			}
 		}
 		marker.SeededProjects = prepared.seeded
 		recordedSeeds = append(recordedSeeds, ".claude.json")
@@ -1675,7 +1473,7 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 			if err != nil {
 				return nil, err
 			}
-			if err := atomicManagedLink(root, rel, seeds.xdg[name]); err != nil {
+			if err := publication.link(filepath.Join(root, filepath.FromSlash(rel)), "owned-bytes", seeds.xdg[name]); err != nil {
 				return nil, fmt.Errorf("xdg seed %s: %v", name, err)
 			}
 			seedLinks = append(seedLinks, name)
@@ -1689,7 +1487,7 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 					if err != nil {
 						return nil, err
 					}
-					if err := removeManagedEntry(root, rel); err != nil {
+					if err := publication.remove(filepath.Join(root, filepath.FromSlash(rel)), "owned-bytes"); err != nil {
 						return nil, err
 					}
 				}
@@ -2325,11 +2123,13 @@ func equalStrings(a, b []string) bool {
 // environment_credential_conflict-class wording, never silence:
 // --repair refuses without touching bytes and points at the explicit
 // migration where it can fix the state. A
-// correctly targeted link whose native target does not exist yet is the
-// distinct detached-pending state — the normal provisioning shape before
+// correctly targeted Codex/Linux-Claude link whose native target does not
+// exist yet is the distinct detached-pending state — the normal provisioning shape before
 // the first login (claude_code on Linux) — reported as a warning, never
 // a stale reason and never silence: provisioning, repair, and bare
-// resolve all succeed loudly. A native target that cannot be inspected
+// resolve all succeed loudly. Pi shared dangling is a visible detached
+// credential conflict; Muse retains its strict native-file liveness gate.
+// A native target that cannot be inspected
 // is a conflict/inspection diagnostic and stays stale, never absence
 // and never silence.
 func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
@@ -2449,9 +2249,10 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 		// loudly without going stale. An inspection failure is a
 		// conflict/inspection diagnostic and stays stale, never
 		// absence and never silence.
-		metadata, err := stateread.Stat(target)
+		metadata, err := req.inspectNativeCredentialTarget(plan.adapter, path, target)
 		if err != nil {
-			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s target %s cannot be inspected: %v (%s)", path, target, err, envregistry.DiagCredentialConflict))
+			v.passthroughReadFailed = v.passthroughReadFailed || strings.Contains(err.Error(), envregistry.DiagPassthroughUnreadable)
+			v.reasons = append(v.reasons, err.Error())
 			continue
 		}
 		switch metadata.Kind {
@@ -2760,6 +2561,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return nil, err
 	}
 	req.Profile = profile
+	if err := envauthority.SelectedLifecycle(req.Home, profile); err != nil {
+		return nil, err
+	}
 	if !identifiers.Valid(profile) {
 		return nil, fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
 	}
@@ -2774,6 +2578,21 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	// Admit the marker authority before store repair, identity migration or
 	// native-state inspection can enter a mutation/recovery path.
 	if err := req.validateActivationCredentialSource(); err != nil {
+		return nil, err
+	}
+	if req.pendingOrigin != nil {
+		if !req.Repair || req.DryRun {
+			return nil, fmt.Errorf("%s: exact home has a pending durable environment unit; rerun with --repair", DiagMaterializeRecoveryRequired)
+		}
+		return repairUnderLock(&req, adapter, source)
+	}
+	if err := req.preflightOriginCredentials(adapter); err != nil {
+		// Credential refusal still precedes every repair/recovery effect. Bare
+		// existing-home reads retain stale-home reporting; metadata failures keep
+		// their distinct unknown-currency diagnostic, never a detached success.
+		if !req.Repair && req.origin != nil && !req.origin.newCapture && strings.Contains(err.Error(), envregistry.DiagCredentialConflict) && !strings.Contains(err.Error(), envregistry.DiagPassthroughUnreadable) {
+			return &ResolveResult{StaleReasons: []string{err.Error()}}, fmt.Errorf("%s: %w", DiagHomeStale, err)
+		}
 		return nil, err
 	}
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
@@ -2926,8 +2745,20 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	var prepared *claudeSeedPlan
 	validate := func() error {
+		// A pre-lock backend observation is not an under-lock observation.
+		req.credentialPolicy = nil
 		// Recheck authority under the mutation lock before journal recovery.
 		if err := req.validateActivationCredentialSource(); err != nil {
+			return err
+		}
+		if req.pendingOrigin != nil {
+			return nil
+		}
+		adapter, err := envregistry.ByID(req.EnvID)
+		if err != nil {
+			return err
+		}
+		if err := req.preflightOriginCredentials(adapter); err != nil {
 			return err
 		}
 		if err := req.validatePreservedLock(); err != nil {
@@ -2964,10 +2795,6 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 		if req.EnvID != envregistry.ClaudeCode {
 			return nil
 		}
-		adapter, err := envregistry.ByID(req.EnvID)
-		if err != nil {
-			return err
-		}
 		form, err := req.Machine.EffectiveForm(adapter)
 		if err != nil {
 			return err
@@ -2997,7 +2824,18 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	// Recovery may replace the marker as well as the lock. Refuse before
 	// callers publish any further repair using the recovered authority.
+	req.credentialPolicy = nil
 	if err := req.validateActivationCredentialSource(); err != nil {
+		if req.borrowedOperation == nil {
+			_ = op.close()
+		}
+		return nil, op.recoveryRefusal(err)
+	}
+	adapter, err := envregistry.ByID(req.EnvID)
+	if err != nil {
+		return nil, op.recoveryRefusal(err)
+	}
+	if err := req.preflightOriginCredentials(adapter); err != nil {
 		if req.borrowedOperation == nil {
 			_ = op.close()
 		}
@@ -3083,8 +2921,16 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if verdict.passthroughReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
+	group := newHomePublicationGroup()
+	defer group.close()
+	op.publicationGroup = group
+	req.publicationGroup = group
+	defer func() { op.publicationGroup = nil; req.publicationGroup = nil }()
 	if verdict.current {
 		if err := repairNativeSkills(op, req); err != nil {
+			return nil, err
+		}
+		if err := op.commitHomeGroup(req.Home, group, nil, nil, nil, nil); err != nil {
 			return nil, err
 		}
 		fragment, err := buildFragment(req, adapter, verdict)
@@ -3115,6 +2961,32 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	seeds, err := req.gatherSeeds(adapter, provisioned)
 	if err != nil {
 		return nil, err
+	}
+	if adapter.ID == envregistry.OpenCode {
+		recorded := map[string]bool{}
+		if verdict.marker != nil {
+			for _, name := range verdict.marker.SeedLinks {
+				recorded[name] = true
+			}
+		}
+		for name := range seeds.xdg {
+			if recorded[name] {
+				continue
+			}
+			path := filepath.Join(plan.parent, name)
+			state, err := stateread.Lstat(path)
+			if err != nil {
+				return nil, fmt.Errorf("%s: xdg seed %s ownership: %w", envregistry.DiagSeedUnreadable, name, err)
+			}
+			if state.Kind == stateread.KindPresent {
+				// A current operator seed does not authorize taking an unrecorded
+				// managed-parent entry. Preserve even a matching foreign link.
+				delete(seeds.xdg, name)
+				plan.warnings = append(plan.warnings, fmt.Sprintf("%s: %s shadows the allowlisted operator entry and is left as it is", envregistry.DiagSeedShadowed, name))
+			} else if state.Kind != stateread.KindAbsent {
+				return nil, fmt.Errorf("%s: xdg seed %s has unusable ownership metadata", envregistry.DiagSeedUnreadable, name)
+			}
+		}
 	}
 	root := EnvRoot(req.Home)
 	homeRel, err := managedRelative(root, plan.homeDir)
@@ -3166,7 +3038,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 			if err != nil {
 				return nil, err
 			}
-			if _, err := managedPath(root, rel, false); err != nil {
+			if _, err := plannedManagedPath(root, rel); err != nil {
 				return nil, err
 			}
 		}
@@ -3223,12 +3095,15 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		}
 		return nil, fmt.Errorf("%s: %w", DiagRepairFailed, err)
 	}
+	if err := repairNativeSkills(op, req); err != nil {
+		return nil, err
+	}
+	if err := op.commitHomeGroup(req.Home, group, nil, nil, nil, nil); err != nil {
+		return nil, err
+	}
 	after := verifyHome(req, adapter, source, lock, hash)
 	if !after.current {
 		return nil, fmt.Errorf("%s: %s", DiagRepairFailed, strings.Join(after.reasons, "; "))
-	}
-	if err := repairNativeSkills(op, req); err != nil {
-		return nil, err
 	}
 	fragment, err := buildFragment(req, adapter, after)
 	if err != nil {
@@ -3483,7 +3358,22 @@ func (req *ResolveRequest) validateActivationCredentialSource() error {
 	if err != nil {
 		return err
 	}
-	return requirePerHomeCredentialSource(marker)
+	if err := requirePerHomeCredentialSource(marker); err != nil {
+		return err
+	}
+	req.pendingOrigin = nil
+	pending, err := envauthority.PendingUnits(req.Home)
+	if err != nil {
+		return err
+	}
+	if home, ok := pending.Homes[ManagedHomeDir(req.Home, req.Profile, req.EnvID)]; ok {
+		req.pendingOrigin = &home
+		if req.origin == nil {
+			req.origin = &originObservation{raw: append([]byte(nil), home.After.Origin...), newCapture: true}
+		}
+		return nil
+	}
+	return req.observeOrigin(req.EnvID, marker)
 }
 
 // Schema acceptance preserves node identity; it does not authorize treating a

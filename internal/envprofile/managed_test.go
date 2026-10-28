@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/managerlock"
@@ -24,12 +25,13 @@ import (
 // root and a system module, one MCP server, and one skill. Store entries
 // are installed through the product store helpers; the lock is canonical.
 type managedFixture struct {
-	home     string
-	profile  string
-	native   map[string]string
-	xdg      string
-	launch   string
-	lockHash string
+	home          string
+	profile       string
+	native        map[string]string
+	xdg           string
+	launch        string
+	lockHash      string
+	accountAnchor string
 }
 
 func writeManagedFixture(t *testing.T, profile string) *managedFixture {
@@ -43,6 +45,14 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 		native[id] = t.TempDir()
 	}
 	fx := &managedFixture{home: home, profile: profile, native: native, xdg: gitFixtureHome(t), launch: gitFixtureHome(t)}
+	// Synthetic account lookup replaces only raw OS account evidence. Selectors
+	// are supplied independently, so production selection/containment still runs.
+	fx.accountAnchor = t.TempDir()
+	t.Setenv("CODEX_HOME", native["codex_cli"])
+	t.Setenv("CLAUDE_CONFIG_DIR", native["claude_code"])
+	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(native["pi"], "agent"))
+	t.Setenv("XDG_CONFIG_HOME", fx.xdg)
+
 	sourceDir := filepath.Join(t.TempDir(), profile+"-source")
 	if err := os.Mkdir(sourceDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -158,6 +168,9 @@ func (fx *managedFixture) request(envID string) ResolveRequest {
 		revision = envregistry.CodexSeedRevisionB
 	}
 	return ResolveRequest{
+		originAccountLookup: func() (envorigin.Account, error) {
+			return envorigin.Account{UID: uint64(os.Geteuid()), RealUID: uint64(os.Getuid()), EffectiveUID: uint64(os.Geteuid()), Home: fx.accountAnchor}, nil
+		},
 		codexSeedRevisionForTest: revision,
 		Home:                     fx.home,
 		Profile:                  fx.profile,

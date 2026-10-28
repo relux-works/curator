@@ -12,6 +12,9 @@ import (
 	"sync"
 
 	"github.com/relux-works/curator/internal/envauthority"
+	"github.com/relux-works/curator/internal/envjournal"
+	"github.com/relux-works/curator/internal/envorigin"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/staging"
@@ -20,6 +23,7 @@ import (
 // Engine owns journals beneath one manager home. It does not acquire locks;
 // every mutating or journal-reading entry point requires the caller's witness.
 type Engine struct {
+	globalPrepared   map[string]bool
 	mu               sync.Mutex
 	home             string
 	commitCheck      CommitCheck
@@ -27,6 +31,7 @@ type Engine struct {
 	journalRoot      string
 	hooks            Hooks
 	syncStagedParent func(string) error
+	symlink          func(string, string) error
 	// guards retains the in-memory per-write boundary check of every
 	// prepared transaction, keyed by transaction id. A transaction
 	// prepared without a check has no entry; a journal resumed after a
@@ -65,9 +70,11 @@ func New(home string, options ...Option) (*Engine, error) {
 		return nil, err
 	}
 	engine := &Engine{
+		globalPrepared:   map[string]bool{},
 		home:             filepath.Clean(absolute),
 		journalRoot:      filepath.Join(filepath.Clean(absolute), "state", "transactions", "v1"),
 		syncStagedParent: syncDirectory,
+		symlink:          os.Symlink,
 		guards:           map[string]BoundaryCheck{},
 		nsCache:          map[string]map[string]canonicalCacheEntry{},
 	}
@@ -79,14 +86,47 @@ func New(home string, options ...Option) (*Engine, error) {
 	return engine, nil
 }
 
+// Home returns the immutable manager namespace bound when this engine was created.
+func (engine *Engine) Home() string { return engine.home }
+
 // Prepare creates the durable journal before copying deterministic sibling
 // staging targets. Live targets are not changed. Preparation is kept under the
 // home lock so one transaction id cannot race another process.
-func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
+func (engine *Engine) prepare(lock HomeLock, plan Plan) (*Journal, error) {
 	if err := requireHomeLock(lock); err != nil {
 		return nil, err
 	}
-	if err := envauthority.Validate(engine.home); err != nil {
+	if err := envauthority.ValidateForUnit(engine.home, plan.Unit); err != nil {
+		return nil, err
+	}
+	if plan.Unit != nil {
+		for _, target := range plan.Targets {
+			if target.Class == envunit.BackupQuarantine || target.Class == "quarantine" {
+				return nil, journalf("opaque class cannot be a file target")
+			}
+			if err := plan.Unit.ValidateReadScope(target.Class, target.LivePath); err != nil {
+				return nil, err
+			}
+			for _, path := range []string{target.LivePath, target.StagedSource} {
+				if path != "" {
+					if err := envunit.ValidateEntryRead(path, target.Class); err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
+	}
+	paths := make([]string, 0, len(plan.Targets)+len(plan.Directories)+len(plan.Opaque))
+	for _, target := range plan.Targets {
+		paths = append(paths, target.LivePath)
+	}
+	for _, dir := range plan.Directories {
+		paths = append(paths, dir.LivePath)
+	}
+	for _, opaque := range plan.Opaque {
+		paths = append(paths, opaque.LivePath)
+	}
+	if err := envauthority.AdmitEffects(engine.home, plan.Unit, paths); err != nil {
 		return nil, err
 	}
 	engine.mu.Lock()
@@ -96,6 +136,11 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 	if err := engine.checkOwnership(); err != nil {
 		return nil, err
 	}
+	plan, cleanupLifecycle, err := engine.planLifecycle(plan)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanupLifecycle()
 
 	journal, _, err := engine.buildJournal(plan)
 	if err != nil {
@@ -106,8 +151,27 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
+	// Private empty staging needs its planned native boundary during allocation.
+	// This unsaved skeleton is replaced by bindEnvironmentUnit's complete actual
+	// inventory below; saveJournal never sees it as durable admission evidence.
+	journal.Unit = cloneEnvironmentUnit(plan.Unit)
+	if err := engine.allocateDirectoryStaging(journal); err != nil {
+		return nil, errors.Join(err, engine.cleanupDirectoryStaging(journal))
+	}
+	if err := bindEnvironmentUnit(journal, plan.Unit); err != nil {
+		return nil, errors.Join(err, engine.cleanupDirectoryStaging(journal))
+	}
+	if journal.Unit != nil && journal.Unit.Action == envunit.GlobalExtend && plan.Lifecycle == nil {
+		journal.Global = &envjournal.GlobalRetention{Healthy: true, State: "planned"}
+	}
+	if err := finishLifecycle(journal, plan); err != nil {
+		return nil, errors.Join(err, engine.cleanupDirectoryStaging(journal))
+	}
+	if err := envauthority.AdmitJournal(engine.home, journal); err != nil {
+		return nil, errors.Join(err, engine.cleanupDirectoryStaging(journal))
+	}
 	if err := engine.saveJournal(journal); err != nil {
-		return nil, err
+		return nil, errors.Join(err, engine.cleanupDirectoryStaging(journal))
 	}
 	prepared := false
 	defer func() {
@@ -126,7 +190,7 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 		if err := validatePrivateReplacement(target, target.StagedPath); err != nil {
 			return nil, engine.abortPreparation(journal, err)
 		}
-		got, err := target.digest(target.StagedPath)
+		got, err := target.Digest(target.StagedPath)
 		if err != nil || got != target.DesiredDigest {
 			if err == nil {
 				err = corruptionf("staged target %s/%s digest %s, want %s", target.Class, target.Identifier, got, target.DesiredDigest)
@@ -157,6 +221,9 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 		return nil, engine.abortPreparation(journal, err)
 	}
 	prepared = true
+	if journal.Global != nil {
+		engine.globalPrepared[journal.TransactionID] = true
+	}
 	if plan.BoundaryCheck != nil {
 		engine.guards[journal.TransactionID] = plan.BoundaryCheck
 	}
@@ -195,6 +262,19 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 		Targets:             make([]TargetRecord, len(targets)),
 		BoundaryProof:       cloneDurableProof(plan.BoundaryProof),
 	}
+	opaque, err := buildOpaque(plan)
+	if err != nil {
+		return nil, nil, err
+	}
+	journal.Opaque = opaque
+	directories, err := buildDirectories(plan)
+	if err != nil {
+		return nil, nil, err
+	}
+	journal.Directories = directories
+	if len(directories) != 0 {
+		journal.Schema = metadataJournalSchema
+	}
 	if journal.BoundaryProof == nil && plan.BoundaryCheck != nil {
 		journal.BoundaryProof = &staging.DurableSnapshot{}
 	}
@@ -204,7 +284,7 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 		if target.Class == "" || target.Identifier == "" || !validText(target.Class) || !validText(target.Identifier) {
 			return nil, nil, fmt.Errorf("target %d has invalid class or identifier", index)
 		}
-		if !target.Kind.valid() {
+		if !target.Kind.Valid() {
 			return nil, nil, fmt.Errorf("target %s/%s has invalid kind %q", target.Class, target.Identifier, target.Kind)
 		}
 		if target.Kind == KindEntry && target.PreimageDigest == "" {
@@ -241,6 +321,11 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 				return nil, nil, err
 			}
 			source = filepath.Clean(source)
+			if target.PrivateTree {
+				if err := validatePrivateTree(source); err != nil {
+					return nil, nil, fmt.Errorf("private transaction tree source: %w", err)
+				}
+			}
 			if target.PrivateFile {
 				if err := privatedir.ValidateFile(source); err != nil {
 					return nil, nil, fmt.Errorf("private transaction source: %w", err)
@@ -258,13 +343,14 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 			}
 			sources[index] = source
 			stagedSource = source
-			stagedPath = sidecarPath(live, plan.TransactionID, index, "desired")
+			stagedPath = stagedTargetPath(live, plan.TransactionID, index, journal.Directories)
 			stagingEntries, err = captureRemovalEntries(target.Kind, source, desiredDigest)
 			if err != nil {
 				return nil, nil, fmt.Errorf("target %s/%s: capture staging manifest: %w", target.Class, target.Identifier, err)
 			}
 		}
 		record := TargetRecord{
+			PrivateTree:        target.PrivateTree,
 			PrivateFile:        target.PrivateFile,
 			Class:              target.Class,
 			Identifier:         target.Identifier,
@@ -293,7 +379,15 @@ func (engine *Engine) buildJournal(plan Plan) (*Journal, []string, error) {
 		}
 		journal.Targets[index] = record
 	}
-	if err := engine.validateJournal(journal); err != nil {
+	for _, target := range journal.Targets {
+		if target.StagedPath != "" {
+			info, err := os.Lstat(filepath.Dir(target.StagedPath))
+			if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return nil, nil, journalf("transaction_parent_not_enlisted: staging parent must be an existing directory: %v", err)
+			}
+		}
+	}
+	if err := engine.validatePlanningJournal(journal, plan.Unit); err != nil {
 		return nil, nil, err
 	}
 	return journal, sources, nil
@@ -343,6 +437,10 @@ func (engine *Engine) Commit(lock HomeLock, transactionID string) error {
 	journal, err := engine.loadJournal(transactionID)
 	if err != nil {
 		return err
+	}
+	if journal.Global != nil && engine.globalPrepared[journal.TransactionID] && (journal.Phase == PhasePrepared || journal.Phase == PhaseCommitting) {
+		defer delete(engine.globalPrepared, journal.TransactionID)
+		return engine.commit(journal)
 	}
 	return engine.resume(journal)
 }
@@ -395,10 +493,23 @@ func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 }
 
 func (engine *Engine) resume(journal *Journal) error {
+	if err := envauthority.AdmitJournal(engine.home, journal); err != nil {
+		return err
+	}
 	switch journal.Phase {
 	case PhasePreparing:
 		return engine.discardPreparing(journal)
 	case PhasePrepared, PhaseCommitting:
+		if journal.Global != nil {
+			if journal.Global.State == "retaining" {
+				return engine.finishGlobalRetention(journal)
+			}
+			journal.Phase = PhaseRollingBack
+			if err := engine.saveJournal(journal); err != nil {
+				return err
+			}
+			return engine.rollback(journal)
+		}
 		return engine.commit(journal)
 	case PhaseCleanup:
 		return engine.cleanupCommitted(journal)
@@ -418,6 +529,26 @@ func (engine *Engine) commit(journal *Journal) error {
 		if err := engine.saveJournal(journal); err != nil {
 			return err
 		}
+	}
+	if journal.Global != nil {
+		return engine.commitGlobalRetention(journal)
+	}
+	return engine.commitRemainingTargets(journal)
+}
+func (engine *Engine) commitRemainingTargets(journal *Journal) error {
+	if err := engine.commitDirectories(journal); err != nil {
+		journal.Phase = PhaseRollingBack
+		if saveErr := engine.saveJournal(journal); saveErr != nil {
+			return errors.Join(err, saveErr)
+		}
+		return errors.Join(err, engine.rollback(journal))
+	}
+	if err := engine.commitOpaque(journal); err != nil {
+		journal.Phase = PhaseRollingBack
+		if saveErr := engine.saveJournal(journal); saveErr != nil {
+			return errors.Join(err, saveErr)
+		}
+		return errors.Join(err, engine.rollback(journal))
 	}
 	for index := range journal.Targets {
 		if err := engine.commitTarget(journal, index); err != nil {
@@ -463,7 +594,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 			if err := verifyPreimage(target); err != nil {
 				return err
 			}
-			digest, err := target.digest(target.LivePath)
+			digest, err := target.Digest(target.LivePath)
 			if err != nil {
 				return err
 			}
@@ -480,7 +611,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 				if err := syncTree(target.BackupPath); err != nil {
 					return err
 				}
-				captured, err := target.digest(target.BackupPath)
+				captured, err := target.Digest(target.BackupPath)
 				if err != nil {
 					return err
 				}
@@ -503,7 +634,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 		}
 		fallthrough
 	case StateBackedUp:
-		current, err := target.digest(target.LivePath)
+		current, err := target.Digest(target.LivePath)
 		if err != nil {
 			return err
 		}
@@ -527,7 +658,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 			if err := validatePrivateReplacement(target, target.StagedPath); err != nil {
 				return err
 			}
-			stagedDigest, err := target.digest(target.StagedPath)
+			stagedDigest, err := target.Digest(target.StagedPath)
 			if err != nil || stagedDigest != target.DesiredDigest {
 				if err == nil {
 					err = corruptionf("staged target %s/%s digest changed", target.Class, target.Identifier)
@@ -561,7 +692,7 @@ func (engine *Engine) commitTarget(journal *Journal, index int) error {
 		if err := validatePrivateReplacement(target, target.LivePath); err != nil {
 			return err
 		}
-		current, err := target.digest(target.LivePath)
+		current, err := target.Digest(target.LivePath)
 		if err != nil {
 			return err
 		}
@@ -597,6 +728,9 @@ func (engine *Engine) checkBoundary(journal *Journal, index int) error {
 		return err
 	}
 	if err := checkReadInputs(journal.ReadInputs); err != nil {
+		return err
+	}
+	if err := verifyCommittedDirectories(journal); err != nil {
 		return err
 	}
 	delete(engine.nsCache, journal.TransactionID)
@@ -706,14 +840,14 @@ func (engine *Engine) cachedCanonicalTargetPath(transactionID, path string, entr
 }
 
 func (engine *Engine) recoverPendingBackup(target *TargetRecord) error {
-	backupDigest, err := target.digest(target.BackupPath)
+	backupDigest, err := target.Digest(target.BackupPath)
 	if err != nil {
 		return err
 	}
 	if backupDigest == DigestAbsent {
 		return nil
 	}
-	liveDigest, err := target.digest(target.LivePath)
+	liveDigest, err := target.Digest(target.LivePath)
 	if err != nil {
 		return err
 	}
@@ -735,7 +869,7 @@ func (engine *Engine) recoverPendingBackup(target *TargetRecord) error {
 
 func verifyPreimage(target *TargetRecord) error {
 	if target.PreimageDigest != "" {
-		current, err := target.digest(target.LivePath)
+		current, err := target.Digest(target.LivePath)
 		if err != nil {
 			return err
 		}
@@ -790,12 +924,18 @@ func (engine *Engine) rollback(journal *Journal) error {
 				return err
 			}
 		}
+		if err := engine.rollbackOpaque(journal); err != nil {
+			return err
+		}
 		journal.Phase = PhaseRollbackCleanup
 		if err := engine.saveJournal(journal); err != nil {
 			return err
 		}
 	}
 	if err := engine.removePreparedSidecars(journal); err != nil {
+		return err
+	}
+	if err := engine.rollbackDirectories(journal); err != nil {
 		return err
 	}
 	return engine.removeJournalDurably(journal)
@@ -807,25 +947,26 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 		return engine.rollbackExchange(journal, index)
 	}
 	if target.State == StatePending {
-		if backup, err := target.digest(target.BackupPath); err != nil {
+		if backup, err := target.Digest(target.BackupPath); err != nil {
 			return err
 		} else if backup == DigestAbsent {
-			return nil
+			target.State = StateRolledBack
+			return engine.saveJournal(journal)
 		}
 		target.State = StateBackedUp
 	}
 	if target.State == StateRolledBack {
 		return nil
 	}
-	current, err := target.digest(target.LivePath)
+	current, err := target.Digest(target.LivePath)
 	if err != nil {
 		return err
 	}
-	rollbackDigest, err := target.digest(target.RollbackPath)
+	rollbackDigest, err := target.Digest(target.RollbackPath)
 	if err != nil {
 		return err
 	}
-	backupDigest, err := target.digest(target.BackupPath)
+	backupDigest, err := target.Digest(target.BackupPath)
 	if err != nil {
 		return err
 	}
@@ -846,7 +987,7 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 			return corruptionf("target %s/%s has both live and rollback bytes", target.Class, target.Identifier)
 		}
 		if rollbackDigest != target.DesiredDigest {
-			if existing, err := target.digest(target.LivePath); err != nil {
+			if existing, err := target.Digest(target.LivePath); err != nil {
 				return err
 			} else if existing != DigestAbsent {
 				return corruptionf("rollback refused to overwrite current bytes for %s/%s", target.Class, target.Identifier)
@@ -863,12 +1004,12 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 		if err := engine.renameNoReplace(target.LivePath, target.RollbackPath); err != nil {
 			return err
 		}
-		rollbackDigest, err = target.digest(target.RollbackPath)
+		rollbackDigest, err = target.Digest(target.RollbackPath)
 		if err != nil {
 			return err
 		}
 		if rollbackDigest != target.DesiredDigest {
-			if existing, existingErr := target.digest(target.LivePath); existingErr != nil {
+			if existing, existingErr := target.Digest(target.LivePath); existingErr != nil {
 				return existingErr
 			} else if existing != DigestAbsent {
 				return corruptionf("rollback captured unknown bytes for %s/%s and current bytes appeared", target.Class, target.Identifier)
@@ -889,7 +1030,7 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 		return corruptionf("backup for %s/%s changed before rollback", target.Class, target.Identifier)
 	}
 	if backupDigest != DigestAbsent {
-		if existing, err := target.digest(target.LivePath); err != nil {
+		if existing, err := target.Digest(target.LivePath); err != nil {
 			return err
 		} else if existing != DigestAbsent {
 			return corruptionf("rollback refused to overwrite current bytes for %s/%s", target.Class, target.Identifier)
@@ -912,13 +1053,23 @@ func (engine *Engine) rollbackTarget(journal *Journal, index int) error {
 }
 
 func (engine *Engine) cleanupCommitted(journal *Journal) error {
+	if err := envjournal.VerifyUnitState(journal, engine.home); err != nil {
+		return err
+	}
+	if err := verifyCommittedDirectories(journal); err != nil {
+		return err
+	}
 	for index := range journal.Targets {
 		target := &journal.Targets[index]
-		current, err := target.digest(target.LivePath)
+		current, err := target.Digest(target.LivePath)
 		if err != nil {
 			return err
 		}
-		if current != target.DesiredDigest {
+		want := target.DesiredDigest
+		if envjournal.GlobalRetained(journal) && !envjournal.GlobalPublishedTarget(journal, target.LivePath) {
+			want = target.PreimageDigest
+		}
+		if current != want {
 			return corruptionf("cleanup refused changed target %s/%s", target.Class, target.Identifier)
 		}
 	}
@@ -929,6 +1080,12 @@ func (engine *Engine) cleanupCommitted(journal *Journal) error {
 		if err := engine.removeRecordedSidecar(journal, removal); err != nil {
 			return err
 		}
+	}
+	if err := engine.cleanupOpaque(journal); err != nil {
+		return err
+	}
+	if err := engine.cleanupDirectoryStaging(journal); err != nil {
+		return err
 	}
 	return engine.removeJournalDurably(journal)
 }
@@ -1146,10 +1303,82 @@ func cloneJournal(journal *Journal) *Journal {
 	clone.ReferencedBuildKeys = append([]string(nil), journal.ReferencedBuildKeys...)
 	clone.RemovalEntries = append([]RemovalEntry(nil), journal.RemovalEntries...)
 	clone.Targets = append([]TargetRecord(nil), journal.Targets...)
+	clone.Directories = append([]DirectoryRecord(nil), journal.Directories...)
+	clone.Opaque = append([]OpaqueRecord(nil), journal.Opaque...)
+	clone.Unit = cloneEnvironmentUnit(journal.Unit)
+	if journal.Global != nil {
+		v := *journal.Global
+		clone.Global = &v
+	}
 	for index := range clone.Targets {
 		clone.Targets[index].StagingEntries = append([]RemovalEntry(nil), journal.Targets[index].StagingEntries...)
 	}
 	clone.BoundaryProof = cloneDurableProof(journal.BoundaryProof)
+	clone.ReadInputs = cloneReadInputs(journal.ReadInputs)
+	return &clone
+}
+
+// Commit checks receive an independent snapshot, including all nested authority
+// bytes and maps. A callback cannot alter later recovery/admission evidence.
+func cloneEnvironmentUnit(unit *envunit.Unit) *envunit.Unit {
+	if unit == nil {
+		return nil
+	}
+	clone := *unit
+	if unit.Legacy != nil {
+		legacy := *unit.Legacy
+		if unit.Legacy.Entries != nil {
+			legacy.Entries = append([]envunit.LegacyTarget{}, unit.Legacy.Entries...)
+		}
+		clone.Legacy = &legacy
+	}
+	if unit.LeasePreimage != nil {
+		capture := *unit.LeasePreimage
+		capture.Image.Bytes = append([]byte(nil), unit.LeasePreimage.Image.Bytes...)
+		clone.LeasePreimage = &capture
+	}
+	clone.Profiles = append([]envunit.ProfileTransition(nil), unit.Profiles...)
+	for i := range clone.Profiles {
+		clone.Profiles[i].Closure = append([]string(nil), unit.Profiles[i].Closure...)
+		clone.Profiles[i].OldLock.Bytes = append([]byte(nil), unit.Profiles[i].OldLock.Bytes...)
+		clone.Profiles[i].NewLock.Bytes = append([]byte(nil), unit.Profiles[i].NewLock.Bytes...)
+	}
+	clone.Homes = nil
+	if unit.Homes != nil {
+		clone.Homes = append([]envunit.Home{}, unit.Homes...)
+	}
+	for i := range clone.Homes {
+		clone.Homes[i].Before.Marker = append([]byte(nil), unit.Homes[i].Before.Marker...)
+		clone.Homes[i].Before.Origin = append([]byte(nil), unit.Homes[i].Before.Origin...)
+		clone.Homes[i].After.Marker = append([]byte(nil), unit.Homes[i].After.Marker...)
+		clone.Homes[i].After.Origin = append([]byte(nil), unit.Homes[i].After.Origin...)
+	}
+	clone.Native = append([]envunit.Native(nil), unit.Native...)
+	for i := range clone.Native {
+		clone.Native[i].MarkerBefore = append([]byte(nil), unit.Native[i].MarkerBefore...)
+		clone.Native[i].MarkerAfter = append([]byte(nil), unit.Native[i].MarkerAfter...)
+		clone.Native[i].Paths = append([]string(nil), unit.Native[i].Paths...)
+	}
+	clone.Targets = nil
+	if unit.Targets != nil {
+		clone.Targets = append([]envunit.Target{}, unit.Targets...)
+	}
+	clone.BoundaryProof = *cloneDurableProof(&unit.BoundaryProof)
+	if unit.LedgerPublication != nil {
+		publication := *unit.LedgerPublication
+		publication.EntryIDs = append([]string(nil), unit.LedgerPublication.EntryIDs...)
+		clone.LedgerPublication = &publication
+	}
+	if unit.RetainedEntry != nil {
+		entry := *unit.RetainedEntry
+		entry.Serialized = append([]byte(nil), unit.RetainedEntry.Serialized...)
+		entry.HomeLocks = make(map[string]envunit.RecordImage, len(unit.RetainedEntry.HomeLocks))
+		for key, image := range unit.RetainedEntry.HomeLocks {
+			image.Bytes = append([]byte(nil), image.Bytes...)
+			entry.HomeLocks[key] = image
+		}
+		clone.RetainedEntry = &entry
+	}
 	return &clone
 }
 
@@ -1175,7 +1404,19 @@ func cloneDurableProof(proof *staging.DurableSnapshot) *staging.DurableSnapshot 
 }
 
 func (engine *Engine) checkCommit(journal *Journal) error {
+	if err := envauthority.AdmitJournal(engine.home, journal); err != nil {
+		return err
+	}
+	if err := envjournal.VerifyUnitState(journal, engine.home); err != nil {
+		return err
+	}
+	if err := envjournal.VerifyForwardOrigins(journal, engine.home); err != nil {
+		return err
+	}
 	if engine.commitCheck == nil {
+		if journal.ProjectIdentity == "project-leases" {
+			return fmt.Errorf("%s: project lease continuation policy unavailable", envorigin.DiagInvalid)
+		}
 		return nil
 	}
 	snapshot := cloneJournal(journal)

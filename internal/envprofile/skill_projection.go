@@ -66,10 +66,11 @@ func projectSkill(home, source string, version hashing.Version) (skillOf, error)
 // raw package snapshots and command/runtime stores remain untouched.
 func publishSkillProjection(op *operation, home string, skill skillOf) (resultErr error) {
 	parent := filepath.Dir(skill.root)
-	if err := privatedir.MakeAll(parent); err != nil {
-		return err
-	}
-	if err := pathboundary.ValidateRouteWithOwner(contextstore.Root(home), parent, pathboundary.DefaultOwnerLookup()); err != nil {
+	if _, err := os.Lstat(parent); err == nil {
+		if err := pathboundary.ValidateRouteWithOwner(contextstore.Root(home), parent, pathboundary.DefaultOwnerLookup()); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
 		return err
 	}
 	state, err := stateread.Lstat(skill.root)
@@ -88,7 +89,7 @@ func publishSkillProjection(op *operation, home string, skill skillOf) (resultEr
 	if err != nil {
 		return err
 	}
-	staging, err := os.MkdirTemp(parent, ".projection-*")
+	staging, err := os.MkdirTemp("", ".projection-*")
 	if err != nil {
 		return err
 	}
@@ -114,6 +115,10 @@ func publishSkillProjection(op *operation, home string, skill skillOf) (resultEr
 		Class: "skill-projection", Identifier: skill.hash, Kind: kind, LivePath: skill.root,
 		StagedSource: staging, PreimageDigest: preimage,
 	}}}
+	plan.Directories, err = op.engine.PublicationDirectories(skill.root)
+	if err != nil {
+		return err
+	}
 	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
 		return err
 	}

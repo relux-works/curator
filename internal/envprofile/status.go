@@ -295,12 +295,13 @@ type StatusRequest struct {
 	LaunchDir string
 	// passthrough inspection seams mirror ResolveRequest for deterministic
 	// production-entry tests of failed lstat/readlink operations.
-	passthroughLstat    func(string) (os.FileInfo, error)
-	passthroughReadlink func(string) (string, error)
-	museTargetStat      func(string) (os.FileInfo, error)
-	readStateFile       func(string) (stateread.File, error)
-	readRegularFile     func(string) (stateread.File, error)
-	readStateDirectory  func(string) (stateread.Directory, error)
+	passthroughLstat      func(string) (os.FileInfo, error)
+	passthroughReadlink   func(string) (string, error)
+	passthroughTargetStat func(string) (os.FileInfo, error)
+	museTargetStat        func(string) (os.FileInfo, error)
+	readStateFile         func(string) (stateread.File, error)
+	readRegularFile       func(string) (stateread.File, error)
+	readStateDirectory    func(string) (stateread.Directory, error)
 	// codexSeedRevisionForTest exercises retained, non-shipped posture rows
 	// without mutating the registry singleton.
 	codexSeedRevisionForTest string
@@ -320,6 +321,7 @@ func (req *StatusRequest) resolve() ResolveRequest {
 		codexSeedRevisionForTest: req.codexSeedRevisionForTest,
 		passthroughLstat:         req.passthroughLstat,
 		passthroughReadlink:      req.passthroughReadlink,
+		passthroughTargetStat:    req.passthroughTargetStat,
 		museTargetStat:           req.museTargetStat,
 		readStateFile:            req.readStateFile,
 		readRegularFile:          req.readRegularFile,

@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/relux-works/curator/internal/envunit"
 	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
 	"github.com/relux-works/curator/internal/envauthority"
+	"github.com/relux-works/curator/internal/envlifecycle"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/projectlease"
@@ -32,11 +33,17 @@ type operation struct {
 		AssertCurrent() error
 		Close() error
 	}
-	engine *transaction.Engine
+	engine           *transaction.Engine
+	policy           Policy
+	publicationGroup *homePublicationGroup
+	publishPlan      func(transaction.Plan) error
+	joinedLegacy     *transaction.Plan
+	stageLegacy      func(*envunit.Unit) (transaction.Plan, error)
+	initialProfile   map[string][]byte // exact first-use installed records, private until Prepare
+	retained         *envlifecycle.GlobalRetained
 	// Prepared under this lock before recovery or repair publication.
 	claudePrepared *claudeSeedPlan
 	recovered      bool
-	undo           *globalUndo
 }
 
 // newOperationEngine keeps recovery observation available to entry-point tests.
@@ -87,9 +94,8 @@ func beginCaptureOperation(home string, options ...transaction.Option) (*operati
 // incomplete profile journals before the caller mutates anything: every
 // profile mutation runs serialized like any other manager-home
 // transaction, and its manager-home records publish through op.publish.
-// The per-entry agent-home payloads are not transaction targets in this
-// stage (see the switch.go package doc for why); they stay direct writes
-// under the held lock.
+// Managed and native home publishers additionally enlist their enumerated
+// home/marker/origin and metadata effects in complete durable units.
 func beginOperation(home string, options ...transaction.Option) (*operation, error) {
 	return beginOperationValidated(home, nil, options...)
 }
@@ -172,12 +178,17 @@ func (op *operation) publish(files map[string][]byte, removals ...string) error 
 // publishProtected adds planning-time boundary identities and a current-input
 // check to the existing journal publisher. Legacy profile calls remain nil.
 func (op *operation) publishProtected(files map[string][]byte, boundaries *staging.Boundaries, validate func() error, removals ...string) error {
-	for path := range files {
-		if err := op.capture(path); err != nil {
-			return err
-		}
+	if handled, err := op.publishPurgedReuse(files, removals, boundaries, validate); handled || err != nil {
+		return err
 	}
-	if err := op.capture(removals...); err != nil {
+	if handled, err := op.publishManagedRebind(op.engine.Home(), files, removals, boundaries, validate); handled || err != nil {
+		return err
+	}
+	paths := append([]string(nil), removals...)
+	for path := range files {
+		paths = append(paths, path)
+	}
+	if err := envauthority.AdmitEffects(op.engine.Home(), nil, paths); err != nil {
 		return err
 	}
 	if len(files) == 0 && len(removals) == 0 {
@@ -210,18 +221,26 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 		}
 	}()
 	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profiles"}
+	var writePaths []string
+	for _, item := range changes {
+		if !item.remove {
+			writePaths = append(writePaths, item.path)
+		}
+	}
+	var err error
+	plan.Directories, err = op.engine.PublicationDirectories(writePaths...)
+	if err != nil {
+		return fmt.Errorf("capture profile record parents: %w", err)
+	}
 	for _, item := range changes {
 		live := item.path
-		if err := os.MkdirAll(filepath.Dir(live), 0o755); err != nil {
-			return err
-		}
 		preimage, err := transaction.DigestTarget(transaction.KindBytes, live)
 		if err != nil {
 			return fmt.Errorf("read the current state of %s: %w", live, err)
 		}
 		target := transaction.Target{
 			Class: "profile", Identifier: live, Kind: transaction.KindBytes,
-			LivePath: live, PreimageDigest: preimage,
+			LivePath: live, PreimageDigest: preimage, PrivateFile: !item.remove,
 		}
 		if !item.remove {
 			temp, err := privatedir.CreateTemp("", "curator-profile-record-*")
@@ -276,15 +295,11 @@ func (op *operation) publishProtected(files map[string][]byte, boundaries *stagi
 		if item.remove {
 			continue
 		}
-		if err := privatedir.ProtectFile(item.path); err != nil {
+		if err := privatedir.ValidateFile(item.path); err != nil {
 			return fmt.Errorf("protect published profile record %s: %w", item.path, err)
 		}
 	}
-	var publishedPaths []string
-	for _, item := range changes {
-		publishedPaths = append(publishedPaths, item.path)
-	}
-	return op.recordPostimages(publishedPaths...)
+	return nil
 }
 
 // newTransactionID names one profile journal.

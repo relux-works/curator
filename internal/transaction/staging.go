@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/relux-works/curator/internal/linkcap"
 	"github.com/relux-works/curator/internal/privatedir"
 )
 
@@ -76,7 +77,10 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 	case "link":
 		// A link is created complete in one step: its destination string is its
 		// whole content, so there is no partial state to write ahead.
-		if err := os.Symlink(entry.LinkTarget, destination); err != nil {
+		if err := engine.symlink(entry.LinkTarget, destination); err != nil {
+			if entry.RelativePath == "" && linkcap.Unavailable(err) {
+				return &linkUnavailable{path: target.LivePath, cause: err}
+			}
 			return err
 		}
 	case "directory":
@@ -97,12 +101,12 @@ func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entr
 		if err := verifyRemovalEntry(source, info, entry); err != nil {
 			return corruptionf("staging source entry changed before copy: %s", source)
 		}
-		if target.PrivateFile {
+		if target.PrivateFile || target.PrivateTree {
 			if err := privatedir.ValidateFile(source); err != nil {
 				return fmt.Errorf("private transaction source: %w", err)
 			}
 		}
-		file, err := createStagingFile(destination, target.PrivateFile)
+		file, err := createStagingFile(destination, target.PrivateFile || target.PrivateTree)
 		if err != nil {
 			return err
 		}
@@ -130,7 +134,29 @@ func createStagingFile(path string, private bool) (*os.File, error) {
 	return createPublicationFile(path, 0)
 }
 
+// validatePrivateTree is metadata/protection only. It never follows links and
+// applies only to already enumerated, manager-produced build output trees.
+func validatePrivateTree(root string) error {
+	if err := privatedir.Validate(root); err != nil {
+		return err
+	}
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return privatedir.Validate(path)
+		}
+		return privatedir.ValidateFile(path)
+	})
+}
+
 func validatePrivateReplacement(target *TargetRecord, path string) error {
+	if target.PrivateTree {
+		if err := validatePrivateTree(path); err != nil {
+			return fmt.Errorf("private transaction tree replacement: %w", err)
+		}
+	}
 	if target.PrivateFile {
 		if err := privatedir.ValidateFile(path); err != nil {
 			return fmt.Errorf("private transaction replacement: %w", err)
@@ -212,7 +238,7 @@ func (engine *Engine) discardPreparing(journal *Journal) error {
 			continue
 		}
 		if target.StagingDiscarded {
-			if digest, err := target.digest(target.StagedPath); err != nil {
+			if digest, err := target.Digest(target.StagedPath); err != nil {
 				return err
 			} else if digest != DigestAbsent {
 				return corruptionf("discarded preparation staging reappeared: %s", target.StagedPath)
@@ -222,7 +248,7 @@ func (engine *Engine) discardPreparing(journal *Journal) error {
 		if err := validatePreparingTarget(target); err != nil {
 			return err
 		}
-		digest, err := target.digest(target.StagedPath)
+		digest, err := target.Digest(target.StagedPath)
 		if err != nil {
 			return err
 		}

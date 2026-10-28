@@ -17,7 +17,9 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 func (fx *managedFixture) migrateRequest() MigrateRequest {
@@ -533,47 +535,47 @@ func TestMigrateNoSecretCopies(t *testing.T) {
 		}
 		assertNoCopy(t, "before the crash")
 		crash := gxReq
-		crash.InjectFault = func(point string, applied int) error {
-			if point == MigrateFaultCrash && applied >= 1 {
-				return errors.New("kill -9")
+		hit := false
+		crash.transactionOptions = []transaction.Option{transaction.WithHooks(transaction.Hooks{Fault: func(event transaction.Event) error {
+			if !hit && event.Point == transaction.PointAfterInstall && event.Class == "credential-entry" {
+				hit = true
+				panic("no-copy-unit-stop")
 			}
 			return nil
+		}})}
+		func() {
+			defer func() {
+				if v := recover(); v != "no-copy-unit-stop" {
+					t.Fatalf("wrong stop: %v", v)
+				}
+			}()
+			_, _ = ApplyMigration(crash)
+		}()
+		if !hit {
+			t.Fatal("actual credential owner did not reach stop")
 		}
-		interrupted, err := ApplyMigration(crash)
-		if err == nil || !strings.Contains(err.Error(), "interrupted") {
-			t.Fatalf("the crash must interrupt, got %v", err)
+		journals, err := filepath.Glob(filepath.Join(gx.home, "state", "transactions", "v1", "*.json"))
+		if err != nil || len(journals) == 0 {
+			t.Fatalf("standing transaction journal: %v %v", journals, err)
 		}
-		if interrupted == nil || len(interrupted.Applied) != 1 {
-			t.Fatalf("one operation stands at the kill: %+v", interrupted)
-		}
-		journal, err := readMigrationJournal(gx.home)
-		if err != nil || journal == nil {
-			t.Fatalf("the journal stands after the kill: %+v (%v)", journal, err)
-		}
-		journalBytes, err := os.ReadFile(migrationJournalPath(gx.home))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, sentinel := range []string{gxPiCredential, gxCodexCredential} {
-			if strings.Contains(string(journalBytes), sentinel) {
-				t.Fatalf("the standing journal holds credential bytes: %q", sentinel)
+		for _, path := range journals {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sentinel := range []string{gxPiCredential, gxCodexCredential} {
+				if strings.Contains(string(raw), sentinel) {
+					t.Fatal("journal contains fixture credential payload")
+				}
 			}
 		}
-		assertNoCopy(t, "while the journal stands")
-		retry := gxReq
-		retry.InjectFault = nil
-		result, err := ApplyMigration(retry)
+		assertNoCopy(t, "while complete unit stands")
+		op, err := beginOperation(gx.home)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if result.Recovered == nil || result.Recovered.Plan != gxReport.Hash {
-			t.Fatalf("the apply reports the recovery: %+v", result.Recovered)
-		}
-		if len(result.Applied) != 2 {
-			t.Fatalf("the recovered apply executes the whole plan: %+v", result.Applied)
-		}
-		if _, err := os.Lstat(migrationJournalPath(gx.home)); !os.IsNotExist(err) {
-			t.Fatalf("the recovered apply deletes the journal: %v", err)
+		if err = op.close(); err != nil {
+			t.Fatal(err)
 		}
 		if _, err := os.Lstat(gxCodexLink); !os.IsNotExist(err) {
 			t.Fatalf("the codex link is unlinked: %v", err)
@@ -738,8 +740,19 @@ func TestMigrateConflictsRefuse(t *testing.T) {
 		if err := os.WriteFile(markerPath, []byte("{not a marker"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		assertMigrateConflict(t, fx, fx.migrateRequest(), "",
-			[]string{"marker is invalid"}, []string{"back the marker up"})
+		before := nativeSnapshot(t, fx.home)
+		req := fx.migrateRequest()
+		if report, err := PlanMigration(req); err == nil || !strings.Contains(err.Error(), envmarker.DiagMarkerInvalid) || report != nil {
+			t.Fatalf("invalid marker common planning refusal: %v", err)
+		}
+		req.Expect = strings.Repeat("a", 64)
+		if result, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), envmarker.DiagMarkerInvalid) || result != nil {
+			t.Fatalf("invalid marker common apply refusal: %v", err)
+		}
+		if nativeSnapshot(t, fx.home) != before {
+			t.Fatal("invalid marker refusal changed state")
+		}
+
 	})
 	t.Run("unknown credential store", func(t *testing.T) {
 		fx := writeManagedFixture(t, "acme")
@@ -802,9 +815,9 @@ func assertMigrateConflict(t *testing.T, fx *managedFixture, req MigrateRequest,
 }
 
 // TestMigratePiRootInspectionFailure pins the absent-versus-
-// uninspectable distinction for the Pi roots inventory: a re-point
-// planned while a native root cannot be statted is a conflict carrying
-// the inspection diagnostic — never silence, and never the absence
+// uninspectable distinction for recorded Pi authority: a re-point planned
+// through a substituted non-directory ancestor fails physical origin validation
+// before credential inspection — never silence, and never the absence
 // wording. A regular file where the agent directory should be fails the
 // target stat deterministically on Unix, even as root; Windows maps a
 // stat through a file to path-not-found, so the row is Unix-only.
@@ -835,14 +848,19 @@ func TestMigratePiRootInspectionFailure(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(native, "agent"), []byte("not a directory\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	assertMigrateConflict(t, fx, fx.migrateRequest(), "",
-		[]string{"cannot be inspected", agentAuth}, []string{"restore access to the native roots out of band"})
-	report, err := PlanMigration(fx.migrateRequest())
-	if err != nil {
-		t.Fatal(err)
+	before := snapshotCredentialScope(t, fx)
+	req := fx.migrateRequest()
+	report, err := PlanMigration(req)
+	if err == nil || !strings.Contains(err.Error(), envorigin.DiagInvalid) || !strings.Contains(err.Error(), "ancestor is not a readable directory") || report != nil {
+		t.Fatalf("physical origin rejection: %v", err)
 	}
-	if plan := report.Text(MigratePhasePlan); strings.Contains(plan, "does not exist") {
-		t.Fatalf("an inspection failure is not absence:\n%s", plan)
+	req.Expect = strings.Repeat("a", 64)
+	if result, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), envorigin.DiagInvalid) || result != nil && len(result.Applied) > 0 {
+		t.Fatalf("physical origin apply refusal: %v", err)
+	}
+	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
+	if len(added)+len(removed)+len(changed) != 0 {
+		t.Fatalf("invalid origin refusal changed preimages: %v %v %v", added, removed, changed)
 	}
 	if target, err := os.Readlink(link); err != nil || target != oldTarget {
 		t.Fatalf("the link is untouched: %q (%v)", target, err)
@@ -893,7 +911,7 @@ func TestMigratePlanDriftRefuses(t *testing.T) {
 			t.Fatalf("the drift refusal names %q: %v", want, err)
 		}
 	}
-	if result == nil || result.Report == nil || len(result.Applied) != 0 {
+	if result != nil && len(result.Applied) != 0 {
 		t.Fatalf("a drifted apply executes nothing: %+v", result)
 	}
 	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
@@ -924,129 +942,20 @@ func TestMigratePlanDriftRefuses(t *testing.T) {
 	}
 }
 
-// TestMigrateRollbackRestoresPriorState injects apply failures and
-// proves every outcome is the prior state, never a mix: links move
-// back, prior markers restore byte-identical, native bytes are
-// untouched. The link-phase fault fires before any marker publish;
-// the post-publish fault fires after, exercising the marker rollback.
+// Returned faults after credential or marker install restore both homes,
+// captured origins and native fixtures; the healthy Pi migration is nearby.
 func TestMigrateRollbackRestoresPriorState(t *testing.T) {
-	requireLinkCapability(t)
-	setup := func(t *testing.T) (*managedFixture, MigrateRequest, map[string]string, map[string]string) {
-		t.Helper()
-		fx := writeManagedFixture(t, "acme")
-		piNative := fx.native["pi"]
-		agentAuth := filepath.Join(piNative, "agent", "auth.json")
-		if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		codexAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
-		if err := os.WriteFile(codexAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		provision(t, fx, "pi", envregistry.DefaultMachineConfig())
-		provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
-		piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
-		_ = os.Remove(piLink)
-		if err := os.Symlink(filepath.Join(piNative, "auth.json"), piLink); err != nil {
-			t.Fatal(err)
-		}
-		isolated := envregistry.DefaultMachineConfig()
-		isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
-		req := fx.migrateRequest()
-		req.Machine = isolated
-		report, err := PlanMigration(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(report.Ops()) != 2 {
-			t.Fatalf("the rollback plan carries two operations: %+v", report.Ops())
-		}
-		req.Expect = report.Hash
-		markers := map[string]string{}
-		for _, env := range []string{"pi", "codex_cli"} {
-			payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), envmarker.Name))
-			if err != nil {
-				t.Fatal(err)
-			}
-			markers[env] = string(payload)
-		}
-		natives := map[string]string{
-			agentAuth: sha256Of(t, agentAuth),
-			codexAuth: sha256Of(t, codexAuth),
-		}
-		return fx, req, markers, natives
+	for _, mode := range []string{"after-credential", "after-marker"} {
+		t.Run(mode, func(t *testing.T) { migrationTransactionCase(t, mode) })
 	}
-	assertRolledBack := func(t *testing.T, fx *managedFixture, markers, natives map[string]string) {
-		t.Helper()
-		piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
-		if target, err := os.Readlink(piLink); err != nil || target != filepath.Join(fx.native["pi"], "auth.json") {
-			t.Fatalf("the Pi link moves back to its prior target: %q (%v)", target, err)
-		}
-		codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
-		if target, err := os.Readlink(codexLink); err != nil || target != filepath.Join(fx.native["codex_cli"], "auth.json") {
-			t.Fatalf("the codex link is re-created at its prior target: %q (%v)", target, err)
-		}
-		for _, env := range []string{"pi", "codex_cli"} {
-			payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), envmarker.Name))
-			if err != nil || string(payload) != markers[env] {
-				t.Fatalf("the prior %s marker restores byte-identical", env)
-			}
-		}
-		for path, want := range natives {
-			if digest := sha256Of(t, path); digest != want {
-				t.Fatalf("native bytes untouched: %s", path)
-			}
-		}
-		if _, err := os.Lstat(migrationJournalPath(fx.home)); !os.IsNotExist(err) {
-			t.Fatalf("a clean rollback deletes the journal: %v", err)
-		}
-		for _, env := range []string{"pi", "codex_cli"} {
-			strays, err := filepath.Glob(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), ".migrate-*.tmp"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(strays) != 0 {
-				t.Fatalf("no temporary links survive rollback: %v", strays)
-			}
-		}
-	}
-	t.Run("link phase", func(t *testing.T) {
-		fx, req, markers, natives := setup(t)
-		req.InjectFault = func(point string, applied int) error {
-			if point == MigrateFaultLink && applied >= 1 {
-				return os.ErrInvalid
-			}
-			return nil
-		}
-		if _, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), "rolled back") {
-			t.Fatalf("the injected fault fails rolled back, got %v", err)
-		}
-		assertRolledBack(t, fx, markers, natives)
-	})
-	t.Run("post publish", func(t *testing.T) {
-		fx, req, markers, natives := setup(t)
-		req.InjectFault = func(point string, _ int) error {
-			if point == MigrateFaultPublish {
-				return os.ErrInvalid
-			}
-			return nil
-		}
-		if _, err := ApplyMigration(req); err == nil || !strings.Contains(err.Error(), "rolled back") {
-			t.Fatalf("the injected fault fails rolled back, got %v", err)
-		}
-		assertRolledBack(t, fx, markers, natives)
-	})
 }
 
 // TestMigrateOldRootBytesWarnAndProceed proves bytes at the old Pi root
 // alone (agent root empty) warn loudly but do not block: the relink
 // leaves the old bytes untouched, the manager never moves them, and the
-// re-pointed link dangles pending until the operator moves the live
-// bytes out of band. The narrowing killer for a mutant that refuses
-// whenever the old root holds bytes.
+// re-pointed link dangles until the operator reconciles native bytes out of
+// band. Explicit migration may correct that recorded pointer, but Pi Resolve
+// still refuses the absent native leaf without a fragment.
 func TestMigrateOldRootBytesWarnAndProceed(t *testing.T) {
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
@@ -1059,7 +968,17 @@ func TestMigrateOldRootBytesWarnAndProceed(t *testing.T) {
 	if err := os.WriteFile(oldAuth, oldBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	auth := filepath.Join(fx.native["pi"], "agent", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(auth), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(auth, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
 	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
+	if err := os.Remove(auth); err != nil {
+		t.Fatal(err)
+	}
 	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
 	agentAuth := filepath.Join(native, "agent", "auth.json")
 	_ = os.Remove(link)
@@ -1091,11 +1010,8 @@ func TestMigrateOldRootBytesWarnAndProceed(t *testing.T) {
 		t.Fatalf("old-root bytes untouched: %q (%v)", payload, err)
 	}
 	current, err := Resolve(fx.request("pi"))
-	if err != nil {
-		t.Fatalf("the re-pointed home succeeds pending: %v", err)
-	}
-	if warnings := strings.Join(current.Warnings, "; "); !strings.Contains(warnings, "detached-pending") {
-		t.Fatalf("the pending finding reports loudly: %q", warnings)
+	if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) || !strings.Contains(err.Error(), "reason=dangling") || current != nil && len(current.Document) > 0 {
+		t.Fatalf("Pi absent native leaf must visibly refuse launch: %v", err)
 	}
 }
 
@@ -1105,7 +1021,17 @@ func TestMigrateOldRootBytesWarnAndProceed(t *testing.T) {
 func TestMigratePendingNeedsNothing(t *testing.T) {
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
+	auth := filepath.Join(fx.native["pi"], "agent", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(auth), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(auth, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
 	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
+	if err := os.Remove(auth); err != nil {
+		t.Fatal(err)
+	}
 	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
 	want := filepath.Join(fx.native["pi"], "agent", "auth.json")
 	report, err := PlanMigration(fx.migrateRequest())
@@ -1241,7 +1167,7 @@ func TestMigrateApplyRequiresPlan(t *testing.T) {
 			t.Fatalf("the refusal names %q: %v", want, err)
 		}
 	}
-	if result == nil || result.Report == nil || len(result.Applied) != 0 {
+	if result != nil && len(result.Applied) != 0 {
 		t.Fatalf("a plan-less apply executes nothing: %+v", result)
 	}
 	if target, err := os.Readlink(link); err != nil || target != oldTarget {
@@ -1281,7 +1207,7 @@ func TestMigratePrintFailureRefusesBeforeMutation(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "cannot print") {
 		t.Fatalf("an undeliverable plan must refuse before mutating, got %v", err)
 	}
-	if result == nil || result.Report == nil || len(result.Applied) != 0 {
+	if result != nil && len(result.Applied) != 0 {
 		t.Fatalf("an unprinted apply executes nothing: %+v", result)
 	}
 	if target, err := os.Readlink(link); err != nil || target != oldTarget {
@@ -1296,15 +1222,18 @@ func TestMigratePrintFailureRefusesBeforeMutation(t *testing.T) {
 	}
 }
 
-// TestMigrateMarkerDriftRefuses is the committed reviewer marker-drift
-// probe: a marker edit between plan and apply (here the valid
-// profile.lock_sha256 field) re-hashes the plan, so the stale hash
-// refuses with zero writes. The check digests raw marker bytes —
-// credential bytes are never read for it. A mutant hashing without the
-// marker accepts the stale plan and fails the refusal.
+// A substituted marker lock binding refuses before mutation, regardless of
+// a previously printed plan hash. Credential payloads are never read.
 func TestMigrateMarkerDriftRefuses(t *testing.T) {
 	requireLinkCapability(t)
 	fx := writeManagedFixture(t, "acme")
+	auth := filepath.Join(fx.native["pi"], "agent", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(auth), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(auth, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
 	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
 	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
 	oldTarget := filepath.Join(fx.native["pi"], "auth.json")
@@ -1337,10 +1266,10 @@ func TestMigrateMarkerDriftRefuses(t *testing.T) {
 	snap := snapshotCredentialScope(t, fx)
 	req.Expect = before.Hash
 	result, err := ApplyMigration(req)
-	if err == nil || !strings.Contains(err.Error(), "plan drift") {
-		t.Fatalf("a marker edit must refuse with plan drift, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), envorigin.DiagInvalid) || !strings.Contains(err.Error(), "marker/installed lock binding mismatch") {
+		t.Fatalf("a substituted marker binding must refuse before plan execution, got %v", err)
 	}
-	if result == nil || result.Report == nil || len(result.Applied) != 0 {
+	if result != nil && len(result.Applied) != 0 {
 		t.Fatalf("a drifted apply executes nothing: %+v", result)
 	}
 	if target, err := os.Readlink(link); err != nil || target != oldTarget {
@@ -1355,366 +1284,28 @@ func TestMigrateMarkerDriftRefuses(t *testing.T) {
 	}
 }
 
-// TestMigrateFailedRelinkKeepsOldLink is the committed reviewer
-// syscall-failure probe, adapted to the journaled executor: an
-// OS-rejected oversized target fails the relink with the old link
-// standing (never a remove-then-create window), and the journal-driven
-// reconciliation keeps the prior link. Helper-level by construction —
-// the production-entry syscall rows are
-// TestMigrateSyscallFailureRollsBack — so this pins the OS boundary,
-// not the entry.
+// The real staging syscall rejects an oversized target before replacement;
+// whole-unit compensation preserves both original links and home preimages.
 func TestMigrateFailedRelinkKeepsOldLink(t *testing.T) {
-	home := gitFixtureHome(t)
-	full := filepath.Join(ManagedHomeDir(home, "acme", "pi"), "auth.json")
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink("old-target", full); err != nil {
-		t.Fatal(err)
-	}
-	oversized := strings.Repeat("x", 100000)
-	journal := &migrationJournal{
-		Version: migrationJournalVersion,
-		Plan:    strings.Repeat("0", 64),
-		Ops: []migrationJournalOp{{
-			Profile: "acme", EnvID: "pi", Kind: MigrateOpRelink,
-			Path: "auth.json", From: "old-target", To: oversized,
-		}},
-		Markers: []migrationJournalMarker{},
-	}
-	ops := []MigrateOp{{
-		Profile: "acme", EnvID: "pi", Kind: MigrateOpRelink,
-		Path: "auth.json", From: "old-target", To: oversized,
-	}}
-	applied, err := executeMigrationOps(MigrateRequest{Home: home}, ops, journal)
-	if err == nil {
-		t.Fatal("expected OS rejection of the oversized target")
-	}
-	if len(applied) != 0 {
-		t.Fatalf("a failed relink applies nothing: %+v", applied)
-	}
-	if target, err := os.Readlink(full); err != nil || target != "old-target" {
-		t.Fatalf("the failed relink leaves the old link standing: %q (%v)", target, err)
-	}
-	if err := reconcileJournalLinks(home, journal, os.Symlink, os.Rename); err != nil {
-		t.Fatalf("reconciliation keeps the prior link: %v", err)
-	}
-	if target, err := os.Readlink(full); err != nil || target != "old-target" {
-		t.Fatalf("the prior link stands after reconciliation: %q (%v)", target, err)
-	}
-	strays, err := filepath.Glob(filepath.Join(filepath.Dir(full), ".migrate-*.tmp"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(strays) != 0 {
-		t.Fatalf("no temporary links survive a failed relink: %v", strays)
-	}
+	migrationTransactionCase(t, "oversized-symlink")
 }
 
-// TestMigrateSyscallFailureRollsBack drives the syscall boundary
-// through the production entry: an injected Symlink failure and an
-// injected Rename failure each fail the apply with the old link
-// standing, the prior state restored, the journal deleted, and no
-// temporary links or credential copies left behind. A mutant restoring
-// remove-then-create loses the old link on the symlink half and fails
-// the standing-link assertion.
+// Raw staging Symlink failure and a fault immediately before credential
+// install are separate boundaries. The latter is not a Rename syscall witness.
+// Both preserve complete original homes, not merely return an error.
 func TestMigrateSyscallFailureRollsBack(t *testing.T) {
-	requireLinkCapability(t)
-	setup := func(t *testing.T) (*managedFixture, MigrateRequest, string, string, string) {
-		t.Helper()
-		fx := writeManagedFixture(t, "acme")
-		native := fx.native["pi"]
-		agentAuth := filepath.Join(native, "agent", "auth.json")
-		if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		credential := "CRED-SENTINEL-SYSCALL-4b2d\n"
-		if err := os.WriteFile(agentAuth, []byte(credential), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		provision(t, fx, "pi", envregistry.DefaultMachineConfig())
-		link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
-		oldTarget := filepath.Join(native, "auth.json")
-		_ = os.Remove(link)
-		if err := os.Symlink(oldTarget, link); err != nil {
-			t.Fatal(err)
-		}
-		req := fx.migrateRequest()
-		report, err := PlanMigration(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(report.Ops()) != 1 {
-			t.Fatalf("one relink op: %+v", report.Ops())
-		}
-		req.Expect = report.Hash
-		return fx, req, link, oldTarget, credential
-	}
-	assertRolledBack := func(t *testing.T, fx *managedFixture, link, oldTarget, credential string, before fileSnapshot, err error, want string) {
-		t.Helper()
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Fatalf("the injected failure must surface, got %v", err)
-		}
-		if !strings.Contains(err.Error(), "rolled back") {
-			t.Fatalf("the failure rolls back, got %v", err)
-		}
-		if target, err := os.Readlink(link); err != nil || target != oldTarget {
-			t.Fatalf("the old link stands through the failure: %q (%v)", target, err)
-		}
-		agentAuth := filepath.Join(fx.native["pi"], "agent", "auth.json")
-		holders := credentialHolders(t, fx, credential)
-		if len(holders) != 1 || !holders[agentAuth] {
-			t.Fatalf("no file newly carries credential content: %v", holders)
-		}
-		if _, err := os.Lstat(migrationJournalPath(fx.home)); !os.IsNotExist(err) {
-			t.Fatalf("the rollback deletes the journal: %v", err)
-		}
-		strays, err := filepath.Glob(filepath.Join(filepath.Dir(link), ".migrate-*.tmp"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(strays) != 0 {
-			t.Fatalf("no temporary links survive the failure: %v", strays)
-		}
-		added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
-		if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
-			t.Fatalf("the failure writes nothing durable: added=%v removed=%v changed=%v", added, removed, changed)
-		}
-	}
-	t.Run("symlink failure", func(t *testing.T) {
-		fx, req, link, oldTarget, credential := setup(t)
-		before := snapshotCredentialScope(t, fx)
-		req.symlink = func(_, _ string) error {
-			return errors.New("injected symlink failure")
-		}
-		_, err := ApplyMigration(req)
-		assertRolledBack(t, fx, link, oldTarget, credential, before, err, "injected symlink failure")
-	})
-	t.Run("rename failure", func(t *testing.T) {
-		fx, req, link, oldTarget, credential := setup(t)
-		before := snapshotCredentialScope(t, fx)
-		req.rename = func(_, _ string) error {
-			return errors.New("injected rename failure")
-		}
-		_, err := ApplyMigration(req)
-		assertRolledBack(t, fx, link, oldTarget, credential, before, err, "injected rename failure")
-	})
-}
-
-// TestMigrateInterruptedApplyRecovers proves crash recovery through the
-// production entries: a simulated kill after the first operation leaves
-// the journal standing with links half-done; inspect and plan report
-// the interruption read-only; the next apply with the same plan hash
-// recovers to the prior state and then executes the whole plan,
-// ending migrated with the journal gone.
-func TestMigrateInterruptedApplyRecovers(t *testing.T) {
-	requireLinkCapability(t)
-	fx := writeManagedFixture(t, "acme")
-	piNative := fx.native["pi"]
-	agentAuth := filepath.Join(piNative, "agent", "auth.json")
-	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	codexAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
-	if err := os.WriteFile(codexAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
-	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
-	piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
-	oldTarget := filepath.Join(piNative, "auth.json")
-	_ = os.Remove(piLink)
-	if err := os.Symlink(oldTarget, piLink); err != nil {
-		t.Fatal(err)
-	}
-	codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
-	isolated := envregistry.DefaultMachineConfig()
-	isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
-	req := fx.migrateRequest()
-	req.Machine = isolated
-	report, err := PlanMigration(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(report.Ops()) != 2 {
-		t.Fatalf("the plan carries two operations: %+v", report.Ops())
-	}
-	req.Expect = report.Hash
-	// Kill after the first operation: registry order puts the codex
-	// unlink first and the Pi relink second.
-	crash := req
-	crash.InjectFault = func(point string, applied int) error {
-		if point == MigrateFaultCrash && applied >= 1 {
-			return errors.New("kill -9")
-		}
-		return nil
-	}
-	interrupted, err := ApplyMigration(crash)
-	if err == nil || !strings.Contains(err.Error(), "interrupted") {
-		t.Fatalf("the crash must interrupt, got %v", err)
-	}
-	if interrupted == nil || len(interrupted.Applied) != 1 {
-		t.Fatalf("one operation stands at the kill: %+v", interrupted)
-	}
-	if _, err := os.Lstat(codexLink); !os.IsNotExist(err) {
-		t.Fatalf("the first operation landed before the kill: %v", err)
-	}
-	if target, err := os.Readlink(piLink); err != nil || target != oldTarget {
-		t.Fatalf("the second operation never ran: %q (%v)", target, err)
-	}
-	journal, err := readMigrationJournal(fx.home)
-	if err != nil || journal == nil {
-		t.Fatalf("the journal stands after the kill: %+v (%v)", journal, err)
-	}
-	if journal.Plan != report.Hash || len(journal.Ops) != 2 || !journal.Ops[0].Done || journal.Ops[1].Done {
-		t.Fatalf("the journal records one of two done: %+v", journal)
-	}
-	// The read-only phases report the interruption without recovering.
-	stale, err := PlanMigration(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stale.Recovery == nil || stale.Recovery.Plan != report.Hash || stale.Recovery.Done != 1 {
-		t.Fatalf("the plan surfaces the interruption: %+v", stale.Recovery)
-	}
-	for _, phase := range []string{MigratePhaseInspect, MigratePhasePlan} {
-		text := stale.Text(phase)
-		if !strings.Contains(text, "interrupted migration apply") || !strings.Contains(text, report.Hash) {
-			t.Fatalf("%s banners the interruption:\n%s", phase, text)
-		}
-	}
-	if plan := stale.Text(MigratePhasePlan); !strings.Contains(plan, "recover:") {
-		t.Fatalf("the interrupted plan points at recovery:\n%s", plan)
-	}
-	if _, err := os.Lstat(codexLink); !os.IsNotExist(err) {
-		t.Fatal("planning recovers nothing")
-	}
-	// The next apply with the same hash recovers, then executes.
-	var printed strings.Builder
-	retry := req
-	retry.Print = &printed
-	retry.InjectFault = nil
-	result, err := ApplyMigration(retry)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Recovered == nil || result.Recovered.Plan != report.Hash {
-		t.Fatalf("the apply reports the recovery: %+v", result.Recovered)
-	}
-	if len(result.Applied) != 2 {
-		t.Fatalf("the recovered apply executes the whole plan: %+v", result.Applied)
-	}
-	out := printed.String()
-	announced := strings.Index(out, "recovering interrupted migration apply")
-	planned := strings.Index(out, "credential migration plan")
-	if announced < 0 || planned < 0 || announced > planned {
-		t.Fatalf("the recovery announces before the locked plan prints:\n%s", out)
-	}
-	if target, err := os.Readlink(piLink); err != nil || target != agentAuth {
-		t.Fatalf("the Pi link migrated: %q (%v)", target, err)
-	}
-	if _, err := os.Lstat(codexLink); !os.IsNotExist(err) {
-		t.Fatalf("the codex link is unlinked: %v", err)
-	}
-	marker := readManagedMarker(t, fx, "codex_cli")
-	if marker.Passthrough == nil || len(*marker.Passthrough) != 0 {
-		t.Fatalf("the record drops the unlinked entry: %+v", marker.Passthrough)
-	}
-	if _, err := os.Lstat(migrationJournalPath(fx.home)); !os.IsNotExist(err) {
-		t.Fatalf("the recovered apply deletes the journal: %v", err)
+	for _, mode := range []string{"symlink-error", "before-install"} {
+		t.Run(mode, func(t *testing.T) { migrationTransactionCase(t, mode) })
 	}
 }
 
-// TestMigratePublishFailureRevertsLinks proves a failed marker
-// publication reverts the links: the apply fails naming the
-// publication, every link is back at its prior target, prior markers
-// restore byte-identical, native bytes are untouched, and the journal
-// is deleted.
-func TestMigratePublishFailureRevertsLinks(t *testing.T) {
-	requireLinkCapability(t)
-	fx := writeManagedFixture(t, "acme")
-	piNative := fx.native["pi"]
-	agentAuth := filepath.Join(piNative, "agent", "auth.json")
-	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	codexAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
-	if err := os.WriteFile(codexAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
-	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
-	piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
-	oldTarget := filepath.Join(piNative, "auth.json")
-	_ = os.Remove(piLink)
-	if err := os.Symlink(oldTarget, piLink); err != nil {
-		t.Fatal(err)
-	}
-	codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
-	isolated := envregistry.DefaultMachineConfig()
-	isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
-	req := fx.migrateRequest()
-	req.Machine = isolated
-	report, err := PlanMigration(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(report.Ops()) != 2 {
-		t.Fatalf("the plan carries two operations: %+v", report.Ops())
-	}
-	markers := map[string]string{}
-	for _, env := range []string{"pi", "codex_cli"} {
-		payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), envmarker.Name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		markers[env] = string(payload)
-	}
-	natives := map[string]string{
-		agentAuth: sha256Of(t, agentAuth),
-		codexAuth: sha256Of(t, codexAuth),
-	}
-	req.Expect = report.Hash
-	req.InjectFault = func(point string, _ int) error {
-		if point == MigrateFaultPublishBegin {
-			return errors.New("injected publish failure")
-		}
-		return nil
-	}
-	_, err = ApplyMigration(req)
-	if err == nil || !strings.Contains(err.Error(), "marker publish failed") {
-		t.Fatalf("the publish failure must surface, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "rolled back") {
-		t.Fatalf("the publish failure reverts the links, got %v", err)
-	}
-	if target, err := os.Readlink(piLink); err != nil || target != oldTarget {
-		t.Fatalf("the Pi link moves back to its prior target: %q (%v)", target, err)
-	}
-	if target, err := os.Readlink(codexLink); err != nil || target != codexAuth {
-		t.Fatalf("the codex link is re-created at its prior target: %q (%v)", target, err)
-	}
-	for _, env := range []string{"pi", "codex_cli"} {
-		payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, env), envmarker.Name))
-		if err != nil || string(payload) != markers[env] {
-			t.Fatalf("the prior %s marker restores byte-identical", env)
-		}
-	}
-	for path, want := range natives {
-		if digest := sha256Of(t, path); digest != want {
-			t.Fatalf("native bytes untouched: %s", path)
-		}
-	}
-	if _, err := os.Lstat(migrationJournalPath(fx.home)); !os.IsNotExist(err) {
-		t.Fatalf("the rollback deletes the journal: %v", err)
-	}
-}
+// A fresh engine completes genuine credential-prefix intent using captured
+// origins. This models an in-process restart, not an OS kill.
+func TestMigrateInterruptedApplyRecovers(t *testing.T) { migrationTransactionCase(t, "restart") }
+
+// A real marker publication fault after credential installation restores
+// complete prior marker/origin/home state and preserves native fixtures.
+func TestMigratePublishFailureRevertsLinks(t *testing.T) { migrationTransactionCase(t, "after-marker") }
 
 // TestMigrateSealedJournalDeletesWithoutTouching proves a sealed
 // (fully applied) journal never rolls back completed work: the next
@@ -1793,190 +1384,66 @@ func TestMigrateSealedJournalDeletesWithoutTouching(t *testing.T) {
 // closed: inspect and plan banner it as blocked, and apply refuses
 // naming the backup-first operator choice with zero writes and the
 // journal left for inspection.
+// A malformed legacy record blocks read-only planning before backend lookup
+// as well as Apply; it is preserved exactly rather than guessed away.
 func TestMigrateBrokenJournalRefuses(t *testing.T) {
-	requireLinkCapability(t)
-	fx, link, oldTarget, _ := mistargetedPiFixture(t)
-	if err := os.MkdirAll(filepath.Dir(migrationJournalPath(fx.home)), 0o755); err != nil {
+	fx, _, _, _ := mistargetedPiFixture(t)
+	if err := os.MkdirAll(filepath.Dir(migrationJournalPath(fx.home)), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(migrationJournalPath(fx.home), []byte("{not a journal"), 0o600); err != nil {
+	if err := os.WriteFile(migrationJournalPath(fx.home), []byte("{not a journal"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	report, err := PlanMigration(fx.migrateRequest())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Recovery == nil || report.Recovery.Broken == "" {
-		t.Fatalf("the plan marks the journal broken: %+v", report.Recovery)
-	}
-	if plan := report.Text(MigratePhasePlan); !strings.Contains(plan, "unusable") || !strings.Contains(plan, "blocked:") {
-		t.Fatalf("the plan banners the broken journal:\n%s", plan)
-	}
-	if inspect := report.Text(MigratePhaseInspect); !strings.Contains(inspect, "unusable") {
-		t.Fatalf("the inventory banners the broken journal:\n%s", inspect)
-	}
-	before := snapshotCredentialScope(t, fx)
+	before := nativeSnapshot(t, fx.home)
 	req := fx.migrateRequest()
-	req.Expect = report.Hash
-	result, err := ApplyMigration(req)
-	if err == nil || !strings.Contains(err.Error(), "unusable") {
-		t.Fatalf("a broken journal must refuse, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "back it up out of band") {
-		t.Fatalf("the refusal names the operator choice: %v", err)
-	}
-	if result == nil || result.Report == nil || len(result.Applied) != 0 {
-		t.Fatalf("a broken journal applies nothing: %+v", result)
-	}
-	if target, err := os.Readlink(link); err != nil || target != oldTarget {
-		t.Fatalf("the link is untouched: %q (%v)", target, err)
-	}
-	if _, err := os.Lstat(migrationJournalPath(fx.home)); err != nil {
-		t.Fatalf("the broken journal is left for inspection: %v", err)
-	}
-	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
-	if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
-		t.Fatalf("a broken journal writes nothing: added=%v removed=%v changed=%v", added, removed, changed)
+	req.Expect = strings.Repeat("a", 64)
+	for _, apply := range []bool{false, true} {
+		var err error
+		if apply {
+			_, err = ApplyMigration(req)
+		} else {
+			_, err = PlanMigration(req)
+		}
+		if err == nil || !strings.Contains(err.Error(), envorigin.DiagInvalid) || !strings.Contains(err.Error(), "legacy migration journal") {
+			t.Fatalf("malformed journal refusal apply=%t: %v", apply, err)
+		}
+		if nativeSnapshot(t, fx.home) != before {
+			t.Fatal("malformed journal refusal changed state")
+		}
 	}
 }
 
-// TestMigrateRecoveryRefusesUnexpectedTarget proves the recovery
-// validates the entire inventory before any write: an interrupted apply
-// whose pending link was re-pointed out of band to an unexpected target
-// refuses naming the exact operator choice, preserving the unexpected
-// link, the half-done state, and the journal. A mutant that recovers
-// before validating silently moves the link back and accepts the stale
-// plan.
+// A substituted link after interrupted publication refuses before recovery
+// continuation, preserving the unexpected entry and entire durable state.
 func TestMigrateRecoveryRefusesUnexpectedTarget(t *testing.T) {
-	requireLinkCapability(t)
-	fx := writeManagedFixture(t, "acme")
-	piNative := fx.native["pi"]
-	agentAuth := filepath.Join(piNative, "agent", "auth.json")
-	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(agentAuth, []byte("{\"t\":\"operator-pi\"}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	codexAuth := filepath.Join(fx.native["codex_cli"], "auth.json")
-	if err := os.WriteFile(codexAuth, []byte("{\"t\":\"operator\"}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
-	provision(t, fx, "codex_cli", envregistry.DefaultMachineConfig())
-	piLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
-	oldTarget := filepath.Join(piNative, "auth.json")
-	_ = os.Remove(piLink)
-	if err := os.Symlink(oldTarget, piLink); err != nil {
-		t.Fatal(err)
-	}
-	codexLink := filepath.Join(ManagedHomeDir(fx.home, "acme", "codex_cli"), "auth.json")
-	isolated := envregistry.DefaultMachineConfig()
-	isolated.Isolation = map[string]map[string]string{"acme": {"codex_cli": "isolated"}}
-	req := fx.migrateRequest()
-	req.Machine = isolated
-	report, err := PlanMigration(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(report.Ops()) != 2 {
-		t.Fatalf("the plan carries two operations: %+v", report.Ops())
-	}
-	req.Expect = report.Hash
-	crash := req
-	crash.InjectFault = func(point string, applied int) error {
-		if point == MigrateFaultCrash && applied >= 1 {
-			return errors.New("kill -9")
-		}
-		return nil
-	}
-	if _, err := ApplyMigration(crash); err == nil || !strings.Contains(err.Error(), "interrupted") {
-		t.Fatalf("the crash must interrupt, got %v", err)
-	}
-	unexpected := filepath.Join(t.TempDir(), "operator-target")
-	_ = os.Remove(piLink)
-	if err := os.Symlink(unexpected, piLink); err != nil {
-		t.Fatal(err)
-	}
-	req.InjectFault = nil
-	before := snapshotCredentialScope(t, fx)
-	result, err := ApplyMigration(req)
-	if err == nil {
-		t.Fatal("an unexpected link target during recovery must refuse")
-	}
-	for _, want := range []string{"recovery found", unexpected, "out of band", "re-run"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Fatalf("the refusal names %q: %v", want, err)
-		}
-	}
-	if result == nil || len(result.Applied) != 0 {
-		t.Fatalf("a refused recovery applies nothing: %+v", result)
-	}
-	if target, err := os.Readlink(piLink); err != nil || target != unexpected {
-		t.Fatalf("the unexpected link is preserved: %q (%v)", target, err)
-	}
-	if _, err := os.Lstat(codexLink); !os.IsNotExist(err) {
-		t.Fatalf("the half-done state is preserved: %v", err)
-	}
-	if _, err := os.Lstat(migrationJournalPath(fx.home)); err != nil {
-		t.Fatalf("the journal stands for the operator fix: %v", err)
-	}
-	added, removed, changed := snapshotDiff(before, snapshotCredentialScope(t, fx))
-	if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
-		t.Fatalf("a refused recovery writes nothing: added=%v removed=%v changed=%v", added, removed, changed)
-	}
+	migrationTransactionCase(t, "wrong-link")
 }
 
-// TestMigrateRecoveryCleansOwnedTemp proves the journal owns its
-// temporary links exactly: a leftover owned temp (symlink to the
-// recorded target at the recorded path, from a kill between the symlink
-// and the rename) is removed by the next recovery, which then executes
-// the plan. Foreign paths are never touched (see
-// TestReviewerRecoveryPreservesRegularTemp).
-func TestMigrateRecoveryCleansOwnedTemp(t *testing.T) {
-	requireLinkCapability(t)
-	fx, piLink, oldTarget, agentAuth := mistargetedPiFixture(t)
+// An unsealed legacy journal cannot authorize temp cleanup or recovery.
+// Temp and journal remain exact; completed-receipt cleanup has a nearby control.
+func TestMigrateUnsealedLegacyTempRefuses(t *testing.T) {
+	fx, link, old, target := mistargetedPiFixture(t)
 	report, err := PlanMigration(fx.migrateRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.Ops()) != 1 {
-		t.Fatalf("one relink op: %+v", report.Ops())
-	}
-	owned := filepath.Join(filepath.Dir(piLink), ".migrate-owned-test.tmp")
-	if err := os.Symlink(agentAuth, owned); err != nil {
+	temp := filepath.Join(filepath.Dir(link), ".migrate-owned-test.tmp")
+	if err = os.Symlink(target, temp); err != nil {
 		t.Fatal(err)
 	}
-	journal := &migrationJournal{
-		Version: migrationJournalVersion,
-		Plan:    report.Hash,
-		Ops: []migrationJournalOp{{
-			Profile: "acme", EnvID: "pi", Kind: MigrateOpRelink,
-			Path: "auth.json", From: oldTarget, To: agentAuth,
-			Temp: owned, TempTarget: agentAuth,
-		}},
-		Markers: []migrationJournalMarker{},
-	}
-	if err := writeMigrationJournal(fx.home, journal); err != nil {
+	j := &migrationJournal{Version: 1, Plan: report.Hash, Ops: []migrationJournalOp{{Profile: fx.profile, EnvID: "pi", Kind: MigrateOpRelink, Path: "auth.json", From: old, To: target, Temp: temp, TempTarget: target}}, Markers: []migrationJournalMarker{}}
+	if err = writeMigrationJournal(fx.home, j); err != nil {
 		t.Fatal(err)
 	}
-	retry := fx.migrateRequest()
-	retry.Expect = report.Hash
-	result, err := ApplyMigration(retry)
-	if err != nil {
-		t.Fatal(err)
+	before := nativeSnapshot(t, fx.home)
+	req := fx.migrateRequest()
+	req.Expect = report.Hash
+	result, err := ApplyMigration(req)
+	if err == nil || !strings.Contains(err.Error(), envorigin.DiagInvalid) || result != nil && len(result.Applied) > 0 {
+		t.Fatalf("unsealed legacy continuation refusal: %v", err)
 	}
-	if result.Recovered == nil || result.Recovered.Plan != report.Hash {
-		t.Fatalf("the apply reports the recovery: %+v", result.Recovered)
-	}
-	if _, err := os.Lstat(owned); !os.IsNotExist(err) {
-		t.Fatalf("the owned temp is cleaned: %v", err)
-	}
-	if target, err := os.Readlink(piLink); err != nil || target != agentAuth {
-		t.Fatalf("the Pi link migrated: %q (%v)", target, err)
-	}
-	if _, err := os.Lstat(migrationJournalPath(fx.home)); !os.IsNotExist(err) {
-		t.Fatalf("the recovered apply deletes the journal: %v", err)
+	if nativeSnapshot(t, fx.home) != before {
+		t.Fatal("unsealed legacy refusal changed journal, home or claimed temp")
 	}
 }
 
