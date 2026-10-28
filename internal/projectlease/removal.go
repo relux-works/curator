@@ -13,6 +13,7 @@ type ProfileRemoval struct {
 	Before, After []byte
 }
 
+// PrepareProfileRemoval captures exact lease-reference revocations for the removal unit.
 func PrepareProfileRemoval(home, profile string, held managerlock.Held) (*ProfileRemoval, error) {
 	if err := held.Validate(home); err != nil {
 		return nil, err

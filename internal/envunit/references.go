@@ -19,9 +19,12 @@ type ReferencePreimage struct {
 	Mode  uint32      `json:"mode"`
 }
 
+// LeaseReferencePath returns the fixed manager-owned lease reference record.
 func LeaseReferencePath(manager string) string {
 	return filepath.Join(manager, "state", "project-leases", "v1", "ledger.json")
 }
+
+// InputDigest returns the digest of the captured lease-reference preimage.
 func (p ReferencePreimage) InputDigest() (string, error) {
 	if p.Image.Kind == "absent" {
 		return "absent", nil

@@ -996,7 +996,7 @@ func nativeMCPUnit(req ProfileMCPRequest) (*envunit.Unit, error) {
 		if err := resolve.observeOrigin(adapter.ID, marker); err != nil {
 			return nil, err
 		}
-		raw, err := os.ReadFile(filepath.Join(target, envmarker.Name))
+		raw, err := os.ReadFile(filepath.Join(target, envmarker.Name)) // #nosec G304 -- exact managed marker path was boundary/record authority checked immediately above.
 		if err != nil {
 			return nil, err
 		}

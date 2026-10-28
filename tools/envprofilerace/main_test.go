@@ -122,6 +122,86 @@ func TestBuildEventControls(t *testing.T) {
 	}
 }
 
+// A driver must retain effective tool paths across synthetic HOME replacement.
+// Explicit offline policy is preserved, and malformed/missing/relative paths
+// refuse instead of falling back to a new empty HOME-dependent cache.
+func TestToolEnvironmentBindings(t *testing.T) {
+	root := t.TempDir()
+	values := map[string]string{"GOCACHE": filepath.Join(root, "cache"), "GOPATH": filepath.Join(root, "go"), "GOMODCACHE": filepath.Join(root, "mod"), "GOPROXY": "off", "GOSUMDB": "off"}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := bindToolEnvironment([]string{"HOME=synthetic", "GOMODCACHE=old"}, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(result, "\n")
+	for key, value := range values {
+		if strings.Count(joined, key+"=") != 1 || !strings.Contains(joined, key+"="+value) {
+			t.Fatalf("effective tool binding lost: %s", key)
+		}
+	}
+	for _, key := range []string{"GOCACHE", "GOPATH", "GOMODCACHE", "GOPROXY", "GOSUMDB"} {
+		t.Run(key, func(t *testing.T) {
+			bad := make(map[string]string)
+			for k, value := range values {
+				bad[k] = value
+			}
+			bad[key] = ""
+			payload, err := json.Marshal(bad)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := bindToolEnvironment(nil, payload); err == nil {
+				t.Fatal("missing tool binding accepted")
+			}
+		})
+	}
+	values["GOMODCACHE"] = "relative"
+	raw, err = json.Marshal(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bindToolEnvironment(nil, raw); err == nil {
+		t.Fatal("relative tool cache accepted")
+	}
+	if _, err := bindToolEnvironment(nil, []byte("invalid")); err == nil {
+		t.Fatal("malformed context accepted")
+	}
+	values["GOMODCACHE"] = filepath.Join(root, "mod")
+	values["HOME"] = "unexpected"
+	raw, err = json.Marshal(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bindToolEnvironment(nil, raw); err == nil {
+		t.Fatal("unexpected tool-context selector accepted")
+	}
+}
+
+// The real driver query resolves only tool metadata in this disposable offline
+// test environment; it neither compiles a race shard nor looks up an account.
+func TestEffectiveToolEnvironment(t *testing.T) {
+	result, err := effectiveToolEnvironment(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]string{}
+	for _, entry := range result {
+		key, value, _ := strings.Cut(entry, "=")
+		seen[key] = value
+	}
+	for _, key := range []string{"GOCACHE", "GOPATH", "GOMODCACHE"} {
+		if !filepath.IsAbs(seen[key]) {
+			t.Fatalf("missing effective %s", key)
+		}
+	}
+	if os.Getenv("GOPROXY") == "off" && seen["GOPROXY"] != "off" {
+		t.Fatal("driver silently enabled network")
+	}
+}
+
 func writeEvidence(t *testing.T, dir string, tests []string) {
 	t.Helper()
 	shards, err := partition(tests)

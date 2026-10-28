@@ -66,6 +66,7 @@ const (
 	KindExchange TargetKind = "exchange"
 )
 
+// Valid checks whether this target kind is supported by the closed journal.
 func (kind TargetKind) Valid() bool {
 	switch kind {
 	case KindBytes, KindEntry, KindExchange:
@@ -84,6 +85,7 @@ type GlobalRetention struct {
 	State    string                       `json:"state"`
 }
 
+// Journal is the bounded durable replacement transaction carrier.
 type Journal struct {
 	Global              *GlobalRetention         `json:"global_retention,omitempty"`
 	Opaque              []OpaqueRecord           `json:"opaque_quarantines,omitempty"`
@@ -112,6 +114,7 @@ type OpaqueRecord struct {
 	State          CommitState   `json:"state"`
 }
 
+// DirectoryRecord records a parent metadata action and its durable progress.
 type DirectoryRecord struct {
 	EmptyMuseHome string        `json:"empty_muse_home,omitempty"`
 	LivePath      string        `json:"live_path"`
@@ -123,6 +126,7 @@ type DirectoryRecord struct {
 	State         CommitState   `json:"state"`
 }
 
+// RemovalEntry pins one opaque removal entry without reading its payload.
 type RemovalEntry struct {
 	RelativePath string `json:"relative_path"`
 	Kind         string `json:"kind"`
@@ -131,6 +135,7 @@ type RemovalEntry struct {
 	LinkTarget   string `json:"link_target,omitempty"`
 }
 
+// TargetRecord records a target preimage, desired image and publication progress.
 type TargetRecord struct {
 	PrivateTree         bool           `json:"private_tree,omitempty"`
 	PrivateFile         bool           `json:"private_file,omitempty"`
@@ -159,7 +164,7 @@ type TargetRecord struct {
 	State               CommitState    `json:"state"`
 }
 
-// digest reads one of this target's own paths — live, staged, backup, or
+// Digest reads one of this target's own paths — live, staged, backup, or
 // rollback — with the strictness its kind requires. Every state comparison in
 // the engine goes through here so a target can never be read as a shape it does
 // not own.

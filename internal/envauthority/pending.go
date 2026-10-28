@@ -18,6 +18,7 @@ type pendingEffect struct {
 	DirectoryOnly bool
 }
 
+// Pending contains verified pending-unit effects and exact recovery bindings.
 type Pending struct {
 	LeaseJournals []*envjournal.Journal
 	OtherJournals int
@@ -71,8 +72,8 @@ func PendingUnits(manager string) (*Pending, error) {
 				if entry.Name() != journal.TransactionID+".json" {
 					return nil, fmt.Errorf("%s: lease journal filename differs", envorigin.DiagInvalid)
 				}
-				copy := journal
-				result.LeaseJournals = append(result.LeaseJournals, &copy)
+				leaseJournal := journal
+				result.LeaseJournals = append(result.LeaseJournals, &leaseJournal)
 			}
 			continue
 		}

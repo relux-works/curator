@@ -26,6 +26,8 @@ type LegacyMigration struct {
 	MarkersDone bool                    `json:"markers_done"`
 	Complete    bool                    `json:"complete"`
 }
+
+// LegacyMigrationOp describes one bounded native-only migration operation.
 type LegacyMigrationOp struct {
 	Profile    string `json:"profile"`
 	EnvID      string `json:"env"`
@@ -37,6 +39,8 @@ type LegacyMigrationOp struct {
 	Temp       string `json:"temp,omitempty"`
 	TempTarget string `json:"temp_target,omitempty"`
 }
+
+// LegacyMigrationMarker pins the marker binding for a completed legacy migration.
 type LegacyMigrationMarker struct {
 	Live  string `json:"live"`
 	Prior []byte `json:"prior"`

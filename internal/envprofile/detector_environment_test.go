@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-var detectorToolKeys = []string{"PATH", "GOCACHE", "GOPATH", "GOMODCACHE", "GOTOOLCHAIN", "CGO_ENABLED", "LANG", "LC_ALL", "CURATOR_FIXTURE_PID_LOG", "SYSTEMROOT", "WINDIR"}
+var detectorToolKeys = []string{"PATH", "GOCACHE", "GOPATH", "GOMODCACHE", "GOPROXY", "GOSUMDB", "GOTOOLCHAIN", "CGO_ENABLED", "LANG", "LC_ALL", "CURATOR_FIXTURE_PID_LOG", "SYSTEMROOT", "WINDIR"}
 
 func isolateDetectorParent(t *testing.T) {
 	t.Helper()
@@ -48,6 +48,12 @@ func isolateDetectorParent(t *testing.T) {
 		}
 	}
 	for key, value := range map[string]string{"GOFLAGS": "-trimpath -buildvcs=false", "GOENV": "off", "GOTELEMETRY": "off", "GOPROXY": "off", "GOSUMDB": "off"} {
+		// An explicit tool transport belongs to the caller. Local fixture runs
+		// supply off; hosted drivers bind their effective module/cache context
+		// before synthetic HOME changes. Never silently enable a network fallback.
+		if (key == "GOPROXY" || key == "GOSUMDB") && tools[key] != "" {
+			continue
+		}
 		if err := os.Setenv(key, value); err != nil {
 			t.Fatal(err)
 		}

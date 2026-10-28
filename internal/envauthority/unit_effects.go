@@ -69,7 +69,7 @@ func AdmitEffects(manager string, unit *envunit.Unit, paths []string) error {
 			continue
 		}
 		parts := strings.Split(rel, string(filepath.Separator))
-		if len(parts) != 1 && !(len(parts) == 2 && (parts[1] == "lock.json" || parts[1] == "source.json")) {
+		if len(parts) != 1 && (len(parts) != 2 || (parts[1] != "lock.json" && parts[1] != "source.json")) {
 			continue
 		}
 		profile := parts[0]

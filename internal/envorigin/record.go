@@ -135,7 +135,7 @@ func (r *Record) validate() error {
 	default:
 		return invalid("unknown selector state")
 	}
-	if !(r.Capture.Method == "provisioning" && r.Capture.Authority == "native-selection" || r.Capture.Method == "adoption" && r.Capture.Authority == "explicit-operator-input") {
+	if (r.Capture.Method != "provisioning" || r.Capture.Authority != "native-selection") && (r.Capture.Method != "adoption" || r.Capture.Authority != "explicit-operator-input") {
 		return invalid("invalid capture provenance")
 	}
 	if _, err := time.Parse(time.RFC3339Nano, r.Capture.Time); err != nil || !strings.HasSuffix(r.Capture.Time, "Z") {

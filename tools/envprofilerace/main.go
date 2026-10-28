@@ -131,6 +131,13 @@ func runShard(dir string, shard int) error {
 	if shard < 0 || shard >= shardCount {
 		return fmt.Errorf("shard must be 0..%d", shardCount-1)
 	}
+	// Bind tool paths before tests replace HOME. This preserves the driver's
+	// actual module cache and transport policy; it neither copies a cache nor
+	// turns an explicitly offline invocation into a downloading invocation.
+	toolEnv, err := effectiveToolEnvironment(os.Environ())
+	if err != nil {
+		return err
+	}
 	tests, err := inventory()
 	if err != nil {
 		return err
@@ -154,6 +161,7 @@ func runShard(dir string, shard int) error {
 	m := manifest{Commit: commit, GOOS: runtime.GOOS, Shard: shard, Tests: tests, Selector: selector(shards[shard])}
 	// #nosec G204 -- Selector is an escaped list of discovered test names; no shell is invoked.
 	cmd := exec.Command("go", "test", "-race", "-json", "-count=1", "-timeout="+timeout, "-run", m.Selector, "./internal/envprofile")
+	cmd.Env = toolEnv
 	cmd.Stdout = stream
 	cmd.Stderr = os.Stderr
 	fmt.Printf("envprofilerace: shard %d/%d, %d of %d tests, timeout=%s\n", shard, shardCount, len(shards[shard]), len(tests), timeout)
@@ -185,6 +193,46 @@ func runShard(dir string, shard int) error {
 	}
 	fmt.Printf("envprofilerace: shard %d PASS %.3fs (<%ds)\n", shard, elapsed, marginSeconds)
 	return nil
+}
+
+func effectiveToolEnvironment(base []string) ([]string, error) {
+	cmd := exec.Command("go", "env", "-json", "GOCACHE", "GOPATH", "GOMODCACHE", "GOPROXY", "GOSUMDB")
+	cmd.Env = base
+	raw, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("resolve Go tool paths: %w", err)
+	}
+	return bindToolEnvironment(base, raw)
+}
+
+func bindToolEnvironment(base []string, raw []byte) ([]string, error) {
+	var values map[string]string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, fmt.Errorf("invalid Go tool context: %w", err)
+	}
+	keys := []string{"GOCACHE", "GOPATH", "GOMODCACHE", "GOPROXY", "GOSUMDB"}
+	if len(values) != len(keys) {
+		return nil, fmt.Errorf("Go tool context fields differ")
+	}
+	for _, key := range keys[:3] {
+		if !filepath.IsAbs(values[key]) || filepath.Clean(values[key]) != values[key] {
+			return nil, fmt.Errorf("Go tool path %s is not absolute and clean", key)
+		}
+	}
+	if values["GOPROXY"] == "" || values["GOSUMDB"] == "" {
+		return nil, fmt.Errorf("Go tool transport is missing")
+	}
+	result := make([]string, 0, len(base)+len(keys))
+	for _, entry := range base {
+		key, _, _ := strings.Cut(entry, "=")
+		if _, replace := values[key]; !replace {
+			result = append(result, entry)
+		}
+	}
+	for _, key := range keys {
+		result = append(result, key+"="+values[key])
+	}
+	return result, nil
 }
 
 // Require completed top-level tests, not just the planned -run expression.

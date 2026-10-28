@@ -10,8 +10,8 @@ import (
 	"github.com/relux-works/curator/internal/envunit"
 )
 
-// Only the fixed installed publication and structured receipt survive a handled
-// global conflict. Homes, activation, native surfaces and legacy consumers do
+// GlobalPublishedTarget identifies the fixed installed publication and receipt
+// that survive a handled global conflict. Homes, activation, native surfaces and legacy consumers do
 // not become stable merely because their intended L1 images were journaled.
 func GlobalPublishedTarget(j *Journal, path string) bool {
 	if j.Global == nil || j.Unit == nil {
@@ -28,6 +28,8 @@ func GlobalPublishedTarget(j *Journal, path string) bool {
 	}
 	return false
 }
+
+// GlobalPublishedDirectory identifies a parent needed by the retained installed records or ledger.
 func GlobalPublishedDirectory(j *Journal, path string) bool {
 	if j.Unit != nil && j.Unit.LedgerPublication != nil && strings.HasPrefix(j.Unit.LedgerPublication.Path, path+string(filepath.Separator)) {
 		return true
@@ -39,8 +41,11 @@ func GlobalPublishedDirectory(j *Journal, path string) bool {
 	}
 	return false
 }
+
+// GlobalRetained reports the explicitly journaled retaining phase.
 func GlobalRetained(j *Journal) bool { return j.Global != nil && j.Global.State == "retaining" }
 
+// ValidateGlobal checks the typed global disposition and complete preimage bindings.
 func ValidateGlobal(j *Journal) error {
 	if j.Global == nil {
 		// Before binding, the initial construction has no durable global disposition.

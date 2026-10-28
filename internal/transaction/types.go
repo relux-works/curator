@@ -17,11 +17,7 @@ import (
 )
 
 const (
-	// PointBeforeStagingFinalMode observes a private writable sidecar before final protection.
-	PointBeforeStagingFinalMode Point = "before_staging_final_mode"
-	// PointAfterStagingFinalMode observes final protection with the original writer still open.
-	PointAfterStagingFinalMode Point = "after_staging_final_mode"
-	journalSchema                    = "curator-install-transaction-v1"
+	journalSchema = "curator-install-transaction-v1"
 	// DigestAbsent is the canonical digest token for an absent target.
 	DigestAbsent = "absent"
 )
@@ -40,11 +36,16 @@ type HomeLock interface {
 	AssertHeld() error
 }
 
-// Journal wire identities are shared with the independent admission reader.
+// Phase aliases the durable recovery phase shared with independent admission.
 type Phase = envjournal.Phase
+
+// CommitState aliases a closed durable target progress state.
 type CommitState = envjournal.CommitState
+
+// TargetKind aliases the closed replacement entry kind.
 type TargetKind = envjournal.TargetKind
 
+// PhasePreparing and its siblings preserve the shared journal phase/state/kind values.
 const (
 	PhasePreparing       = envjournal.PhasePreparing
 	PhasePrepared        = envjournal.PhasePrepared
@@ -61,17 +62,10 @@ const (
 	KindExchange         = envjournal.KindExchange
 )
 
-// Target describes one desired replacement. Class and Identifier are the
-// canonical ordering key. An empty StagedSource means the desired state is
-// absence. Exactly one preimage expectation is required: PreimageDigest, or
-// ExpectedGeneration read from GenerationPath (relative to LivePath, or the
-// live file itself when empty). A KindEntry target must use PreimageDigest,
-// because a link carries no generation file. A KindExchange target requires
-// a present PreimageDigest and present StagedSource, with no generation fields.
-// LinkFallback is an operation-private alternative for a noncredential
-// projection. Source must be a pinned, link-free prepared file/tree. Marker
-// fields bind a home copy reason to its exact declared surface; legacy adapter
-// mirrors have no home marker. No alternate or callback is needed after Prepare.
+// LinkFallback declares a pinned noncredential projection alternative.
+// Source must be a pinned, link-free prepared file/tree. Marker fields bind a
+// home copy reason to its exact declared surface; legacy adapter mirrors have
+// no home marker. No alternate or callback is needed after Prepare.
 type LinkFallback struct {
 	Source       string
 	Class        string
@@ -80,6 +74,13 @@ type LinkFallback struct {
 	RelativePath string
 }
 
+// Target describes one desired replacement and its exact preimage expectation.
+// Class and Identifier form the canonical ordering key. An empty StagedSource
+// means absence. Exactly one preimage expectation is required: PreimageDigest,
+// or ExpectedGeneration read from GenerationPath (relative to LivePath, or the
+// live file itself when empty). KindEntry requires PreimageDigest because a
+// link carries no generation file. KindExchange requires a present preimage
+// and staged source, with no generation fields.
 type Target struct {
 	LinkFallback *LinkFallback
 	// PrivateFile requires a regular, owner-only replacement, created privately
@@ -132,11 +133,14 @@ type Plan struct {
 	BoundaryProof *staging.DurableSnapshot
 }
 
+// OpaqueTarget declares an opaque whole-entry quarantine action.
 type OpaqueTarget struct {
 	Class    string
 	LivePath string
 	Before   envunit.Image
 }
+
+// OpaqueRecord aliases the durable opaque action record.
 type OpaqueRecord = envjournal.OpaqueRecord
 
 // Journal is the canonical durable recovery record. Paths are absolute so
@@ -174,10 +178,20 @@ type TargetRecord = envjournal.TargetRecord
 type Point string
 
 const (
+	// PointBeforeStagingFinalMode observes a private writable sidecar before final protection.
+	PointBeforeStagingFinalMode Point = "before_staging_final_mode"
+	// PointAfterStagingFinalMode observes final protection with the original writer still open.
+	PointAfterStagingFinalMode Point = "after_staging_final_mode"
+)
+
+const (
 	// PointGlobalRetained follows durable handled-conflict confirmation, before receipt publication.
-	PointGlobalRetained          Point = "global_retained"
-	PointAfterQuarantine         Point = "after_quarantine"
-	PointAfterQuarantineRestore  Point = "after_quarantine_restore"
+	PointGlobalRetained Point = "global_retained"
+	// PointAfterQuarantine follows the opaque live-to-quarantine rename.
+	PointAfterQuarantine Point = "after_quarantine"
+	// PointAfterQuarantineRestore follows precommit restoration of the opaque entry.
+	PointAfterQuarantineRestore Point = "after_quarantine_restore"
+	// PointDuringQuarantineRemoval observes postcommit opaque cleanup progress.
 	PointDuringQuarantineRemoval Point = "during_quarantine_removal"
 	// PointAfterDirectoryInstall follows metadata publication before its state
 	// write. Recovery must prove the exact prepared inode, not path existence.

@@ -216,7 +216,9 @@ func TestProvisioningOriginNativeLinkFallback(t *testing.T) {
 				if e != nil {
 					t.Fatal(e)
 				}
-				fresh.close()
+				if err := fresh.close(); err != nil {
+					t.Fatal(err)
+				}
 			} else if err != nil {
 				t.Fatal(err)
 			}

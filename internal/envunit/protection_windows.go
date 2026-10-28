@@ -55,6 +55,8 @@ func metadataProtection(path string, info os.FileInfo) (uint32, string, error) {
 	}
 	return mode, protection, nil
 }
+
+// ValidProtection checks the canonical owner/DACL descriptor spelling.
 func ValidProtection(value string) bool {
 	if value == "" || len(value) > 16384 || strings.ContainsRune(value, 0) {
 		return false
@@ -71,7 +73,7 @@ func ValidProtection(value string) bool {
 	return err == nil && dacl != nil && descriptor.String() == value
 }
 
-// The caller checks the exact entry/preimage before this operation. Apply only
+// ApplyDirectoryProtection follows the caller's exact entry/preimage check. Apply only
 // the recorded DACL/control, retaining owner, inode, children and file content.
 // A fresh observation must equal the recorded postimage before progress saves.
 func ApplyDirectoryProtection(path string, want Image) error {

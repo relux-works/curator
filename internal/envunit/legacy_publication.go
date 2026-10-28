@@ -21,6 +21,8 @@ type LegacyPublication struct {
 	ExternalStore string         `json:"external_store,omitempty"`
 	Entries       []LegacyTarget `json:"entries"`
 }
+
+// LegacyTarget binds one inherited publisher target to its exact class and preimages.
 type LegacyTarget struct {
 	Class string `json:"class"`
 	Path  string `json:"path"`
@@ -172,6 +174,8 @@ func (u *Unit) validateLegacy() error {
 	}
 	return nil
 }
+
+// LegacyOwns checks whether the exact class/path is enlisted by the inherited publisher.
 func (u *Unit) LegacyOwns(class, path string) bool {
 	if u.Legacy == nil || u.validateLegacy() != nil {
 		return false
@@ -183,6 +187,8 @@ func (u *Unit) LegacyOwns(class, path string) bool {
 	}
 	return false
 }
+
+// LegacyParent checks whether the exact parent is enlisted by the inherited publisher.
 func (u *Unit) LegacyParent(path string) bool {
 	if u.Legacy == nil || u.validateLegacy() != nil {
 		return false
@@ -194,6 +200,8 @@ func (u *Unit) LegacyParent(path string) bool {
 	}
 	return false
 }
+
+// VerifyLegacyRoots revalidates the inherited publisher root identities.
 func (u *Unit) VerifyLegacyRoots() error {
 	if u.Legacy == nil {
 		return nil

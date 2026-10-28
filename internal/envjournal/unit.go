@@ -418,6 +418,7 @@ func VerifyUnitState(j *Journal, manager string) error {
 	return nil
 }
 
+// VerifyForwardOrigins rechecks recorded origins before forward unit continuation.
 func VerifyForwardOrigins(j *Journal, manager string) error {
 	if j.Unit == nil {
 		return nil
@@ -444,7 +445,7 @@ func VerifyForwardOrigins(j *Journal, manager string) error {
 	return nil
 }
 
-// Decode canonicality is checked by independent readers before granting a
+// CanonicalEqual checks canonical bytes before independent readers grant a
 // pending exception. The concrete wire admits no extra duplicate/case variants.
 func CanonicalEqual(raw []byte, j *Journal, marshal func(any) ([]byte, error)) bool {
 	canonical, err := marshal(j)

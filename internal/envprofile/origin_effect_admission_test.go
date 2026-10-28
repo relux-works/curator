@@ -82,7 +82,11 @@ func TestProvisioningOriginLeaseLedgerOwnerRequired(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer op.close()
+	defer func() {
+		if err := op.close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	path := filepath.Join(fx.home, "state", "project-leases", "v1", "ledger.json")
 	e = op.publish(map[string][]byte{path: []byte("forbidden generic ledger")})
 	if e == nil || !strings.Contains(e.Error(), envorigin.DiagInvalid) {

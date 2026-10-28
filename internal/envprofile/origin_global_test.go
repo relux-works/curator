@@ -114,7 +114,11 @@ func TestProvisioningOriginGlobalRetainedConflict(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer held.Close()
+	defer func() {
+		if err := held.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	calls := 0
 	info, e := publishGlobalContinuationFixture(t, fx.home, resolver, held, &calls)
 	if e == nil || !strings.Contains(e.Error(), DiagUnmanagedConflict) {

@@ -20,11 +20,16 @@ import (
 	"github.com/relux-works/curator/internal/staging"
 )
 
+// Version identifies the closed environment-unit carrier.
 const Version = "environment-unit/1"
+
+// MaxBytes bounds the environment-unit decoder.
 const MaxBytes = 4 << 20
 
+// Action identifies the admitted lifecycle operation.
 type Action string
 
+// Provision and its siblings enumerate the closed lifecycle action grammar.
 const (
 	Provision    Action = "provision"
 	Adopt        Action = "adopt"
@@ -41,6 +46,7 @@ var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 var hash = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 var identity = regexp.MustCompile(`^[0-9]+:[0-9]+$`)
 
+// Manager pins the manager directory identity and owner.
 type Manager struct {
 	Path     string `json:"path"`
 	Identity string `json:"identity"`
@@ -59,11 +65,15 @@ type Image struct {
 	Digest     string `json:"digest,omitempty"`
 	LinkTarget string `json:"link_target,omitempty"`
 }
+
+// RecordImage binds bounded record bytes to their digest.
 type RecordImage struct {
 	Kind   string `json:"kind"`
 	Bytes  []byte `json:"bytes,omitempty"`
 	Digest string `json:"digest,omitempty"`
 }
+
+// ProfileTransition binds the old and new installed lock records.
 type ProfileTransition struct {
 	Name      string      `json:"name"`
 	Source    string      `json:"source"`
@@ -72,11 +82,15 @@ type ProfileTransition struct {
 	OldLock   RecordImage `json:"old_lock"`
 	NewLock   RecordImage `json:"new_lock"`
 }
+
+// HomeImage retains the exact marker and origin authority for a home state.
 type HomeImage struct {
 	Kind   string `json:"kind"`
 	Marker []byte `json:"marker,omitempty"`
 	Origin []byte `json:"origin,omitempty"`
 }
+
+// Home binds one adapter home to its before and after authority.
 type Home struct {
 	Profile         string    `json:"profile"`
 	Adapter         string    `json:"adapter"`
@@ -88,12 +102,16 @@ type Home struct {
 	Before          HomeImage `json:"before"`
 	After           HomeImage `json:"after"`
 }
+
+// Target binds an exact publication path and class to its before and after images.
 type Target struct {
 	Class  string `json:"class"`
 	Path   string `json:"path"`
 	Before Image  `json:"before"`
 	After  Image  `json:"after"`
 }
+
+// Unit describes one complete environment authority and publication transition.
 type Unit struct {
 	LeasePreimage     *ReferencePreimage      `json:"lease_preimage,omitempty"`
 	Legacy            *LegacyPublication      `json:"legacy_publication,omitempty"`
@@ -177,12 +195,15 @@ func ObserveManager(path string) (Manager, error) {
 	return Manager{Path: path, Identity: id, Owner: string(owner)}, nil
 }
 
+// Validate checks the manager identity grammar and absolute path.
 func (m Manager) Validate() error {
 	if !absolute(m.Path) || !identity.MatchString(m.Identity) || m.Owner == "" || len(m.Owner) > 256 || strings.ContainsAny(m.Owner, "\x00\r\n") {
 		return invalid("manager identity grammar")
 	}
 	return nil
 }
+
+// Verify reobserves the manager directory identity and owner.
 func (m Manager) Verify() error {
 	if err := m.Validate(); err != nil {
 		return err
@@ -197,6 +218,7 @@ func (m Manager) Verify() error {
 	return nil
 }
 
+// Parse decodes and validates the closed environment-unit carrier.
 func Parse(raw []byte, manager Manager) (*Unit, error) {
 	if len(raw) == 0 || len(raw) > MaxBytes {
 		return nil, invalid("unit size")
@@ -213,6 +235,8 @@ func Parse(raw []byte, manager Manager) (*Unit, error) {
 	}
 	return &u, nil
 }
+
+// Marshal validates and encodes the complete environment unit.
 func (u *Unit) Marshal() ([]byte, error) {
 	if err := u.Validate(); err != nil {
 		return nil, err
@@ -232,7 +256,7 @@ func (i Image) validateImage(credential, desired bool) error {
 		}
 		return nil
 	}
-	if (!identity.MatchString(i.Identity) && !(desired && i.Identity == "" && (i.Kind == "file" || i.Kind == "link" || i.Kind == "tree"))) || i.Owner == "" || i.Mode > 07777 || !(desired && i.Identity == "" && i.Protection == "") && !ValidProtection(i.Protection) {
+	if (!identity.MatchString(i.Identity) && (!desired || i.Identity != "" || (i.Kind != "file" && i.Kind != "link" && i.Kind != "tree"))) || i.Owner == "" || i.Mode > 07777 || (!desired || i.Identity != "" || i.Protection != "") && !ValidProtection(i.Protection) {
 		return invalid("entry identity/owner/mode")
 	}
 	switch i.Kind {
@@ -663,6 +687,7 @@ type Progress struct {
 	Live  Image
 }
 
+// ValidateProgress checks target progress against the admitted transaction phase.
 func (u *Unit) ValidateProgress(phase string, states []Progress) error {
 	if err := u.Validate(); err != nil {
 		return err

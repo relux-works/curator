@@ -78,7 +78,11 @@ func TestProvisioningOriginCommonAdmission(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer op.close()
+			defer func() {
+				if err := op.close(); err != nil {
+					t.Error(err)
+				}
+			}()
 			live := filepath.Join(ProfileDir(fx.home, fx.profile), "healthy-control")
 			if e := op.publish(map[string][]byte{live: []byte("reached")}); e != nil {
 				t.Fatal(e)

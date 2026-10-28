@@ -9,6 +9,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
+// BackupQuarantine identifies opaque cleanup of an owned backup generation.
 const BackupQuarantine = "backup-quarantine"
 
 // BackupAdapter admits one canonical numeric generation below an enumerated

@@ -56,7 +56,11 @@ func TestProvisioningOriginPendingNativeEffects(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer held.Close()
+	defer func() {
+		if err := held.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	engine, e := transaction.New(fx.home)
 	if e != nil {
 		t.Fatal(e)

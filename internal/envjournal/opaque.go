@@ -15,10 +15,12 @@ import (
 	"github.com/relux-works/curator/internal/staging"
 )
 
+// OpaquePath returns the fixed sibling quarantine path for an opaque action.
 func OpaquePath(live, id string, index int) string {
 	return filepath.Join(filepath.Dir(live), fmt.Sprintf(".curator-quarantine-%s-%03d", entrydigest.ShortIdentity(id), index))
 }
 
+// OpaqueClass distinguishes whole-home purge from owned backup quarantine.
 func OpaqueClass(action OpaqueRecord) string {
 	if action.Class == "" {
 		return "quarantine"
@@ -26,6 +28,7 @@ func OpaqueClass(action OpaqueRecord) string {
 	return action.Class
 }
 
+// ValidateOpaque checks opaque action identity, namespace, state and receipt bindings.
 func ValidateOpaque(j *Journal) error {
 	if len(j.Opaque) == 0 {
 		if j.Unit != nil && j.Unit.Action == envunit.Purge && len(j.Unit.Homes) != 0 {
@@ -100,6 +103,7 @@ func ValidateOpaque(j *Journal) error {
 	return nil
 }
 
+// VerifyPurgeReceipt verifies retained-removal evidence before opaque purge continuation.
 func VerifyPurgeReceipt(unit *envunit.Unit) error {
 	if unit.Action != envunit.Purge {
 		return nil
@@ -131,6 +135,7 @@ func VerifyPurgeReceipt(unit *envunit.Unit) error {
 	return nil
 }
 
+// VerifyOpaqueState checks live/quarantine identities for the current durable phase.
 func VerifyOpaqueState(j *Journal) error {
 	if err := ValidateOpaque(j); err != nil {
 		return err

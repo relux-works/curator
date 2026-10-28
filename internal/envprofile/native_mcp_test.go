@@ -545,13 +545,14 @@ func TestProfileMCPChangedInputsRefuse(t *testing.T) {
 			if kind == "native" && !bytes.Contains(nativeRead(t, path), []byte("external")) {
 				t.Fatal("EXTERNAL_PREIMAGE_OVERWRITTEN")
 			}
-			if kind == "parent" || kind == "parent-same-bytes" {
+			switch kind {
+			case "parent", "parent-same-bytes":
 				if err == nil {
 					t.Fatal("changed parent accepted")
 				}
-			} else if kind == "lock" {
+			case "lock":
 				requireMCPError(t, err, envorigin.DiagInvalid)
-			} else {
+			default:
 				requireMCPError(t, err, "transaction_input_changed")
 			}
 			if result.Published {

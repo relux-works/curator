@@ -26,7 +26,9 @@ func TestProvisioningOriginBackupRetention(t *testing.T) {
 				t.Fatal(err)
 			}
 			results, err := materializeScopeWithNativeHome(op, fx.home, fx.profile, "codex_cli", Policy{}, req.NativeHomeOf)
-			op.close()
+			if err := op.close(); err != nil {
+				t.Fatal(err)
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
