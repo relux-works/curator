@@ -19,14 +19,22 @@ import (
 func ShortTempDir(t testing.TB) string {
 	t.Helper()
 	if runtime.GOOS != "windows" {
-		return t.TempDir()
+		dir, err := physicalPath(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return dir
 	}
-	ordinary, err := filepath.Abs(os.TempDir())
+	ordinary, err := physicalPath(os.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	base := filepath.VolumeName(ordinary) + string(os.PathSeparator)
 	dir, err := os.MkdirTemp(base, "c-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err = physicalPath(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -640,3 +640,58 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workf
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+### Git fixture isolation
+
+Test packages that create or drive scratch Git repositories call the neutral
+`internal/testgitenv.Isolate` helper from `TestMain`, before `m.Run`. It removes
+every inherited `GIT_*` variable, `SSH_AUTH_SOCK` and `SSH_ASKPASS`,
+uses an empty global Git config with system config disabled, and pins HOME and
+XDG_CONFIG_HOME to disposable directories (also USERPROFILE on Windows).
+It clears inherited CODEX_HOME, CLAUDE_CONFIG_DIR, PI_CODING_AGENT_DIR and
+XDG_DATA_HOME/XDG_STATE_HOME/XDG_CACHE_HOME so they cannot bypass HOME pinning.
+Tests can still set explicit fixture configuration inside that boundary.
+Run `go test -count=1 ./internal/testgitenv` for real hostile-repository and
+home-preservation regressions, or `go test ./...` for the full suite.
+`TestMain` removes its temporary homes, including read-only module-cache
+directories; its permission walk never follows symlinks or chmods regular
+files. Optional logs belong under `.temp/`.
+
+The prefix rule covers repository/storage selectors, tracing destinations,
+attribute/index overrides, SSH commands and unknown future `GIT_*` names.
+Only two Git variables are reintroduced: `GIT_CONFIG_GLOBAL` selects the owned
+empty file, and `GIT_CONFIG_NOSYSTEM=1` disables host system configuration.
+Fixture-local overrides, including explicit `GIT_TRACE`, still work after entry.
+The independent regression inputs include random unknown names and actual
+external trace sentinels. Git's `rev-parse --local-env-vars` is checked as a
+reported subset, not treated as a complete environment inventory.
+Scratch roots are absolute physical paths (`Abs` and `EvalSymlinks`) before
+HOME, config or cleanup paths are derived. TMPDIR/TMP/TEMP are normalized too,
+so a later cwd change cannot redirect a temporary fixture; cleanup restores
+all managed values, including absence and explicitly empty values.
+
+Standalone `.github/ci/gate-selftest.sh` sources
+`.github/ci/isolate-test-env.sh` before its first fixture command. This is the
+shell equivalent of the same boundary, scoped to the disposable gate process;
+the caller owns its scratch directory and cleanup. Run
+`bash .github/ci/gate-selftest.sh` for gate checks. The helper suite replays the
+actual ancestry prefix with hostile repository/storage, signing and trace
+channels, compares every disposable decoy file, and checks shell/Go prefix
+parity plus fixture-local tracing.
+The shell boundary reads the NUL-delimited process environment with `env -0`,
+including inherited Git names that Bash's exported-variable table omits.
+It refuses with exit 2 before fixture commands when a Git name cannot be
+safely unset as a shell identifier, or complete enumeration cannot be verified.
+Environment values stay in a pipe and are never recorded. Ordinary unknown
+identifiers are scrubbed; only the two fixture Git defaults are reintroduced.
+`TestShellCompleteGitPrefixNames` inspects a raw child before Go's TestMain,
+pairs nonidentifier and enumeration-failure refusals with real two-commit
+ancestry/tracing controls, and checks complete outside preimages. Run the
+helper suite with Bash 5 on PATH to cover its nonidentifier inheritance;
+`CURATOR_TEST_PREFIX_BASH=/absolute/path/to/bash` selects another Bash for
+this focused test without adding skips. These checks cover the inherited
+Git prefix, not arbitrary executable or non-Git command channels.
+`TestPhysicalTemporaryRoots` covers absolute, relative `.tmp` and symlinked
+temporary roots plus cwd changes; a platform that cannot create a directory
+symlink fails that control with an explicit error. These checks use synthetic data;
+they neither read live credentials nor operate on an operator repository.

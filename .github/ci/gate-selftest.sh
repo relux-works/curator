@@ -20,7 +20,14 @@ ROOTDIR="$(cd "$HERE/../.." && pwd)"
 cd "$ROOTDIR" || exit 2
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/gate-selftest.XXXXXX")" || exit 2
+WORK="$(cd "$WORK" && pwd -P)" || exit 2
 trap 'rm -rf "$WORK"' EXIT
+
+# This script is also run directly, outside Go TestMain. Isolate before even
+# the first ancestry-fixture Git call; inherited selectors/signing config must
+# never reach an operator repository. The gate owns this process and scratch.
+. "$HERE/isolate-test-env.sh"
+isolate_test_env "$WORK/environment" || exit 2
 
 PASS=0; FAIL=0; SKIPPED=0
 
