@@ -4,6 +4,22 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- An existing profile source cache refreshes from the git descriptor the
+  operation names, not from the origin stored when the cache was first
+  cloned. A cache created through an HTTPS spelling whose transport the
+  machine can no longer authenticate made `curator profile install` with
+  the SSH descriptor of the same repository fail in
+  `git fetch --all --tags --prune`. The refresh now fetches the named URL over
+  the operator's configured transport (`gitops.FetchURL`, with the same head
+  and tag refspecs as `FetchURLIsolated`) and leaves the cache's configuration
+  untouched. A cache whose stored origin does not name the same normalized
+  repository identity, or has no single origin, refuses with
+  `profile_source_invalid` before any fetch. An identity with no recorded
+  spelling still refreshes through its stored remotes, and exact-commit
+  replay is unchanged.
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed

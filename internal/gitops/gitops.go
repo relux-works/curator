@@ -405,11 +405,8 @@ func FetchIsolated(repo string) error {
 // than a possibly stale origin URL. Heads and tags are mapped into the same
 // local refs used by Resolve.
 func FetchURLIsolated(repo, remoteURL string) error {
-	trimmed := strings.TrimSpace(remoteURL)
-	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
-		return fmt.Errorf("refusing to fetch from suspicious git URL")
-	}
-	if err := EnsureRepo(repo); err != nil {
+	args, err := fetchURLArgs(repo, remoteURL)
+	if err != nil {
 		return err
 	}
 	env, cleanup, err := isolatedGitEnv()
@@ -417,13 +414,41 @@ func FetchURLIsolated(repo, remoteURL string) error {
 		return err
 	}
 	defer cleanup()
-	args := []string{
+	_, err = runWithEnv(repo, env, withIsolatedConfigArgs(args)...)
+	return err
+}
+
+// FetchURL refreshes one repository from an explicitly resolved endpoint
+// like FetchURLIsolated, but over the operator's configured transport, the
+// one Clone uses: ambient git and ssh configuration under the network
+// protocol allowlist. It never consults or rewrites the checkout's configured
+// remotes, so a cache whose stored origin is stale, or names a transport this
+// machine cannot authenticate, still refreshes from the endpoint the caller
+// asked for.
+func FetchURL(repo, remoteURL string) error {
+	args, err := fetchURLArgs(repo, remoteURL)
+	if err != nil {
+		return err
+	}
+	_, err = run(repo, args...)
+	return err
+}
+
+// fetchURLArgs validates an explicit fetch endpoint and maps its heads and
+// tags into the same local refs Resolve reads.
+func fetchURLArgs(repo, remoteURL string) ([]string, error) {
+	trimmed := strings.TrimSpace(remoteURL)
+	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+		return nil, fmt.Errorf("refusing to fetch from suspicious git URL")
+	}
+	if err := EnsureRepo(repo); err != nil {
+		return nil, err
+	}
+	return []string{
 		"fetch", "--force", "--prune", "--no-write-fetch-head", trimmed,
 		"+refs/heads/*:refs/remotes/origin/*",
 		"+refs/tags/*:refs/tags/*",
-	}
-	_, err = runWithEnv(repo, env, withIsolatedConfigArgs(args)...)
-	return err
+	}, nil
 }
 
 // FetchCommitIsolated requests one locked object ID from the repository's
