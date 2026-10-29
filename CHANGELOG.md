@@ -19,13 +19,18 @@ All notable implementation changes are recorded here.
   same normalized repository identity, or has no single non-empty origin
   (values are read NUL-delimited with repository-local includes expanded,
   so an empty, blank or included extra value counts), refuses with
-  `profile_source_invalid` before any fetch. `gitops.FetchURL` admits only
-  `https://host[:port]/path`, `ssh://[user@]host[:port]/path` and scp-like
-  `[user@]host:path` endpoints with a DNS or bracketed IPv6 host, a user
-  name without `:`, and an unreserved path. Anything else refuses before
-  git runs, without echoing the endpoint: credentials, queries, fragments,
-  percent-encoding, whitespace, remote-helper transports, opaque spellings,
-  `http://`, `git://` and file forms. An identity with no recorded
+  `profile_source_invalid` before any fetch. `gitops.FetchURL` admits the
+  descriptor contract's network endpoints minus credential carriers and
+  malformed authorities, and passes `--` before the endpoint. Refused before
+  git runs, without echoing the endpoint:
+  - user information other than an ssh or scp-like user name without `:`;
+  - remote-helper (`x::`) and opaque `scheme:` spellings;
+  - schemes other than https, http, git and ssh;
+  - ports outside 1–65535, and bracketed hosts that are not IPv6 addresses;
+  - queries, fragments, percent escapes, whitespace, control characters and
+    backslashes;
+  - a scheme-named scp host without a user, local and drive paths, a leading
+    `-`, and endpoints over 4096 bytes. An identity with no recorded
   spelling still refreshes through its stored remotes, and exact-commit
   replay is unchanged.
 

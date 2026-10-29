@@ -29,7 +29,7 @@ func TestFetchURLArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"fetch", "--force", "--prune", "--no-write-fetch-head", "git@example.com:team/profiles.git",
+	want := []string{"fetch", "--force", "--prune", "--no-write-fetch-head", "--", "git@example.com:team/profiles.git",
 		"+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*"}
 	if !slices.Equal(args, want) {
 		t.Fatalf("args = %q, want %q", args, want)
@@ -41,18 +41,20 @@ func TestFetchURLArgs(t *testing.T) {
 	}
 }
 
-// FetchURL admits only the https, ssh and scp-like endpoint forms and refuses
-// everything else before git runs, without echoing the input. A fake git on
-// PATH records every invocation: each refused case leaves the marker empty and
-// keeps the canary out of the error, and each admitted case reaches git. The
-// refused cases cover remote-helper transports of every spelling, upper-case
-// schemes, passwords and user information in every URL and scp form,
-// percent-encoding, whitespace and newlines, empty and extra-slash authorities,
-// queries, fragments, opaque and option-shaped spellings, http, git:// and
-// file forms, a drive-letter host and a scheme-named host. A benign '@' in a
-// path is refused as well: the grammar is deliberately narrower than what git
-// accepts.
-func TestFetchURLAdmitsOnlyTheEndpointGrammar(t *testing.T) {
+// FetchURL admits the descriptor contract's network endpoints and refuses,
+// before git runs and without echoing the input, the ones that carry
+// credentials or a malformed authority. A fake git on PATH records every
+// invocation: each refused case leaves the marker empty and keeps the canary
+// out of the error, and each admitted case reaches git. Refused: remote-helper
+// transports of every spelling, passwords and user information outside ssh
+// and scp, percent-encoding, whitespace and newlines, empty and extra-slash
+// authorities, queries, fragments, opaque and option-shaped spellings, file
+// and local forms, a scheme-named scp host without a user, out-of-range ports
+// and bracketed hosts that are not IPv6 addresses. Admitted: https, http,
+// git:// and ssh in any scheme case, '@', Unicode and inner '-' in a path,
+// single-character and explicit-user scheme-named scp hosts, trailing-dot and
+// IDN hosts, ports 1-65535 and IPv6 literals.
+func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 	const c = "canary-secret-7f3a"
 	bin := t.TempDir()
 	marker := filepath.Join(t.TempDir(), "git-ran")
@@ -70,18 +72,16 @@ func TestFetchURLAdmitsOnlyTheEndpointGrammar(t *testing.T) {
 		"https::https://user:" + c + "@example.invalid/team/repo.git",
 		"http::https://example.invalid/" + c + ".git",
 		"ext::sh -c " + c, "fd::7", "file::/tmp/" + c, "x::" + c, "1::" + c, "a_b::" + c,
-		"HTTPS://example.invalid/" + c + ".git", "Https://example.invalid/" + c + ".git", "SSH://git@example.invalid/" + c + ".git",
 		"https://user:" + c + "@example.invalid/team/repo.git",
 		"https://" + c + "@example.invalid/team/repo.git",
 		"https://user%3A" + c + "@example.invalid/team/repo.git",
 		"http://user:" + c + "@example.invalid/team/repo.git",
-		"http://example.invalid/" + c + ".git",
-		"git://example.invalid/" + c + ".git",
 		"git://user:" + c + "@example.invalid/team/repo.git",
+		"git://" + c + "@example.invalid/team/repo.git",
 		"file:///tmp/" + c + ".git",
+		"ftp://example.invalid/" + c + ".git",
 		"ssh://git:" + c + "@example.invalid/team/repo.git",
 		"ssh://git:" + c + "@[::1]/team/repo.git",
-		"ssh://example.invalid/-" + c,
 		"git:" + c + "@example.invalid:team/repo.git",
 		"user:" + c + "@[::1]:team/repo.git",
 		"https:opaque-" + c,
@@ -92,18 +92,28 @@ func TestFetchURLAdmitsOnlyTheEndpointGrammar(t *testing.T) {
 		"https://example.invalid/team/repo.git?next=https://user:" + c + "@example.invalid/",
 		"https://example.invalid/team/repo.git#" + c,
 		"https://example.invalid/team/%2F" + c,
+		"https://example.invalid/team\\" + c,
 		" https://example.invalid/" + c + ".git",
 		"https://example.invalid/" + c + ".git ",
 		"https://example.invalid/team/repo.git\n" + c,
-		"https://example.invalid/team/r@" + c + ".git",
 		"https://exa_mple.invalid/" + c + ".git",
 		"https://example.invalid",
 		"https://example.invalid/",
-		"https://example.invalid:99999999/" + c + ".git",
-		"c:" + c,
+		"https://example.invalid:0/" + c + ".git",
+		"https://example.invalid:65536/" + c + ".git",
+		"https://example.invalid:99999/" + c + ".git",
+		"https://example.invalid:/" + c + ".git",
+		"https://[.]/" + c + ".git",
+		"https://[:::]/" + c + ".git",
+		"https://[abcd]/" + c + ".git",
+		"https://[127.0.0.1]/" + c + ".git",
+		"ssh://git@[abcd]/" + c + ".git",
+		"git@[127.0.0.1]:" + c + ".git",
+		"[:::]:" + c + ".git",
 		"ssh:" + c,
 		"https:" + c,
-		"example.invalid:-" + c,
+		"C:/" + c,
+		"C:\\" + c,
 		"/tmp/" + c + ".git",
 		"./" + c,
 	}
@@ -118,16 +128,38 @@ func TestFetchURLAdmitsOnlyTheEndpointGrammar(t *testing.T) {
 	}
 	for _, url := range []string{
 		"https://example.invalid/team/repo.git",
+		"HTTPS://example.invalid/team/repo.git",
+		"http://example.invalid/team/repo.git",
+		"git://example.invalid/team/repo.git",
+		"SSH://git@example.invalid/team/repo.git",
+		"https://example.invalid/team/r@name.git",
+		"https://example.invalid/team/репо.git",
+		"https://example.invalid/team/repo!name.git",
+		"https://example.invalid/-team/repo.git",
+		"https://example.invalid//team/repo.git",
+		"https://example.invalid/team/repo.git/",
+		"https://example.invalid./team/repo.git",
+		"https://xn--bcher-kva.example/team/repo.git",
 		"https://example.invalid:8443/team/repo.git",
+		"https://example.invalid:1/team/repo.git",
+		"https://example.invalid:65535/team/repo.git",
 		"https://[::1]/team/repo.git",
+		"https://[2001:db8::1]:8443/team/repo.git",
 		"ssh://git@example.invalid/team/repo.git",
 		"ssh://git@example.invalid:2222/team/repo.git",
 		"ssh://example.invalid/team/repo.git",
 		"ssh://git@[::1]/team/repo.git",
+		"ssh://foo;bar@example.invalid/team/repo.git",
+		"ssh://foo@bar@example.invalid/team/repo.git",
 		"git@example.invalid:team/repo.git",
 		"git@[::1]:team/repo.git",
+		"git@ssh:team/repo.git",
 		"github-work:team/repo.git",
+		"git@github-work:Org/nested/repo.git",
+		"c:team/repo.git",
+		"git@c:team/repo.git",
 		"example.invalid:/srv/team/repo.git",
+		"example.invalid:-team/repo.git",
 	} {
 		_ = os.Remove(marker)
 		if err := FetchURL(repo, url); err != nil && strings.HasPrefix(err.Error(), "refusing to fetch") {

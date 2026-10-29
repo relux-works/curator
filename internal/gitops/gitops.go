@@ -12,13 +12,16 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/relux-works/curator/internal/identity"
 	"io"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // AllowedProtocols is the GIT_ALLOW_PROTOCOL value for every network
@@ -427,7 +430,7 @@ func FetchURLIsolated(repo, remoteURL string) error {
 // machine cannot authenticate, still refreshes from the endpoint the caller
 // asked for.
 func FetchURL(repo, remoteURL string) error {
-	if err := validateFetchEndpoint(remoteURL); err != nil {
+	if err := ValidateFetchEndpoint(remoteURL); err != nil {
 		return err
 	}
 	args, err := fetchURLArgs(repo, remoteURL)
@@ -438,44 +441,152 @@ func FetchURL(repo, remoteURL string) error {
 	return err
 }
 
-// The endpoint grammar FetchURL admits. Each form is anchored and spelled
-// out character by character; anything it does not describe refuses before
-// any git call. A host is a DNS name or a bracketed IPv6 literal, a user name
-// carries no ':', and a path is a run of unreserved characters whose first
-// character is not '-'. No form admits user information on HTTPS, a password,
-// a query, a fragment, percent-encoding, whitespace or a remote-helper
-// transport.
-const (
-	endpointHost = `(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\])`
-	endpointUser = `[A-Za-z0-9._-]+`
-	endpointPort = `(?::[0-9]{1,5})?`
-	endpointPath = `[A-Za-z0-9._~+][A-Za-z0-9._~+/-]*`
-)
+// fetchSchemes are the URL schemes of the descriptor contract, matched case
+// insensitively.
+var fetchSchemes = map[string]bool{"https": true, "http": true, "git": true, "ssh": true}
 
-var (
-	httpsEndpoint = regexp.MustCompile(`^https://` + endpointHost + endpointPort + `/` + endpointPath + `$`)
-	sshEndpoint   = regexp.MustCompile(`^ssh://(?:` + endpointUser + `@)?` + endpointHost + endpointPort + `/` + endpointPath + `$`)
-	scpEndpoint   = regexp.MustCompile(`^(?:` + endpointUser + `@)?(` + endpointHost + `):/?` + endpointPath + `$`)
-)
+// scpSchemeHosts are hosts a scp-like address without a user may not name:
+// `https:path` is an opaque scheme spelling, not an SSH host.
+var scpSchemeHosts = map[string]bool{"http": true, "https": true, "ssh": true, "git": true, "file": true, "ftp": true, "ftps": true, "ext": true, "fd": true}
 
-// schemeNames are hosts a scp-like address may not name: `https:path` is a
-// scheme spelling, not an SSH host.
-var schemeNames = map[string]bool{"http": true, "https": true, "ssh": true, "git": true, "file": true, "ftp": true, "ftps": true, "ext": true, "fd": true}
+const maxFetchEndpoint = 4096
 
-// validateFetchEndpoint admits only the https://host[:port]/path,
-// ssh://[user@]host[:port]/path and scp-like [user@]host:path forms the
-// profile lane records, and refuses everything else without echoing the
-// input. A scp-like host must be longer than one character (a drive letter is
-// a local path) and must not be a scheme name.
-func validateFetchEndpoint(remoteURL string) error {
-	if httpsEndpoint.MatchString(remoteURL) || sshEndpoint.MatchString(remoteURL) {
+var errFetchEndpoint = fmt.Errorf("refusing to fetch from a git endpoint that carries credentials or a malformed authority")
+
+// ValidateFetchEndpoint admits every network endpoint of the descriptor
+// contract and refuses, before any git call and with a fixed error that never
+// contains the endpoint, the ones that carry credentials or a malformed
+// authority. The host grammar is the identity parser's own (identity.ValidHost,
+// a single character included; drive paths stay local). On top of it:
+//   - the URL scheme is https, http, git or ssh, in any case;
+//   - user information appears only on ssh and scp-like forms, as a user name
+//     without ':';
+//   - a port is 1 to 65535, and a bracketed host is an IPv6 address;
+//   - there is no query, fragment, percent escape, `x::` remote-helper
+//     transport or opaque `scheme:` spelling;
+//   - the path is valid UTF-8 without control characters, whitespace,
+//     backslash, '?' or '#' ('@', Unicode and a '-' inside are admitted);
+//   - the endpoint does not start with '-' and is at most 4096 bytes.
+func ValidateFetchEndpoint(endpoint string) error {
+	if endpoint == "" || len(endpoint) > maxFetchEndpoint || !utf8.ValidString(endpoint) ||
+		strings.HasPrefix(endpoint, "-") || strings.ContainsAny(endpoint, "?#%\\") {
+		return errFetchEndpoint
+	}
+	for _, character := range endpoint {
+		if unicode.IsControl(character) || unicode.IsSpace(character) {
+			return errFetchEndpoint
+		}
+	}
+	if scheme, rest, found := strings.Cut(endpoint, "://"); found {
+		if !fetchSchemes[strings.ToLower(scheme)] {
+			return errFetchEndpoint
+		}
+		authority, path, hasPath := strings.Cut(rest, "/")
+		if !hasPath || strings.Trim(path, "/") == "" {
+			return errFetchEndpoint
+		}
+		if at := strings.LastIndex(authority, "@"); at >= 0 {
+			if !strings.EqualFold(scheme, "ssh") || !validFetchUser(authority[:at]) {
+				return errFetchEndpoint
+			}
+			authority = authority[at+1:]
+		}
+		if !validFetchHostPort(authority) {
+			return errFetchEndpoint
+		}
 		return nil
 	}
-	if match := scpEndpoint.FindStringSubmatch(remoteURL); match != nil && !strings.Contains(remoteURL, "://") &&
-		len(match[1]) > 1 && !schemeNames[strings.ToLower(match[1])] {
-		return nil
+	if identity.IsDrivePath(endpoint) {
+		return errFetchEndpoint
 	}
-	return fmt.Errorf("refusing to fetch from a git endpoint outside the https, ssh and scp-like forms")
+	address, user, hasUser := endpoint, "", false
+	if at := strings.LastIndex(scpHostPart(endpoint), "@"); at >= 0 {
+		user, address, hasUser = endpoint[:at], endpoint[at+1:], true
+		if !validFetchUser(user) {
+			return errFetchEndpoint
+		}
+	}
+	host, path, ok := splitScpAddress(address)
+	if !ok || path == "" || strings.HasPrefix(path, ":") {
+		return errFetchEndpoint
+	}
+	if strings.HasPrefix(host, "[") {
+		if !validIPv6Literal(host) {
+			return errFetchEndpoint
+		}
+	} else if !identity.ValidHost(host) || (!hasUser && scpSchemeHosts[strings.ToLower(host)]) {
+		return errFetchEndpoint
+	}
+	return nil
+}
+
+// scpHostPart is the part of a scp-like address before its host/path colon,
+// with a leading bracketed IPv6 literal kept whole.
+func scpHostPart(endpoint string) string {
+	if open := strings.Index(endpoint, "["); open >= 0 {
+		if closing := strings.Index(endpoint[open:], "]"); closing >= 0 {
+			return endpoint[:open]
+		}
+	}
+	before, _, _ := strings.Cut(endpoint, ":")
+	return before
+}
+
+// splitScpAddress splits host:path, keeping a bracketed IPv6 host whole.
+func splitScpAddress(address string) (string, string, bool) {
+	if strings.HasPrefix(address, "[") {
+		closing := strings.Index(address, "]")
+		if closing < 0 || closing+1 >= len(address) || address[closing+1] != ':' {
+			return "", "", false
+		}
+		return address[:closing+1], address[closing+2:], true
+	}
+	host, path, found := strings.Cut(address, ":")
+	return host, path, found && !strings.Contains(host, "/")
+}
+
+func validFetchUser(user string) bool {
+	return user != "" && !strings.ContainsAny(user, ":/")
+}
+
+// validFetchHostPort checks host[:port], where host is a portable hostname or a
+// bracketed IPv6 literal and a port is 1 to 65535.
+func validFetchHostPort(authority string) bool {
+	host, port := authority, ""
+	if strings.HasPrefix(authority, "[") {
+		closing := strings.Index(authority, "]")
+		if closing < 0 {
+			return false
+		}
+		host, port = authority[:closing+1], strings.TrimPrefix(authority[closing+1:], ":")
+		if closing+1 < len(authority) && authority[closing+1] != ':' {
+			return false
+		}
+		if !validIPv6Literal(host) {
+			return false
+		}
+	} else {
+		var hasPort bool
+		host, port, hasPort = strings.Cut(authority, ":")
+		if !identity.ValidHost(host) || (hasPort && port == "") {
+			return false
+		}
+	}
+	if port != "" {
+		number, err := strconv.Atoi(port)
+		if err != nil || number < 1 || number > 65535 || strconv.Itoa(number) != port {
+			return false
+		}
+	}
+	return true
+}
+
+func validIPv6Literal(host string) bool {
+	if !strings.HasPrefix(host, "[") || !strings.HasSuffix(host, "]") {
+		return false
+	}
+	address, err := netip.ParseAddr(host[1 : len(host)-1])
+	return err == nil && address.Is6() && address.Zone() == ""
 }
 
 // fetchURLArgs validates an explicit fetch endpoint and maps its heads and
@@ -489,7 +600,7 @@ func fetchURLArgs(repo, remoteURL string) ([]string, error) {
 		return nil, err
 	}
 	return []string{
-		"fetch", "--force", "--prune", "--no-write-fetch-head", trimmed,
+		"fetch", "--force", "--prune", "--no-write-fetch-head", "--", trimmed,
 		"+refs/heads/*:refs/remotes/origin/*",
 		"+refs/tags/*:refs/tags/*",
 	}, nil
