@@ -433,7 +433,7 @@ func FetchURL(repo, remoteURL string) error {
 	if err := ValidateFetchEndpoint(remoteURL); err != nil {
 		return err
 	}
-	args, err := fetchURLArgs(repo, remoteURL)
+	args, err := fetchURLArgs(repo, lowerURLScheme(remoteURL))
 	if err != nil {
 		return err
 	}
@@ -499,50 +499,50 @@ func ValidateFetchEndpoint(endpoint string) error {
 	if identity.IsDrivePath(endpoint) {
 		return errFetchEndpoint
 	}
-	address, user, hasUser := endpoint, "", false
-	if at := strings.LastIndex(scpHostPart(endpoint), "@"); at >= 0 {
-		user, address, hasUser = endpoint[:at], endpoint[at+1:], true
-		if !validFetchUser(user) {
-			return errFetchEndpoint
-		}
-	}
-	host, path, ok := splitScpAddress(address)
-	if !ok || path == "" || strings.HasPrefix(path, ":") {
+	user, host, path, ok := gitSCPSplit(endpoint)
+	if !ok || path == "" || strings.HasPrefix(path, ":") || (user != "" && !validFetchUser(user)) {
 		return errFetchEndpoint
 	}
-	if strings.HasPrefix(host, "[") {
-		if !validIPv6Literal(host) {
-			return errFetchEndpoint
-		}
-	} else if !identity.ValidHost(host) || (!hasUser && scpSchemeHosts[strings.ToLower(host)]) {
+	// What git contacts must be what the identity binding names: the same
+	// user and host. A disagreement (for example `user:secret@h:path`, where
+	// git connects to host `user`) refuses before git runs.
+	identityUser, identityHost, identityOK := identity.SCPUserHost(endpoint)
+	if !identityOK || identityUser != user || !strings.EqualFold(identityHost, host) {
+		return errFetchEndpoint
+	}
+	if !identity.ValidHost(host) || (user == "" && scpSchemeHosts[strings.ToLower(host)]) {
 		return errFetchEndpoint
 	}
 	return nil
 }
 
-// scpHostPart is the part of a scp-like address before its host/path colon,
-// with a leading bracketed IPv6 literal kept whole.
-func scpHostPart(endpoint string) string {
-	if open := strings.Index(endpoint, "["); open >= 0 {
-		if closing := strings.Index(endpoint[open:], "]"); closing >= 0 {
-			return endpoint[:open]
+// gitSCPSplit splits a scp-like address the way git's connect.c does. The
+// host may be bracketed, introduced by a leading '[' or by "@[" (host_end).
+// The path starts after the first ':' that follows that bracket, and the
+// user is everything before the host part's last '@', which is how ssh
+// splits the user@host argument git hands it. A spelling git cannot use (no
+// ':' after the bracket, as with "@[" in a path) does not split.
+func gitSCPSplit(endpoint string) (user, host, path string, ok bool) {
+	start := 0
+	if at := strings.Index(endpoint, "@["); at >= 0 {
+		start = at + 1
+	}
+	end := 0
+	if start < len(endpoint) && endpoint[start] == '[' {
+		if closing := strings.Index(endpoint[start+1:], "]"); closing >= 0 {
+			end = start + 1 + closing
 		}
 	}
-	before, _, _ := strings.Cut(endpoint, ":")
-	return before
-}
-
-// splitScpAddress splits host:path, keeping a bracketed IPv6 host whole.
-func splitScpAddress(address string) (string, string, bool) {
-	if strings.HasPrefix(address, "[") {
-		closing := strings.Index(address, "]")
-		if closing < 0 || closing+1 >= len(address) || address[closing+1] != ':' {
-			return "", "", false
-		}
-		return address[:closing+1], address[closing+2:], true
+	colon := strings.Index(endpoint[end:], ":")
+	if colon < 0 {
+		return "", "", "", false
 	}
-	host, path, found := strings.Cut(address, ":")
-	return host, path, found && !strings.Contains(host, "/")
+	colon += end
+	hostPart := endpoint[:colon]
+	if at := strings.LastIndex(hostPart, "@"); at >= 0 {
+		return hostPart[:at], hostPart[at+1:], endpoint[colon+1:], true
+	}
+	return "", hostPart, endpoint[colon+1:], true
 }
 
 func validFetchUser(user string) bool {
@@ -559,7 +559,7 @@ func validFetchHostPort(authority string) bool {
 			return false
 		}
 		host, port = authority[:closing+1], strings.TrimPrefix(authority[closing+1:], ":")
-		if closing+1 < len(authority) && authority[closing+1] != ':' {
+		if closing+1 < len(authority) && (authority[closing+1] != ':' || port == "") {
 			return false
 		}
 		if !validIPv6Literal(host) {
@@ -586,7 +586,17 @@ func validIPv6Literal(host string) bool {
 		return false
 	}
 	address, err := netip.ParseAddr(host[1 : len(host)-1])
-	return err == nil && address.Is6() && address.Zone() == ""
+	return err == nil && address.Is6() && !address.Is4In6() && address.Zone() == ""
+}
+
+// lowerURLScheme lowercases a URL endpoint's scheme for git's argv only: the
+// descriptor contract matches schemes in any case, git does not, and the
+// identity binding compares the caller's own spelling.
+func lowerURLScheme(endpoint string) string {
+	if scheme, rest, found := strings.Cut(endpoint, "://"); found {
+		return strings.ToLower(scheme) + "://" + rest
+	}
+	return endpoint
 }
 
 // fetchURLArgs validates an explicit fetch endpoint and maps its heads and

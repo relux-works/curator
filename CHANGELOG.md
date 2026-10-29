@@ -24,9 +24,18 @@ All notable implementation changes are recorded here.
   malformed authorities, and passes `--` before the endpoint. Refused before
   git runs, without echoing the endpoint:
   - user information other than an ssh or scp-like user name without `:`;
+  - a scp-like address whose user or host, split the way git splits it (the
+    first `:` after an optional bracketed host), differs from what the
+    identity parser binds, so `user:secret@h:path`, where git would contact
+    host `user`, refuses;
+  - `@[` in a scp-like path, which git itself cannot use ("no path
+    specified");
   - remote-helper (`x::`) and opaque `scheme:` spellings;
-  - schemes other than https, http, git and ssh;
-  - ports outside 1–65535, and bracketed hosts that are not IPv6 addresses;
+  - schemes other than https, http, git and ssh (any case; git receives the
+    scheme lowercased);
+  - ports outside 1–65535 or empty, including after a bracketed host, and
+    bracketed hosts that are not plain IPv6 addresses (IPv4-mapped ones
+    included);
   - queries, fragments, percent escapes, whitespace, control characters and
     backslashes;
   - a scheme-named scp host without a user, local and drive paths, a leading
