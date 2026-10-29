@@ -20,7 +20,9 @@ func TestFetchURLArgs(t *testing.T) {
 	if _, err := fetchURLArgs(repo, "git@example.com:team/profiles.git"); err == nil {
 		t.Fatal("a directory that is not a repository was accepted")
 	}
-	run(repo, "init", "-q")
+	if _, err := run(repo, "init", "-q"); err != nil {
+		t.Fatal(err)
+	}
 	args, err := fetchURLArgs(repo, " git@example.com:team/profiles.git ")
 	if err != nil {
 		t.Fatal(err)
