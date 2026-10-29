@@ -4,6 +4,16 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- Curator-launched Claude Code members no longer stop on the "read outside
+  the working directories" prompt when they read their own declared skills
+  or selected context modules. Launch-time resolve projects a narrow
+  `Read(//…/**)` allow set for exactly those paths, lexical and resolved,
+  into the managed home's `settings.json`. Operator settings, deny and ask
+  rules are preserved, and other homes' skills and unselected packages
+  still prompt. See `docs/claude-read-scope.md` (BUG-261029-q1kxk5).
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed

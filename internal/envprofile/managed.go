@@ -328,6 +328,9 @@ type homePlan struct {
 	marker           *envmarker.Marker
 	fileHashes       map[string][]byte
 	warnings         []string
+	// readScope is the Claude settings projection of the declared skills
+	// and selected context members (claude_read_scope.go).
+	readScope claudeReadScope
 }
 
 // assembleHome builds the desired managed home purely from the lock, the
@@ -405,6 +408,9 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 		return nil, err
 	}
 	plan.skills(req, skills, surfaces)
+	if adapter.ID == envregistry.ClaudeCode {
+		plan.readScope = planClaudeReadScope(req.Home, plan.homeDir, adapter.SkillsDir, skills, lock)
+	}
 	if err := plan.mcp(req, servers, surfaces); err != nil {
 		return nil, err
 	}
@@ -1664,6 +1670,11 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 		}
 		marker.SeededProjects = prepared.seeded
 		recordedSeeds = append(recordedSeeds, ".claude.json")
+		// A conflicting operator settings document is reported by
+		// verification as a warning, never overwritten here.
+		if err := publishClaudeReadScope(root, homeRel, plan.readScope); err != nil && !errors.Is(err, errClaudeSettingsConflict) {
+			return nil, err
+		}
 	}
 	sort.Strings(recordedSeeds)
 	marker.Seeds = &recordedSeeds
@@ -2108,6 +2119,7 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 	verdict.checkSurfaces(req, plan, marker)
 	verdict.checkPassthrough(req, plan, marker)
 	verdict.checkClaudeProject(req, plan)
+	verdict.checkClaudeReadScope(req, plan)
 	verdict.checkXDG(req, plan, marker)
 	verdict.checkShadows(plan, marker)
 	verdict.current = len(verdict.reasons) == 0
@@ -2482,6 +2494,35 @@ func (v *verification) checkClaudeProject(req *ResolveRequest, plan *homePlan) {
 	}
 	if plan.form == envregistry.FormReferenced && !entries[req.LaunchDir] {
 		v.reasons = append(v.reasons, fmt.Sprintf("launch directory %s has no external-includes approval", req.LaunchDir))
+	}
+}
+
+// checkClaudeReadScope reports a managed home whose settings do not carry
+// exactly the plan's read scope as stale, so --repair publishes it. Operator
+// settings Curator does not override stay a warning and keep the home current.
+func (v *verification) checkClaudeReadScope(req *ResolveRequest, plan *homePlan) {
+	if plan.adapter.ID != envregistry.ClaudeCode {
+		return
+	}
+	root := EnvRoot(req.Home)
+	homeRel, err := managedRelative(root, plan.homeDir)
+	if err != nil {
+		v.reasons = append(v.reasons, fmt.Sprintf("managed %s: %v", claudeSettingsName, err))
+		return
+	}
+	input, present, err := readClaudeSettings(root, homeRel)
+	if err == nil {
+		var changed bool
+		_, changed, err = mergeClaudeReadScope(input, present, plan.readScope)
+		if err == nil && changed {
+			v.reasons = append(v.reasons, fmt.Sprintf("managed %s does not carry the read scope of the declared skills and selected contexts", claudeSettingsName))
+			return
+		}
+	}
+	if errors.Is(err, errClaudeSettingsConflict) {
+		v.warnings = append(v.warnings, fmt.Sprintf("%v; the read scope of the declared skills and selected contexts is not projected", err))
+	} else if err != nil {
+		v.reasons = append(v.reasons, err.Error())
 	}
 }
 
