@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -66,17 +67,6 @@ func TestFetchURLArgs(t *testing.T) {
 // trailing-dot and IDN hosts, and an inner '-' in a user.
 func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 	const c = "canary-secret-7f3a"
-	bin := t.TempDir()
-	marker := filepath.Join(t.TempDir(), "git-ran")
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho ran >> \"$GIT_MARKER\"\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("GIT_MARKER", marker)
-	repo := t.TempDir()
-	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	refused := []string{
 		"", " ", "-" + c, "--upload-pack=" + c,
 		"https::https://user:" + c + "@example.invalid/team/repo.git",
@@ -154,16 +144,7 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 		"/tmp/" + c + ".git",
 		"./" + c,
 	}
-	for _, url := range refused {
-		err := FetchURL(repo, url)
-		if err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") || strings.Contains(err.Error(), c) {
-			t.Errorf("FetchURL(%q) err = %v, want an input-free refusal", url, err)
-		}
-		if _, statErr := os.Stat(marker); statErr == nil {
-			t.Fatalf("FetchURL(%q) ran git before refusing", url)
-		}
-	}
-	for _, url := range []string{
+	admitted := []string{
 		"https://example.invalid/team/repo.git",
 		"HTTPS://example.invalid/team/repo.git",
 		"http://example.invalid/team/repo.git",
@@ -194,7 +175,43 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 		"example.invalid:org/r@[x.git",
 		"ssh://a@-x@example.invalid/team/repo.git",
 		"git-x@example.invalid:team/repo.git",
-	} {
+	}
+	// The verdicts are platform-independent; the fake git that proves no
+	// invocation is a POSIX script.
+	for _, url := range refused {
+		if err := ValidateFetchEndpoint(url); err != errFetchEndpoint {
+			t.Errorf("ValidateFetchEndpoint(%q) = %v, want the fixed refusal", url, err)
+		}
+	}
+	for _, url := range admitted {
+		if err := ValidateFetchEndpoint(url); err != nil {
+			t.Errorf("ValidateFetchEndpoint(%q) refused an admitted endpoint: %v", url, err)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("the git invocation marker is a POSIX script")
+	}
+	bin := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "git-ran")
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho ran >> \"$GIT_MARKER\"\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GIT_MARKER", marker)
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, url := range refused {
+		err := FetchURL(repo, url)
+		if err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") || strings.Contains(err.Error(), c) {
+			t.Errorf("FetchURL(%q) err = %v, want an input-free refusal", url, err)
+		}
+		if _, statErr := os.Stat(marker); statErr == nil {
+			t.Fatalf("FetchURL(%q) ran git before refusing", url)
+		}
+	}
+	for _, url := range admitted {
 		_ = os.Remove(marker)
 		if err := FetchURL(repo, url); err != nil && strings.HasPrefix(err.Error(), "refusing to fetch") {
 			t.Fatalf("FetchURL(%q) refused an admitted endpoint: %v", url, err)
@@ -259,6 +276,7 @@ var destinationRows = []struct {
 // binding host; git is not run for them. Every refused row refuses with the
 // fixed, input-free error, and the recording ssh never runs. The table is
 // finite: it shows agreement for these spellings, not for every byte string.
+// On Windows only the verdicts and bindings run; the git runs are POSIX.
 func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 	const secret = "planted-secret-91c2"
 	bin := t.TempDir()
@@ -278,6 +296,9 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 	if _, err := run(repo, "init", "-q"); err != nil {
 		t.Fatal(err)
 	}
+	// The recording ssh is a POSIX script, so Windows checks the verdicts
+	// and bindings without running git.
+	posix := runtime.GOOS != "windows"
 	admitted := 0
 	for _, row := range destinationRows {
 		endpoint := strings.ReplaceAll(row.endpoint, "SECRET", secret)
@@ -286,6 +307,9 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 			err := ValidateFetchEndpoint(endpoint)
 			if err != errFetchEndpoint {
 				t.Errorf("%q: ValidateFetchEndpoint = %v, want the fixed refusal", endpoint, err)
+				continue
+			}
+			if !posix {
 				continue
 			}
 			if err := FetchURL(repo, endpoint); err == nil || strings.Contains(err.Error(), secret) {
@@ -307,6 +331,9 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 			if err != nil || strings.ToLower(parsed.Hostname()) != wantHost {
 				t.Errorf("%q: URL authority host does not equal binding host %q", endpoint, wantHost)
 			}
+			continue
+		}
+		if !posix {
 			continue
 		}
 		_ = FetchURL(repo, endpoint)
