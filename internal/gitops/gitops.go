@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -426,12 +427,44 @@ func FetchURLIsolated(repo, remoteURL string) error {
 // machine cannot authenticate, still refreshes from the endpoint the caller
 // asked for.
 func FetchURL(repo, remoteURL string) error {
+	if err := refuseCredentialURL(remoteURL); err != nil {
+		return err
+	}
 	args, err := fetchURLArgs(repo, remoteURL)
 	if err != nil {
 		return err
 	}
 	_, err = run(repo, args...)
 	return err
+}
+
+// refuseCredentialURL refuses, before any git call and without echoing the
+// input, an endpoint that carries credentials: a password in any URL's user
+// information, any user information on an HTTP(S) URL, and a scp-like
+// address whose user part holds a colon. An SSH user name (ssh://git@host or
+// git@host:path) is a transport hint, not a credential, and stays admitted.
+func refuseCredentialURL(remoteURL string) error {
+	trimmed := strings.TrimSpace(remoteURL)
+	if scheme, _, found := strings.Cut(trimmed, "://"); found {
+		parsed, err := url.Parse(trimmed)
+		if err != nil {
+			return fmt.Errorf("refusing to fetch from an unparsable git URL")
+		}
+		if parsed.User == nil {
+			return nil
+		}
+		if _, hasPassword := parsed.User.Password(); hasPassword {
+			return fmt.Errorf("refusing to fetch from a git URL that carries a password")
+		}
+		if strings.EqualFold(scheme, "http") || strings.EqualFold(scheme, "https") {
+			return fmt.Errorf("refusing to fetch from an HTTP(S) git URL that carries user information")
+		}
+		return nil
+	}
+	if user, _, found := strings.Cut(trimmed, "@"); found && strings.Contains(user, ":") {
+		return fmt.Errorf("refusing to fetch from a git address that carries a password")
+	}
+	return nil
 }
 
 // fetchURLArgs validates an explicit fetch endpoint and maps its heads and

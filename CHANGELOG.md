@@ -14,9 +14,13 @@ All notable implementation changes are recorded here.
   `git fetch --all --tags --prune`. The refresh now fetches the named URL over
   the operator's configured transport (`gitops.FetchURL`, with the same head
   and tag refspecs as `FetchURLIsolated`) and leaves the cache's configuration
-  untouched. A cache whose stored origin does not name the same normalized
-  repository identity, or has no single origin, refuses with
-  `profile_source_invalid` before any fetch. An identity with no recorded
+  untouched. A same-alias reinstall carries the requested descriptor into
+  the update it delegates to. A cache whose stored origin does not name the
+  same normalized repository identity, or has no single non-empty origin
+  (values are read NUL-delimited, so an empty or blank extra value counts),
+  refuses with `profile_source_invalid` before any fetch. `gitops.FetchURL`
+  refuses an endpoint carrying a password or HTTP(S) user information
+  before running git, without echoing it. An identity with no recorded
   spelling still refreshes through its stored remotes, and exact-commit
   replay is unchanged.
 

@@ -38,3 +38,41 @@ func TestFetchURLArgs(t *testing.T) {
 		}
 	}
 }
+
+// FetchURL refuses an endpoint that carries credentials before running git,
+// and the refusal never echoes the input: a password in any URL form, user
+// information on HTTP(S), and a scp-like address with a password. The
+// controls show an SSH user name in both spellings and a plain HTTPS URL pass
+// the credential check and reach git (here a missing remote, so git fails
+// with its own error rather than a credential refusal).
+func TestFetchURLRefusesCredentialURLs(t *testing.T) {
+	repo := t.TempDir()
+	if _, err := run(repo, "init", "-q"); err != nil {
+		t.Fatal(err)
+	}
+	const canary = "canary-secret-7f3a"
+	for _, url := range []string{
+		"https://user:" + canary + "@example.invalid/team/repo.git",
+		"https://" + canary + "@example.invalid/team/repo.git",
+		"http://user:" + canary + "@example.invalid/team/repo.git",
+		"ssh://git:" + canary + "@example.invalid/team/repo.git",
+		"git:" + canary + "@example.invalid:team/repo.git",
+	} {
+		err := FetchURL(repo, url)
+		if err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") || strings.Contains(err.Error(), canary) {
+			t.Fatalf("FetchURL(credential URL) err = %v, want a refusal that does not echo the input", err)
+		}
+	}
+	for _, url := range []string{
+		"git@example.invalid:team/repo.git",
+		"ssh://git@example.invalid/team/repo.git",
+		"https://example.invalid/team/repo.git",
+	} {
+		if err := refuseCredentialURL(url); err != nil {
+			t.Fatalf("refuseCredentialURL(%q) = %v, want admitted", url, err)
+		}
+	}
+	if err := FetchURL(repo, "file://"+t.TempDir()+"/missing.git"); err == nil || strings.HasPrefix(err.Error(), "refusing to fetch") {
+		t.Fatalf("a credential-free endpoint did not reach git: %v", err)
+	}
+}

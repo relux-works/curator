@@ -74,7 +74,8 @@ func TestProfileCacheRefreshesFromTheRequestedDescriptor(t *testing.T) {
 }
 
 // A cache whose stored origin names another repository, or has no single
-// origin, refuses before any fetch: the new tag never arrives and the
+// non-empty origin (missing, repeated, or with an empty or blank extra value),
+// refuses before any fetch: the new tag never arrives and the
 // configuration is unchanged. The SSH descriptor stays the same, so the
 // refusal is the cache binding's, not the transport's.
 func TestProfileCacheRefusesAForeignOrUnboundOrigin(t *testing.T) {
@@ -89,6 +90,15 @@ func TestProfileCacheRefusesAForeignOrUnboundOrigin(t *testing.T) {
 		{"missing", func(t *testing.T, dir string) { gitRun(t, dir, "remote", "remove", "origin") }, "no single stored origin"},
 		{"repeated", func(t *testing.T, dir string) {
 			gitRun(t, dir, "config", "--add", "remote.origin.url", cacheOriginSSH)
+		}, "no single stored origin"},
+		{"repeated-empty", func(t *testing.T, dir string) {
+			gitRun(t, dir, "config", "--add", "remote.origin.url", "")
+		}, "no single stored origin"},
+		{"repeated-blank", func(t *testing.T, dir string) {
+			gitRun(t, dir, "config", "--add", "remote.origin.url", "   ")
+		}, "no single stored origin"},
+		{"only-empty", func(t *testing.T, dir string) {
+			gitRun(t, dir, "config", "remote.origin.url", "")
 		}, "no single stored origin"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -127,5 +137,64 @@ func TestProfileCacheWithoutARecordedSpellingUsesItsStoredOrigin(t *testing.T) {
 	}
 	if !cacheHasTag(dir, "v1.1.0") {
 		t.Fatal("the stored-origin refresh did not reach the new tag")
+	}
+}
+
+// The same-source reinstall delegates to update, which refreshes the locked
+// sources through a manager of its own. Through the public Install, with the
+// HTTPS transport no longer working, reinstalling the same alias and tag over
+// the SSH descriptor refreshes from that descriptor and succeeds, keeping the
+// stored HTTPS origin. When the cache origin names another repository, the
+// same reinstall refuses with the cache configuration and the installed lock
+// unchanged.
+func TestProfileReinstallKeepsTheRequestedDescriptor(t *testing.T) {
+	for _, foreign := range []bool{false, true} {
+		t.Run(map[bool]string{false: "descriptor", true: "foreign-origin"}[foreign], func(t *testing.T) {
+			home := gitFixtureHome(t)
+			pinHomes(t)
+			ids := newGitIdentities(t)
+			repo := gitRepo(t, map[string]string{"agent-context.json": `{"schema_version":1,"name":"prof","version":"1.0.0"}`}, "v1.0.0")
+			ids.serve(repo, cacheOriginHTTPS)
+			if _, _, _, err := Install(home, InstallOptions{Operand: cacheOriginHTTPS, Tag: "v1.0.0", As: "prof"}); err != nil {
+				t.Fatalf("install over HTTPS: %v", err)
+			}
+			canonical, err := canonicalGit(cacheOriginHTTPS)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := newGitManager(home).repoDir(canonical)
+			if err := os.WriteFile(ids.path, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			ids.serve(filepath.Join(t.TempDir(), "unreachable"), cacheOriginHTTPS)
+			ids.serve(repo, cacheOriginSSH)
+			if foreign {
+				gitRun(t, dir, "config", "remote.origin.url", "https://example.com/other/profiles.git")
+			}
+			configBefore := fixtureGitOutput(t, dir, "config", "--local", "--list")
+			lockBefore, err := os.ReadFile(lockPath(home, "prof"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _, _, err = Install(home, InstallOptions{Operand: cacheOriginSSH, Tag: "v1.0.0", As: "prof"})
+			if !foreign {
+				if err != nil {
+					t.Fatalf("same-alias reinstall over SSH: %v", err)
+				}
+				if origin := fixtureGitOutput(t, dir, "config", "--get", "remote.origin.url"); origin != cacheOriginHTTPS {
+					t.Fatalf("stored origin rewritten to %q", origin)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "origin differs") {
+				t.Fatalf("foreign-origin reinstall err = %v, want the origin refusal", err)
+			}
+			if after := fixtureGitOutput(t, dir, "config", "--local", "--list"); after != configBefore {
+				t.Fatal("refused reinstall changed the cache configuration")
+			}
+			if lockAfter, err := os.ReadFile(lockPath(home, "prof")); err != nil || string(lockAfter) != string(lockBefore) {
+				t.Fatalf("refused reinstall changed the installed lock: %v", err)
+			}
+		})
 	}
 }
