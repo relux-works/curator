@@ -54,13 +54,15 @@ func TestFetchURLArgs(t *testing.T) {
 // percent-encoding, whitespace and newlines, empty and extra-slash
 // authorities, queries, fragments, opaque and option-shaped spellings, file
 // and local forms, a scheme-named scp host without a user, every explicit port
-// and bracketed host (the identity parser reads neither), paths the identity
-// parser rejects (`a@b:secret@h:p`, `h:org/r@x:y`), ssh URL users that are not
-// URL user information (`ssh://foo[bar]@h/p`, where the identity parser falls
-// back to binding host `ssh` while git contacts `h`), an empty user or one
-// starting with '-', scp addresses where git's split and the identity parser
-// disagree on the user or host, and a closed "@[...]" bracket in a scp path,
-// which git itself cannot use ("no path specified"). Admitted: https, http,
+// and bracketed host (the identity parser rejects non-empty ports and IPv6
+// hosts; FetchURL's URL checks refuse empty ports and every bracketed or
+// unparseable URL authority), paths the identity parser rejects
+// (`a@b:secret@h:p`, `h:org/r@x:y`), ssh URL users that are not URL user
+// information (`ssh://foo[bar]@h/p`, where the identity parser falls back to
+// binding host `ssh` while git contacts `h`), an empty user or one starting
+// with '-', scp addresses where git's split and the identity parser disagree
+// on the user or host, and a closed "@[...]" bracket in a scp path, which git
+// itself cannot use ("no path specified"). Admitted: https, http,
 // git:// and ssh in any scheme case, '@', Unicode, an unmatched '[' and inner
 // '-' in a path, single-character and explicit-user scheme-named scp hosts,
 // trailing-dot and IDN hosts, and an inner '-' in a user.
@@ -384,14 +386,14 @@ func readsAsDrive(endpoint string) bool {
 
 // Where git reads a leading letter and ':' as a drive (Git for Windows), a
 // scp address with a one-letter host and no user refuses, because git would
-// fetch a local directory while the identity binds host c. A user in front
-// and a digit host stay scp addresses there and are admitted, and with the
-// rule off the same spellings are admitted again, so the refusal comes from
-// this rule and not from the rest of the predicate. Both settings run on
-// every platform; the platform default is runtime.GOOS == "windows".
+// fetch a local directory while the identity binds host c. A user in front,
+// an ssh URL and a digit host are not drive paths there and are admitted, and
+// with the rule off the same spellings are admitted again, so the refusal
+// comes from this rule and not from the rest of the predicate. Both settings
+// run on every platform; the platform default is runtime.GOOS == "windows".
 func TestFetchURLRefusesADrivePrefixWhereGitReadsOne(t *testing.T) {
 	drives := []string{"c:org/repo.git", "Z:org/repo.git", "h:p", "h:org/r@[x"}
-	scp := []string{"git@c:org/repo.git", "1:org/repo.git", "example.invalid:org/repo.git"}
+	scp := []string{"git@c:org/repo.git", "ssh://c/org/repo.git", "1:org/repo.git", "example.invalid:org/repo.git"}
 	saved := gitReadsDrivePrefix
 	t.Cleanup(func() { gitReadsDrivePrefix = saved })
 	gitReadsDrivePrefix = true
