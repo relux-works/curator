@@ -233,3 +233,87 @@ func TestProfileCacheAcceptsAnIncludedSingleOrigin(t *testing.T) {
 		t.Fatal("the refresh did not reach the descriptor's new tag")
 	}
 }
+
+// Every network spelling the descriptor pipeline admits stays admitted by the
+// refresh: each family runs canonicalGit, then recordRaw, then the FetchURL
+// predicate on the spelling recordRaw keeps. The already-canonical family
+// records no spelling and keeps the stored-remote fallback.
+func TestDescriptorPipelineSpellingsReachFetchURL(t *testing.T) {
+	for _, declared := range []string{
+		"git@github.com:Org/re.po_name-1.git",
+		"ssh://git@github.com/Org/re.po_name-1.git",
+		"https://github.com/Org/re.po_name-1.git",
+		"git@github-work:Org/nested/re.po_name-1.git",
+		"ssh://git@github-work/Org/nested/re.po_name-1.git",
+		"github-work:Org/repo.git",
+		"https://github.com/UPPER/Repo.git",
+		"https://github.com/Org/nested/deeper/repo.git",
+		"  https://github.com/Org/repo.git  ",
+		"https://name@github.com/Org/repo.git",
+		"http://example.invalid/org/repo.git",
+		"git://example.invalid/org/repo.git",
+		"HTTPS://example.invalid/org/repo.git",
+		"SSH://git@example.invalid/org/repo.git",
+		"https://example.invalid/org/r@name.git",
+		"https://example.invalid/org/репо.git",
+		"https://example.invalid/org/repo!name.git",
+		"https://example.invalid/org/-repo.git",
+		"https://example.invalid/-org/repo.git",
+		"c:org/repo.git",
+		"git@c:org/repo.git",
+		"git@ssh:org/repo.git",
+		"https://example.invalid./org/repo.git",
+		"https://example..invalid/org/repo.git",
+		"ssh://foo;bar@example.invalid/org/repo.git",
+		"ssh://foo@bar@example.invalid/org/repo.git",
+		"https://example.invalid//org/repo.git",
+		"git@example.invalid:/org/repo.git",
+		"https://xn--bcher-kva.example/org/repo.git",
+		"https://example.invalid/org/repo.git/",
+	} {
+		canonical, err := canonicalGit(declared)
+		if err != nil {
+			t.Fatalf("%q: the descriptor pipeline refuses it (%v); the table lists admitted spellings only", declared, err)
+		}
+		manager := newGitManager(t.TempDir())
+		manager.recordRaw(canonical, declared)
+		recorded, ok := manager.fetchRaw[canonical]
+		if !ok {
+			t.Fatalf("%q: recordRaw kept no spelling", declared)
+		}
+		if err := gitops.ValidateFetchEndpoint(recorded); err != nil {
+			t.Errorf("%q (recorded %q): the refresh refuses a spelling the pipeline admits: %v", declared, recorded, err)
+		}
+	}
+	canonicalOnly := newGitManager(t.TempDir())
+	canonicalOnly.recordRaw("github.com/Org/repo", "github.com/Org/repo")
+	if _, ok := canonicalOnly.fetchRaw["github.com/Org/repo"]; ok {
+		t.Fatal("an already-canonical source recorded a spelling; it must keep the stored-remote fallback")
+	}
+}
+
+// Public installs through spellings the round-3 grammar wrongly refused:
+// http://, git://, '@' in the path and a single-character scp host each
+// install, and reinstalling the same alias refreshes the existing cache from
+// that descriptor.
+func TestProfileInstallAcceptsContractSpellings(t *testing.T) {
+	for _, operand := range []string{
+		"http://example.com/team/plain.git",
+		"git://example.com/team/gitproto.git",
+		"https://example.com/team/r@name.git",
+		"git@c:team/onechar.git",
+	} {
+		t.Run(operand, func(t *testing.T) {
+			home := gitFixtureHome(t)
+			pinHomes(t)
+			ids := newGitIdentities(t)
+			repo := gitRepo(t, map[string]string{"agent-context.json": `{"schema_version":1,"name":"prof","version":"1.0.0"}`}, "v1.0.0")
+			ids.serve(repo, operand)
+			for round := 0; round < 2; round++ {
+				if _, _, _, err := Install(home, InstallOptions{Operand: operand, Tag: "v1.0.0", As: "prof"}); err != nil {
+					t.Fatalf("install %d of %q: %v", round, operand, err)
+				}
+			}
+		})
+	}
+}
