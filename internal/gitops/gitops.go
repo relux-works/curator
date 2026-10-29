@@ -458,8 +458,11 @@ var errFetchEndpoint = fmt.Errorf("refusing to fetch from a git endpoint that ca
 // reads whose git destination is the host their identity binding names,
 // minus the ones that carry credentials. Everything else refuses before any
 // git call, with a fixed error that never contains the endpoint:
-//   - identity.Parse must accept the endpoint as a network source, so a port,
-//     a bracketed host, a non-portable path or a percent escape refuses;
+//   - identity.Parse must accept the endpoint as a network source, so a
+//     non-empty port, an IPv6 host, a non-portable identity or a percent
+//     escape refuses. The URL checks below also refuse an empty port, every
+//     bracketed authority and every URL that does not parse, which the
+//     identity parser lets through or reads as a scp address;
 //   - the host git contacts must equal the host of the canonical binding. A
 //     URL form must parse as a URL, without the identity parser's scp
 //     fallback, and its authority is the destination; a scp-like form uses
