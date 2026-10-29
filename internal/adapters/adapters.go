@@ -155,6 +155,20 @@ func casingAliasUnmanaged(target string) bool {
 	base := filepath.Base(target)
 	entries, err := os.ReadDir(filepath.Dir(target)) // #nosec G304 -- adapter parent under validation
 	if err != nil {
+		if os.IsNotExist(err) {
+			// A planned profile owner can precede its first native parent.
+			// Prove a missing tail up to a real directory; a broken parent
+			// symlink, a non-directory, or an inspection error remains unknown.
+			for parent := filepath.Dir(target); ; parent = filepath.Dir(parent) {
+				info, inspectErr := os.Lstat(parent)
+				if inspectErr == nil {
+					return !info.IsDir() || info.Mode()&os.ModeSymlink != 0
+				}
+				if !os.IsNotExist(inspectErr) || parent == filepath.Dir(parent) {
+					return true
+				}
+			}
+		}
 		return true
 	}
 	for _, entry := range entries {

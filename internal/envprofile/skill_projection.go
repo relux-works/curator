@@ -66,10 +66,11 @@ func projectSkill(home, source string, version hashing.Version) (skillOf, error)
 // raw package snapshots and command/runtime stores remain untouched.
 func publishSkillProjection(op *operation, home string, skill skillOf) (resultErr error) {
 	parent := filepath.Dir(skill.root)
-	if err := privatedir.MakeAll(parent); err != nil {
-		return err
-	}
-	if err := pathboundary.ValidateRouteWithOwner(contextstore.Root(home), parent, pathboundary.DefaultOwnerLookup()); err != nil {
+	if _, err := os.Lstat(parent); err == nil {
+		if err := pathboundary.ValidateRouteWithOwner(contextstore.Root(home), parent, pathboundary.DefaultOwnerLookup()); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
 		return err
 	}
 	state, err := stateread.Lstat(skill.root)
@@ -88,7 +89,7 @@ func publishSkillProjection(op *operation, home string, skill skillOf) (resultEr
 	if err != nil {
 		return err
 	}
-	staging, err := os.MkdirTemp(parent, ".projection-*")
+	staging, err := os.MkdirTemp("", ".projection-*")
 	if err != nil {
 		return err
 	}
@@ -114,6 +115,10 @@ func publishSkillProjection(op *operation, home string, skill skillOf) (resultEr
 		Class: "skill-projection", Identifier: skill.hash, Kind: kind, LivePath: skill.root,
 		StagedSource: staging, PreimageDigest: preimage,
 	}}}
+	plan.Directories, err = op.engine.PublicationDirectories(skill.root)
+	if err != nil {
+		return err
+	}
 	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
 		return err
 	}
@@ -157,41 +162,6 @@ func recordedSkillFallback(prior *envmarker.Marker, path string) bool {
 		}
 	}
 	return false
-}
-
-// Replace the complete copied tree through the existing recoverable entry
-// transaction. Overlay-copying would retain excluded files from the old tree;
-// renaming a symlink over a non-empty directory is unavailable on some hosts.
-func publishSkillFallback(op *operation, root, rel, source string) (resultErr error) {
-	live, err := managedPath(root, rel, true)
-	if err != nil {
-		return err
-	}
-	stage, err := os.MkdirTemp(filepath.Dir(live), ".curator-skill-copy-*")
-	if err != nil {
-		return err
-	}
-	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(stage)) }()
-	stageRel, err := managedRelative(root, stage)
-	if err != nil {
-		return err
-	}
-	nextRel := managedJoin(stageRel, "next")
-	if err := copyTree(source, root, nextRel); err != nil {
-		return err
-	}
-	digest, err := transaction.DigestTarget(transaction.KindEntry, live)
-	if err != nil {
-		return err
-	}
-	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-skill-projection", Targets: []transaction.Target{{
-		Class: "skill-context", Identifier: rel, Kind: transaction.KindEntry, LivePath: live,
-		StagedSource: filepath.Join(stage, "next"), PreimageDigest: digest,
-	}}}
-	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
-		return err
-	}
-	return op.engine.Commit(op.lock, plan.TransactionID)
 }
 
 // Every projection-tree identity retains the legacy no-v1-hash-over-NUL

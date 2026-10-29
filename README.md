@@ -230,6 +230,12 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 # outputs, markers, fragments, and config keep the canonical id.
 ```
 
+The unreleased [provisioning-origin and lifecycle source change](docs/provisioning-origin.md)
+records original native authority before first publication. Existing homes use
+that verified record; legacy homes require explicit `env adopt` attestation.
+The reference also describes retained global conflicts and receipt-backed later
+purge. This is source behavior, not a release or native-provider qualification.
+
 `--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
 
 </details>

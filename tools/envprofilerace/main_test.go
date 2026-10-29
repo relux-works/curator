@@ -77,21 +77,128 @@ func TestStreamControls(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, tc := range map[string]struct{ data, want string }{
-		"missing":       {string(fixtureStream(tests[:1])), "missing completed test TestTwo"},
-		"duplicate":     {strings.Split(good, "\n")[0] + "\n" + good, "duplicate test TestOne"},
-		"unselected":    {strings.ReplaceAll(good, "TestTwo", "TestOther"), "unexpected or duplicate test TestOther"},
-		"no-package":    {strings.Join(strings.Split(good, "\n")[:2], "\n"), "want one passing package"},
-		"failed":        {strings.Replace(good, "pass", "fail", 1), "failed test/package TestOne"},
-		"invalid-json":  {good + "broken", "invalid test JSON"},
-		"slow":          {strings.Replace(good, ":42", ":1800", 1), "outside (0,1800)s margin"},
-		"wrong-package": {strings.ReplaceAll(good, pkg, "other"), "unexpected package"},
-		"twice-package": {good + strings.Split(good, "\n")[2], "want one passing package"},
+		"missing":         {string(fixtureStream(tests[:1])), "missing completed test TestTwo"},
+		"duplicate":       {strings.Split(good, "\n")[0] + "\n" + good, "duplicate test TestOne"},
+		"unselected":      {strings.ReplaceAll(good, "TestTwo", "TestOther"), "unexpected or duplicate test TestOther"},
+		"no-package":      {strings.Join(strings.Split(good, "\n")[:2], "\n"), "want one passing package"},
+		"failed":          {strings.Replace(good, "pass", "fail", 1), "failed test/package TestOne"},
+		"invalid-json":    {good + "broken", "invalid test JSON"},
+		"slow":            {strings.Replace(good, ":42", ":1800", 1), "outside (0,1800)s margin"},
+		"wrong-package":   {strings.ReplaceAll(good, pkg, "other"), "unexpected package"},
+		"twice-package":   {good + strings.Split(good, "\n")[2], "want one passing package"},
+		"package-skipped": {strings.Replace(good, `"Action":"pass","Package":"`+pkg+`","Elapsed"`, `"Action":"skip","Package":"`+pkg+`","Elapsed"`, 1), "want one passing package"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := validateStream([]byte(tc.data), tests); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("got %v, want %s", err, tc.want)
 			}
 		})
+	}
+}
+
+// Build-output uses ImportPath rather than Package. Only the selected test
+// package's compiler/linker output is admitted; it is never test completion.
+func TestBuildEventControls(t *testing.T) {
+	good := string(fixtureStream([]string{"TestOne"}))
+	build := fmt.Sprintf(`{"Action":"build-output","ImportPath":%q,"Output":"linker warning\n"}`+"\n", pkg)
+	if _, err := validateStream([]byte(build+good), []string{"TestOne"}); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct{ data, want string }{
+		"missing-import":   {strings.Replace(build, `"ImportPath":`+fmt.Sprintf("%q", pkg), `"ImportPath":""`, 1) + good, "invalid build event"},
+		"mixed-package":    {strings.TrimSuffix(build, "}\n") + `,"Package":` + fmt.Sprintf("%q", pkg) + "}\n" + good, "invalid build event"},
+		"test-with-import": {strings.TrimSuffix(strings.Split(good, "\n")[0], "}") + `,"ImportPath":` + fmt.Sprintf("%q", pkg) + "}\n" + good, "unexpected build import on test event"},
+		"foreign-import":   {strings.Replace(build, pkg, "foreign/package", 1) + good, "unexpected build import"},
+		"build-fail":       {strings.Replace(build, "build-output", "build-fail", 1) + good, "build failure"},
+		"build-test":       {strings.TrimSuffix(build, "}\n") + `,"Test":"TestOne"}` + "\n" + good, "invalid build event"},
+		"missing-test":     {build + string(fixtureStream(nil)), "missing completed test"},
+		"unknown-action":   {strings.Replace(build, "build-output", "build-skip", 1) + good, "unsupported event action"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := validateStream([]byte(tc.data), []string{"TestOne"}); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
+	}
+}
+
+// A driver must retain effective tool paths across synthetic HOME replacement.
+// Explicit offline policy is preserved, and malformed/missing/relative paths
+// refuse instead of falling back to a new empty HOME-dependent cache.
+func TestToolEnvironmentBindings(t *testing.T) {
+	root := t.TempDir()
+	values := map[string]string{"GOCACHE": filepath.Join(root, "cache"), "GOPATH": filepath.Join(root, "go"), "GOMODCACHE": filepath.Join(root, "mod"), "GOPROXY": "off", "GOSUMDB": "off"}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := bindToolEnvironment([]string{"HOME=synthetic", "GOMODCACHE=old"}, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(result, "\n")
+	for key, value := range values {
+		if strings.Count(joined, key+"=") != 1 || !strings.Contains(joined, key+"="+value) {
+			t.Fatalf("effective tool binding lost: %s", key)
+		}
+	}
+	for _, key := range []string{"GOCACHE", "GOPATH", "GOMODCACHE", "GOPROXY", "GOSUMDB"} {
+		t.Run(key, func(t *testing.T) {
+			bad := make(map[string]string)
+			for k, value := range values {
+				bad[k] = value
+			}
+			bad[key] = ""
+			payload, err := json.Marshal(bad)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := bindToolEnvironment(nil, payload); err == nil {
+				t.Fatal("missing tool binding accepted")
+			}
+		})
+	}
+	values["GOMODCACHE"] = "relative"
+	raw, err = json.Marshal(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bindToolEnvironment(nil, raw); err == nil {
+		t.Fatal("relative tool cache accepted")
+	}
+	if _, err := bindToolEnvironment(nil, []byte("invalid")); err == nil {
+		t.Fatal("malformed context accepted")
+	}
+	values["GOMODCACHE"] = filepath.Join(root, "mod")
+	values["HOME"] = "unexpected"
+	raw, err = json.Marshal(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bindToolEnvironment(nil, raw); err == nil {
+		t.Fatal("unexpected tool-context selector accepted")
+	}
+}
+
+// The real driver query resolves only tool metadata in this disposable offline
+// test environment; it neither compiles a race shard nor looks up an account.
+func TestEffectiveToolEnvironment(t *testing.T) {
+	result, err := effectiveToolEnvironment(os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]string{}
+	for _, entry := range result {
+		key, value, _ := strings.Cut(entry, "=")
+		seen[key] = value
+	}
+	for _, key := range []string{"GOCACHE", "GOPATH", "GOMODCACHE"} {
+		if !filepath.IsAbs(seen[key]) {
+			t.Fatalf("missing effective %s", key)
+		}
+	}
+	if os.Getenv("GOPROXY") == "off" && seen["GOPROXY"] != "off" {
+		t.Fatal("driver silently enabled network")
 	}
 }
 

@@ -1,7 +1,12 @@
 package envprofile
 
 import (
+	"errors"
 	"fmt"
+	"github.com/relux-works/curator/internal/envlifecycle"
+	"github.com/relux-works/curator/internal/envunit"
+	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/transaction"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -55,6 +60,8 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 	if err != nil {
 		return Info{}, err
 	}
+	op.policy = policy
+	op.policy.EnvironmentMachine = machine
 	closed := borrowed != nil
 	closeOperation := func() {
 		if !closed {
@@ -63,27 +70,48 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 		}
 	}
 	defer closeOperation()
-	if err := op.capture(ProfileDir(home, DefaultProfile), CurrentFile(home)); err != nil {
-		return Info{}, err
-	}
-	if err := ensureDefault(op, home, policy); err != nil {
-		return Info{}, err
-	}
 	profile, err := currentOrDefault(home)
 	if err != nil {
 		return Info{}, err
 	}
-	if err := op.capture(ProfileDir(home, profile)); err != nil {
-		return Info{}, err
-	}
 	source, err := readSource(home, profile)
+	var oldLock *contextlock.Lock
+	var oldHash string
+	if isStateAbsent(err) && profile == DefaultProfile {
+		// Only a genuinely absent installed namespace is first use. Partial,
+		// unreadable and retained namespaces never acquire new authority here.
+		state, e := stateread.Lstat(ProfileDir(home, profile))
+		if e != nil {
+			return Info{}, e
+		}
+		if state.Kind != stateread.KindAbsent {
+			return Info{}, fmt.Errorf("%s: first-use profile namespace is not absent", DiagSourceInvalid)
+		}
+		oldLock, payload, e := planDefault(home, policy)
+		if e != nil {
+			return Info{}, e
+		}
+		canonical, e := oldLock.Canonical()
+		if e != nil {
+			return Info{}, e
+		}
+		op.initialProfile = map[string][]byte{sourcePath(home, profile): payload, lockPath(home, profile): canonical}
+		defer func() { op.initialProfile = nil }()
+		source = Source{Kind: KindLocal}
+		// Preserve the planned base for resolution; no live L0 exists.
+		return globalResolvedSkillOperation(op, home, profile, source, oldLock, "absent", policy, machine, addition, nativeHomeOf)
+	}
 	if err != nil {
 		return Info{}, err
 	}
-	oldLock, oldHash, err := readLock(home, profile)
+	oldLock, oldHash, err = readLock(home, profile)
 	if err != nil {
 		return Info{}, err
 	}
+	return globalResolvedSkillOperation(op, home, profile, source, oldLock, oldHash, policy, machine, addition, nativeHomeOf)
+}
+
+func globalResolvedSkillOperation(op *operation, home, profile string, source Source, oldLock *contextlock.Lock, oldHash string, policy Policy, machine envregistry.MachineConfig, addition *DirectSkill, nativeHomeOf func(string) (string, error)) (_ Info, resultErr error) {
 	manager := newGitManager(home).withPolicy(policy)
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, err
@@ -111,40 +139,119 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 		return Info{}, err
 	}
 	newHash := contextlock.HashBytes(canonical)
-	if newHash != oldHash {
-		if err := op.publish(map[string][]byte{lockPath(home, profile): canonical}); err != nil {
-			return Info{}, err
-		}
-	}
 	info := Info{Name: profile, Source: source, Lock: result.Lock, LockHash: newHash, Current: true, Warnings: warnings}
-	for _, adapter := range envregistry.Registry {
-		if err := op.noteParents(filepath.Join(ManagedHomeDir(home, profile, adapter.ID), envmarker.Name)); err != nil {
+	g := newHomePublicationGroup()
+	defer finishPublicationCleanup(&resultErr, g.close)
+	op.publicationGroup = g
+	defer func() { op.publicationGroup = nil }()
+	records := map[string][]byte{}
+	if op.initialProfile != nil {
+		records[sourcePath(home, profile)] = op.initialProfile[sourcePath(home, profile)]
+	}
+	if newHash != oldHash {
+		records[lockPath(home, profile)] = canonical
+	}
+	// Rebind every materialized adapter from its original capture before any
+	// publication. This collector does not publish L1 or any home.
+	if len(records) != 0 {
+		if _, err := op.publishManagedRebind(home, records, nil, nil, nil); err != nil {
 			return info, err
 		}
 	}
-	// Preflight both managed and in-place homes while the manager lock is held.
-	// A static unmanaged conflict is found before any surface is written, while
-	// the extended lock and immutable entries are already published.
-	if err := preflightManagedProfile(home, profile, policy, machine, nativeHomeOf); err != nil {
-		return info, err
-	}
-	if err := preflightInPlaceScope(home, profile, "", policy, nativeHomeOf); err != nil {
-		return info, globalInPlaceError(err)
-	}
-	nativeResults, err := materializeScopeWithNativeHome(op, home, profile, "", policy, nativeHomeOf)
+	var conflict *globalInPlaceConflict
+	environments, err := globalNativeEnvironments(home, profile)
 	if err != nil {
 		return info, err
 	}
-	for _, result := range nativeResults {
-		if !result.OK {
-			return info, globalInPlaceError(fmt.Errorf("%s", result.Detail))
+	for _, environment := range environments {
+		conflictErr := preflightInPlaceObserved(home, profile, environment, policy, nativeHomeOf, source, result.Lock, newHash)
+		var candidate *globalInPlaceConflict
+		if conflictErr != nil && !errors.As(conflictErr, &candidate) {
+			return info, conflictErr
+		}
+		if conflict == nil {
+			conflict = candidate
 		}
 	}
-	closeOperation()
-	if _, err := syncManagedProfileWithOperation(home, profile, policy, machine, nativeHomeOf, borrowed); err != nil {
+	planningPolicy := policy
+	if conflict != nil {
+		planningPolicy.Takeover = true
+	}
+	for _, environment := range environments {
+		nativeResults, err := materializeScopeObserved(op, home, profile, environment, planningPolicy, nativeHomeOf, source, result.Lock, newHash)
+		if err != nil {
+			return info, err
+		}
+		for _, entry := range nativeResults {
+			if !entry.OK {
+				if entry.cause != nil {
+					return info, entry.cause
+				}
+				return info, fmt.Errorf("%s", entry.Detail)
+			}
+		}
+	}
+	if g.unit == nil {
+		return info, fmt.Errorf("global publication has no bound home inventory")
+	}
+	g.unit.Action = envunit.GlobalExtend
+	var lifecycle *envlifecycle.Change
+	if conflict != nil {
+		identity, err := envunit.ObserveManager(home)
+		if err != nil {
+			return info, err
+		}
+		_, prior, err := envlifecycle.Read(identity)
+		if err != nil {
+			return info, err
+		}
+		lifecycle = &envlifecycle.Change{Prior: prior, Conflict: &conflict.capture}
+	}
+	op.publishPlan = func(plan transaction.Plan) error {
+		plan.Unit.Action = envunit.GlobalExtend
+		plan.Lifecycle = lifecycle
+		if op.stageLegacy != nil && conflict == nil {
+			legacy, err := op.stageLegacy(plan.Unit)
+			if err != nil {
+				return err
+			}
+			op.joinedLegacy = &legacy
+		}
+		if op.joinedLegacy != nil {
+			var err error
+			plan, err = joinLegacyPlan(plan, *op.joinedLegacy)
+			if err != nil {
+				return err
+			}
+		}
+		if _, err := op.engine.Prepare(op.lock, plan); err != nil {
+			return err
+		}
+		return op.engine.Commit(op.lock, plan.TransactionID)
+	}
+	defer func() { op.publishPlan = nil }()
+	if err := op.commitHomeGroup(home, g, records, nil, nil, nil); err != nil {
 		return info, err
 	}
 	return info, nil
+}
+
+// A profile lock publication affects its scoped native consumers as well as
+// unscoped machine consumers. A scope selecting another profile is disjoint;
+// a same-profile scope cannot hide an adapter from the complete rebind group.
+func globalNativeEnvironments(home, profile string) ([]string, error) {
+	scoped, err := ScopedCurrents(home)
+	if err != nil {
+		return nil, err
+	}
+	var environments []string
+	for _, adapter := range Adapters {
+		selected, hasScope := scoped["env:"+adapter.ID]
+		if !hasScope || selected == profile {
+			environments = append(environments, adapter.ID)
+		}
+	}
+	return environments, nil
 }
 
 func currentOrDefault(home string) (string, error) {

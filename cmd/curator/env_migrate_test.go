@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // These tests drive the production run() entry point for the env
@@ -35,29 +38,73 @@ func requireLinkCapability(t *testing.T) {
 	}
 }
 
-// installPiProfile installs the acme profile and provisions its Pi
-// home through the CLI, returning the managed link, the old native
-// target, and the agent-root target.
+// adoptMigrationFixture constructs a historical managed fixture, then calls
+// actual CLI adoption and recorded maintenance. It never uses initial account
+// discovery; env-i HOME does not replace the production account database.
+func adoptMigrationFixture(t *testing.T, source stubConfigSource, id, native string) {
+	t.Helper()
+	manager := source.cfg.Home()
+	lock, hash, err := contextlock.Read(filepath.Join(envprofile.ProfileDir(manager, "acme"), "lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := envprofile.ManagedHomeDir(manager, "acme", id)
+	if err = privatedir.MakeAll(target); err != nil {
+		t.Fatal(err)
+	}
+	members := []envmarker.Member{}
+	for _, m := range lock.Members {
+		if m.Kind == contextlock.KindContext {
+			members = append(members, envmarker.Member{Name: m.Name, Version: m.Version, Commit: m.Commit, StateSHA256: m.StateHash, Weight: m.Weight, Overlay: m.Overlay})
+		}
+	}
+	passthrough := []envmarker.Passthrough{{Path: "auth.json", Strategy: "file-link"}}
+	seeds := []string{}
+	marker := &envmarker.Marker{Version: 1, Mode: envmarker.ModeManagedHome, Profile: envmarker.Profile{Name: "acme", Root: lock.Root, Kind: "local", LockSHA256: strings.TrimPrefix(hash, "sha256:")}, Members: members, Precedence: envmarker.Precedence{Winner: "higher-weight", Placement: "winner-last"}, Surfaces: map[string]envmarker.Surface{}, Passthrough: &passthrough, Seeds: &seeds}
+	raw, err := marker.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(target, envmarker.Name), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Symlink(filepath.Join(native, "auth.json"), filepath.Join(target, "auth.json")); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"env", "adopt", id, "--profile", "acme", "--managed-target", target, "--lock-sha256", hash, "--operator-home", t.TempDir(), "--selector-state", "present-value", "--selector-value", native, "--native-root", native}
+	if code, _, diag := runProfile(t, source, args...); code != exitOK {
+		t.Fatalf("adopt synthetic %s: %d %s", id, code, diag)
+	}
+	if code, _, diag := runProfile(t, source, "env", "resolve", id, "--repair"); code != exitOK {
+		t.Fatalf("recorded repair %s: %d %s", id, code, diag)
+	}
+}
+
+// Pi's selector is the agent root itself, never its parent or agent/agent.
+// This CLI fixture adopts explicit authority before any recorded maintenance.
 func installPiProfile(t *testing.T, source stubConfigSource) (link, oldTarget, agentAuth string) {
 	t.Helper()
-	writeNativeCredentials(t)
+	native := filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "agent")
+	t.Setenv("PI_CODING_AGENT_DIR", native)
+	if err := os.MkdirAll(native, 0700); err != nil {
+		t.Fatal(err)
+	}
+	agentAuth = filepath.Join(native, "auth.json")
+	if err := os.WriteFile(agentAuth, []byte("fixture-pi-credential\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
-	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
-		t.Fatalf("install stderr:\n%s", stderr)
+	if code, _, diag := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("install: %s", diag)
 	}
-	if code, _, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair"); code != exitOK {
-		t.Fatalf("resolve pi --repair = %d\nstderr:\n%s", code, stderr)
+	adoptMigrationFixture(t, source, "pi", native)
+	link = filepath.Join(envprofile.ManagedHomeDir(source.cfg.Home(), "acme", "pi"), "auth.json")
+	oldTarget = filepath.Join(filepath.Dir(native), "auth.json")
+	if got, err := os.Readlink(link); err != nil || got != agentAuth {
+		t.Fatalf("Pi target %q %v want %q", got, err, agentAuth)
 	}
-	managed := filepath.Join(source.cfg.Home(), "environments", "acme", "pi")
-	link = filepath.Join(managed, "auth.json")
-	native := os.Getenv("PI_CODING_AGENT_DIR")
-	oldTarget = filepath.Join(native, "auth.json")
-	agentAuth = filepath.Join(native, "agent", "auth.json")
-	if target, err := os.Readlink(link); err != nil || target != agentAuth {
-		t.Fatalf("provisioned Pi link targets %q (%v), want %q", target, err, agentAuth)
-	}
-	return link, oldTarget, agentAuth
+	return
 }
 
 func planHash(t *testing.T, plan string) string {
@@ -172,9 +219,7 @@ func TestEnvMigrateConflictRefuses(t *testing.T) {
 	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
 		t.Fatalf("install stderr:\n%s", stderr)
 	}
-	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex_cli", "--repair"); code != exitOK {
-		t.Fatalf("resolve codex_cli --repair = %d\nstderr:\n%s", code, stderr)
-	}
+	adoptMigrationFixture(t, source, "codex_cli", os.Getenv("CODEX_HOME"))
 	link := filepath.Join(source.cfg.Home(), "environments", "acme", "codex_cli", "auth.json")
 	_ = os.Remove(link)
 	managed := []byte("managed-credential\n")
@@ -331,13 +376,9 @@ func TestEnvMigratePrintBeforeWrite(t *testing.T) {
 	}
 }
 
-// TestEnvResolveRepairFailedOnUninspectable proves the CLI surfaces the
-// repair_failed refusal: a correctly targeted Pi link whose native
-// target cannot be inspected fails env resolve --repair with
-// environment_repair_failed carrying the inspection reason, with the
-// link untouched. Unix-only: the uninspectable-target fixture is the
-// ENOTDIR shape Windows maps to path-not-found. The library half is
-// TestCredentialLinkInspectionRepairFails.
+// Replacing the recorded native directory with a regular file is an origin
+// authority refusal before repair/backend lookup, with the link untouched.
+// This fixture exercises metadata, not a production account or credential read.
 func TestEnvResolveRepairFailedOnUninspectable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("this host cannot create an uninspectable link target: Windows maps a stat through a file to path-not-found, so the inspection diagnostic runs on the unix runners")
@@ -346,17 +387,17 @@ func TestEnvResolveRepairFailedOnUninspectable(t *testing.T) {
 	link, _, agentAuth := installPiProfile(t, source)
 	native := os.Getenv("PI_CODING_AGENT_DIR")
 	// Break the target's parent: a file where the agent directory was.
-	if err := os.RemoveAll(filepath.Join(native, "agent")); err != nil {
+	if err := os.RemoveAll(native); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(native, "agent"), []byte("not a directory\n"), 0o644); err != nil {
+	if err := os.WriteFile(native, []byte("not a directory\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	code, _, stderr := runProfile(t, source, "env", "resolve", "pi", "--repair")
 	if code != exitFail {
 		t.Fatalf("resolve --repair = %d, want %d\n%s", code, exitFail, stderr)
 	}
-	for _, want := range []string{"environment_repair_failed", "cannot be inspected", "environment_credential_conflict", "auth.json"} {
+	for _, want := range []string{"environment_provisioning_origin_invalid", "ancestor is not a readable directory"} {
 		if !strings.Contains(stderr, want) {
 			t.Fatalf("the refusal carries the inspection reason, want %q in:\n%s", want, stderr)
 		}

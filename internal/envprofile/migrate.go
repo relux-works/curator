@@ -1,42 +1,23 @@
-// Package envprofile credential migration runs the explicit inspect →
-// plan → apply step (environments §7.4, §10.1; manager §12.4; decision
-// 0017 choice 3). A mode change or a native-root correction that leaves
-// a recorded credential link behind is
-// never applied by resolve --repair: repair re-links an absent link and
-// refuses anything else, pointing at this step where the explicit
-// migration can fix it. The migration inventories the old marker, every
-// recorded link target, and both Pi roots; preserves the effective mode;
-// relinks recorded symlinks at the declared native path and unlinks
-// stale recorded links; and never copies, moves, or rewrites credential
-// bytes — a relink moves the pointer, never the file.
-//
-// Inspect and plan share one read-only computation (no lock, never a
-// credential-byte read) and differ only in what they print; apply takes
-// the manager-home mutation lock, requires the --expect plan hash,
-// prints the locked, revalidated plan before the first mutation,
-// refuses on plan drift and on conflicts, and executes link operations
-// through a durable migration journal (temp-link + atomic rename, never
-// remove-then-create), publishing changed markers through the journaled
-// record publication. A syscall failure mid-op or a failed marker
-// publication reverts the links; a leftover journal from an
-// interrupted apply is reported by inspect/plan and recovered — rolled
-// back to the prior state — by the next apply carrying a plan hash.
+// Package envprofile implements explicit read-only credential migration plans
+// and locked apply. Existing homes use their verified provisioning origin, never
+// the current caller's selectors. Apply enlists credential entries, marker,
+// origin and affected profile identities in one durable environment unit. It
+// never copies credential bytes. Returned failures compensate mutable preimages;
+// interrupted units recover by their proven phase through common admission.
+// Old unsealed link-only journals cannot authorize writes; completed legacy
+// receipts allow only exact verified cleanup. Repair does not perform migration.
 package envprofile
 
 import (
-	"bytes"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
@@ -57,20 +38,6 @@ const (
 const (
 	MigrateOpRelink = "relink"
 	MigrateOpUnlink = "unlink"
-)
-
-// Migration fault points for the MigrateRequest.InjectFault seam:
-// after each applied link operation ("link"); after an applied link
-// operation simulating a process kill ("crash": the journal stands and
-// no rollback runs, so the next apply must recover); before the marker
-// publication ("publish-begin": simulates a publication failure, which
-// reverts the links); and after the marker publication ("publish").
-// Production never sets InjectFault.
-const (
-	MigrateFaultLink         = "link"
-	MigrateFaultCrash        = "crash"
-	MigrateFaultPublishBegin = "publish-begin"
-	MigrateFaultPublish      = "publish"
 )
 
 // Entry classifications for one recorded-or-wanted credential path.
@@ -105,8 +72,8 @@ const (
 // (plan drift). Print receives the locked, revalidated plan text before
 // the first mutation (a write failure fails the apply before anything
 // changes); nil prints nothing and the caller uses
-// MigrateApplyResult.Report instead. InjectFault, symlink, and rename
-// are test seams: production never sets them.
+// MigrateApplyResult.Report instead. The private transactionOptions seam injects raw transaction faults;
+// it never decides origin authority or recovery policy.
 type MigrateRequest struct {
 	Home               string
 	Profile            string
@@ -115,29 +82,8 @@ type MigrateRequest struct {
 	Detect             func(envregistry.Adapter) string
 	NativeHomeOf       func(string) (string, error)
 	Expect             string
-	InjectFault        func(point string, applied int) error
 	Print              io.Writer
-	symlink            func(oldname, newpath string) error
-	rename             func(oldpath, newpath string) error
 	transactionOptions []transaction.Option
-}
-
-// symlinkFn resolves the link-creation primitive: os.Symlink unless a
-// test injected a syscall-boundary failure.
-func (req *MigrateRequest) symlinkFn() func(string, string) error {
-	if req.symlink != nil {
-		return req.symlink
-	}
-	return os.Symlink
-}
-
-// renameFn resolves the atomic-replacement primitive: os.Rename unless
-// a test injected a syscall-boundary failure.
-func (req *MigrateRequest) renameFn() func(string, string) error {
-	if req.rename != nil {
-		return req.rename
-	}
-	return os.Rename
 }
 
 // resolveFor builds the resolve shim the migration reuses for the native
@@ -235,7 +181,7 @@ func (rec *MigrateRecovery) notice(home string) string {
 		return fmt.Sprintf("migration journal %s is unusable (%s); back it up out of band, verify every managed link by hand, and only then remove it and re-run `curator env migrate --plan`\n",
 			migrationJournalPath(home), rec.Broken)
 	}
-	return fmt.Sprintf("interrupted migration apply detected: plan %s, %d of %d link operations completed; the next `curator env migrate --apply --expect %s` recovers to the prior state under the manager lock before executing (this read-only command recovers nothing)\n",
+	return fmt.Sprintf("completed legacy migration receipt detected: plan %s, %d of %d link operations completed; the next `curator env migrate --apply --expect %s` validates and cleans the receipt under the manager lock, preserving verified postimages (this read-only command changes nothing)\n",
 		rec.Plan, rec.Done, rec.Ops, rec.Plan)
 }
 
@@ -294,6 +240,12 @@ func (r *MigrateReport) conflictError() error {
 // credential bytes (lstat/readlink/stat only). It serves both the
 // inspect and the plan renderings; use MigrateReport.Text to print.
 func PlanMigration(req MigrateRequest) (*MigrateReport, error) {
+	// Read-only planning still reaches backend observation. Validate every
+	// authority/lifecycle/recovery owner first, including disjoint homes; selected
+	// scope and a standing journal never waive the common admission boundary.
+	if err := envauthority.Validate(req.Home); err != nil {
+		return nil, err
+	}
 	profiles, err := migrationProfiles(req.Home, req.Profile)
 	if err != nil {
 		return nil, err
@@ -417,6 +369,10 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 		HomeDir: ManagedHomeDir(req.Home, profile, adapter.ID),
 		PiOld:   MigrateRootNA, PiNew: MigrateRootNA,
 	}
+	if err := validateMarkerBoundary(req.Home, profile, adapter.ID, nil); err != nil {
+		home.addConflict("", err.Error(), "restore the owned no-follow marker boundary before migration")
+		return home
+	}
 	markerPath := filepath.Join(home.HomeDir, envmarker.Name)
 	markerFile, err := stateread.ReadFile(markerPath)
 	if err != nil {
@@ -448,6 +404,10 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 	home.markerRaw = payload
 	home.Mode = marker.Mode
 	rr := req.resolveFor(profile, adapter.ID)
+	if err := rr.observeOrigin(adapter.ID, marker); err != nil {
+		home.addConflict("", err.Error(), "verify the original provisioning history; use explicit env adopt only with trusted attestation for a legacy home")
+		return home
+	}
 	policy, err := rr.resolveCredentialPolicy(adapter)
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("cannot establish the credential strategy: %v", err),
@@ -469,7 +429,7 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 		return home
 	}
 	home.credentialRecords = credentials
-	native, err := rr.nativeHome(adapter.ID)
+	native, err := rr.credentialNativeRoot(adapter.ID)
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("cannot resolve the native home: %v", err),
 			"restore the native home out of band and re-run")
@@ -700,8 +660,8 @@ func (h *MigrateHome) staleDeclaredTarget(adapter envregistry.Adapter, native, p
 // never touches native files). Roots are informational where no
 // re-point is planned.
 func (h *MigrateHome) inventoryPiRoots(native string) {
-	h.PiOldPath = filepath.Join(native, "auth.json")
-	h.PiNewPath = filepath.Join(native, "agent", "auth.json")
+	h.PiOldPath = filepath.Join(filepath.Dir(native), "auth.json")
+	h.PiNewPath = filepath.Join(native, "auth.json")
 	h.PiOld = statRoot(h.PiOldPath)
 	h.PiNew = statRoot(h.PiNewPath)
 	relink := false
@@ -961,22 +921,10 @@ type MigrateApplyResult struct {
 	Recovered *MigrateRecovery
 }
 
-// ApplyMigration executes the migration under the manager-home mutation
-// lock in strict order: require the --expect plan hash (refusing with
-// zero writes when it is missing); validate the entire recovery
-// inventory before any recovery write and recover a leftover journal
-// back to the prior state, announcing the recovery before mutating;
-// re-inventory and print the locked, revalidated plan before the first
-// mutation (a print failure fails before anything changes); refuse on
-// plan drift and on conflicts with zero writes; then journal the intent
-// and execute exactly the printed operations link by link — each relink
-// as a journaled temp-link + atomic rename, never remove-then-create —
-// publishing changed markers as one journaled transaction. A link-phase
-// syscall failure or a failed marker publication reverts the links; a
-// post-publish failure restores the prior markers first, then the
-// links. Every outcome is the prior state or the migrated state, never
-// a mix; a kill between mutations leaves the journal for the next apply
-// carrying a plan hash to recover.
+// ApplyMigration requires a current plan hash and holds the manager mutation
+// lock. Common phase-aware recovery precedes revalidation. Drift or conflict
+// refuses before new publication; actual link/marker/origin changes publish as
+// one complete unit with durable preimages and protection metadata.
 func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 	op, err := beginOperation(req.Home, req.transactionOptions...)
 	if err != nil {
@@ -1006,7 +954,7 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 		return result, fmt.Errorf("%s: migration apply needs a prior plan: run `curator env migrate --plan%s`, then apply with `--expect %s`",
 			envregistry.DiagCredentialConflict, report.scopeFlags(), report.Hash)
 	}
-	recovered, err := recoverMigrationJournal(req.Home, op, req.Print, req.symlinkFn(), req.renameFn())
+	recovered, err := recoverMigrationJournal(req.Home, op, req.Print)
 	if err != nil {
 		report, planErr := PlanMigration(req)
 		if planErr != nil {
@@ -1041,11 +989,6 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 			return result, err
 		}
 		defer migration.cleanup()
-		if req.InjectFault != nil {
-			if err := req.InjectFault(MigrateFaultPublishBegin, 0); err != nil {
-				return result, err
-			}
-		}
 		inputs, err := identityMigrationInputs(&req, profiles)
 		if err != nil {
 			return result, err
@@ -1062,68 +1005,10 @@ func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
 	if len(ops) == 0 {
 		return result, nil
 	}
-	changed, priors, err := changedMarkers(report)
-	if err != nil {
+	if err := publishCredentialMigration(op, req, report); err != nil {
 		return result, err
 	}
-	journal := newMigrationJournal(report, changed, priors)
-	if err := writeMigrationJournal(req.Home, journal); err != nil {
-		return result, fmt.Errorf("migration apply cannot journal the plan, refusing before any mutation: %v", err)
-	}
-	applied, err := executeMigrationOps(req, ops, journal)
-	if err != nil {
-		var crash *migrationCrashError
-		if errors.As(err, &crash) {
-			result.Applied = crash.applied
-			return result, fmt.Errorf("migration apply interrupted after %d of %d operations (the journal stands at %s): re-run `curator env migrate --apply --expect %s%s` to recover the prior state and retry",
-				len(crash.applied), len(ops), migrationJournalPath(req.Home), report.Hash, report.scopeFlags())
-		}
-		rollbackErr := reconcileJournalLinks(req.Home, journal, req.symlinkFn(), req.renameFn())
-		journalErr := removeMigrationJournalIfClean(req.Home, rollbackErr)
-		return result, migrationFaultError(req.Home, err, rollbackErr, journalErr)
-	}
-	result.Applied = applied
-	if req.InjectFault != nil {
-		if err := req.InjectFault(MigrateFaultPublishBegin, len(applied)); err != nil {
-			rollbackErr := reconcileJournalLinks(req.Home, journal, req.symlinkFn(), req.renameFn())
-			journalErr := removeMigrationJournalIfClean(req.Home, rollbackErr)
-			return result, fmt.Errorf("migration marker publish failed: %v; %s; re-run `curator env migrate --plan%s` to confirm the restored state",
-				err, rollbackOutcome(req.Home, rollbackErr, journalErr), report.scopeFlags())
-		}
-	}
-	if len(changed) > 0 {
-		if err := op.publish(changed); err != nil {
-			rollbackErr := reconcileJournalLinks(req.Home, journal, req.symlinkFn(), req.renameFn())
-			journalErr := removeMigrationJournalIfClean(req.Home, rollbackErr)
-			return result, fmt.Errorf("migration marker publish failed: %v; %s; re-run `curator env migrate --plan%s` to confirm the restored state",
-				err, rollbackOutcome(req.Home, rollbackErr, journalErr), report.scopeFlags())
-		}
-		journal.MarkersDone = true
-		if err := writeMigrationJournal(req.Home, journal); err != nil {
-			rbErr := rollbackMigrationMarkersAndLinks(op, req, journal)
-			journalErr := removeMigrationJournalIfClean(req.Home, rbErr)
-			return result, fmt.Errorf("migration apply failed and was rolled back: cannot update the journal after publishing markers: %v; %s",
-				err, rollbackOutcome(req.Home, rbErr, journalErr))
-		}
-	}
-	if req.InjectFault != nil {
-		if err := req.InjectFault(MigrateFaultPublish, len(applied)); err != nil {
-			rbErr := rollbackMigrationMarkersAndLinks(op, req, journal)
-			journalErr := removeMigrationJournalIfClean(req.Home, rbErr)
-			return result, migrationFaultError(req.Home, err, rbErr, journalErr)
-		}
-	}
-	journal.Complete = true
-	if err := writeMigrationJournal(req.Home, journal); err != nil {
-		rbErr := rollbackMigrationMarkersAndLinks(op, req, journal)
-		journalErr := removeMigrationJournalIfClean(req.Home, rbErr)
-		return result, fmt.Errorf("migration apply failed and was rolled back: cannot seal the journal: %v; %s",
-			err, rollbackOutcome(req.Home, rbErr, journalErr))
-	}
-	if err := removeMigrationJournal(req.Home); err != nil {
-		return result, fmt.Errorf("migration applied %d operations but cannot remove the completed journal %s: %v; the sealed journal is inert — the next apply deletes it without touching links — but back up manager state before re-running",
-			len(applied), migrationJournalPath(req.Home), err)
-	}
+	result.Applied = ops
 	return result, nil
 }
 
@@ -1136,163 +1021,6 @@ func printMigrationPlan(w io.Writer, report *MigrateReport) error {
 	}
 	_, err := io.WriteString(w, report.Text(MigratePhasePlan))
 	return err
-}
-
-// migrationCrashError marks a simulated process kill: the journal stands
-// with the operations applied so far and no rollback runs, so the next
-// apply must recover. Only the InjectFault seam produces it.
-type migrationCrashError struct {
-	applied []MigrateOp
-}
-
-func (e *migrationCrashError) Error() string {
-	return fmt.Sprintf("simulated crash after %d operations", len(e.applied))
-}
-
-// executeMigrationOps re-validates each operation against live state
-// under the held lock and executes it through the durable journal: the
-// intent for every operation is on disk before the first mutation, and
-// each operation is marked done durably right after it lands, so a kill
-// between any two steps recovers deterministically. Relinks move via a
-// journaled temp-link + atomic rename (never remove-then-create), so a
-// failed syscall leaves the old link standing. Only symlink, rename, and
-// unlink syscalls run here — credential bytes are never read.
-func executeMigrationOps(req MigrateRequest, ops []MigrateOp, journal *migrationJournal) ([]MigrateOp, error) {
-	var applied []MigrateOp
-	for i, op := range ops {
-		full := filepath.Join(ManagedHomeDir(req.Home, op.Profile, op.EnvID), filepath.FromSlash(op.Path))
-		if err := validateMigrationOp(full, op); err != nil {
-			return applied, err
-		}
-		switch op.Kind {
-		case MigrateOpRelink:
-			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-				return applied, fmt.Errorf("relink %s: %v", op.Path, err)
-			}
-			if err := atomicRelinkJournaled(req.Home, journal, i, full, op.To, req.symlinkFn(), req.renameFn()); err != nil {
-				return applied, fmt.Errorf("relink %s: %v", op.Path, err)
-			}
-		case MigrateOpUnlink:
-			if op.From != "" {
-				if err := os.Remove(full); err != nil {
-					return applied, fmt.Errorf("unlink %s: %v", op.Path, err)
-				}
-			}
-		default:
-			return applied, fmt.Errorf("unknown migration operation %q", op.Kind)
-		}
-		applied = append(applied, op)
-		journal.Ops[i].Done = true
-		journal.Ops[i].Temp = ""
-		journal.Ops[i].TempTarget = ""
-		if err := writeMigrationJournal(req.Home, journal); err != nil {
-			return applied, fmt.Errorf("cannot journal the completed %s %s: %v", op.Kind, op.Path, err)
-		}
-		if req.InjectFault != nil {
-			if err := req.InjectFault(MigrateFaultLink, len(applied)); err != nil {
-				return applied, err
-			}
-			if err := req.InjectFault(MigrateFaultCrash, len(applied)); err != nil {
-				return applied, &migrationCrashError{applied: applied}
-			}
-		}
-	}
-	return applied, nil
-}
-
-// atomicRelinkJournaled re-points the symlink at full to target without
-// a remove-then-create window: the replacement is created under a
-// temporary name in the same directory, then renamed over the old link
-// in one atomic step. The temporary path and its expected target are
-// journaled before the symlink runs, so a kill between the symlink and
-// the rename leaves an owned temp the next recovery cleans; cleanup
-// removes only that recorded path and only when it is a symlink to the
-// recorded target. Any failure leaves the old link standing; a failed
-// rename removes its own temporary link best effort (a leftover stays
-// journaled). On success the recorded Temp stands until the caller
-// marks the operation done and clears it in the same journal write — a
-// crash in between leaves Temp pointing at an absent path, which
-// cleans as a no-op.
-func atomicRelinkJournaled(home string, journal *migrationJournal, index int, full, target string, symlink func(string, string) error, rename func(string, string) error) error {
-	dir := filepath.Dir(full)
-	for attempt := 0; attempt < 10; attempt++ {
-		tmp := filepath.Join(dir, ".migrate-"+migrationRandHex()+".tmp")
-		metadata, err := stateread.Lstat(tmp)
-		if err != nil {
-			return err
-		}
-		if metadata.Kind == stateread.KindPresent {
-			continue
-		}
-		if metadata.Kind != stateread.KindAbsent {
-			return stateread.UnusableError(tmp, fmt.Errorf("unknown temporary metadata state %q", metadata.Kind))
-		}
-		journal.Ops[index].Temp = tmp
-		journal.Ops[index].TempTarget = target
-		if err := writeMigrationJournal(home, journal); err != nil {
-			journal.Ops[index].Temp = ""
-			journal.Ops[index].TempTarget = ""
-			return fmt.Errorf("cannot journal the temporary link intent: %v", err)
-		}
-		if err := symlink(target, tmp); err != nil {
-			if os.IsExist(err) {
-				journal.Ops[index].Temp = ""
-				journal.Ops[index].TempTarget = ""
-				continue
-			}
-			return err
-		}
-		if err := rename(tmp, full); err != nil {
-			_ = removeOwnedTemp(tmp, target)
-			return err
-		}
-		return nil
-	}
-	return fmt.Errorf("cannot pick a temporary link name in %s", dir)
-}
-
-// removeOwnedTemp removes the recorded temporary link only when it is a
-// symlink to the recorded target. An absent path is a no-op; a regular
-// file, directory, or symlink to any other target is never deleted and
-// reports a mismatch for the caller to refuse on.
-func removeOwnedTemp(tmp, want string) error {
-	metadata, err := stateread.Lstat(tmp)
-	if err != nil {
-		return err
-	}
-	if metadata.Kind == stateread.KindAbsent {
-		return nil
-	}
-	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-		return stateread.UnusableError(tmp, fmt.Errorf("unknown temporary metadata state %q", metadata.Kind))
-	}
-	info := metadata.Info
-	if info.Mode()&os.ModeSymlink == 0 {
-		shape := "a regular file"
-		if info.IsDir() {
-			shape = "a directory"
-		}
-		return fmt.Errorf("temporary path %s holds %s, not the owned link: move it aside out of band and re-run", tmp, shape)
-	}
-	got, err := os.Readlink(tmp)
-	if err != nil {
-		return err
-	}
-	if got != want {
-		return fmt.Errorf("temporary path %s links to %s, not the owned target %s: remove it out of band and re-run", tmp, got, want)
-	}
-	return os.Remove(tmp)
-}
-
-// migrationRandHex names one temporary link. Uniqueness is best effort
-// (the journaled relink retries on collision); ownership comes from the
-// journal record, never from the .migrate-*.tmp name pattern.
-func migrationRandHex() string {
-	var random [8]byte
-	if _, err := rand.Read(random[:]); err != nil {
-		return fmt.Sprintf("%x", time.Now().UnixNano())
-	}
-	return hex.EncodeToString(random[:])
 }
 
 // validateMigrationOp re-checks one operation's preconditions at
@@ -1374,314 +1102,11 @@ func changedMarkers(report *MigrateReport) (map[string][]byte, map[string][]byte
 	return changed, priors, nil
 }
 
-// validateRecoveryInventory re-checks the entire recovery inventory
-// before any recovery write: every journaled marker must read back as
-// the recorded prior or the intended bytes, every journaled link must
-// sit at its recorded prior or intended target, and every recorded
-// temporary path must be absent or the owned symlink. Anything else —
-// an edited marker, an unexpected link target, a foreign file at a
-// recorded temp path — refuses naming the exact operator action,
-// preserving the unknown state and the journal. Only states proven to
-// belong to this transaction reconcile.
-func validateRecoveryInventory(home string, journal *migrationJournal) error {
-	var failures []string
-	for _, marker := range journal.Markers {
-		markerFile, err := stateread.ReadFile(marker.Live)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("marker %s cannot be inspected: %v; restore access out of band and re-run", marker.Live, err))
-			continue
-		}
-		if markerFile.Kind == stateread.KindAbsent {
-			failures = append(failures, fmt.Sprintf("marker %s is missing (expected the prior or the intended bytes): restore it out of band from backup and re-run", marker.Live))
-			continue
-		}
-		if markerFile.Kind != stateread.KindPresent {
-			failures = append(failures, fmt.Sprintf("marker %s cannot be inspected: %v; restore access out of band and re-run", marker.Live, stateread.UnusableError(marker.Live, fmt.Errorf("unknown file state %q", markerFile.Kind))))
-			continue
-		}
-		current := markerFile.Bytes
-		if !bytes.Equal(current, marker.Prior) && !bytes.Equal(current, marker.New) {
-			failures = append(failures, fmt.Sprintf("marker %s was edited out of band (neither the prior nor the intended bytes): decide which bytes win, back %s up out of band, reconcile it by hand, and re-run", marker.Live, marker.Live))
-		}
-	}
-	for _, op := range journal.Ops {
-		full := filepath.Join(ManagedHomeDir(home, op.Profile, op.EnvID), filepath.FromSlash(op.Path))
-		where := fmt.Sprintf("profile %s, environment %s, %s", op.Profile, op.EnvID, op.Path)
-		metadata, err := stateread.Lstat(full)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s (%s) cannot be inspected: %v; restore access out of band and re-run", op.Path, where, err))
-			continue
-		}
-		if metadata.Kind == stateread.KindAbsent {
-			switch {
-			case op.Kind == MigrateOpRelink:
-				failures = append(failures, fmt.Sprintf("%s (%s) is missing (expected a link to %s or %s): restore the recorded link out of band and re-run", op.Path, where, op.From, op.To))
-			case op.Kind == MigrateOpUnlink && op.From == "":
-				// Absent is both the prior and the intended state.
-			default:
-				// Absent is the intended unlinked state.
-			}
-			continue
-		}
-		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-			failures = append(failures, fmt.Sprintf("%s (%s) cannot be inspected: %v; restore access out of band and re-run", op.Path, where, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind))))
-			continue
-		}
-		info := metadata.Info
-		if info.Mode()&os.ModeSymlink == 0 {
-			shape := "a regular file"
-			if info.IsDir() {
-				shape = "a directory"
-			}
-			failures = append(failures, fmt.Sprintf("%s (%s) holds %s where the recorded link was: decide which side wins and restore the recorded link out of band (the manager never moves credential bytes), then re-run", op.Path, where, shape))
-			continue
-		}
-		got, err := os.Readlink(full)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s (%s) link target cannot be read: restore access out of band and re-run", op.Path, where))
-			continue
-		}
-		switch {
-		case op.Kind == MigrateOpRelink:
-			if got != op.From && got != op.To {
-				failures = append(failures, fmt.Sprintf("%s (%s) links to %s, expected %s or %s: decide which target wins out of band, restore the recorded link by hand (the manager never moves credential bytes), and re-run", op.Path, where, got, op.From, op.To))
-			}
-		case op.Kind == MigrateOpUnlink && op.From == "":
-			failures = append(failures, fmt.Sprintf("%s (%s) links to %s where no link is expected: remove it out of band and re-run", op.Path, where, got))
-		default:
-			if got != op.From {
-				failures = append(failures, fmt.Sprintf("%s (%s) links to %s, expected %s or absent: decide which side wins out of band, restore the recorded link by hand (the manager never moves credential bytes), and re-run", op.Path, where, got, op.From))
-			}
-		}
-	}
-	for _, op := range journal.Ops {
-		if op.Temp == "" {
-			continue
-		}
-		metadata, err := stateread.Lstat(op.Temp)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("temporary path %s cannot be inspected: %v; restore access out of band and re-run", op.Temp, err))
-			continue
-		}
-		if metadata.Kind == stateread.KindAbsent {
-			continue
-		}
-		if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-			failures = append(failures, fmt.Sprintf("temporary path %s cannot be inspected: %v; restore access out of band and re-run", op.Temp, stateread.UnusableError(op.Temp, fmt.Errorf("unknown metadata state %q", metadata.Kind))))
-			continue
-		}
-		info := metadata.Info
-		if info.Mode()&os.ModeSymlink == 0 {
-			shape := "a regular file"
-			if info.IsDir() {
-				shape = "a directory"
-			}
-			failures = append(failures, fmt.Sprintf("temporary path %s holds %s, not the owned link to %s: move it aside out of band and re-run", op.Temp, shape, op.TempTarget))
-			continue
-		}
-		got, err := os.Readlink(op.Temp)
-		if err != nil {
-			failures = append(failures, fmt.Sprintf("temporary path %s target cannot be read: restore access out of band and re-run", op.Temp))
-			continue
-		}
-		if got != op.TempTarget {
-			failures = append(failures, fmt.Sprintf("temporary path %s links to %s, not the owned target %s: remove it out of band and re-run", op.Temp, got, op.TempTarget))
-		}
-	}
-	if len(failures) > 0 {
-		return fmt.Errorf("migration recovery found %d unexpected states, refusing before any write (the journal stands at %s and nothing was changed): %s",
-			len(failures), migrationJournalPath(home), strings.Join(failures, "; "))
-	}
-	return nil
-}
-
-// reconcileJournalLinks converges every journaled link to its prior
-// (From) state in reverse plan order: already-prior links are left
-// alone, moved links move back through a journaled temp-link + atomic
-// rename, and removed links are re-created. Each operation's recorded
-// temporary link is removed first, and only when it is a symlink to the
-// recorded target — foreign paths are never touched. Anything
-// unexpected fails closed naming the operator choice instead of
-// guessing. Journal deletes are the caller's: in-process rollback
-// deletes the journal on success, while recovery deletes it after the
-// markers restore.
-func reconcileJournalLinks(home string, journal *migrationJournal, symlink func(string, string) error, rename func(string, string) error) error {
-	var failures []string
-	for i := len(journal.Ops) - 1; i >= 0; i-- {
-		op := journal.Ops[i]
-		if op.Temp != "" {
-			if err := removeOwnedTemp(op.Temp, op.TempTarget); err != nil {
-				failures = append(failures, err.Error())
-			}
-		}
-		if op.Kind == MigrateOpUnlink && op.From == "" {
-			continue
-		}
-		full := filepath.Join(ManagedHomeDir(home, op.Profile, op.EnvID), filepath.FromSlash(op.Path))
-		if err := reconcileLinkToPriorJournaled(home, journal, i, full, op, symlink, rename); err != nil {
-			failures = append(failures, err.Error())
-		}
-	}
-	if len(failures) > 0 {
-		return fmt.Errorf("cannot restore %d prior links: %s", len(failures), strings.Join(failures, "; "))
-	}
-	return nil
-}
-
-// reconcileLinkToPriorJournaled converges one link path to its prior
-// target: absent re-creates it, already-prior is a no-op, and a link at
-// the intended target moves back through a journaled temp-link + atomic
-// rename. Anything else — a non-symlink, or a symlink to an unexpected
-// target — fails closed: the operator resolves it out of band and
-// re-runs. The intended-target check re-validates at mutation time, so
-// an out-of-band edit between the recovery validation and this write
-// refuses instead of erasing the operator's change.
-func reconcileLinkToPriorJournaled(home string, journal *migrationJournal, index int, full string, op migrationJournalOp, symlink func(string, string) error, rename func(string, string) error) error {
-	want := op.From
-	rel := op.Path
-	metadata, err := stateread.Lstat(full)
-	if err != nil {
-		return fmt.Errorf("%s: cannot inspect the link path: %v; restore access out of band and re-run", rel, err)
-	}
-	if metadata.Kind == stateread.KindAbsent {
-		if op.Kind == MigrateOpRelink {
-			return fmt.Errorf("%s: is missing (expected a link to %s or %s): restore the recorded link out of band and re-run", rel, op.From, op.To)
-		}
-		if err := symlink(want, full); err != nil {
-			return fmt.Errorf("%s: cannot re-create the prior link: %v", rel, err)
-		}
-		return nil
-	}
-	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-		return fmt.Errorf("%s: cannot inspect the link path: %v; restore access out of band and re-run", rel, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
-	}
-	info := metadata.Info
-	if info.Mode()&os.ModeSymlink == 0 {
-		shape := "a regular file"
-		if info.IsDir() {
-			shape = "a directory"
-		}
-		return fmt.Errorf("%s: holds %s where the recorded link was: decide which side wins and restore the recorded link out of band (the manager never moves credential bytes), then re-run", rel, shape)
-	}
-	got, err := os.Readlink(full)
-	if err != nil {
-		return fmt.Errorf("%s: link target cannot be read: restore access out of band and re-run", rel)
-	}
-	if got == want {
-		return nil
-	}
-	if op.Kind == MigrateOpRelink {
-		if got != op.To {
-			return fmt.Errorf("%s: links to %s, expected %s or %s: decide which target wins out of band, restore the recorded link by hand (the manager never moves credential bytes), and re-run", rel, got, op.From, op.To)
-		}
-	} else if got != want {
-		return fmt.Errorf("%s: links to %s, expected %s or absent: decide which side wins out of band, restore the recorded link by hand (the manager never moves credential bytes), and re-run", rel, got, want)
-	}
-	if err := atomicRelinkJournaled(home, journal, index, full, want, symlink, rename); err != nil {
-		return fmt.Errorf("%s: cannot move the link back: %v", rel, err)
-	}
-	return nil
-}
-
-// rollbackMigrationMarkersAndLinks restores the journal's prior marker
-// bytes through the journaled record publication, then converges the
-// links back. Best effort per stage; failures are collected.
-func rollbackMigrationMarkersAndLinks(op *operation, req MigrateRequest, journal *migrationJournal) error {
-	var stages []string
-	if len(journal.Markers) > 0 {
-		priors := make(map[string][]byte, len(journal.Markers))
-		for _, marker := range journal.Markers {
-			priors[marker.Live] = marker.Prior
-		}
-		if err := op.publish(priors); err != nil {
-			stages = append(stages, fmt.Sprintf("cannot restore the prior markers: %v", err))
-		}
-	}
-	if err := reconcileJournalLinks(req.Home, journal, req.symlinkFn(), req.renameFn()); err != nil {
-		stages = append(stages, err.Error())
-	}
-	if len(stages) > 0 {
-		return fmt.Errorf("%s", strings.Join(stages, "; "))
-	}
-	return nil
-}
-
-// removeMigrationJournalIfClean deletes the journal after a clean
-// rollback; a dirty rollback keeps it so the next apply retries the
-// recovery. A delete failure is reported so the caller can warn that
-// the next apply re-runs the idempotent recovery.
-func removeMigrationJournalIfClean(home string, rollbackErr error) error {
-	if rollbackErr != nil {
-		return nil
-	}
-	return removeMigrationJournal(home)
-}
-
-// rollbackOutcome phrases a rollback result for error text.
-func rollbackOutcome(home string, rollbackErr, journalErr error) string {
-	switch {
-	case rollbackErr != nil:
-		return fmt.Sprintf("rollback incomplete (%v); the journal stands at %s and the next apply retries the recovery", rollbackErr, migrationJournalPath(home))
-	case journalErr != nil:
-		return fmt.Sprintf("rolled back, but the journal could not be removed (%v); the next apply re-runs the idempotent recovery", journalErr)
-	default:
-		return "rolled back"
-	}
-}
-
-// migrationFaultError joins an apply failure with its rollback outcome.
-func migrationFaultError(home string, fault, rollbackErr, journalErr error) error {
-	return fmt.Errorf("migration apply failed: %v; %s", fault, rollbackOutcome(home, rollbackErr, journalErr))
-}
-
-// migrationJournalVersion is the durable journal schema below the
-// manager state directory. Journals are single-flight under the
-// manager-home mutation lock: at most one apply mutates at a time.
 const migrationJournalVersion = 1
 
-// migrationJournalOp is one journaled link operation: the intent (Kind,
-// Path, From, To) plus whether it landed (Done). From is the rollback
-// data: the prior link target ("" for an unlink whose link was already
-// gone). To is empty for unlink. Temp records the exact temporary-link
-// path the journal owns for this operation's most recent atomic
-// replacement (empty when none is owned); TempTarget is the expected
-// symlink target of that temporary link. Cleanup removes only the
-// recorded Temp path and only when it is a symlink to TempTarget — a
-// regular file, directory, or foreign symlink is never deleted.
-type migrationJournalOp struct {
-	Profile    string `json:"profile"`
-	EnvID      string `json:"env"`
-	Kind       string `json:"kind"`
-	Path       string `json:"path"`
-	From       string `json:"from"`
-	To         string `json:"to"`
-	Done       bool   `json:"done"`
-	Temp       string `json:"temp,omitempty"`
-	TempTarget string `json:"temp_target,omitempty"`
-}
-
-// migrationJournalMarker is one journaled marker intent: the live path,
-// the prior bytes to restore on rollback, and the bytes the apply
-// publishes. Marker bytes are manager records, never credentials.
-type migrationJournalMarker struct {
-	Live  string `json:"live"`
-	Prior []byte `json:"prior"`
-	New   []byte `json:"new"`
-}
-
-// migrationJournal is the durable intent of one apply: the plan hash it
-// executes, the link operations with rollback targets, and the marker
-// intents. MarkersDone records a completed publication; Complete seals
-// a fully applied plan so a crash before the journal delete cannot roll
-// back completed work — recovery of a sealed journal only deletes it.
-type migrationJournal struct {
-	Version     int                      `json:"version"`
-	Plan        string                   `json:"plan"`
-	Ops         []migrationJournalOp     `json:"ops"`
-	Markers     []migrationJournalMarker `json:"markers"`
-	MarkersDone bool                     `json:"markers_done"`
-	Complete    bool                     `json:"complete"`
-}
+type migrationJournalOp = envauthority.LegacyMigrationOp
+type migrationJournalMarker = envauthority.LegacyMigrationMarker
+type migrationJournal = envauthority.LegacyMigration
 
 // migrationJournalPath is the fixed journal below manager state (never
 // below the credential scope, and holding no credential bytes).
@@ -1689,133 +1114,12 @@ func migrationJournalPath(home string) string {
 	return filepath.Join(home, "state", "env-migration.json")
 }
 
-// newMigrationJournal builds the journal for one validated plan: every
-// operation plus the marker intents in live-path order.
-func newMigrationJournal(report *MigrateReport, changed, priors map[string][]byte) *migrationJournal {
-	journal := &migrationJournal{
-		Version: migrationJournalVersion,
-		Plan:    report.Hash,
-		Ops:     []migrationJournalOp{},
-		Markers: []migrationJournalMarker{},
-	}
-	for _, op := range report.Ops() {
-		journal.Ops = append(journal.Ops, migrationJournalOp{
-			Profile: op.Profile, EnvID: op.EnvID, Kind: op.Kind, Path: op.Path, From: op.From, To: op.To,
-		})
-	}
-	lives := make([]string, 0, len(changed))
-	for live := range changed {
-		lives = append(lives, live)
-	}
-	sort.Strings(lives)
-	for _, live := range lives {
-		journal.Markers = append(journal.Markers, migrationJournalMarker{Live: live, Prior: priors[live], New: changed[live]})
-	}
-	return journal
-}
-
-// writeMigrationJournal persists the journal durably (temp + sync +
-// atomic rename) so the intent for every not-yet-executed operation is
-// on disk before its mutation runs.
-func writeMigrationJournal(home string, journal *migrationJournal) error {
-	payload, err := json.Marshal(journal)
-	if err != nil {
-		return err
-	}
-	dir := filepath.Dir(migrationJournalPath(home))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, ".env-migration-*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }()
-	if _, err := tmp.Write(payload); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpName, migrationJournalPath(home)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// readMigrationJournal loads the leftover journal: nil when no apply
-// was interrupted. An unreadable or invalid journal is an error, never
-// silence — the caller refuses and names the out-of-band fix.
+// Legacy journals cannot authorize new forward writes or recreate lost origin.
+// Only a closed, completed journal with verified stable postimages is eligible
+// for cleanup. Unsealed records lack durable parent/protection and origin
+// preimages and are preserved for explicit recovery, across every owner.
 func readMigrationJournal(home string) (*migrationJournal, error) {
-	journalPath := migrationJournalPath(home)
-	state, err := stateread.ReadFile(journalPath)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read: %v", err)
-	}
-	if state.Kind == stateread.KindAbsent {
-		return nil, nil
-	}
-	if state.Kind != stateread.KindPresent {
-		return nil, stateread.UnusableError(journalPath, fmt.Errorf("unknown file state %q", state.Kind))
-	}
-	payload := state.Bytes
-	var journal migrationJournal
-	if err := json.Unmarshal(payload, &journal); err != nil {
-		return nil, fmt.Errorf("invalid JSON: %v", err)
-	}
-	if journal.Version != migrationJournalVersion {
-		return nil, fmt.Errorf("unsupported version %d", journal.Version)
-	}
-	if journal.Plan == "" {
-		return nil, fmt.Errorf("missing plan hash")
-	}
-	for _, op := range journal.Ops {
-		switch op.Kind {
-		case MigrateOpRelink, MigrateOpUnlink:
-		default:
-			return nil, fmt.Errorf("unknown operation %q", op.Kind)
-		}
-		if op.Path == "" || filepath.IsAbs(op.Path) || strings.Contains(op.Path, "..") {
-			return nil, fmt.Errorf("invalid operation path %q", op.Path)
-		}
-		if op.Temp != "" {
-			if !filepath.IsAbs(op.Temp) || !withinHome(home, op.Temp) {
-				return nil, fmt.Errorf("invalid temporary path %q", op.Temp)
-			}
-			base := filepath.Base(op.Temp)
-			if !strings.HasPrefix(base, ".migrate-") || !strings.HasSuffix(base, ".tmp") {
-				return nil, fmt.Errorf("invalid temporary path %q", op.Temp)
-			}
-			if op.TempTarget == "" {
-				return nil, fmt.Errorf("temporary path %q misses its target", op.Temp)
-			}
-		} else if op.TempTarget != "" {
-			return nil, fmt.Errorf("temporary target without a path")
-		}
-	}
-	for _, marker := range journal.Markers {
-		if marker.Live == "" || !filepath.IsAbs(marker.Live) || !withinHome(home, marker.Live) {
-			return nil, fmt.Errorf("invalid marker path %q", marker.Live)
-		}
-	}
-	return &journal, nil
-}
-
-// withinHome reports whether the absolute target stays below the manager
-// home: journaled absolute paths (marker lives, owned temps) must never
-// escape it.
-func withinHome(home, target string) bool {
-	rel, err := filepath.Rel(home, target)
-	if err != nil {
-		return false
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	return envauthority.ReadCompletedLegacyMigration(home)
 }
 
 // removeMigrationJournal deletes the journal after a completed apply, a
@@ -1827,15 +1131,10 @@ func removeMigrationJournal(home string) error {
 	return nil
 }
 
-// recoverMigrationJournal rolls a leftover journal back to the prior
-// state under the held lock: it validates the entire recovery inventory
-// before any write, then links converge to their From targets in
-// reverse plan order, prior marker bytes republish, and the journal is
-// deleted. A sealed (fully applied) journal only deletes. The recovery
-// is announced on print before the first mutation; an announcement
-// failure fails before anything changes. It returns the pre-recovery
-// summary for reporting, or nil when no journal was present.
-func recoverMigrationJournal(home string, op *operation, announce io.Writer, symlink func(string, string) error, rename func(string, string) error) (*MigrateRecovery, error) {
+// recoverMigrationJournal cleans only a validated completed legacy receipt.
+// Common admission has already refused unsealed or substituted records. New
+// migration writes and recovery use the complete environment transaction unit.
+func recoverMigrationJournal(home string, op *operation, announce io.Writer) (*MigrateRecovery, error) {
 	if err := op.lock.AssertHeld(); err != nil {
 		return nil, err
 	}
@@ -1844,78 +1143,22 @@ func recoverMigrationJournal(home string, op *operation, announce io.Writer, sym
 	}
 	journal, err := readMigrationJournal(home)
 	if err != nil {
-		return nil, fmt.Errorf("migration journal %s is unusable (%v): back it up out of band, verify every managed link by hand, and only then remove it and re-run `curator env migrate --plan`",
-			migrationJournalPath(home), err)
+		return nil, fmt.Errorf("migration journal is unusable: %w", err)
 	}
 	if journal == nil {
 		return nil, nil
 	}
-	done := 0
-	for _, entry := range journal.Ops {
-		if entry.Done {
-			done++
-		}
+	if !journal.Complete {
+		return nil, fmt.Errorf("unsealed legacy migration journal cannot authorize recovery")
 	}
-	recovered := &MigrateRecovery{Plan: journal.Plan, Ops: len(journal.Ops), Done: done}
-	if journal.Complete {
-		if announce != nil {
-			if _, err := fmt.Fprintf(announce, "recovering interrupted migration apply: plan %s, %d of %d link operations completed; restoring the prior state under the manager lock\n",
-				journal.Plan, done, len(journal.Ops)); err != nil {
-				return recovered, fmt.Errorf("migration recovery cannot announce itself, refusing before any mutation: %v", err)
-			}
-		}
-		if err := removeMigrationJournal(home); err != nil {
-			return recovered, fmt.Errorf("migration recovery cannot remove the completed journal %s: %v", migrationJournalPath(home), err)
-		}
-		return recovered, nil
-	}
-	if err := validateRecoveryInventory(home, journal); err != nil {
-		return recovered, err
-	}
+	recovered := &MigrateRecovery{Plan: journal.Plan, Ops: len(journal.Ops), Done: len(journal.Ops)}
 	if announce != nil {
-		if _, err := fmt.Fprintf(announce, "recovering interrupted migration apply: plan %s, %d of %d link operations completed; restoring the prior state under the manager lock\n",
-			journal.Plan, done, len(journal.Ops)); err != nil {
-			return recovered, fmt.Errorf("migration recovery cannot announce itself, refusing before any mutation: %v", err)
-		}
-	}
-	if err := reconcileJournalLinks(home, journal, symlink, rename); err != nil {
-		return recovered, fmt.Errorf("migration recovery cannot restore the prior links: %v; the journal stands at %s and the next apply retries the recovery",
-			err, migrationJournalPath(home))
-	}
-	if len(journal.Markers) > 0 {
-		if err := validateRecoveryMarkers(journal); err != nil {
-			return recovered, fmt.Errorf("migration recovery found the markers changed during the link restore, refusing before republishing: %v; the journal stands at %s and the next apply retries the recovery",
-				err, migrationJournalPath(home))
-		}
-		priors := make(map[string][]byte, len(journal.Markers))
-		for _, marker := range journal.Markers {
-			priors[marker.Live] = marker.Prior
-		}
-		if err := op.publish(priors); err != nil {
-			return recovered, fmt.Errorf("migration recovery cannot restore the prior markers: %v; the journal stands at %s and the next apply retries the recovery",
-				err, migrationJournalPath(home))
+		if _, err := fmt.Fprintf(announce, "cleaning completed legacy migration receipt: plan %s, %d completed link operations; preserving verified postimages\n", journal.Plan, len(journal.Ops)); err != nil {
+			return recovered, fmt.Errorf("migration cleanup cannot announce itself, refusing before mutation: %w", err)
 		}
 	}
 	if err := removeMigrationJournal(home); err != nil {
-		return recovered, fmt.Errorf("migration recovery restored the prior state but cannot remove the journal %s: %v; the next apply re-runs the idempotent recovery",
-			migrationJournalPath(home), err)
+		return recovered, fmt.Errorf("completed migration receipt cleanup remains pending: %w", err)
 	}
 	return recovered, nil
-}
-
-// validateRecoveryMarkers re-checks the journaled markers immediately
-// before the recovery republishes the priors: an out-of-band edit
-// between the pre-recovery validation and this write refuses instead of
-// erasing the operator's change.
-func validateRecoveryMarkers(journal *migrationJournal) error {
-	for _, marker := range journal.Markers {
-		current, err := os.ReadFile(marker.Live) // #nosec G304 -- journaled manager record below the resolved home
-		if err != nil {
-			return fmt.Errorf("marker %s cannot be re-checked: %v; restore access out of band and re-run", marker.Live, err)
-		}
-		if !bytes.Equal(current, marker.Prior) && !bytes.Equal(current, marker.New) {
-			return fmt.Errorf("marker %s was edited out of band (neither the prior nor the intended bytes): decide which bytes win, back %s up out of band, reconcile it by hand, and re-run", marker.Live, marker.Live)
-		}
-	}
-	return nil
 }

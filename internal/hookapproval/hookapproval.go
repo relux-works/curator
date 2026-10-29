@@ -252,7 +252,10 @@ func List(home string) ([]Record, error) {
 	if state.Kind == stateread.KindAbsent {
 		return nil, nil
 	}
-	payload := state.Bytes
+	return parseRecords(state.Bytes)
+}
+
+func parseRecords(payload []byte) ([]Record, error) {
 	if len(payload) == 0 {
 		return nil, nil
 	}
@@ -584,9 +587,45 @@ func AssessFailClosedDetailed(home string, extra []string) (rows []Posture, warn
 	return Classify(candidates, records), warnings, false
 }
 
-func writeRecords(home string, records []Record) error {
-	if err := os.MkdirAll(home, 0o755); err != nil {
-		return fmt.Errorf("hookapproval: create state dir: %w", err)
+// PlanUpserts produces private staged approval bytes without reading or writing
+// live state. Paths must already be canonical publication targets, proven by
+// the owner journal's boundary check. Prior malformed records are never dropped.
+func PlanUpserts(prior []byte, additions []Record) ([]byte, error) {
+	records, err := parseRecords(prior)
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range additions {
+		if err := record.Validate(); err != nil {
+			return nil, err
+		}
+		replaced := false
+		for i, old := range records {
+			if pathsEqual(old.Path, record.Path) {
+				records[i] = record
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			records = append(records, record)
+		}
+	}
+	return marshalRecords(records)
+}
+
+func marshalRecords(records []Record) ([]byte, error) {
+	records = append([]Record{}, records...)
+	sort.Slice(records, func(i, j int) bool { return records[i].Path < records[j].Path })
+	for i, record := range records {
+		if err := record.Validate(); err != nil {
+			return nil, err
+		}
+		for _, prior := range records[:i] {
+			if pathsEqual(prior.Path, record.Path) {
+				return nil, fmt.Errorf("hookapproval: duplicate canonical path")
+			}
+		}
 	}
 	var body strings.Builder
 	for _, record := range records {
@@ -599,13 +638,24 @@ func writeRecords(home string, records []Record) error {
 		body.WriteString(record.ApprovedAt.UTC().Format(time.RFC3339))
 		body.WriteByte('\n')
 	}
+	return []byte(body.String()), nil
+}
+
+func writeRecords(home string, records []Record) error {
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		return fmt.Errorf("hookapproval: create state dir: %w", err)
+	}
+	payload, err := marshalRecords(records)
+	if err != nil {
+		return err
+	}
 	temporary, err := os.CreateTemp(home, ".hook-approvals.*.tmp")
 	if err != nil {
 		return fmt.Errorf("hookapproval: stage state: %w", err)
 	}
 	temporaryPath := temporary.Name()
 	defer func() { _ = os.Remove(temporaryPath) }()
-	if _, err := temporary.WriteString(body.String()); err != nil {
+	if _, err := temporary.Write(payload); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("hookapproval: stage state: %w", err)
 	}

@@ -76,7 +76,7 @@ func (c cli) cmdEnvMigrate(cfg *config.Config, args []string) int {
 			return exitFail
 		}
 		if result != nil && result.Recovered != nil {
-			_, _ = fmt.Fprintf(c.stdout, "recovered interrupted migration apply %s: restored the prior state before executing\n", result.Recovered.Plan)
+			_, _ = fmt.Fprintf(c.stdout, "cleaned completed legacy migration receipt %s: preserved committed postimages\n", result.Recovered.Plan)
 		}
 		if result != nil && len(result.Applied) > 0 {
 			_, _ = fmt.Fprintf(c.stdout, "applied migration plan %s: %d operations\n", result.Report.Hash, len(result.Applied))

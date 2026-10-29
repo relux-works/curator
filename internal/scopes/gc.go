@@ -10,6 +10,7 @@ import (
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/projectlease"
@@ -25,6 +26,9 @@ import (
 // It collects the runtime store only. Collect is the locked maintenance entry
 // point that also sweeps the protected build cache.
 func CollectRuntime(home string) ([]string, error) {
+	if err := envauthority.Validate(home); err != nil {
+		return nil, err
+	}
 	if projectlease.HasState(home) {
 		return nil, fmt.Errorf("project leases require serialized Collect; runtime sweep skipped")
 	}
@@ -96,6 +100,9 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err := requireHomeLock(request.Lock); err != nil {
 		return MaintenanceResult{}, err
 	}
+	if err := envauthority.Validate(request.Home); err != nil {
+		return MaintenanceResult{}, err
+	}
 	leaseRoots, err := projectlease.ReferencesUnderLock(request.Home, request.Lock)
 	if err != nil {
 		return MaintenanceResult{}, fmt.Errorf("project lease references unreadable; runtime and build sweeps skipped: %w", err)
@@ -105,7 +112,12 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 		return MaintenanceResult{}, managerlock.ErrNotHeld
 	}
 	witness := owner.Held()
-	check := func() error { return witness.Validate(request.Home) }
+	check := func() error {
+		if err := witness.Validate(request.Home); err != nil {
+			return err
+		}
+		return envauthority.Validate(request.Home)
+	}
 	marked := markScopes(request.Home)
 	for _, entry := range leaseRoots.RuntimeEntries {
 		marked.runtime[entry] = true

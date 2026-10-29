@@ -1,245 +1,65 @@
 // Package projectlease owns stable project homes and durable session leases.
-// Its authority interfaces are manager-side integration boundaries, never
-// repository input or launcher assertions. See protocol/project-context §6.
 package projectlease
 
-import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/unicode/norm"
-	"path/filepath"
-	"regexp"
-	"strings"
+import "github.com/relux-works/curator/internal/projectleaserecord"
 
-	"github.com/relux-works/curator/internal/identifiers"
-	"github.com/relux-works/curator/internal/managerlock"
-	"github.com/relux-works/curator/internal/protocoljson"
-)
+// Binding preserves the existing public API and exact serialized bytes.
+// Common admission and the executor share the same closed decoder.
+type Binding = projectleaserecord.Binding
 
-// ErrRevoked reports that the manager no longer authorizes a project lease.
-var ErrRevoked = errors.New("project authority revoked")
+// Surface aliases the closed lease projection surface.
+type Surface = projectleaserecord.Surface
 
-// ErrArtifactsUnavailable means admission lost a referenced artifact before
-// committing the lease. Callers must not publish or start this reservation.
-var ErrArtifactsUnavailable = errors.New("project_artifacts_unavailable")
+// Composition aliases the protected composition authority record.
+type Composition = projectleaserecord.Composition
 
-// ErrPendingRecovery refuses collection until durable transaction intent is reconciled.
-var ErrPendingRecovery = errors.New("pending project lease transaction; recover before collection")
+// Authority aliases the lease authority transport interface.
+type Authority = projectleaserecord.Authority
 
-// Busy identifies a project view retained by a live or uncertain lease.
-const Busy = "project_view_busy"
-const maxRecord = 1 << 20
+// Evidence aliases reconciled lease liveness evidence.
+type Evidence = projectleaserecord.Evidence
 
-var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
-var hexPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+// Sessions aliases the session observation transport.
+type Sessions = projectleaserecord.Sessions
 
-// Binding is the closed, immutable project-lease/1 carrier. State and process
-// observations are deliberately excluded from these identity bytes.
-type Binding struct {
-	Kind          string `json:"kind"`
-	LeaseID       string `json:"lease_id"`
-	ContextRef    string `json:"context_ref"`
-	ContextSHA256 string `json:"context_sha256"`
-	CheckoutID    string `json:"checkout_id"`
-	Environment   string `json:"environment"`
-	HomeRef       string `json:"home_ref"`
-	OwnerRef      string `json:"owner_ref"`
-	SessionRef    string `json:"session_ref"`
-	Generation    int64  `json:"generation"`
-}
+// Request aliases the bounded lease acquisition request.
+type Request = projectleaserecord.Request
 
-// Surface is the protected receipt projection for one generated regular file.
-// Mode is the numeric value of 0600 or 0700; native mutable state is excluded.
-type Surface struct {
-	SHA256 string `json:"sha256"`
-	Size   int64  `json:"size"`
-	Mode   uint32 `json:"mode"`
-}
+// Phase aliases the durable journal or lease phase.
+type Phase = projectleaserecord.Phase
 
-// Composition is a verified protected projection, including its CCJ-1 digest
-// and registration binding. Cache keys name the existing GC namespaces.
-type Composition struct {
-	Ref             string             `json:"ref"`
-	SHA256          string             `json:"sha256"`
-	CheckoutID      string             `json:"checkout_id"`
-	Profile         string             `json:"profile"`
-	Environment     string             `json:"environment"`
-	HomeRef         string             `json:"home_ref"`
-	ConcurrentState bool               `json:"concurrent_state"`
-	BuildKeys       []string           `json:"build_keys"`
-	RuntimeEntries  []string           `json:"runtime_entries"`
-	Generated       map[string]Surface `json:"generated"`
-}
+// Status aliases the current lease status projection.
+type Status = projectleaserecord.Status
 
-// Authority resolves only issuing-manager protected allocations and checks
-// current admission/revocation. Implementations must not fetch, repair or
-// accept caller-supplied records. Missing authority always refuses a launch.
-type Authority interface {
-	Resolve(context.Context, managerlock.Held, string, string) (Composition, error)
-	Authorize(context.Context, managerlock.Held, Composition, string) error
-}
+// Roots aliases the set of live lease roots.
+type Roots = projectleaserecord.Roots
 
-// Evidence is supplied by the tracked-session authority, not a PID probe.
-// Identity combines session generation with a runner/process incarnation.
-// Terminated means the session AND descendants ended and ownership reconciled.
-// NoChildStarted proves a reserved session never started a provider or child.
-type Evidence struct {
-	SessionRef            string
-	Generation            int64
-	OwnerRef              string
-	ProcessGeneration     string
-	Running               bool
-	Terminated            bool
-	OwnershipReconciled   bool
-	DescendantsTerminated bool
-	NoChildStarted        bool
-}
+// ErrRevoked reports an explicitly revoked lease.
+var ErrRevoked = projectleaserecord.ErrRevoked
 
-// Sessions observes tracked session generations through the owning authority.
-type Sessions interface {
-	Observe(context.Context, string, int64) (Evidence, error)
-}
+// ErrArtifactsUnavailable reports missing protected artifacts.
+var ErrArtifactsUnavailable = projectleaserecord.ErrArtifactsUnavailable
 
-// Request names the immutable composition and tracked owner for a lease.
-type Request struct {
-	LeaseID       string
-	ContextRef    string
-	ContextSHA256 string
-	OwnerRef      string
-	SessionRef    string
-	Generation    int64
-}
+// ErrPendingRecovery requires durable lease recovery before continuation.
+var ErrPendingRecovery = projectleaserecord.ErrPendingRecovery
 
-// Phase describes the protected lifecycle state of a project lease.
-type Phase string
+// Busy reports a project view retained by a live or uncertain lease.
+const Busy = projectleaserecord.Busy
+const maxRecord = projectleaserecord.MaxRecord
 
-// Prepared, Active, Unknown and Released name the durable project lease phases.
+// Prepared and its siblings enumerate durable lease phases.
 const (
-	Prepared Phase = "prepared"
-	Active   Phase = "active"
-	Unknown  Phase = "unknown"
-	Released Phase = "released"
+	Prepared = projectleaserecord.Prepared
+	Active   = projectleaserecord.Active
+	Unknown  = projectleaserecord.Unknown
+	Released = projectleaserecord.Released
 )
 
-// Status never repairs or reconciles. Authority/read errors remain visible.
-type Status struct {
-	Binding          Binding `json:"binding"`
-	State            Phase   `json:"state"`
-	Busy             bool    `json:"busy"`
-	Liveness         string  `json:"liveness"`
-	Revoked          bool    `json:"revoked"`
-	AuthorityUnknown bool    `json:"authority_unknown"`
-	Home             string  `json:"home"`
-}
+func tagged(s, tag string) bool         { return projectleaserecord.Tagged(s, tag) }
+func homeRelative(c Composition) string { return projectleaserecord.HomeRelative(c) }
+func canonical(v any) ([]byte, error)   { return projectleaserecord.Canonical(v) }
+func digest(raw []byte) string          { return projectleaserecord.Digest(raw) }
+func foldPath(path string) string       { return projectleaserecord.FoldPath(path) }
 
-// Roots is a conservative protected-state mark set. Released records are also
-// retained for resume, so collection never silently discards their provenance.
-type Roots struct {
-	Homes          []string
-	Compositions   []string
-	BuildKeys      []string
-	RuntimeEntries []string
-}
-
-func tagged(ref, tag string) bool {
-	return strings.HasPrefix(ref, tag+":") && len(ref) <= 96 && idPattern.MatchString(strings.TrimPrefix(ref, tag+":"))
-}
-func validEnvironment(s string) bool { return s == "claude_code" || s == "codex_cli" || s == "muse" }
-func (b Binding) validate() error {
-	if b.Kind != "project-lease/1" || !idPattern.MatchString(b.LeaseID) || !tagged(b.ContextRef, "composition") || !hexPattern.MatchString(b.ContextSHA256) || !idPattern.MatchString(b.CheckoutID) || !validEnvironment(b.Environment) || !tagged(b.HomeRef, "home") || !tagged(b.OwnerRef, "principal") || !tagged(b.SessionRef, "session") || b.Generation < 1 || b.Generation > protocoljson.MaxSafeInteger {
-		return fmt.Errorf("invalid project-lease/1 binding")
-	}
-	return nil
-}
-func (c Composition) validate() error {
-	if !tagged(c.Ref, "composition") || !hexPattern.MatchString(c.SHA256) || !idPattern.MatchString(c.CheckoutID) || !identifiers.Valid(c.Profile) || !validEnvironment(c.Environment) || !tagged(c.HomeRef, "home") || c.BuildKeys == nil || c.RuntimeEntries == nil || c.Generated == nil {
-		return fmt.Errorf("invalid protected composition projection")
-	}
-	aliases := map[string]bool{}
-	for p, file := range c.Generated {
-		if !safeSurface(p) || !hexPattern.MatchString(file.SHA256) || file.Size < 0 || file.Size > 16<<20 || (file.Mode != 0600 && file.Mode != 0700) {
-			return fmt.Errorf("invalid protected generated surface")
-		}
-		key := foldPath(p)
-		if aliases[key] {
-			return fmt.Errorf("generated surface path alias")
-		}
-		aliases[key] = true
-	}
-	for path := range aliases {
-		parts := strings.Split(path, "/")
-		for i := 1; i < len(parts); i++ {
-			if aliases[strings.Join(parts[:i], "/")] {
-				return fmt.Errorf("generated surface file/ancestor collision")
-			}
-		}
-	}
-
-	total := int64(0)
-	for _, file := range c.Generated {
-		total += file.Size
-	}
-	if len(c.Generated) > 10000 || total > 64<<20 {
-		return fmt.Errorf("generated inventory exceeds limits")
-	}
-	for _, k := range c.BuildKeys {
-		if !strings.HasPrefix(k, "sha256:") || !hexPattern.MatchString(strings.TrimPrefix(k, "sha256:")) {
-			return fmt.Errorf("invalid composition build key")
-		}
-	}
-	for _, k := range c.RuntimeEntries {
-		parts := strings.Split(k, "/")
-		if len(parts) != 2 || !identifiers.Valid(parts[0]) || !identifiers.Valid(parts[1]) {
-			return fmt.Errorf("invalid composition runtime entry")
-		}
-	}
-	return nil
-}
-func homeRelative(c Composition) string {
-	return filepath.Join("environments", "project-views", c.CheckoutID, c.Profile, c.Environment)
-}
-func canonical(v any) ([]byte, error) {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	// Preserve integer precision in the canonical encoder.
-	var object any
-	dec := json.NewDecoder(strings.NewReader(string(raw)))
-	dec.UseNumber()
-	if err = dec.Decode(&object); err != nil {
-		return nil, err
-	}
-	return protocoljson.MarshalCanonical(object)
-}
-func digest(raw []byte) string { h := sha256.Sum256(raw); return hex.EncodeToString(h[:]) }
-
-// ParseBinding reads an exact, bounded CCJ-1 binding before authority lookup.
-func ParseBinding(raw []byte) (Binding, error) {
-	var b Binding
-	if len(raw) > maxRecord {
-		return b, fmt.Errorf("project lease binding exceeds record limit")
-	}
-	if err := protocoljson.UnmarshalCanonical(raw, &b); err != nil {
-		return b, err
-	}
-	// Re-encoding enforces exact member spelling and completeness; the JSON
-	// struct decoder alone also accepts case-insensitive field aliases.
-	exact, err := canonical(b)
-	if err != nil || string(exact) != string(raw) {
-		return b, fmt.Errorf("project lease binding members must match exactly")
-	}
-	if err := b.validate(); err != nil {
-		return b, err
-	}
-	return b, nil
-}
-
-func foldPath(path string) string {
-	return cases.Fold().String(norm.NFC.String(filepath.ToSlash(path)))
-}
+// ParseBinding decodes the exact bounded lease binding.
+func ParseBinding(raw []byte) (Binding, error) { return projectleaserecord.ParseBinding(raw) }

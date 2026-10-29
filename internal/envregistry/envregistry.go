@@ -335,7 +335,7 @@ var Registry = []Adapter{
 			// old target are reported detached, never silently
 			// re-pointed by repair; the move itself runs as the
 			// explicit `env migrate` step (environments §7.4).
-			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "agent/auth.json"}},
+			"default": {{Path: "auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}},
 		},
 		Seeds:             []string{"settings.json", "models.json"},
 		SeedWritten:       map[string]bool{},

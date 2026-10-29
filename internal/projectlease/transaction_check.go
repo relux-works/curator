@@ -63,6 +63,9 @@ func (m *Manager) verifyTransactionArtifacts(journal transaction.Journal) error 
 			if err != nil {
 				return err
 			}
+			if err := m.admitLedger(l); err != nil {
+				return err
+			}
 			for _, e := range l.Leases {
 				if err = m.verifyArtifacts(e.Composition); err != nil {
 					return err

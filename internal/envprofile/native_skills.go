@@ -28,7 +28,7 @@ func inPlaceSkillsDir(id string) string {
 
 // inPlaceSkillsLedger checks the parent before reading ownership state. A
 // failed ledger read is never evidence that an entry is unowned.
-func inPlaceSkillsLedger(native string, adapter Adapter, skills []skillOf, recorded map[string]bool) (map[string]bool, error) {
+func inPlaceSkillsLedger(home, native string, adapter Adapter, skills []skillOf, recorded map[string]bool) (map[string]bool, error) {
 	needed := len(skills) > 0
 	for path := range recorded {
 		if strings.HasPrefix(path, inPlaceSkillsDir(adapter.ID)+"/") {
@@ -41,7 +41,7 @@ func inPlaceSkillsLedger(native string, adapter Adapter, skills []skillOf, recor
 	if inPlaceSkillsDir(adapter.ID) == profileSkillsSurfaceDir {
 		return map[string]bool{}, nil
 	}
-	path, err := managedPath(native, filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), ".csk-managed.json")), false)
+	path, err := nativeSurfacePath(home, native, filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), ".csk-managed.json")))
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (stri
 		return nil, err
 	}
 	adapter, _ := adapterByID(id)
-	native, err := resolveNativeHome(adapter, nativeHomeOf)
+	native, err := resolveNativeHome(home, adapter, nativeHomeOf)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (stri
 	if err != nil {
 		return nil, err
 	}
-	ledger, err := inPlaceSkillsLedger(native, adapter, skills, map[string]bool{})
+	ledger, err := inPlaceSkillsLedger(home, native, adapter, skills, map[string]bool{})
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +201,9 @@ func repairNativeSkills(op *operation, req *ResolveRequest) error {
 	}
 	for _, result := range results {
 		if !result.OK {
+			if result.cause != nil {
+				return result.cause
+			}
 			return fmt.Errorf("%s", result.Detail)
 		}
 	}

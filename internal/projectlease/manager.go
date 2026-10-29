@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/projectleaserecord"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/stateread"
@@ -20,7 +22,7 @@ import (
 )
 
 func (m *Manager) resolve(ctx context.Context, held managerlock.Held, ref, sha, owner string) (Composition, error) {
-	if !tagged(ref, "composition") || !hexPattern.MatchString(sha) || !tagged(owner, "principal") {
+	if !tagged(ref, "composition") || !projectleaserecord.ValidHex(sha) || !tagged(owner, "principal") {
 		return Composition{}, fmt.Errorf("invalid project composition or principal identity")
 	}
 	if err := held.Validate(m.home); err != nil {
@@ -33,13 +35,16 @@ func (m *Manager) resolve(ctx context.Context, held managerlock.Held, ref, sha, 
 	if err != nil {
 		return c, err
 	}
-	if err = c.validate(); err != nil {
+	if err = c.Validate(); err != nil {
 		return c, err
 	}
 	if c.Ref != ref || c.SHA256 != sha {
 		return c, fmt.Errorf("project composition authority returned a different identity")
 	}
 	if err = held.Validate(m.home); err != nil {
+		return c, err
+	}
+	if err = envauthority.SelectedLifecycle(m.home, c.Profile); err != nil {
 		return c, err
 	}
 	if err = m.authority.Authorize(ctx, held, c, owner); err != nil {
@@ -104,7 +109,7 @@ func consistentHome(l *ledger, c Composition) error {
 // requires a reserved tracked session; PID/TTL/caller lifetime are not inputs.
 func (m *Manager) Acquire(ctx context.Context, r Request) (Binding, error) {
 	var result Binding
-	if !idPattern.MatchString(r.LeaseID) || !tagged(r.ContextRef, "composition") || !hexPattern.MatchString(r.ContextSHA256) || !tagged(r.OwnerRef, "principal") || !tagged(r.SessionRef, "session") || r.Generation < 1 || r.Generation > 9007199254740991 {
+	if !projectleaserecord.ValidID(r.LeaseID) || !tagged(r.ContextRef, "composition") || !projectleaserecord.ValidHex(r.ContextSHA256) || !tagged(r.OwnerRef, "principal") || !tagged(r.SessionRef, "session") || r.Generation < 1 || r.Generation > 9007199254740991 {
 		return result, fmt.Errorf("invalid lease request")
 	}
 	err := m.locked(ctx, func(l *ledger, lock *managerlock.HomeLock, engine *transaction.Engine) error {
@@ -114,7 +119,7 @@ func (m *Manager) Acquire(ctx context.Context, r Request) (Binding, error) {
 }
 
 func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lock *managerlock.HomeLock, engine *transaction.Engine, result *Binding) error {
-	if !idPattern.MatchString(r.LeaseID) {
+	if !projectleaserecord.ValidID(r.LeaseID) {
 		return fmt.Errorf("invalid lease ID")
 	}
 	if _, ok := l.Leases[r.LeaseID]; ok {
@@ -127,8 +132,8 @@ func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lo
 	if err = consistentHome(l, c); err != nil {
 		return err
 	}
-	b := Binding{"project-lease/1", r.LeaseID, c.Ref, c.SHA256, c.CheckoutID, c.Environment, c.HomeRef, r.OwnerRef, r.SessionRef, r.Generation}
-	if err = b.validate(); err != nil {
+	b := Binding{Kind: "project-lease/1", LeaseID: r.LeaseID, ContextRef: c.Ref, ContextSHA256: c.SHA256, CheckoutID: c.CheckoutID, Environment: c.Environment, HomeRef: c.HomeRef, OwnerRef: r.OwnerRef, SessionRef: r.SessionRef, Generation: r.Generation}
+	if err = b.Validate(); err != nil {
 		return err
 	}
 	evidence, err := m.observe(ctx, b)
@@ -441,6 +446,9 @@ func (m *Manager) transition(ctx context.Context, id string, fn func(*ledger, *e
 		if !ok {
 			return fmt.Errorf("unknown project lease")
 		}
+		if err := envauthority.SelectedLifecycle(m.home, e.Composition.Profile); err != nil {
+			return err
+		}
 		if err := fn(l, &e, lock); err != nil {
 			return err
 		}
@@ -485,8 +493,12 @@ func (m *Manager) Reconcile(ctx context.Context, id string) error {
 // explicit; recovery never infers death from PID reuse or elapsed time.
 func (m *Manager) Recover(ctx context.Context) error {
 	return m.locked(ctx, func(l *ledger, lock *managerlock.HomeLock, engine *transaction.Engine) error {
+		frozen, err := envauthority.CapturedLeaseProfiles(m.home)
+		if err != nil {
+			return err
+		}
 		for id, e := range l.Leases {
-			if e.State != Released {
+			if !frozen[e.Composition.Profile] && e.State != Released {
 				e.State = Unknown
 				l.Leases[id] = e
 			}
@@ -529,6 +541,9 @@ func (m *Manager) Resume(ctx context.Context, id string) (Binding, error) {
 
 // Status performs no lock creation, journal recovery or state writes.
 func (m *Manager) Status(ctx context.Context) ([]Status, error) {
+	if err := envauthority.Validate(m.home); err != nil {
+		return nil, err
+	}
 	lm, err := managerlock.New(m.home)
 	if err != nil {
 		return nil, err
@@ -541,6 +556,9 @@ func (m *Manager) Status(ctx context.Context) ([]Status, error) {
 		return nil, err
 	}
 	defer func() { _ = lock.Close() }()
+	if err := envauthority.Validate(m.home); err != nil {
+		return nil, err
+	}
 	engine, err := transaction.New(m.home)
 	if err != nil {
 		return nil, err
@@ -562,6 +580,13 @@ func (m *Manager) Status(ctx context.Context) ([]Status, error) {
 	for _, id := range ids {
 		e := l.Leases[id]
 		s := Status{Binding: e.Binding, State: e.State, Busy: e.State != Released, Home: filepath.Join(m.home, homeRelative(e.Composition)), Liveness: "unknown"}
+		if err := envauthority.SelectedLifecycle(m.home, e.Composition.Profile); err != nil {
+			s.State = Unknown
+			s.Busy = true
+			s.AuthorityUnknown = true
+			result = append(result, s)
+			continue
+		}
 		if pending {
 			s.State = Unknown
 			s.Busy = true
@@ -586,6 +611,9 @@ func (m *Manager) Status(ctx context.Context) ([]Status, error) {
 // ReferencesUnderLock is the GC boundary. A corrupt or unreadable ledger is an
 // error, never an empty mark set. No observation can release a reference here.
 func ReferencesUnderLock(home string, lock transaction.HomeLock) (Roots, error) {
+	if err := envauthority.Validate(home); err != nil {
+		return Roots{}, err
+	}
 	if lock == nil {
 		return Roots{}, fmt.Errorf("project reference read requires manager lock")
 	}

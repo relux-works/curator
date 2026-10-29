@@ -15,6 +15,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/envjournal"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -78,6 +80,12 @@ func (engine *Engine) saveJournal(journal *Journal) error {
 	}
 	if err := engine.validateJournal(journal); err != nil {
 		return err
+	}
+	if err := validateDurableDirectories(journal); err != nil {
+		return err
+	}
+	if len(journal.Opaque) != 0 && journal.Unit == nil {
+		return journalf("durable opaque action lacks typed custody")
 	}
 	if err := engine.ensureJournalRoot(); err != nil {
 		return err
@@ -190,6 +198,9 @@ func (engine *Engine) loadJournal(transactionID string) (*Journal, error) {
 	if err := engine.validateJournal(&journal); err != nil {
 		return nil, err
 	}
+	if err := validateDurableDirectories(&journal); err != nil {
+		return nil, err
+	}
 	if tomb && journal.Phase != PhaseCleanup && journal.Phase != PhaseRollbackCleanup {
 		return nil, corruptionf("journal cleanup tomb for transaction %s has phase %q", transactionID, journal.Phase)
 	}
@@ -251,7 +262,7 @@ func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bo
 	if resolve == nil {
 		resolve = canonicalNamespacePath
 	}
-	if journal == nil || journal.Schema != journalSchema || !transactionIDPattern.MatchString(journal.TransactionID) {
+	if journal == nil || (journal.Schema != journalSchema && journal.Schema != metadataJournalSchema) || !transactionIDPattern.MatchString(journal.TransactionID) {
 		return journalf("schema or transaction id is invalid")
 	}
 	if journal.ProjectIdentity == "" || !validText(journal.ProjectIdentity) {
@@ -285,13 +296,19 @@ func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bo
 	if len(journal.Targets) == 0 {
 		return journalf("target list is empty")
 	}
+	if err := validateDirectories(journal); err != nil {
+		return err
+	}
 	for index := range journal.Targets {
 		target := &journal.Targets[index]
 		if target.Class == "" || target.Identifier == "" || !validText(target.Class) || !validText(target.Identifier) {
 			return journalf("target %d class or identifier is invalid", index)
 		}
-		if !target.Kind.valid() {
+		if !target.Kind.Valid() {
 			return journalf("target %d kind %q is invalid", index, target.Kind)
+		}
+		if target.PrivateTree && (target.PrivateFile || target.Kind != KindBytes || target.DesiredDigest == DigestAbsent || (target.Class != "05-external-cache" && target.Class != "05-external-snapshot")) {
+			return journalf("target %d private tree requires a closed build output replacement", index)
 		}
 		if target.PrivateFile && (target.Kind != KindBytes || target.DesiredDigest == DigestAbsent) {
 			return journalf("target %d private file requires a present byte replacement", index)
@@ -308,12 +325,12 @@ func validateJournalWithResolver(journal *Journal, resolveTarget func(string, bo
 		if !filepath.IsAbs(target.LivePath) || !filepath.IsAbs(target.BackupPath) || !filepath.IsAbs(target.RollbackPath) || (target.StagedPath != "" && !filepath.IsAbs(target.StagedPath)) {
 			return journalf("target %d paths are not absolute", index)
 		}
-		if filepath.Dir(target.LivePath) != filepath.Dir(target.BackupPath) || filepath.Dir(target.LivePath) != filepath.Dir(target.RollbackPath) || (target.StagedPath != "" && filepath.Dir(target.LivePath) != filepath.Dir(target.StagedPath)) {
+		if filepath.Dir(target.LivePath) != filepath.Dir(target.BackupPath) || filepath.Dir(target.LivePath) != filepath.Dir(target.RollbackPath) || (target.StagedPath != "" && desiredParent(target.LivePath, journal.Directories) != filepath.Dir(target.StagedPath)) {
 			return journalf("target %d sidecars do not share the live parent", index)
 		}
 		expectedStaged := ""
 		if target.DesiredDigest != DigestAbsent {
-			expectedStaged = sidecarPath(target.LivePath, journal.TransactionID, index, "desired")
+			expectedStaged = stagedTargetPath(target.LivePath, journal.TransactionID, index, journal.Directories)
 		}
 		if target.StagedPath != expectedStaged || target.BackupPath != sidecarPath(target.LivePath, journal.TransactionID, index, "backup") || target.RollbackPath != sidecarPath(target.LivePath, journal.TransactionID, index, "rollback") {
 			return journalf("target %d sidecars are not canonical", index)
@@ -400,6 +417,12 @@ func validateBoundaryProof(journal *Journal) error {
 	for _, target := range journal.Targets {
 		livePaths[target.LivePath] = struct{}{}
 	}
+	for _, action := range journal.Opaque {
+		livePaths[action.LivePath] = struct{}{}
+	}
+	for _, directory := range journal.Directories {
+		livePaths[directory.LivePath] = struct{}{}
+	}
 	for live, record := range proof.Targets {
 		if !validText(live) || !filepath.IsAbs(live) || filepath.Clean(live) != live {
 			return journalf("boundary target path is invalid")
@@ -423,6 +446,17 @@ func validateBoundaryProof(journal *Journal) error {
 }
 
 func (engine *Engine) validateJournal(journal *Journal) error {
+	return engine.validatePlanningJournal(journal, nil)
+}
+
+// planning is used only during the read-only journal construction. No journal
+// with this skeleton is saved: Prepare subsequently binds actual targets and
+// allocated directory identities and validates the complete durable unit.
+func (engine *Engine) validatePlanningJournal(journal *Journal, planning *envunit.Unit) error {
+	if err := envjournal.ValidateUnit(journal, engine.home); err != nil {
+		return err
+	}
+
 	// Guarded transactions share canonical resolutions across saves in one
 	// recheck epoch; legacy journals without a recheck walk every save so
 	// the independence proof never relies on a stale resolution.
@@ -447,6 +481,31 @@ func (engine *Engine) validateJournal(journal *Journal) error {
 	}
 	if err := validateJournalWithResolver(journal, resolveTarget, resolve); err != nil {
 		return err
+	}
+	for _, dir := range journal.Directories {
+		if overlapsReadPath(dir.LivePath, engine.journalRoot) {
+			return journalf("metadata action overlaps transaction state")
+		}
+		if !insideDirectory(dir.LivePath, engine.home) || !insideDirectory(dir.BasePath, engine.home) {
+			binding := journal
+			if journal.Unit == nil && planning != nil {
+				copy := *journal
+				copy.Unit = planning
+				binding = &copy
+			}
+			if err := engine.verifyNativeDirectoryBase(binding, dir); err != nil {
+				return err
+			}
+		}
+		for _, target := range journal.Targets {
+			if dir.StagedPath != "" {
+				for _, path := range []string{target.LivePath, target.StagedPath, target.BackupPath, target.RollbackPath} {
+					if path != "" && overlapsReadPath(path, dir.StagedPath) {
+						return journalf("directory sidecar overlaps target")
+					}
+				}
+			}
+		}
 	}
 	if err := validateIndependentTargetNamespacesWithResolver(journal.Targets, resolveTarget, resolve, targetNamespacePath{
 		owner: "engine",

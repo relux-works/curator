@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/relux-works/curator/internal/envjournal"
+	"github.com/relux-works/curator/internal/envlifecycle"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/staging"
 )
 
@@ -33,81 +36,56 @@ type HomeLock interface {
 	AssertHeld() error
 }
 
-// Phase identifies the durable transaction-wide recovery action.
-type Phase string
+// Phase aliases the durable recovery phase shared with independent admission.
+type Phase = envjournal.Phase
 
+// CommitState aliases a closed durable target progress state.
+type CommitState = envjournal.CommitState
+
+// TargetKind aliases the closed replacement entry kind.
+type TargetKind = envjournal.TargetKind
+
+// PhasePreparing and its siblings preserve the shared journal phase/state/kind values.
 const (
-	// PhasePreparing records a journal whose sibling staging may be incomplete.
-	PhasePreparing Phase = "preparing"
-	// PhasePrepared records fully durable staging before live mutation.
-	PhasePrepared Phase = "prepared"
-	// PhaseCommitting resumes ordered target replacement.
-	PhaseCommitting Phase = "committing"
-	// PhaseCleanup resumes backup deletion after every consumer is durable.
-	PhaseCleanup Phase = "cleanup"
-	// PhaseRollingBack resumes exact reverse target restoration.
-	PhaseRollingBack Phase = "rolling_back"
-	// PhaseRollbackCleanup resumes sidecar deletion after restoration.
-	PhaseRollbackCleanup Phase = "rollback_cleanup"
+	PhasePreparing       = envjournal.PhasePreparing
+	PhasePrepared        = envjournal.PhasePrepared
+	PhaseCommitting      = envjournal.PhaseCommitting
+	PhaseCleanup         = envjournal.PhaseCleanup
+	PhaseRollingBack     = envjournal.PhaseRollingBack
+	PhaseRollbackCleanup = envjournal.PhaseRollbackCleanup
+	StatePending         = envjournal.StatePending
+	StateBackedUp        = envjournal.StateBackedUp
+	StateCommitted       = envjournal.StateCommitted
+	StateRolledBack      = envjournal.StateRolledBack
+	KindBytes            = envjournal.KindBytes
+	KindEntry            = envjournal.KindEntry
+	KindExchange         = envjournal.KindExchange
 )
 
-// CommitState identifies one target's durable progress.
-type CommitState string
-
-const (
-	// StatePending records a target whose live preimage has not been moved.
-	StatePending CommitState = "pending"
-	// StateBackedUp records a durable backup before the desired swap. For
-	// KindExchange, BackupPath holds the desired partner until that swap.
-	StateBackedUp CommitState = "backed_up"
-	// StateCommitted records a durable desired consumer target.
-	StateCommitted CommitState = "committed"
-	// StateRolledBack records a durably restored preimage.
-	StateRolledBack CommitState = "rolled_back"
-)
-
-// TargetKind selects how the engine interprets one target's own path.
-type TargetKind string
-
-const (
-	// KindBytes is the default target kind: one regular file or one link-free
-	// directory tree, owned as bytes. Its path is fully resolved for namespace
-	// independence, so two targets that alias one object through a link are
-	// refused, and a link is never an acceptable live, staged, or backup state.
-	KindBytes TargetKind = ""
-	// KindEntry is one directory entry the manager owns as itself, which may be
-	// a symbolic link — an agent adapter mirror in symlink mode is the reason
-	// this kind exists. The final path component is never resolved, and a link
-	// is digested, staged, backed up, restored, and removed as the link it is:
-	// its complete content is its destination string. Entries inside a directory
-	// tree are still refused, exactly as for KindBytes.
-	KindEntry TargetKind = "entry"
-	// KindExchange owns the same bytes as KindBytes, but replaces a present
-	// preimage with a present staged target using an atomic name exchange.
-	// It is supported on Darwin and Linux. The old object remains at the
-	// backup name until durable commit cleanup; rollback also exchanges names.
-	KindExchange TargetKind = "exchange"
-)
-
-func (kind TargetKind) valid() bool {
-	switch kind {
-	case KindBytes, KindEntry, KindExchange:
-		return true
-	default:
-		return false
-	}
+// LinkFallback declares a pinned noncredential projection alternative.
+// Source must be a pinned, link-free prepared file/tree. Marker fields bind a
+// home copy reason to its exact declared surface; legacy adapter mirrors have
+// no home marker. No alternate or callback is needed after Prepare.
+type LinkFallback struct {
+	Source       string
+	Class        string
+	MarkerPath   string
+	Surface      string
+	RelativePath string
 }
 
-// Target describes one desired replacement. Class and Identifier are the
-// canonical ordering key. An empty StagedSource means the desired state is
-// absence. Exactly one preimage expectation is required: PreimageDigest, or
-// ExpectedGeneration read from GenerationPath (relative to LivePath, or the
-// live file itself when empty). A KindEntry target must use PreimageDigest,
-// because a link carries no generation file. A KindExchange target requires
-// a present PreimageDigest and present StagedSource, with no generation fields.
+// Target describes one desired replacement and its exact preimage expectation.
+// Class and Identifier form the canonical ordering key. An empty StagedSource
+// means absence. Exactly one preimage expectation is required: PreimageDigest,
+// or ExpectedGeneration read from GenerationPath (relative to LivePath, or the
+// live file itself when empty). KindEntry requires PreimageDigest because a
+// link carries no generation file. KindExchange requires a present preimage
+// and staged source, with no generation fields.
 type Target struct {
+	LinkFallback *LinkFallback
 	// PrivateFile requires a regular, owner-only replacement, created privately
 	// and revalidated before publication, including after process restart.
+	PrivateTree        bool
 	PrivateFile        bool
 	Class              string
 	Identifier         string
@@ -121,6 +99,16 @@ type Target struct {
 
 // Plan binds one project identity, ordered target set, and referenced builds.
 type Plan struct {
+	// Legacy is joined by the global profile owner before Prepare; it is not
+	// authority for an independent legacy journal.
+	Legacy    *envunit.LegacyPublication
+	Opaque    []OpaqueTarget
+	Lifecycle *envlifecycle.Change
+	// Unit binds a complete home mutation to its exact origin and installed lock.
+	Unit *envunit.Unit
+	// Directories enlists parent existence and protection separately from file
+	// bytes. Prepare creates only private sidecars; live parents change at Commit.
+	Directories []DirectoryAction
 	// ReadInputs pins non-mutating input bytes across both commit and restart.
 	// Callers must capture these under the mutation lock before planning.
 	ReadInputs          map[string]string
@@ -145,21 +133,34 @@ type Plan struct {
 	BoundaryProof *staging.DurableSnapshot
 }
 
+// OpaqueTarget declares an opaque whole-entry quarantine action.
+type OpaqueTarget struct {
+	Class    string
+	LivePath string
+	Before   envunit.Image
+}
+
+// OpaqueRecord aliases the durable opaque action record.
+type OpaqueRecord = envjournal.OpaqueRecord
+
 // Journal is the canonical durable recovery record. Paths are absolute so
 // home-only restart recovery never depends on the invoking project.
-type Journal struct {
-	ReadInputs          map[string]string        `json:"read_inputs,omitempty"`
-	Schema              string                   `json:"schema"`
-	TransactionID       string                   `json:"transaction_id"`
-	ProjectIdentity     string                   `json:"project_identity"`
-	Phase               Phase                    `json:"phase"`
-	RemovalPath         string                   `json:"removal_path,omitempty"`
-	RemovalDigest       string                   `json:"removal_digest,omitempty"`
-	RemovalEntries      []RemovalEntry           `json:"removal_entries,omitempty"`
-	ReferencedBuildKeys []string                 `json:"referenced_build_keys"`
-	Targets             []TargetRecord           `json:"targets"`
-	BoundaryProof       *staging.DurableSnapshot `json:"boundary_proof,omitempty"`
+type Journal = envjournal.Journal
+
+// DirectoryAction owns one no-follow directory entry's metadata, never its
+// children. Missing parents must each have their own action. Mode is private.
+type DirectoryAction struct {
+	// EmptyMuseHome binds an intentionally empty runtime directory to the
+	// enclosing unit's exact Muse home. It grants no arbitrary parent action.
+	EmptyMuseHome string
+	LivePath      string
+	Before        envunit.Image
+	Mode          uint32
 }
+
+// DirectoryRecord pins both the original entry and the exact prepared inode.
+// Base is the existing staging ancestor, independently guarded after restart.
+type DirectoryRecord = envjournal.DirectoryRecord
 
 // RemovalEntry records one file, directory, or link that the transaction owns
 // in an in-progress cleanup tomb. Missing entries are already durably removed;
@@ -168,54 +169,33 @@ type Journal struct {
 // LinkTarget is the exact destination string of a "link" entry and is the whole
 // of its content: recording it is what makes a link restorable and removable
 // with the same certainty as a digested file.
-type RemovalEntry struct {
-	RelativePath string `json:"relative_path"`
-	Kind         string `json:"kind"`
-	Mode         uint32 `json:"mode"`
-	Digest       string `json:"digest,omitempty"`
-	LinkTarget   string `json:"link_target,omitempty"`
-}
+type RemovalEntry = envjournal.RemovalEntry
 
 // TargetRecord is the complete path-backed recovery record for one target.
-type TargetRecord struct {
-	PrivateFile         bool           `json:"private_file,omitempty"`
-	Class               string         `json:"class"`
-	Identifier          string         `json:"identifier"`
-	Kind                TargetKind     `json:"kind,omitempty"`
-	LivePath            string         `json:"live_path"`
-	StagedPath          string         `json:"staged_path,omitempty"`
-	StagedSource        string         `json:"staged_source,omitempty"`
-	StagingEntries      []RemovalEntry `json:"staging_entries,omitempty"`
-	StagingIndex        int            `json:"staging_index,omitempty"`
-	StagingActive       bool           `json:"staging_active,omitempty"`
-	StagingCreated      bool           `json:"staging_created,omitempty"`
-	StagingBytes        int64          `json:"staging_bytes,omitempty"`
-	StagingPrefixDigest string         `json:"staging_prefix_digest,omitempty"`
-	StagingWriteBytes   int64          `json:"staging_write_bytes,omitempty"`
-	StagingWriteDigest  string         `json:"staging_write_digest,omitempty"`
-	StagingDiscarded    bool           `json:"staging_discarded,omitempty"`
-	PreimageDigest      string         `json:"preimage_digest,omitempty"`
-	ExpectedGeneration  string         `json:"expected_generation,omitempty"`
-	GenerationPath      string         `json:"generation_path,omitempty"`
-	BackupPath          string         `json:"backup_path"`
-	RollbackPath        string         `json:"rollback_path"`
-	DesiredDigest       string         `json:"desired_digest"`
-	BackupDigest        string         `json:"backup_digest,omitempty"`
-	State               CommitState    `json:"state"`
-}
-
-// digest reads one of this target's own paths — live, staged, backup, or
-// rollback — with the strictness its kind requires. Every state comparison in
-// the engine goes through here so a target can never be read as a shape it does
-// not own.
-func (record *TargetRecord) digest(path string) (string, error) {
-	return DigestTarget(record.Kind, path)
-}
+type TargetRecord = envjournal.TargetRecord
 
 // Point identifies a fault-injection and observation boundary.
 type Point string
 
 const (
+	// PointBeforeStagingFinalMode observes a private writable sidecar before final protection.
+	PointBeforeStagingFinalMode Point = "before_staging_final_mode"
+	// PointAfterStagingFinalMode observes final protection with the original writer still open.
+	PointAfterStagingFinalMode Point = "after_staging_final_mode"
+)
+
+const (
+	// PointGlobalRetained follows durable handled-conflict confirmation, before receipt publication.
+	PointGlobalRetained Point = "global_retained"
+	// PointAfterQuarantine follows the opaque live-to-quarantine rename.
+	PointAfterQuarantine Point = "after_quarantine"
+	// PointAfterQuarantineRestore follows precommit restoration of the opaque entry.
+	PointAfterQuarantineRestore Point = "after_quarantine_restore"
+	// PointDuringQuarantineRemoval observes postcommit opaque cleanup progress.
+	PointDuringQuarantineRemoval Point = "during_quarantine_removal"
+	// PointAfterDirectoryInstall follows metadata publication before its state
+	// write. Recovery must prove the exact prepared inode, not path existence.
+	PointAfterDirectoryInstall Point = "after_directory_install"
 	// PointAfterStagingChunkSync follows a durable partial-file write while the
 	// preparing journal still carries its write-ahead ownership record.
 	PointAfterStagingChunkSync Point = "after_staging_chunk_sync"
