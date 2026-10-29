@@ -1,6 +1,8 @@
 package gitops
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -13,8 +15,8 @@ import (
 func TestFetchURLArgs(t *testing.T) {
 	repo := t.TempDir()
 	for _, url := range []string{"", "   ", "--upload-pack=touch /tmp/x", "-c"} {
-		if err := FetchURL(repo, url); err == nil || !strings.Contains(err.Error(), "suspicious") {
-			t.Fatalf("FetchURL(%q) err = %v, want the suspicious-URL refusal", url, err)
+		if err := FetchURL(repo, url); err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") {
+			t.Fatalf("FetchURL(%q) err = %v, want a refusal", url, err)
 		}
 	}
 	if _, err := fetchURLArgs(repo, "git@example.com:team/profiles.git"); err == nil {
@@ -39,48 +41,100 @@ func TestFetchURLArgs(t *testing.T) {
 	}
 }
 
-// FetchURL refuses an endpoint that carries credentials before running git,
-// and the refusal never echoes the input: a password in any URL form, user
-// information on HTTP(S), a scp-like address with a password, a remote-helper
-// address (whose nested URL git passes to a helper unparsed) and an opaque
-// URL. The
-// controls show an SSH user name in both spellings, IPv6 hosts and a plain HTTPS URL pass
-// the credential check and reach git (here a missing remote, so git fails
-// with its own error rather than a credential refusal).
-func TestFetchURLRefusesCredentialURLs(t *testing.T) {
-	repo := t.TempDir()
-	if _, err := run(repo, "init", "-q"); err != nil {
+// FetchURL admits only the https, ssh and scp-like endpoint forms and refuses
+// everything else before git runs, without echoing the input. A fake git on
+// PATH records every invocation: each refused case leaves the marker empty and
+// keeps the canary out of the error, and each admitted case reaches git. The
+// refused cases cover remote-helper transports of every spelling, upper-case
+// schemes, passwords and user information in every URL and scp form,
+// percent-encoding, whitespace and newlines, empty and extra-slash authorities,
+// queries, fragments, opaque and option-shaped spellings, http, git:// and
+// file forms, a drive-letter host and a scheme-named host. A benign '@' in a
+// path is refused as well: the grammar is deliberately narrower than what git
+// accepts.
+func TestFetchURLAdmitsOnlyTheEndpointGrammar(t *testing.T) {
+	const c = "canary-secret-7f3a"
+	bin := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "git-ran")
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho ran >> \"$GIT_MARKER\"\nexit 1\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	const canary = "canary-secret-7f3a"
-	for _, url := range []string{
-		"https://user:" + canary + "@example.invalid/team/repo.git",
-		"https://" + canary + "@example.invalid/team/repo.git",
-		"http://user:" + canary + "@example.invalid/team/repo.git",
-		"ssh://git:" + canary + "@example.invalid/team/repo.git",
-		"git:" + canary + "@example.invalid:team/repo.git",
-		"https::https://user:" + canary + "@example.invalid/team/repo.git",
-		"https::https://" + canary + "@example.invalid/team/repo.git",
-		"ext::sh -c " + canary,
-		"https:/" + canary + "://example.invalid/team/repo.git",
-	} {
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GIT_MARKER", marker)
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	refused := []string{
+		"", " ", "-" + c, "--upload-pack=" + c,
+		"https::https://user:" + c + "@example.invalid/team/repo.git",
+		"http::https://example.invalid/" + c + ".git",
+		"ext::sh -c " + c, "fd::7", "file::/tmp/" + c, "x::" + c, "1::" + c, "a_b::" + c,
+		"HTTPS://example.invalid/" + c + ".git", "Https://example.invalid/" + c + ".git", "SSH://git@example.invalid/" + c + ".git",
+		"https://user:" + c + "@example.invalid/team/repo.git",
+		"https://" + c + "@example.invalid/team/repo.git",
+		"https://user%3A" + c + "@example.invalid/team/repo.git",
+		"http://user:" + c + "@example.invalid/team/repo.git",
+		"http://example.invalid/" + c + ".git",
+		"git://example.invalid/" + c + ".git",
+		"git://user:" + c + "@example.invalid/team/repo.git",
+		"file:///tmp/" + c + ".git",
+		"ssh://git:" + c + "@example.invalid/team/repo.git",
+		"ssh://git:" + c + "@[::1]/team/repo.git",
+		"ssh://example.invalid/-" + c,
+		"git:" + c + "@example.invalid:team/repo.git",
+		"user:" + c + "@[::1]:team/repo.git",
+		"https:opaque-" + c,
+		"https:///user:" + c + "@example.invalid/team/repo.git",
+		"https:////user:" + c + "@example.invalid/team/repo.git",
+		"https://example.invalid/team/repo.git?password=" + c,
+		"https://example.invalid/team/repo.git?access_token=" + c,
+		"https://example.invalid/team/repo.git?next=https://user:" + c + "@example.invalid/",
+		"https://example.invalid/team/repo.git#" + c,
+		"https://example.invalid/team/%2F" + c,
+		" https://example.invalid/" + c + ".git",
+		"https://example.invalid/" + c + ".git ",
+		"https://example.invalid/team/repo.git\n" + c,
+		"https://example.invalid/team/r@" + c + ".git",
+		"https://exa_mple.invalid/" + c + ".git",
+		"https://example.invalid",
+		"https://example.invalid/",
+		"https://example.invalid:99999999/" + c + ".git",
+		"c:" + c,
+		"ssh:" + c,
+		"https:" + c,
+		"example.invalid:-" + c,
+		"/tmp/" + c + ".git",
+		"./" + c,
+	}
+	for _, url := range refused {
 		err := FetchURL(repo, url)
-		if err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") || strings.Contains(err.Error(), canary) {
-			t.Fatalf("FetchURL(credential URL) err = %v, want a refusal that does not echo the input", err)
+		if err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") || strings.Contains(err.Error(), c) {
+			t.Errorf("FetchURL(%q) err = %v, want an input-free refusal", url, err)
+		}
+		if _, statErr := os.Stat(marker); statErr == nil {
+			t.Fatalf("FetchURL(%q) ran git before refusing", url)
 		}
 	}
 	for _, url := range []string{
-		"git@example.invalid:team/repo.git",
-		"ssh://git@example.invalid/team/repo.git",
 		"https://example.invalid/team/repo.git",
+		"https://example.invalid:8443/team/repo.git",
+		"https://[::1]/team/repo.git",
+		"ssh://git@example.invalid/team/repo.git",
+		"ssh://git@example.invalid:2222/team/repo.git",
+		"ssh://example.invalid/team/repo.git",
 		"ssh://git@[::1]/team/repo.git",
+		"git@example.invalid:team/repo.git",
 		"git@[::1]:team/repo.git",
+		"github-work:team/repo.git",
+		"example.invalid:/srv/team/repo.git",
 	} {
-		if err := refuseCredentialURL(url); err != nil {
-			t.Fatalf("refuseCredentialURL(%q) = %v, want admitted", url, err)
+		_ = os.Remove(marker)
+		if err := FetchURL(repo, url); err != nil && strings.HasPrefix(err.Error(), "refusing to fetch") {
+			t.Fatalf("FetchURL(%q) refused an admitted endpoint: %v", url, err)
 		}
-	}
-	if err := FetchURL(repo, "file://"+t.TempDir()+"/missing.git"); err == nil || strings.HasPrefix(err.Error(), "refusing to fetch") {
-		t.Fatalf("a credential-free endpoint did not reach git: %v", err)
+		if _, err := os.Stat(marker); err != nil {
+			t.Fatalf("FetchURL(%q) did not reach git", url)
+		}
 	}
 }

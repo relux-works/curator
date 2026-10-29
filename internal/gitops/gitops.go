@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -428,7 +427,7 @@ func FetchURLIsolated(repo, remoteURL string) error {
 // machine cannot authenticate, still refreshes from the endpoint the caller
 // asked for.
 func FetchURL(repo, remoteURL string) error {
-	if err := refuseCredentialURL(remoteURL); err != nil {
+	if err := validateFetchEndpoint(remoteURL); err != nil {
 		return err
 	}
 	args, err := fetchURLArgs(repo, remoteURL)
@@ -439,45 +438,44 @@ func FetchURL(repo, remoteURL string) error {
 	return err
 }
 
-// remoteHelperAddress matches git's remote-helper spelling
-// `<transport>::<address>` (for example `https::https://...` or `ext::...`),
-// whose nested address git hands to a helper program unparsed.
-var remoteHelperAddress = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*::`)
+// The endpoint grammar FetchURL admits. Each form is anchored and spelled
+// out character by character; anything it does not describe refuses before
+// any git call. A host is a DNS name or a bracketed IPv6 literal, a user name
+// carries no ':', and a path is a run of unreserved characters whose first
+// character is not '-'. No form admits user information on HTTPS, a password,
+// a query, a fragment, percent-encoding, whitespace or a remote-helper
+// transport.
+const (
+	endpointHost = `(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\])`
+	endpointUser = `[A-Za-z0-9._-]+`
+	endpointPort = `(?::[0-9]{1,5})?`
+	endpointPath = `[A-Za-z0-9._~+][A-Za-z0-9._~+/-]*`
+)
 
-// refuseCredentialURL refuses, before any git call and without echoing the
-// input, an endpoint that carries credentials or hides them from this check:
-// a remote-helper address, an opaque URL, a password in any URL's user
-// information, any user information on an HTTP(S) URL, and a scp-like
-// address whose user part holds a colon. An SSH user name (ssh://git@host or
-// git@host:path) is a transport hint, not a credential, and stays admitted.
-func refuseCredentialURL(remoteURL string) error {
-	trimmed := strings.TrimSpace(remoteURL)
-	if remoteHelperAddress.MatchString(trimmed) {
-		return fmt.Errorf("refusing to fetch through a git remote-helper address")
-	}
-	if scheme, _, found := strings.Cut(trimmed, "://"); found {
-		parsed, err := url.Parse(trimmed)
-		if err != nil {
-			return fmt.Errorf("refusing to fetch from an unparsable git URL")
-		}
-		if parsed.Opaque != "" || !strings.EqualFold(parsed.Scheme, scheme) {
-			return fmt.Errorf("refusing to fetch from an opaque git URL")
-		}
-		if parsed.User == nil {
-			return nil
-		}
-		if _, hasPassword := parsed.User.Password(); hasPassword {
-			return fmt.Errorf("refusing to fetch from a git URL that carries a password")
-		}
-		if strings.EqualFold(scheme, "http") || strings.EqualFold(scheme, "https") {
-			return fmt.Errorf("refusing to fetch from an HTTP(S) git URL that carries user information")
-		}
+var (
+	httpsEndpoint = regexp.MustCompile(`^https://` + endpointHost + endpointPort + `/` + endpointPath + `$`)
+	sshEndpoint   = regexp.MustCompile(`^ssh://(?:` + endpointUser + `@)?` + endpointHost + endpointPort + `/` + endpointPath + `$`)
+	scpEndpoint   = regexp.MustCompile(`^(?:` + endpointUser + `@)?(` + endpointHost + `):/?` + endpointPath + `$`)
+)
+
+// schemeNames are hosts a scp-like address may not name: `https:path` is a
+// scheme spelling, not an SSH host.
+var schemeNames = map[string]bool{"http": true, "https": true, "ssh": true, "git": true, "file": true, "ftp": true, "ftps": true, "ext": true, "fd": true}
+
+// validateFetchEndpoint admits only the https://host[:port]/path,
+// ssh://[user@]host[:port]/path and scp-like [user@]host:path forms the
+// profile lane records, and refuses everything else without echoing the
+// input. A scp-like host must be longer than one character (a drive letter is
+// a local path) and must not be a scheme name.
+func validateFetchEndpoint(remoteURL string) error {
+	if httpsEndpoint.MatchString(remoteURL) || sshEndpoint.MatchString(remoteURL) {
 		return nil
 	}
-	if user, _, found := strings.Cut(trimmed, "@"); found && strings.Contains(user, ":") {
-		return fmt.Errorf("refusing to fetch from a git address that carries a password")
+	if match := scpEndpoint.FindStringSubmatch(remoteURL); match != nil && !strings.Contains(remoteURL, "://") &&
+		len(match[1]) > 1 && !schemeNames[strings.ToLower(match[1])] {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("refusing to fetch from a git endpoint outside the https, ssh and scp-like forms")
 }
 
 // fetchURLArgs validates an explicit fetch endpoint and maps its heads and
