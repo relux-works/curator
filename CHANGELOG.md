@@ -24,8 +24,10 @@ All notable implementation changes are recorded here.
   destination is the host of their identity binding, minus credential
   carriers, and passes `--` before the endpoint. Refused before git runs,
   without echoing the endpoint:
-  - an endpoint the identity parser rejects, including every explicit port,
-    bracketed host and non-portable path;
+  - an endpoint the identity parser rejects, which includes a non-empty
+    port, an IPv6 host and a non-portable identity. FetchURL additionally
+    refuses an empty port, every bracketed URL authority and every URL that
+    does not parse;
   - an endpoint whose git destination differs from the binding's host. A URL
     form must parse as a URL, so `ssh://foo[bar]@h/p`, which the identity
     parser binds to host `ssh` while git contacts `h`, refuses. A scp-like
