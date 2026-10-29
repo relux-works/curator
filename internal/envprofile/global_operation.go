@@ -595,6 +595,7 @@ func (op *operation) captureManaged(plan *homePlan, seeds *seedBundle, recorded 
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
 		names[".claude.json"] = true
+		names[claudeSettingsName] = true
 	}
 	for path := range names {
 		paths = append(paths, filepath.Join(plan.homeDir, filepath.FromSlash(path)))
