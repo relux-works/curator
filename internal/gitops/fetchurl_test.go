@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -176,8 +175,15 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 		"ssh://a@-x@example.invalid/team/repo.git",
 		"git-x@example.invalid:team/repo.git",
 	}
-	// The verdicts are platform-independent; the fake git that proves no
-	// invocation is a POSIX script.
+	// Where git reads a leading letter and ':' as a drive, the one-letter scp
+	// host spellings refuse instead.
+	admitted = slices.DeleteFunc(admitted, func(url string) bool {
+		if readsAsDrive(url) {
+			refused = append(refused, url)
+			return true
+		}
+		return false
+	})
 	for _, url := range refused {
 		if err := ValidateFetchEndpoint(url); err != errFetchEndpoint {
 			t.Errorf("ValidateFetchEndpoint(%q) = %v, want the fixed refusal", url, err)
@@ -188,14 +194,9 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 			t.Errorf("ValidateFetchEndpoint(%q) refused an admitted endpoint: %v", url, err)
 		}
 	}
-	if runtime.GOOS == "windows" {
-		t.Skip("the git invocation marker is a POSIX script")
-	}
 	bin := t.TempDir()
 	marker := filepath.Join(t.TempDir(), "git-ran")
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho ran >> \"$GIT_MARKER\"\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeTool(t, bin, "git")
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("GIT_MARKER", marker)
 	repo := t.TempDir()
@@ -276,16 +277,10 @@ var destinationRows = []struct {
 // binding host; git is not run for them. Every refused row refuses with the
 // fixed, input-free error, and the recording ssh never runs. The table is
 // finite: it shows agreement for these spellings, not for every byte string.
-// On Windows only the verdicts and bindings run; the git runs are POSIX.
 func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 	const secret = "planted-secret-91c2"
-	bin := t.TempDir()
 	log := filepath.Join(t.TempDir(), "ssh.log")
-	script := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\"; done > \"$SSH_LOG\"\nexit 1\n"
-	if err := os.WriteFile(filepath.Join(bin, "ssh"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("GIT_SSH", filepath.Join(bin, "ssh"))
+	t.Setenv("GIT_SSH", fakeTool(t, t.TempDir(), "ssh"))
 	t.Setenv("GIT_SSH_COMMAND", "")
 	if err := os.Unsetenv("GIT_SSH_COMMAND"); err != nil {
 		t.Fatal(err)
@@ -296,20 +291,14 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 	if _, err := run(repo, "init", "-q"); err != nil {
 		t.Fatal(err)
 	}
-	// The recording ssh is a POSIX script, so Windows checks the verdicts
-	// and bindings without running git.
-	posix := runtime.GOOS != "windows"
 	admitted := 0
 	for _, row := range destinationRows {
 		endpoint := strings.ReplaceAll(row.endpoint, "SECRET", secret)
 		_ = os.Remove(log)
-		if !row.admit {
+		if !row.admit || readsAsDrive(endpoint) {
 			err := ValidateFetchEndpoint(endpoint)
 			if err != errFetchEndpoint {
 				t.Errorf("%q: ValidateFetchEndpoint = %v, want the fixed refusal", endpoint, err)
-				continue
-			}
-			if !posix {
 				continue
 			}
 			if err := FetchURL(repo, endpoint); err == nil || strings.Contains(err.Error(), secret) {
@@ -331,9 +320,6 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 			if err != nil || strings.ToLower(parsed.Hostname()) != wantHost {
 				t.Errorf("%q: URL authority host does not equal binding host %q", endpoint, wantHost)
 			}
-			continue
-		}
-		if !posix {
 			continue
 		}
 		_ = FetchURL(repo, endpoint)
@@ -387,4 +373,42 @@ func identityUserHost(t *testing.T, endpoint string) (string, string) {
 		t.Fatalf("%q: not a scp-like address the identity parser reads", endpoint)
 	}
 	return user, host
+}
+
+// readsAsDrive reports whether git on this platform reads endpoint as a
+// local drive path: one letter and ':' at the start, where
+// gitReadsDrivePrefix holds.
+func readsAsDrive(endpoint string) bool {
+	return gitReadsDrivePrefix && len(endpoint) >= 2 && isASCIILetter(endpoint[0]) && endpoint[1] == ':'
+}
+
+// Where git reads a leading letter and ':' as a drive (Git for Windows), a
+// scp address with a one-letter host and no user refuses, because git would
+// fetch a local directory while the identity binds host c. A user in front
+// and a digit host stay scp addresses there and are admitted, and with the
+// rule off the same spellings are admitted again, so the refusal comes from
+// this rule and not from the rest of the predicate. Both settings run on
+// every platform; the platform default is runtime.GOOS == "windows".
+func TestFetchURLRefusesADrivePrefixWhereGitReadsOne(t *testing.T) {
+	drives := []string{"c:org/repo.git", "Z:org/repo.git", "h:p", "h:org/r@[x"}
+	scp := []string{"git@c:org/repo.git", "1:org/repo.git", "example.invalid:org/repo.git"}
+	saved := gitReadsDrivePrefix
+	t.Cleanup(func() { gitReadsDrivePrefix = saved })
+	gitReadsDrivePrefix = true
+	for _, endpoint := range drives {
+		if err := ValidateFetchEndpoint(endpoint); err != errFetchEndpoint {
+			t.Errorf("drive prefix read: ValidateFetchEndpoint(%q) = %v, want the fixed refusal", endpoint, err)
+		}
+	}
+	for _, endpoint := range scp {
+		if err := ValidateFetchEndpoint(endpoint); err != nil {
+			t.Errorf("drive prefix read: ValidateFetchEndpoint(%q) = %v, want admitted", endpoint, err)
+		}
+	}
+	gitReadsDrivePrefix = false
+	for _, endpoint := range append(drives, scp...) {
+		if err := ValidateFetchEndpoint(endpoint); err != nil {
+			t.Errorf("no drive prefix: ValidateFetchEndpoint(%q) = %v, want admitted", endpoint, err)
+		}
+	}
 }
