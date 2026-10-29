@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -281,7 +282,16 @@ func TestDescriptorPipelineSpellingsReachFetchURL(t *testing.T) {
 		if !ok {
 			t.Fatalf("%q: recordRaw kept no spelling", declared)
 		}
-		if err := gitops.ValidateFetchEndpoint(recorded); err != nil {
+		err = gitops.ValidateFetchEndpoint(recorded)
+		// Git for Windows reads a leading letter and ':' as a drive, so there
+		// the one-letter scp host without a user refuses instead.
+		if declared == "c:org/repo.git" && runtime.GOOS == "windows" {
+			if err == nil {
+				t.Errorf("%q: admitted where git reads it as a drive path", declared)
+			}
+			continue
+		}
+		if err != nil {
 			t.Errorf("%q (recorded %q): the refresh refuses a spelling the pipeline admits: %v", declared, recorded, err)
 		}
 	}

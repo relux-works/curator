@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"unicode"
@@ -466,6 +467,8 @@ var errFetchEndpoint = fmt.Errorf("refusing to fetch from a git endpoint that ca
 //   - user information appears only on ssh and scp-like forms, as a user name
 //     that is non-empty, has no ':' and does not start with '-', and on a
 //     scp-like form it equals the identity parser's user;
+//   - where git reads a leading letter and ':' as a drive (Git for Windows), a
+//     scp-like form with a one-letter host and no user refuses;
 //   - the URL scheme is https, http, git or ssh, in any case, with no `x::`
 //     remote-helper transport, opaque `scheme:` spelling, query or fragment;
 //   - the endpoint is valid UTF-8 without control characters, whitespace or
@@ -530,7 +533,21 @@ func fetchDestination(endpoint string) (host string, ok bool) {
 	if user == "" && scpSchemeHosts[strings.ToLower(host)] {
 		return "", false
 	}
+	if user == "" && gitReadsDrivePrefix && len(host) == 1 && isASCIILetter(host[0]) {
+		return "", false
+	}
 	return host, true
+}
+
+// gitReadsDrivePrefix reports whether git reads an address that starts with
+// one letter and ':' as a local drive path. Git for Windows does (connect.c
+// url_is_local_not_ssh, has_dos_drive_prefix), so there `c:org/repo.git`
+// names a directory while the identity parser binds host `c`. A user in
+// front (`git@c:org/repo.git`) keeps it a scp address on every platform.
+var gitReadsDrivePrefix = runtime.GOOS == "windows"
+
+func isASCIILetter(character byte) bool {
+	return ('a' <= character && character <= 'z') || ('A' <= character && character <= 'Z')
 }
 
 // gitSCPSplit splits a scp-like address the way git's connect.c does. The

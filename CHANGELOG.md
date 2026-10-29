@@ -38,6 +38,9 @@ All notable implementation changes are recorded here.
     admitted;
   - user information other than an ssh or scp-like user name that is
     non-empty, has no `:` and does not start with `-`;
+  - on Windows, a scp-like address with a one-letter host and no user, such
+    as `c:org/repo.git`, which Git for Windows reads as a drive path while
+    the identity binds host `c` (`git@c:org/repo.git` stays admitted);
   - remote-helper (`x::`) and opaque `scheme:` spellings;
   - schemes other than https, http, git and ssh (any case; git receives the
     scheme lowercased);
