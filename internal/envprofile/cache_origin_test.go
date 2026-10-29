@@ -74,8 +74,8 @@ func TestProfileCacheRefreshesFromTheRequestedDescriptor(t *testing.T) {
 }
 
 // A cache whose stored origin names another repository, or has no single
-// non-empty origin (missing, repeated, or with an empty or blank extra value),
-// refuses before any fetch: the new tag never arrives and the
+// non-empty origin (missing, repeated, with an empty or blank extra value, or
+// with an extra value from an included file), refuses before any fetch: the new tag never arrives and the
 // configuration is unchanged. The SSH descriptor stays the same, so the
 // refusal is the cache binding's, not the transport's.
 func TestProfileCacheRefusesAForeignOrUnboundOrigin(t *testing.T) {
@@ -99,6 +99,11 @@ func TestProfileCacheRefusesAForeignOrUnboundOrigin(t *testing.T) {
 		}, "no single stored origin"},
 		{"only-empty", func(t *testing.T, dir string) {
 			gitRun(t, dir, "config", "remote.origin.url", "")
+		}, "no single stored origin"},
+		{"included-matching", func(t *testing.T, dir string) { includeOrigin(t, dir, cacheOriginSSH) }, "no single stored origin"},
+		{"included-empty", func(t *testing.T, dir string) { includeOrigin(t, dir, "") }, "no single stored origin"},
+		{"included-foreign", func(t *testing.T, dir string) {
+			includeOrigin(t, dir, "https://example.com/other/profiles.git")
 		}, "no single stored origin"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -196,5 +201,35 @@ func TestProfileReinstallKeepsTheRequestedDescriptor(t *testing.T) {
 				t.Fatalf("refused reinstall changed the installed lock: %v", err)
 			}
 		})
+	}
+}
+
+// includeOrigin adds an include.path to the cache configuration whose file
+// sets one more remote.origin.url value.
+func includeOrigin(t *testing.T, dir, value string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "origin.cfg")
+	if err := os.WriteFile(path, []byte("[remote \"origin\"]\n\turl = "+value+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, dir, "config", "include.path", path)
+}
+
+// An origin that only an included file stores is still the cache's single
+// origin: with the direct value removed and the HTTPS origin moved into an
+// include, the refresh from the SSH descriptor succeeds.
+func TestProfileCacheAcceptsAnIncludedSingleOrigin(t *testing.T) {
+	home, canonical, dir, _, _ := staleOriginCache(t)
+	gitRun(t, dir, "config", "--unset", "remote.origin.url")
+	includeOrigin(t, dir, cacheOriginHTTPS)
+	second := newGitManager(home)
+	if _, err := second.Identity("", "", cacheOriginSSH); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.fetch(canonical); err != nil {
+		t.Fatalf("refresh with an included single origin: %v", err)
+	}
+	if !cacheHasTag(dir, "v1.1.0") {
+		t.Fatal("the refresh did not reach the descriptor's new tag")
 	}
 }

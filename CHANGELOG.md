@@ -17,10 +17,12 @@ All notable implementation changes are recorded here.
   untouched. A same-alias reinstall carries the requested descriptor into
   the update it delegates to. A cache whose stored origin does not name the
   same normalized repository identity, or has no single non-empty origin
-  (values are read NUL-delimited, so an empty or blank extra value counts),
-  refuses with `profile_source_invalid` before any fetch. `gitops.FetchURL`
-  refuses an endpoint carrying a password or HTTP(S) user information
-  before running git, without echoing it. An identity with no recorded
+  (values are read NUL-delimited with repository-local includes expanded,
+  so an empty, blank or included extra value counts), refuses with
+  `profile_source_invalid` before any fetch. `gitops.FetchURL` refuses,
+  before running git and without echoing it, an endpoint carrying a
+  password or HTTP(S) user information, a remote-helper address
+  (`<transport>::<address>`) and an opaque URL. An identity with no recorded
   spelling still refreshes through its stored remotes, and exact-commit
   replay is unchanged.
 

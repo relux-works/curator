@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -438,17 +439,29 @@ func FetchURL(repo, remoteURL string) error {
 	return err
 }
 
+// remoteHelperAddress matches git's remote-helper spelling
+// `<transport>::<address>` (for example `https::https://...` or `ext::...`),
+// whose nested address git hands to a helper program unparsed.
+var remoteHelperAddress = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*::`)
+
 // refuseCredentialURL refuses, before any git call and without echoing the
-// input, an endpoint that carries credentials: a password in any URL's user
+// input, an endpoint that carries credentials or hides them from this check:
+// a remote-helper address, an opaque URL, a password in any URL's user
 // information, any user information on an HTTP(S) URL, and a scp-like
 // address whose user part holds a colon. An SSH user name (ssh://git@host or
 // git@host:path) is a transport hint, not a credential, and stays admitted.
 func refuseCredentialURL(remoteURL string) error {
 	trimmed := strings.TrimSpace(remoteURL)
+	if remoteHelperAddress.MatchString(trimmed) {
+		return fmt.Errorf("refusing to fetch through a git remote-helper address")
+	}
 	if scheme, _, found := strings.Cut(trimmed, "://"); found {
 		parsed, err := url.Parse(trimmed)
 		if err != nil {
 			return fmt.Errorf("refusing to fetch from an unparsable git URL")
+		}
+		if parsed.Opaque != "" || !strings.EqualFold(parsed.Scheme, scheme) {
+			return fmt.Errorf("refusing to fetch from an opaque git URL")
 		}
 		if parsed.User == nil {
 			return nil
