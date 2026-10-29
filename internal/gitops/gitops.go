@@ -12,12 +12,17 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/relux-works/curator/internal/identity"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // AllowedProtocols is the GIT_ALLOW_PROTOCOL value for every network
@@ -405,11 +410,8 @@ func FetchIsolated(repo string) error {
 // than a possibly stale origin URL. Heads and tags are mapped into the same
 // local refs used by Resolve.
 func FetchURLIsolated(repo, remoteURL string) error {
-	trimmed := strings.TrimSpace(remoteURL)
-	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
-		return fmt.Errorf("refusing to fetch from suspicious git URL")
-	}
-	if err := EnsureRepo(repo); err != nil {
+	args, err := fetchURLArgs(repo, remoteURL)
+	if err != nil {
 		return err
 	}
 	env, cleanup, err := isolatedGitEnv()
@@ -417,13 +419,198 @@ func FetchURLIsolated(repo, remoteURL string) error {
 		return err
 	}
 	defer cleanup()
-	args := []string{
-		"fetch", "--force", "--prune", "--no-write-fetch-head", trimmed,
-		"+refs/heads/*:refs/remotes/origin/*",
-		"+refs/tags/*:refs/tags/*",
-	}
 	_, err = runWithEnv(repo, env, withIsolatedConfigArgs(args)...)
 	return err
+}
+
+// FetchURL refreshes one repository from an explicitly resolved endpoint
+// like FetchURLIsolated, but over the operator's configured transport, the
+// one Clone uses: ambient git and ssh configuration under the network
+// protocol allowlist. It never consults or rewrites the checkout's configured
+// remotes, so a cache whose stored origin is stale, or names a transport this
+// machine cannot authenticate, still refreshes from the endpoint the caller
+// asked for.
+func FetchURL(repo, remoteURL string) error {
+	if err := ValidateFetchEndpoint(remoteURL); err != nil {
+		return err
+	}
+	args, err := fetchURLArgs(repo, lowerURLScheme(remoteURL))
+	if err != nil {
+		return err
+	}
+	_, err = run(repo, args...)
+	return err
+}
+
+// fetchSchemes are the URL schemes of the descriptor contract, matched case
+// insensitively.
+var fetchSchemes = map[string]bool{"https": true, "http": true, "git": true, "ssh": true}
+
+// scpSchemeHosts are hosts a scp-like address without a user may not name:
+// `https:path` is an opaque scheme spelling, not an SSH host.
+var scpSchemeHosts = map[string]bool{"http": true, "https": true, "ssh": true, "git": true, "file": true, "ftp": true, "ftps": true, "ext": true, "fd": true}
+
+const maxFetchEndpoint = 4096
+
+var errFetchEndpoint = fmt.Errorf("refusing to fetch from a git endpoint that carries credentials or a malformed authority")
+
+// ValidateFetchEndpoint admits exactly the network sources the identity parser
+// reads whose git destination is the host their identity binding names,
+// minus the ones that carry credentials. Everything else refuses before any
+// git call, with a fixed error that never contains the endpoint:
+//   - identity.Parse must accept the endpoint as a network source, so a
+//     non-empty port, an IPv6 host, a non-portable identity or a percent
+//     escape refuses. The URL checks below also refuse an empty port, every
+//     bracketed authority and every URL that does not parse, which the
+//     identity parser lets through or reads as a scp address;
+//   - the host git contacts must equal the host of the canonical binding. A
+//     URL form must parse as a URL, without the identity parser's scp
+//     fallback, and its authority is the destination; a scp-like form uses
+//     git's own split;
+//   - user information appears only on ssh and scp-like forms, as a user name
+//     that is non-empty, has no ':' and does not start with '-', and on a
+//     scp-like form it equals the identity parser's user;
+//   - where git reads a leading letter and ':' as a drive (Git for Windows), a
+//     scp-like form with a one-letter host and no user refuses;
+//   - the URL scheme is https, http, git or ssh, in any case, with no `x::`
+//     remote-helper transport, opaque `scheme:` spelling, query or fragment;
+//   - the endpoint is valid UTF-8 without control characters, whitespace or
+//     backslash, does not start with '-' and is at most 4096 bytes.
+func ValidateFetchEndpoint(endpoint string) error {
+	if endpoint == "" || len(endpoint) > maxFetchEndpoint || !utf8.ValidString(endpoint) ||
+		strings.HasPrefix(endpoint, "-") || strings.ContainsAny(endpoint, "?#%\\") {
+		return errFetchEndpoint
+	}
+	for _, character := range endpoint {
+		if unicode.IsControl(character) || unicode.IsSpace(character) {
+			return errFetchEndpoint
+		}
+	}
+	canonical, err := identity.Parse(endpoint)
+	if err != nil || canonical == "" {
+		return errFetchEndpoint
+	}
+	boundHost, _, _ := strings.Cut(canonical, "/")
+	host, ok := fetchDestination(endpoint)
+	if !ok || strings.ToLower(host) != boundHost {
+		return errFetchEndpoint
+	}
+	return nil
+}
+
+// fetchDestination returns the host git contacts for endpoint, after checking
+// its scheme and user information. ok is false for a spelling outside the
+// descriptor contract.
+func fetchDestination(endpoint string) (host string, ok bool) {
+	if scheme, rest, found := strings.Cut(endpoint, "://"); found {
+		if !fetchSchemes[strings.ToLower(scheme)] {
+			return "", false
+		}
+		// The identity parser refuses a port but not an empty one
+		// (`https://h:/p`); no ':' in the host covers both, and bracketed
+		// hosts with them.
+		parsed, err := url.Parse(endpoint)
+		if err != nil || parsed.Host == "" || parsed.Opaque != "" || strings.ContainsAny(parsed.Host, ":[]") {
+			return "", false
+		}
+		if parsed.User != nil {
+			authority, _, _ := strings.Cut(rest, "/")
+			user := authority[:strings.LastIndex(authority, "@")]
+			_, hasPassword := parsed.User.Password()
+			if !strings.EqualFold(scheme, "ssh") || hasPassword || !validFetchUser(user) || parsed.User.Username() != user {
+				return "", false
+			}
+		}
+		return parsed.Hostname(), true
+	}
+	user, host, path, ok := gitSCPSplit(endpoint)
+	if !ok || path == "" || strings.HasPrefix(path, ":") || (user != "" && !validFetchUser(user)) {
+		return "", false
+	}
+	// git's user must be the identity parser's: `user:secret@h:path` makes git
+	// contact host `user`, and a bracketed scp host is not one the parser reads.
+	identityUser, identityHost, identityOK := identity.SCPUserHost(endpoint)
+	if !identityOK || identityUser != user || !strings.EqualFold(identityHost, host) {
+		return "", false
+	}
+	if user == "" && scpSchemeHosts[strings.ToLower(host)] {
+		return "", false
+	}
+	if user == "" && gitReadsDrivePrefix && len(host) == 1 && isASCIILetter(host[0]) {
+		return "", false
+	}
+	return host, true
+}
+
+// gitReadsDrivePrefix reports whether git reads an address that starts with
+// one letter and ':' as a local drive path. Git for Windows does (connect.c
+// url_is_local_not_ssh, has_dos_drive_prefix), so there `c:org/repo.git`
+// names a directory while the identity parser binds host `c`. A user in
+// front (`git@c:org/repo.git`) keeps it a scp address on every platform.
+var gitReadsDrivePrefix = runtime.GOOS == "windows"
+
+func isASCIILetter(character byte) bool {
+	return ('a' <= character && character <= 'z') || ('A' <= character && character <= 'Z')
+}
+
+// gitSCPSplit splits a scp-like address the way git's connect.c does. The
+// host may be bracketed, introduced by a leading '[' or by "@[" (host_end).
+// The path starts after the first ':' that follows that bracket, and the
+// user is everything before the host part's last '@', which is how ssh
+// splits the user@host argument git hands it. A spelling git cannot use (no
+// ':' after the bracket, as with "@[" in a path) does not split.
+func gitSCPSplit(endpoint string) (user, host, path string, ok bool) {
+	start := 0
+	if at := strings.Index(endpoint, "@["); at >= 0 {
+		start = at + 1
+	}
+	end := 0
+	if start < len(endpoint) && endpoint[start] == '[' {
+		if closing := strings.Index(endpoint[start+1:], "]"); closing >= 0 {
+			end = start + 1 + closing
+		}
+	}
+	colon := strings.Index(endpoint[end:], ":")
+	if colon < 0 {
+		return "", "", "", false
+	}
+	colon += end
+	hostPart := endpoint[:colon]
+	if at := strings.LastIndex(hostPart, "@"); at >= 0 {
+		return hostPart[:at], hostPart[at+1:], endpoint[colon+1:], true
+	}
+	return "", hostPart, endpoint[colon+1:], true
+}
+
+func validFetchUser(user string) bool {
+	return user != "" && !strings.HasPrefix(user, "-") && !strings.ContainsAny(user, ":/")
+}
+
+// lowerURLScheme lowercases a URL endpoint's scheme for git's argv only: the
+// descriptor contract matches schemes in any case, git does not, and the
+// identity binding compares the caller's own spelling.
+func lowerURLScheme(endpoint string) string {
+	if scheme, rest, found := strings.Cut(endpoint, "://"); found {
+		return strings.ToLower(scheme) + "://" + rest
+	}
+	return endpoint
+}
+
+// fetchURLArgs validates an explicit fetch endpoint and maps its heads and
+// tags into the same local refs Resolve reads.
+func fetchURLArgs(repo, remoteURL string) ([]string, error) {
+	trimmed := strings.TrimSpace(remoteURL)
+	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+		return nil, fmt.Errorf("refusing to fetch from suspicious git URL")
+	}
+	if err := EnsureRepo(repo); err != nil {
+		return nil, err
+	}
+	return []string{
+		"fetch", "--force", "--prune", "--no-write-fetch-head", "--", trimmed,
+		"+refs/heads/*:refs/remotes/origin/*",
+		"+refs/tags/*:refs/tags/*",
+	}, nil
 }
 
 // FetchCommitIsolated requests one locked object ID from the repository's

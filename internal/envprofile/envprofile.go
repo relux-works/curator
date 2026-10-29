@@ -843,7 +843,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil)
+			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil, manager.fetchRaw)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -1200,11 +1200,16 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile)
+	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile, nil)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+// requested carries the operator's spellings recorded by the operation that
+// delegates here (a same-source reinstall), keyed by canonical identity, so
+// the locked-source refresh fetches from the descriptor the operator named.
+// An update with nothing requested passes nil and refreshes through the
+// caches' stored remotes.
+func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error), requested map[string]string) (Info, bool, error) {
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
 	}
@@ -1250,6 +1255,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
 	}
 	manager := newGitManager(home).withPolicy(policy)
+	for canonical, raw := range requested {
+		manager.recordRaw(canonical, raw)
+	}
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, false, err
 	}

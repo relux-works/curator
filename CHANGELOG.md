@@ -4,6 +4,55 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- An existing profile source cache refreshes from the git descriptor the
+  operation names, not from the origin stored when the cache was first
+  cloned. A cache created through an HTTPS spelling whose transport the
+  machine can no longer authenticate made `curator profile install` with
+  the SSH descriptor of the same repository fail in
+  `git fetch --all --tags --prune`. The refresh now fetches the named URL over
+  the operator's configured transport (`gitops.FetchURL`, with the same head
+  and tag refspecs as `FetchURLIsolated`) and leaves the cache's configuration
+  untouched. A same-alias reinstall carries the requested descriptor into
+  the update it delegates to. A cache whose stored origin does not name the
+  same normalized repository identity, or has no single non-empty origin
+  (values are read NUL-delimited with repository-local includes expanded,
+  so an empty, blank or included extra value counts), refuses with
+  `profile_source_invalid` before any fetch. `gitops.FetchURL` admits
+  exactly the network sources the identity parser reads whose git
+  destination is the host of their identity binding, minus credential
+  carriers, and passes `--` before the endpoint. Refused before git runs,
+  without echoing the endpoint:
+  - an endpoint the identity parser rejects, which includes a non-empty
+    port, an IPv6 host and a non-portable identity. FetchURL additionally
+    refuses an empty port, every bracketed URL authority and every URL that
+    does not parse;
+  - an endpoint whose git destination differs from the binding's host. A URL
+    form must parse as a URL, so `ssh://foo[bar]@h/p`, which the identity
+    parser binds to host `ssh` while git contacts `h`, refuses. A scp-like
+    form is split the way git splits it (the first `:` after an optional
+    bracketed host), and its user must also equal the identity parser's, so
+    `user:secret@h:path`, where git would contact host `user`, refuses, as
+    does a closed `@[...]` bracket that moves git's host;
+  - a scp-like path with a closed `@[...]` bracket and no `:` after it, which
+    git itself cannot use ("no path specified"); an unmatched `[` stays
+    admitted;
+  - user information other than an ssh or scp-like user name that is
+    non-empty, has no `:` and does not start with `-`;
+  - on Windows, a scp-like address with a one-letter host and no user, such
+    as `c:org/repo.git`, which Git for Windows reads as a drive path while
+    the identity binds host `c` (`git@c:org/repo.git` stays admitted);
+  - remote-helper (`x::`) and opaque `scheme:` spellings;
+  - schemes other than https, http, git and ssh (any case; git receives the
+    scheme lowercased);
+  - queries, fragments, percent escapes, whitespace, control characters and
+    backslashes;
+  - a scheme-named scp host without a user, local and drive paths, a leading
+    `-`, and endpoints over 4096 bytes. An identity with no recorded
+  spelling still refreshes through its stored remotes, and exact-commit
+  replay is unchanged.
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed
