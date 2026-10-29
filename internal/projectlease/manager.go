@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	homeleasestate "github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/stateread"
@@ -153,6 +154,9 @@ func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lo
 		return err
 	}
 	// Authority and session callbacks may have observed artifacts earlier.
+	if err := homeleasestate.GuardMutation(m.home, lock, "project-leases", []string{filepath.Join(m.home, homeRelative(c))}); err != nil {
+		return err
+	}
 	// Recheck presence while the exact-home lock excludes the collector, before
 	// a durable lease can claim roots that no longer exist.
 	if err = m.verifyArtifacts(c); err != nil {
@@ -377,6 +381,9 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 			// A generated receipt can be empty; the native writable home still
 			// exists before transfer. Existing directories are never hardened.
 			projectHome := filepath.Join(m.home, key)
+			if err := homeleasestate.GuardMutation(m.home, lock, "project-leases", []string{projectHome}); err != nil {
+				return err
+			}
 			if err = checkedRoute(m.home, projectHome); err != nil {
 				return err
 			}

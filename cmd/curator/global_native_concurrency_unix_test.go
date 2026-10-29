@@ -53,10 +53,10 @@ func TestNativeCommandProcess(_ *testing.T) {
 	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.Getenv("CURATOR_NATIVE_GIT_CONFIG"))
 	for i, arg := range os.Args {
 		if arg == "--" {
-			os.Exit(run(os.Args[i+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
+			exitGuardedTests(run(os.Args[i+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
 		}
 	}
-	os.Exit(94)
+	exitGuardedTests(94)
 }
 
 // A CLI can run the production two-minute compiler before verification and
