@@ -46,21 +46,24 @@ func TestFetchURLArgs(t *testing.T) {
 
 // FetchURL admits the descriptor contract's network endpoints and refuses,
 // before git runs and without echoing the input, the ones that carry
-// credentials or a malformed authority. A fake git on PATH records every
-// invocation: each refused case leaves the marker empty and keeps the canary
-// out of the error, and each admitted case reaches git. Refused: remote-helper
-// transports of every spelling, passwords and user information outside ssh
-// and scp, percent-encoding, whitespace and newlines, empty and extra-slash
+// credentials, a malformed authority, or a destination other than the
+// identity binding's host. A fake git on PATH records every invocation: each
+// refused case leaves the marker empty and keeps the canary out of the error,
+// and each admitted case reaches git. Refused: remote-helper transports of
+// every spelling, passwords and user information outside ssh and scp,
+// percent-encoding, whitespace and newlines, empty and extra-slash
 // authorities, queries, fragments, opaque and option-shaped spellings, file
-// and local forms, a scheme-named scp host without a user, out-of-range or
-// empty ports, bracketed hosts that are not plain IPv6 addresses (IPv4-mapped
-// included), scp addresses where git's split and the identity parser disagree
-// on the user or host (`user:secret@h:path`, where git contacts host `user`;
-// a bracketed scp host the identity parser does not read), and "@[" in a scp
-// path, which git itself cannot use ("no path specified"). Admitted: https, http,
-// git:// and ssh in any scheme case, '@', Unicode and inner '-' in a path,
-// single-character and explicit-user scheme-named scp hosts, trailing-dot and
-// IDN hosts, ports 1-65535 and IPv6 literals.
+// and local forms, a scheme-named scp host without a user, every explicit port
+// and bracketed host (the identity parser reads neither), paths the identity
+// parser rejects (`a@b:secret@h:p`, `h:org/r@x:y`), ssh URL users that are not
+// URL user information (`ssh://foo[bar]@h/p`, where the identity parser falls
+// back to binding host `ssh` while git contacts `h`), an empty user or one
+// starting with '-', scp addresses where git's split and the identity parser
+// disagree on the user or host, and a closed "@[...]" bracket in a scp path,
+// which git itself cannot use ("no path specified"). Admitted: https, http,
+// git:// and ssh in any scheme case, '@', Unicode, an unmatched '[' and inner
+// '-' in a path, single-character and explicit-user scheme-named scp hosts,
+// trailing-dot and IDN hosts, and an inner '-' in a user.
 func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 	const c = "canary-secret-7f3a"
 	bin := t.TempDir()
@@ -127,6 +130,23 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 		"ssh://git@[::1]:/" + c + ".git",
 		"https://[::ffff:127.0.0.1]/" + c + ".git",
 		"https://[::ffff:7f00:1]/" + c + ".git",
+		"https://example.invalid:8443/" + c + ".git",
+		"https://example.invalid:1/" + c + ".git",
+		"https://example.invalid:65535/" + c + ".git",
+		"https://[::1]/" + c + ".git",
+		"https://[2001:db8::1]:8443/" + c + ".git",
+		"ssh://git@example.invalid:2222/" + c + ".git",
+		"ssh://git@[::1]/" + c + ".git",
+		"a@b:" + c + "@example.invalid:org/repo.git",
+		"example.invalid:org/r@x:" + c,
+		"ssh://foo[bar]@example.invalid/" + c + ".git",
+		"ssh://foo]bar@example.invalid/" + c + ".git",
+		"ssh://foo[bar@example.invalid/" + c + ".git",
+		"ssh://юзер@example.invalid/" + c + ".git",
+		"ssh://-oProxyCommand=" + c + "@example.invalid/team/repo.git",
+		"-oProxyCommand=" + c + "@example.invalid:team/repo.git",
+		"git@-oProxyCommand=" + c + ":team/repo.git",
+		"ssh://@example.invalid/" + c + ".git",
 		"ssh:" + c,
 		"https:" + c,
 		"C:/" + c,
@@ -157,15 +177,8 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 		"https://example.invalid/team/repo.git/",
 		"https://example.invalid./team/repo.git",
 		"https://xn--bcher-kva.example/team/repo.git",
-		"https://example.invalid:8443/team/repo.git",
-		"https://example.invalid:1/team/repo.git",
-		"https://example.invalid:65535/team/repo.git",
-		"https://[::1]/team/repo.git",
-		"https://[2001:db8::1]:8443/team/repo.git",
 		"ssh://git@example.invalid/team/repo.git",
-		"ssh://git@example.invalid:2222/team/repo.git",
 		"ssh://example.invalid/team/repo.git",
-		"ssh://git@[::1]/team/repo.git",
 		"ssh://foo;bar@example.invalid/team/repo.git",
 		"ssh://foo@bar@example.invalid/team/repo.git",
 		"git@example.invalid:team/repo.git",
@@ -178,6 +191,9 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 		"git@c:team/repo.git",
 		"example.invalid:/srv/team/repo.git",
 		"example.invalid:-team/repo.git",
+		"example.invalid:org/r@[x.git",
+		"ssh://a@-x@example.invalid/team/repo.git",
+		"git-x@example.invalid:team/repo.git",
 	} {
 		_ = os.Remove(marker)
 		if err := FetchURL(repo, url); err != nil && strings.HasPrefix(err.Error(), "refusing to fetch") {
@@ -189,12 +205,60 @@ func TestFetchURLAdmitsTheDescriptorContract(t *testing.T) {
 	}
 }
 
-// What git actually contacts over ssh is what the identity binding names. A
-// recording ssh on GIT_SSH captures the destination argument of a real git
-// fetch for every admitted ssh:// and scp-like descriptor family; its user
-// and host equal the identity parser's, and no argument carries the planted
-// secret. The scp spellings where git and the identity parser disagree refuse
-// before git, and the recording ssh never runs for them.
+// destinationRows is the argv-agreement table of scp, ssh and https
+// spellings, with SECRET standing for a planted secret. admit is the predicate's
+// verdict: an admitted row is an identity-parsed network source whose git
+// destination is the binding's host; every other row refuses.
+var destinationRows = []struct {
+	endpoint string
+	admit    bool
+}{
+	{"[::1]:", false}, {"[v]:", false}, {"git@[::1]:", false}, {"git@[v]:", false},
+	{"alice:SECRET@h:p", false}, {"a@b:SECRET@h:p", false}, {"ssh://a@b:SECRET@h/p", false},
+	{"u[:SECRET@h:p", false}, {"[foo:SECRET]@h:p", false}, {"a@b@h:p", false},
+	{"ssh://a@b@h/p", true}, {"a@b@c@h:p", false}, {"ssh://a@b@c@h/p", true},
+	{"user:SECRET@h:org/repo.git", false}, {"x:SECRET@h:22:p", false}, {"git:SECRET@h:22:p", false},
+	{"ssh://user:SECRET@h/p", false}, {"git@h:org/r@name.git", true}, {"h:org/r@x:y", false},
+	{"h:p@x:y", false}, {"h:p@[x]:y", false}, {"git@h:p@[x]:y", false},
+	{"foo[bar]@h:org/repo.git", true}, {"foo[bar@h:p", true}, {"foo]bar@h:p", true},
+	{"foo[bar]x@h:p", true}, {"ssh://foo[bar]@h/p", false}, {"ssh://foo]bar@h/p", false},
+	{"ssh://foo[bar@h/p", false}, {"ssh://foo[bar]@ssh/p", false}, {"git@[h]:p", false}, {"[h]:p", false},
+	{"git@h[x]:p", false}, {"git@h]x:p", false}, {"h:org/r[x].git", true},
+	{"h:org/r]x.git", true}, {"git@h:org/r@[x].git", false}, {"h:org/r@[x].git", false},
+	{"h:org/r@[x", true}, {"h:org/r@[x:y", false}, {"git@h:org/r@[x:y", false},
+	{"foo@[bar]@h:p", false}, {"foo@[bar@h:p", false}, {"@[x]:p", false}, {"@[x:p", false},
+	{"git@[::1]:p", false}, {"[::1]:p", false}, {"ssh://git@[::1]/p", false},
+	{"ssh://[::1]/p", false}, {"юзер@h:p", true}, {"ssh://юзер@h/p", false},
+	{"u%40x@h:p", false}, {"ssh://u%40x@h/p", false}, {"@h:p", false}, {"ssh://@h/p", false},
+	{"ssh://-oProxyCommand=x@h/p", false}, {"-oProxyCommand=x@h:p", false},
+	{"git@-oProxyCommand=x:p", false}, {"ssh://git@-oProxyCommand=x/p", false},
+	{"ssh://-oProxyCommand=x/p", false}, {"ssh://a@-oProxyCommand=x@h/p", true},
+	{"HTTPS://h/Org/Repo.git", true}, {"Http://h/Org/Repo.git", true},
+	{"SSH://git@H/Org/Repo.git", true}, {"ssh://h/p", true}, {"h:p", true},
+	{"ssh://u@H/p", true}, {"u@H:p", true}, {"ssh://foo;bar@h/p", true},
+	{"https://[::1]:/SECRET.git", false}, {"ssh://git@[::1]:/SECRET.git", false},
+	{"https://[::1]/p", false},
+	{"https://[v]:/SECRET.git", false}, {"ssh://git@[v]:/SECRET.git", false},
+	{"https://[v]/p", false}, {"ssh://git@[v]/p", false}, {"git@[v]:p", false}, {"[v]:p", false},
+	{"https://[::ffff:127.0.0.1]:/SECRET.git", false}, {"ssh://git@[::ffff:127.0.0.1]:/SECRET.git", false},
+	{"https://[::ffff:127.0.0.1]/p", false}, {"ssh://git@[::ffff:127.0.0.1]/p", false},
+	{"git@[::ffff:127.0.0.1]:p", false}, {"[::ffff:127.0.0.1]:p", false},
+	{"https://[::ffff:7f00:1]:/SECRET.git", false}, {"ssh://git@[::ffff:7f00:1]:/SECRET.git", false},
+	{"https://[::ffff:7f00:1]/p", false}, {"ssh://git@[::ffff:7f00:1]/p", false},
+	{"git@[::ffff:7f00:1]:p", false}, {"[::ffff:7f00:1]:p", false},
+	{"ssh://git@[2001:db8::1]:1/p", false}, {"ssh://[::1]:65535/p", false},
+	{"https://[2001:db8::1]:8443/p", false}, {"https://h:1/p", false}, {"https://h:65535/p", false},
+}
+
+// Every admitted row of the agreement table reaches the host its identity
+// binding names. For ssh and scp-like rows, a recording ssh on GIT_SSH
+// captures the destination argument of a real git fetch: its host equals the
+// host of identity.Parse's canonical binding, its user equals the identity
+// parser's user, and no argument carries the planted secret. For https rows,
+// whose destination is the URL authority, the parsed hostname equals the
+// binding host; git is not run for them. Every refused row refuses with the
+// fixed, input-free error, and the recording ssh never runs. The table is
+// finite: it shows agreement for these spellings, not for every byte string.
 func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 	const secret = "planted-secret-91c2"
 	bin := t.TempDir()
@@ -204,35 +268,52 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("GIT_SSH", filepath.Join(bin, "ssh"))
+	t.Setenv("GIT_SSH_COMMAND", "")
+	if err := os.Unsetenv("GIT_SSH_COMMAND"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_SSH_VARIANT", "ssh")
 	t.Setenv("SSH_LOG", log)
 	repo := t.TempDir()
 	if _, err := run(repo, "init", "-q"); err != nil {
 		t.Fatal(err)
 	}
-	for _, endpoint := range []string{
-		"ssh://git@github.com/Org/re.po_name-1.git",
-		"ssh://git@github-work/Org/nested/re.po_name-1.git",
-		"SSH://git@example.invalid/org/repo.git",
-		"ssh://foo;bar@example.invalid/org/repo.git",
-		"ssh://foo@bar@example.invalid/org/repo.git",
-		"ssh://git@example.invalid:2222/org/repo.git",
-		"git@github.com:Org/re.po_name-1.git",
-		"git@github-work:Org/nested/re.po_name-1.git",
-		"github-work:Org/repo.git",
-		"c:org/repo.git",
-		"git@c:org/repo.git",
-		"git@ssh:org/repo.git",
-		"git@example.invalid:/org/repo.git",
-		"foo[bar]@example.invalid:org/repo.git",
-		"git@example.invalid:org/r@name.git",
-	} {
+	admitted := 0
+	for _, row := range destinationRows {
+		endpoint := strings.ReplaceAll(row.endpoint, "SECRET", secret)
 		_ = os.Remove(log)
-		if err := FetchURL(repo, endpoint); err != nil && strings.HasPrefix(err.Error(), "refusing to fetch") {
-			t.Fatalf("%q refused: %v", endpoint, err)
+		if !row.admit {
+			err := ValidateFetchEndpoint(endpoint)
+			if err != errFetchEndpoint {
+				t.Errorf("%q: ValidateFetchEndpoint = %v, want the fixed refusal", endpoint, err)
+				continue
+			}
+			if err := FetchURL(repo, endpoint); err == nil || strings.Contains(err.Error(), secret) {
+				t.Errorf("%q: FetchURL err = %v, want an input-free refusal", endpoint, err)
+			}
+			if _, err := os.Stat(log); err == nil {
+				t.Errorf("%q: ssh ran for a refused endpoint", endpoint)
+			}
+			continue
 		}
+		admitted++
+		if err := ValidateFetchEndpoint(endpoint); err != nil {
+			t.Errorf("%q refused: %v", endpoint, err)
+			continue
+		}
+		wantUser, wantHost := identityUserHost(t, endpoint)
+		if scheme, _, _ := strings.Cut(strings.ToLower(endpoint), "://"); scheme == "https" || scheme == "http" {
+			parsed, err := url.Parse(endpoint)
+			if err != nil || strings.ToLower(parsed.Hostname()) != wantHost {
+				t.Errorf("%q: URL authority host does not equal binding host %q", endpoint, wantHost)
+			}
+			continue
+		}
+		_ = FetchURL(repo, endpoint)
 		recorded, err := os.ReadFile(log)
 		if err != nil {
-			t.Fatalf("%q: git did not run ssh: %v", endpoint, err)
+			t.Errorf("%q: git did not run ssh: %v", endpoint, err)
+			continue
 		}
 		args := strings.Split(strings.TrimSpace(string(recorded)), "\n")
 		destination := ""
@@ -246,41 +327,35 @@ func TestFetchURLSSHDestinationMatchesIdentity(t *testing.T) {
 		if at >= 0 {
 			gotUser, gotHost = destination[:at], destination[at+1:]
 		}
-		wantUser, wantHost := identityUserHost(t, endpoint)
-		if gotUser != wantUser || !strings.EqualFold(gotHost, wantHost) {
+		if gotUser != wantUser || strings.ToLower(gotHost) != wantHost {
 			t.Errorf("%q: git contacted user %q host %q, the identity binding names user %q host %q", endpoint, gotUser, gotHost, wantUser, wantHost)
 		}
 		if strings.Contains(string(recorded), secret) {
 			t.Errorf("%q: the ssh argv carries the secret", endpoint)
 		}
 	}
-	for _, endpoint := range []string{
-		"user:" + secret + "@example.invalid:org/repo.git",
-		"x:" + secret + "@example.invalid:22:org/repo.git",
-		"git:" + secret + "@example.invalid:22:org/repo.git",
-	} {
-		_ = os.Remove(log)
-		err := FetchURL(repo, endpoint)
-		if err == nil || !strings.HasPrefix(err.Error(), "refusing to fetch") || strings.Contains(err.Error(), secret) {
-			t.Fatalf("%q: err = %v, want an input-free refusal", endpoint, err)
-		}
-		if _, err := os.Stat(log); err == nil {
-			t.Fatalf("%q: ssh ran for a refused endpoint", endpoint)
-		}
+	if admitted == 0 || admitted == len(destinationRows) {
+		t.Fatalf("admitted %d of %d rows; the table needs both verdicts", admitted, len(destinationRows))
 	}
 }
 
-// identityUserHost is the user and host the identity binding reads.
+// identityUserHost is the user the identity parser reads and the host of the
+// canonical binding identity.Parse returns.
 func identityUserHost(t *testing.T, endpoint string) (string, string) {
 	t.Helper()
+	canonical, err := identity.Parse(endpoint)
+	if err != nil || canonical == "" {
+		t.Fatalf("%q: identity.Parse = %q, %v", endpoint, canonical, err)
+	}
+	host, _, _ := strings.Cut(canonical, "/")
 	if strings.Contains(endpoint, "://") {
 		parsed, err := url.Parse(endpoint)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("%q: %v", endpoint, err)
 		}
-		return parsed.User.Username(), parsed.Hostname()
+		return parsed.User.Username(), host
 	}
-	user, host, ok := identity.SCPUserHost(endpoint)
+	user, _, ok := identity.SCPUserHost(endpoint)
 	if !ok {
 		t.Fatalf("%q: not a scp-like address the identity parser reads", endpoint)
 	}

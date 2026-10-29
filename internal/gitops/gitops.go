@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"github.com/relux-works/curator/internal/identity"
 	"io"
-	"net/netip"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -453,20 +453,23 @@ const maxFetchEndpoint = 4096
 
 var errFetchEndpoint = fmt.Errorf("refusing to fetch from a git endpoint that carries credentials or a malformed authority")
 
-// ValidateFetchEndpoint admits every network endpoint of the descriptor
-// contract and refuses, before any git call and with a fixed error that never
-// contains the endpoint, the ones that carry credentials or a malformed
-// authority. The host grammar is the identity parser's own (identity.ValidHost,
-// a single character included; drive paths stay local). On top of it:
-//   - the URL scheme is https, http, git or ssh, in any case;
+// ValidateFetchEndpoint admits exactly the network sources the identity parser
+// reads whose git destination is the host their identity binding names,
+// minus the ones that carry credentials. Everything else refuses before any
+// git call, with a fixed error that never contains the endpoint:
+//   - identity.Parse must accept the endpoint as a network source, so a port,
+//     a bracketed host, a non-portable path or a percent escape refuses;
+//   - the host git contacts must equal the host of the canonical binding. A
+//     URL form must parse as a URL, without the identity parser's scp
+//     fallback, and its authority is the destination; a scp-like form uses
+//     git's own split;
 //   - user information appears only on ssh and scp-like forms, as a user name
-//     without ':';
-//   - a port is 1 to 65535, and a bracketed host is an IPv6 address;
-//   - there is no query, fragment, percent escape, `x::` remote-helper
-//     transport or opaque `scheme:` spelling;
-//   - the path is valid UTF-8 without control characters, whitespace,
-//     backslash, '?' or '#' ('@', Unicode and a '-' inside are admitted);
-//   - the endpoint does not start with '-' and is at most 4096 bytes.
+//     that is non-empty, has no ':' and does not start with '-', and on a
+//     scp-like form it equals the identity parser's user;
+//   - the URL scheme is https, http, git or ssh, in any case, with no `x::`
+//     remote-helper transport, opaque `scheme:` spelling, query or fragment;
+//   - the endpoint is valid UTF-8 without control characters, whitespace or
+//     backslash, does not start with '-' and is at most 4096 bytes.
 func ValidateFetchEndpoint(endpoint string) error {
 	if endpoint == "" || len(endpoint) > maxFetchEndpoint || !utf8.ValidString(endpoint) ||
 		strings.HasPrefix(endpoint, "-") || strings.ContainsAny(endpoint, "?#%\\") {
@@ -477,43 +480,57 @@ func ValidateFetchEndpoint(endpoint string) error {
 			return errFetchEndpoint
 		}
 	}
-	if scheme, rest, found := strings.Cut(endpoint, "://"); found {
-		if !fetchSchemes[strings.ToLower(scheme)] {
-			return errFetchEndpoint
-		}
-		authority, path, hasPath := strings.Cut(rest, "/")
-		if !hasPath || strings.Trim(path, "/") == "" {
-			return errFetchEndpoint
-		}
-		if at := strings.LastIndex(authority, "@"); at >= 0 {
-			if !strings.EqualFold(scheme, "ssh") || !validFetchUser(authority[:at]) {
-				return errFetchEndpoint
-			}
-			authority = authority[at+1:]
-		}
-		if !validFetchHostPort(authority) {
-			return errFetchEndpoint
-		}
-		return nil
-	}
-	if identity.IsDrivePath(endpoint) {
+	canonical, err := identity.Parse(endpoint)
+	if err != nil || canonical == "" {
 		return errFetchEndpoint
 	}
-	user, host, path, ok := gitSCPSplit(endpoint)
-	if !ok || path == "" || strings.HasPrefix(path, ":") || (user != "" && !validFetchUser(user)) {
-		return errFetchEndpoint
-	}
-	// What git contacts must be what the identity binding names: the same
-	// user and host. A disagreement (for example `user:secret@h:path`, where
-	// git connects to host `user`) refuses before git runs.
-	identityUser, identityHost, identityOK := identity.SCPUserHost(endpoint)
-	if !identityOK || identityUser != user || !strings.EqualFold(identityHost, host) {
-		return errFetchEndpoint
-	}
-	if !identity.ValidHost(host) || (user == "" && scpSchemeHosts[strings.ToLower(host)]) {
+	boundHost, _, _ := strings.Cut(canonical, "/")
+	host, ok := fetchDestination(endpoint)
+	if !ok || strings.ToLower(host) != boundHost {
 		return errFetchEndpoint
 	}
 	return nil
+}
+
+// fetchDestination returns the host git contacts for endpoint, after checking
+// its scheme and user information. ok is false for a spelling outside the
+// descriptor contract.
+func fetchDestination(endpoint string) (host string, ok bool) {
+	if scheme, rest, found := strings.Cut(endpoint, "://"); found {
+		if !fetchSchemes[strings.ToLower(scheme)] {
+			return "", false
+		}
+		// The identity parser refuses a port but not an empty one
+		// (`https://h:/p`); no ':' in the host covers both, and bracketed
+		// hosts with them.
+		parsed, err := url.Parse(endpoint)
+		if err != nil || parsed.Host == "" || parsed.Opaque != "" || strings.ContainsAny(parsed.Host, ":[]") {
+			return "", false
+		}
+		if parsed.User != nil {
+			authority, _, _ := strings.Cut(rest, "/")
+			user := authority[:strings.LastIndex(authority, "@")]
+			_, hasPassword := parsed.User.Password()
+			if !strings.EqualFold(scheme, "ssh") || hasPassword || !validFetchUser(user) || parsed.User.Username() != user {
+				return "", false
+			}
+		}
+		return parsed.Hostname(), true
+	}
+	user, host, path, ok := gitSCPSplit(endpoint)
+	if !ok || path == "" || strings.HasPrefix(path, ":") || (user != "" && !validFetchUser(user)) {
+		return "", false
+	}
+	// git's user must be the identity parser's: `user:secret@h:path` makes git
+	// contact host `user`, and a bracketed scp host is not one the parser reads.
+	identityUser, identityHost, identityOK := identity.SCPUserHost(endpoint)
+	if !identityOK || identityUser != user || !strings.EqualFold(identityHost, host) {
+		return "", false
+	}
+	if user == "" && scpSchemeHosts[strings.ToLower(host)] {
+		return "", false
+	}
+	return host, true
 }
 
 // gitSCPSplit splits a scp-like address the way git's connect.c does. The
@@ -546,47 +563,7 @@ func gitSCPSplit(endpoint string) (user, host, path string, ok bool) {
 }
 
 func validFetchUser(user string) bool {
-	return user != "" && !strings.ContainsAny(user, ":/")
-}
-
-// validFetchHostPort checks host[:port], where host is a portable hostname or a
-// bracketed IPv6 literal and a port is 1 to 65535.
-func validFetchHostPort(authority string) bool {
-	host, port := authority, ""
-	if strings.HasPrefix(authority, "[") {
-		closing := strings.Index(authority, "]")
-		if closing < 0 {
-			return false
-		}
-		host, port = authority[:closing+1], strings.TrimPrefix(authority[closing+1:], ":")
-		if closing+1 < len(authority) && (authority[closing+1] != ':' || port == "") {
-			return false
-		}
-		if !validIPv6Literal(host) {
-			return false
-		}
-	} else {
-		var hasPort bool
-		host, port, hasPort = strings.Cut(authority, ":")
-		if !identity.ValidHost(host) || (hasPort && port == "") {
-			return false
-		}
-	}
-	if port != "" {
-		number, err := strconv.Atoi(port)
-		if err != nil || number < 1 || number > 65535 || strconv.Itoa(number) != port {
-			return false
-		}
-	}
-	return true
-}
-
-func validIPv6Literal(host string) bool {
-	if !strings.HasPrefix(host, "[") || !strings.HasSuffix(host, "]") {
-		return false
-	}
-	address, err := netip.ParseAddr(host[1 : len(host)-1])
-	return err == nil && address.Is6() && !address.Is4In6() && address.Zone() == ""
+	return user != "" && !strings.HasPrefix(user, "-") && !strings.ContainsAny(user, ":/")
 }
 
 // lowerURLScheme lowercases a URL endpoint's scheme for git's argv only: the

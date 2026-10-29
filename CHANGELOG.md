@@ -19,23 +19,28 @@ All notable implementation changes are recorded here.
   same normalized repository identity, or has no single non-empty origin
   (values are read NUL-delimited with repository-local includes expanded,
   so an empty, blank or included extra value counts), refuses with
-  `profile_source_invalid` before any fetch. `gitops.FetchURL` admits the
-  descriptor contract's network endpoints minus credential carriers and
-  malformed authorities, and passes `--` before the endpoint. Refused before
-  git runs, without echoing the endpoint:
-  - user information other than an ssh or scp-like user name without `:`;
-  - a scp-like address whose user or host, split the way git splits it (the
-    first `:` after an optional bracketed host), differs from what the
-    identity parser binds, so `user:secret@h:path`, where git would contact
-    host `user`, refuses;
-  - `@[` in a scp-like path, which git itself cannot use ("no path
-    specified");
+  `profile_source_invalid` before any fetch. `gitops.FetchURL` admits
+  exactly the network sources the identity parser reads whose git
+  destination is the host of their identity binding, minus credential
+  carriers, and passes `--` before the endpoint. Refused before git runs,
+  without echoing the endpoint:
+  - an endpoint the identity parser rejects, including every explicit port,
+    bracketed host and non-portable path;
+  - an endpoint whose git destination differs from the binding's host. A URL
+    form must parse as a URL, so `ssh://foo[bar]@h/p`, which the identity
+    parser binds to host `ssh` while git contacts `h`, refuses. A scp-like
+    form is split the way git splits it (the first `:` after an optional
+    bracketed host), and its user must also equal the identity parser's, so
+    `user:secret@h:path`, where git would contact host `user`, refuses, as
+    does a closed `@[...]` bracket that moves git's host;
+  - a scp-like path with a closed `@[...]` bracket and no `:` after it, which
+    git itself cannot use ("no path specified"); an unmatched `[` stays
+    admitted;
+  - user information other than an ssh or scp-like user name that is
+    non-empty, has no `:` and does not start with `-`;
   - remote-helper (`x::`) and opaque `scheme:` spellings;
   - schemes other than https, http, git and ssh (any case; git receives the
     scheme lowercased);
-  - ports outside 1–65535 or empty, including after a bracketed host, and
-    bracketed hosts that are not plain IPv6 addresses (IPv4-mapped ones
-    included);
   - queries, fragments, percent escapes, whitespace, control characters and
     backslashes;
   - a scheme-named scp host without a user, local and drive paths, a leading
