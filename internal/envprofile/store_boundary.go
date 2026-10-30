@@ -300,9 +300,17 @@ func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, fa
 		if isCredentialRefusal(err) {
 			return err
 		}
+		if homeLeaseRefusal(err) {
+			return err
+		}
 		return fmt.Errorf("%s: %v", DiagRepairFailed, err)
 	}
-	defer func() { _ = op.close() }()
+	if req.borrowedOperation == nil {
+		defer func() { _ = op.close() }()
+	}
+	if err := homeLeaseGuard(req.Home, op.lock, []string{contextstore.EntryDir(req.Home, member.Kind, member.Name, member.PinKey())}); err != nil {
+		return err
+	}
 
 	roots, err := validateResolveRoots(req.Home, req.boundaryOwnerLookup)
 	if err != nil {

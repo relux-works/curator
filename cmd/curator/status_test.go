@@ -31,6 +31,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testhomeguard"
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
@@ -48,24 +49,37 @@ func TestMain(m *testing.M) {
 		if path := os.Getenv("CURATOR_TEST_MCP_TRIPWIRE"); path != "" {
 			_ = os.WriteFile(path, []byte("invoked"), 0600)
 		}
-		os.Exit(97)
+		exitGuardedTests(97)
 	}
 
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
-		os.Exit(runNativeBuildWorker())
+		exitGuardedTests(runNativeBuildWorker())
 	}
-	// Before any branch that runs tests: a CLI helper child runs git too.
-	restoreGitEnv := testgitenv.Isolate()
+	fixtureChild := (os.Getenv(cliHelperProcess) == "1" || os.Getenv(cliPathChild) == "1") && !testhomeguard.ControlProcess()
+	if code, parent := testhomeguard.Supervise(fixtureChild); parent {
+		os.Exit(code)
+	}
+	// Shared isolation always neutralizes Git. Restore only explicitly selected
+	// fixture roots before dispatch; ambient roots stay pinned by testgitenv.
+	previousHome, _ := os.UserHomeDir()
+	restoreGitEnv := isolateCLIProcess(fixtureChild)
+	if !fixtureChild {
+		if err := testhomeguard.CheckIsolation(previousHome); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			restoreGitEnv()
+			os.Exit(2)
+		}
+	}
 	if os.Getenv(cliHelperProcess) == "1" {
 		code := m.Run()
 		restoreGitEnv()
-		os.Exit(code)
+		exitGuardedTests(code)
 	}
 	restorePath, err := isolateCLIPath()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "isolate CLI test PATH:", err)
 		restoreGitEnv()
-		os.Exit(1)
+		exitGuardedTests(1)
 	}
 	// The parent already holds the host-toolchain lock. These children run
 	// only PATH isolation witnesses, including their explicit provider cases.
@@ -73,7 +87,7 @@ func TestMain(m *testing.M) {
 		code := m.Run()
 		restorePath()
 		restoreGitEnv()
-		os.Exit(code)
+		exitGuardedTests(code)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -82,7 +96,7 @@ func TestMain(m *testing.M) {
 		_, _ = fmt.Fprintln(os.Stderr, "acquire package host GOROOT test lock:", err)
 		restorePath()
 		restoreGitEnv()
-		os.Exit(1)
+		exitGuardedTests(1)
 	}
 	code := m.Run()
 	restorePath()
@@ -93,7 +107,7 @@ func TestMain(m *testing.M) {
 			code = 1
 		}
 	}
-	os.Exit(code)
+	exitGuardedTests(code)
 }
 
 func TestCLIHelperProcess(t *testing.T) {
@@ -109,9 +123,9 @@ func TestCLIHelperProcess(t *testing.T) {
 		}
 	}
 	if separator < 0 {
-		os.Exit(exitUsage)
+		exitGuardedTests(exitUsage)
 	}
-	os.Exit(run(os.Args[separator+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
+	exitGuardedTests(run(os.Args[separator+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
 }
 
 // capture runs one CLI invocation with a private config source and output

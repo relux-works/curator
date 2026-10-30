@@ -106,7 +106,13 @@ type detectedSkill struct {
 // that is already installed stops the import with
 // profile_import_name_taken before any write.
 func Import(home string, options ImportOptions) (Info, bool, bool, error) {
-	op, err := beginOperation(home)
+	name := options.As
+	if name == "" {
+		name = ImportProfileDefault
+	}
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) {
+		return homeLeaseInstallTargets(home, InstallOptions{As: name, Use: options.Use})
+	})
 	if err != nil {
 		return Info{}, false, false, err
 	}

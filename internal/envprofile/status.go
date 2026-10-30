@@ -329,6 +329,9 @@ func (req *StatusRequest) resolve() ResolveRequest {
 
 // StatusOf recomputes the profile × environment × surface matrix.
 func StatusOf(req StatusRequest) (*Status, error) {
+	if err := homeLeaseRead(req.Home, nil); err != nil {
+		return nil, err
+	}
 	shippedCodexSeedRevision := envregistry.CodexSeedRevision
 	if req.codexSeedRevisionForTest != "" {
 		if req.codexSeedRevisionForTest != envregistry.CodexSeedRevisionA && req.codexSeedRevisionForTest != envregistry.CodexSeedRevisionB {

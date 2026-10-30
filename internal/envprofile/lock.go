@@ -41,7 +41,26 @@ type operation struct {
 
 // newOperationEngine keeps recovery observation available to entry-point tests.
 var newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
-	return transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
+	check := func(lock transaction.HomeLock, journal transaction.Journal) error {
+		if journal.ProjectIdentity == "project-leases" {
+			return projectlease.TransactionCheck(home)(lock, journal)
+		}
+		return guardProjectLeaseJournal(home, lock, journal)
+	}
+	return transaction.New(home, append(options, transaction.WithCommitCheck(check))...)
+}
+
+// Foreign publication and the complete recovery inventory use the same physical
+// project-home target gate. Project-owned journals retain their artifact policy.
+func guardProjectLeaseJournal(home string, lock transaction.HomeLock, journal transaction.Journal) error {
+	if journal.ProjectIdentity == "project-leases" {
+		return nil
+	}
+	targets := make([]string, 0, len(journal.Targets))
+	for _, target := range journal.Targets {
+		targets = append(targets, target.LivePath)
+	}
+	return projectlease.GuardMutation(home, lock, targets)
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
@@ -97,6 +116,14 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 // beginOperationValidated checks read-only inputs under the lock before journal
 // recovery can write. All mutations also validate manager-wide authority.
 func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+	return beginOperationGuarded(home, validate, nil, options...)
+}
+
+func beginOperationSelected(home string, validate func() error, selectTargets func() ([]string, error), options ...transaction.Option) (*operation, error) {
+	return beginOperationSelectedRecovery(home, validate, selectTargets, true, options...)
+}
+
+func beginOperationSelectedRecovery(home string, validate func() error, selectTargets func() ([]string, error), recoverPending bool, options ...transaction.Option) (*operation, error) {
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err
@@ -122,12 +149,31 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 			return nil, err
 		}
 	}
+	targets, err := selectTargets()
+	if err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
+	if err := homeLeaseGuardBeforeRecovery(home, lock, targets); err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
 	engine, err := newOperationEngine(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
 	}
-	recovered, err := projectlease.RecoverUnderLock(home, lock, engine)
+	var recovered bool
+	if recoverPending {
+		// A commit refusal can abort its journal. Admit ALL foreign target sets
+		// read-only before replay so neither an earlier journal nor rollback writes.
+		_, err = engine.PendingRecoveryMatching(lock, func(journal transaction.Journal) (bool, error) {
+			return false, guardProjectLeaseJournal(home, lock, journal)
+		})
+		if err == nil {
+			recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+		}
+	}
 	if err != nil {
 		_ = lock.Close()
 		if isCredentialRefusal(err) {
@@ -140,6 +186,14 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 	if err := envauthority.Validate(home); err != nil {
 		_ = op.close()
 		return nil, op.recoveryRefusal(err)
+	}
+	// Generic lock/recovery acquisition does not declare a project-home write.
+	// Selected writers must qualify their complete target set after recovery.
+	if targets != nil {
+		if err := homeLeaseGuard(home, lock, targets); err != nil {
+			_ = op.close()
+			return nil, op.recoveryRefusal(err)
+		}
 	}
 	return op, nil
 }
