@@ -37,7 +37,7 @@ func Merge(payload []byte, nativeFile string) ([]byte, error) {
 			return nil, fmt.Errorf("invalid Claude settings JSON")
 		}
 		if err := json.Unmarshal(payload, &object); err != nil || object == nil {
-			return nil, fmt.Errorf("Claude settings must be an object")
+			return nil, fmt.Errorf("settings must be an object")
 		}
 	}
 	var excludes []string
