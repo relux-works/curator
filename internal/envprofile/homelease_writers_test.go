@@ -967,3 +967,111 @@ func TestHomeLeaseCredentialLinkRepair(t *testing.T) {
 		})
 	}
 }
+
+// W06: actual install/import --use and automatic first activation refuse
+// before publishing a new profile when they affect a leased old profile or
+// a physical native-home alias. Nonactivating installs/imports and the same
+// activation after break actually publish; an aliased target is then named
+// directly to satisfy the independent native route gate. Disjoint protection stays.
+// All import/native inputs are synthetic; no provider is launched.
+func TestHomeLeaseInstallImportActivation(t *testing.T) {
+	for _, operation := range []string{"install", "import"} {
+		for _, activation := range []string{"use", "first-alias"} {
+			t.Run(operation+"/"+activation, func(t *testing.T) {
+				fx, m, lease := leasedManagedFixture(t)
+				checkDisjoint := preserveDisjointHomeLease(t, fx)
+				source := t.TempDir()
+				writePackage(t, source, "activation-target", "1.0.0", "activation fixture\n")
+				seams := pinImportSeams(t)
+				for _, adapter := range Adapters {
+					writeNativeFile(t, seams.native[adapter.ID], adapter.Target, "activation fixture\n")
+				}
+				write := func(name string, use bool) (Info, bool, error) {
+					if operation == "import" {
+						opts := seams.options(Policy{})
+						opts.As, opts.Use = name, use
+						info, activated, _, err := Import(fx.home, opts)
+						return info, activated, err
+					}
+					info, activated, _, err := Install(fx.home, InstallOptions{Operand: source, As: name, Use: use})
+					return info, activated, err
+				}
+				// A genuinely disjoint import/install must not require breaking
+				// either existing reservation or switching the native scope.
+				protected := captureTree(t, ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI))
+				info, activated, err := write("nonactivating", false)
+				if err != nil || activated || info.Name != "nonactivating" {
+					t.Fatalf("nonactivating control: name=%s activated=%t err=%v", info.Name, activated, err)
+				}
+				if !reflect.DeepEqual(protected, captureTree(t, ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI))) {
+					t.Fatal("disjoint install changed protected home")
+				}
+				rows, err := m.List(context.Background(), envregistry.CodexCLI, fx.profile)
+				if err != nil || len(rows) != 1 || !reflect.DeepEqual(rows[0], *lease) {
+					t.Fatal("disjoint install changed target reservation", err)
+				}
+				checkDisjoint()
+				if activation == "first-alias" {
+					if err := os.Remove(CurrentFile(fx.home)); err != nil {
+						t.Fatal(err)
+					}
+					alias := filepath.Join(t.TempDir(), "native-alias")
+					if err := os.Symlink(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), alias); err != nil {
+						t.Fatal(err)
+					}
+					t.Setenv("CODEX_HOME", alias)
+				}
+				before, _ := captureFixtureState(t, fx)
+				_, _, err = write("activation-target", activation == "use")
+				requireHomeLeaseRefusal(t, err, lease.LeaseID)
+				after, _ := captureFixtureState(t, fx)
+				if !bytes.Equal(before, after) {
+					t.Fatal("activation refusal published partial profile/native state")
+				}
+				if _, err := os.Lstat(ProfileDir(fx.home, "activation-target")); !os.IsNotExist(err) {
+					t.Fatal("refused profile was published", err)
+				}
+				breakFixtureLease(t, m, lease)
+				if activation == "first-alias" {
+					// The native writer independently refuses a symlinked home.
+					// Its valid positive uses the same physical target directly.
+					t.Setenv("CODEX_HOME", ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI))
+				}
+				info, activated, err = write("activation-target", activation == "use")
+				if err != nil || !activated || info.Name != "activation-target" {
+					t.Fatalf("activation control: name=%s activated=%t entries=%+v err=%v", info.Name, activated, info.Activation, err)
+				}
+				if len(info.Activation) != len(Adapters) {
+					t.Fatalf("activation entry count %d", len(info.Activation))
+				}
+				for _, row := range info.Activation {
+					if !row.OK {
+						t.Fatalf("activation failed: %+v", row)
+					}
+				}
+				current, err := Current(fx.home)
+				if err != nil || current != "activation-target" {
+					t.Fatalf("current=%q, err=%v", current, err)
+				}
+				if _, _, _, err := loadResolveInputs(fx.home, "activation-target"); err != nil {
+					t.Fatal("actual installed lock/source missing", err)
+				}
+				for _, adapter := range Adapters {
+					native, err := NativeHome(adapter)
+					if err != nil {
+						t.Fatal(err)
+					}
+					payload, err := os.ReadFile(filepath.Join(native, adapter.Target))
+					if err != nil || !bytes.Contains(payload, []byte("activation fixture")) {
+						t.Fatal("native adapter did not materialize intended context", adapter.ID, err)
+					}
+					marker, err := envmarker.Read(native)
+					if err != nil || marker == nil || marker.Profile.Name != "activation-target" {
+						t.Fatal("native marker does not match selection", adapter.ID, err)
+					}
+				}
+				checkDisjoint()
+			})
+		}
+	}
+}
