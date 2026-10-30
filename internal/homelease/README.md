@@ -100,8 +100,10 @@ Writer coverage still needs a complete corpus adapter for all variants of the
 Borrowed global continuation and a two-environment native MCP batch have paired
 real writer controls. Shared-store reconstruction with two consumers, unmanaged
 takeover/backup, first provisioning and resolve/use/explicit identity migration
-also have real controls with disjoint protection retained. Selected explicit
-migration includes sibling environments; an actual legacy recovery journal
+also have real controls with disjoint protection retained. Native Codex selection
+protects the old and new profiles, including scoped clear and direct pointer
+setters; these fixtures do not cover every environment or physical native alias.
+Selected explicit migration includes sibling environments; an actual legacy recovery journal
 retains its conservative manager-wide guard. These controls do not cover every
 ownership combination. Cache
 publication and sweep use the real APIs with synthetic artifact bytes, inputs,
