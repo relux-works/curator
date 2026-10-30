@@ -158,3 +158,56 @@ func TestClaudeNativeMemorySettingsFileKinds(t *testing.T) {
 		})
 	}
 }
+
+// Changing the operator home makes its old exclusion stale without read-only
+// writes; repair preserves that exclusion and admits the new home in both forms.
+func TestClaudeNativeMemoryChangedHome(t *testing.T) {
+	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
+		t.Run(form, func(t *testing.T) {
+			firstHome := t.TempDir()
+			t.Setenv("HOME", firstHome)
+			t.Setenv("USERPROFILE", firstHome)
+			_, req, seed := claudeRepairFixture(t, form)
+			req.Repair = false
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("original home positive: %v", err)
+			}
+			root := filepath.Join(filepath.Dir(seed), "CLAUDE.md")
+			settings := filepath.Join(filepath.Dir(seed), "settings.json")
+			beforeRoot, beforeSeed, beforeSettings := readClaudeState(t, root), readClaudeState(t, seed), readClaudeState(t, settings)
+			nextHome := t.TempDir()
+			t.Setenv("HOME", nextHome)
+			t.Setenv("USERPROFILE", nextHome)
+			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), DiagHomeStale) || !strings.Contains(err.Error(), "native memory exclusion") {
+				t.Fatalf("changed home must refuse the stale exclusion: %v", err)
+			}
+			if !bytes.Equal(beforeRoot, readClaudeState(t, root)) || !bytes.Equal(beforeSeed, readClaudeState(t, seed)) || !bytes.Equal(beforeSettings, readClaudeState(t, settings)) {
+				t.Fatal("read-only changed-home refusal wrote context, seed or settings")
+			}
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatal(err)
+			}
+			req.Repair = false
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("repaired home positive: %v", err)
+			}
+			var got struct {
+				Excludes []string `json:"claudeMdExcludes"`
+			}
+			if err := json.Unmarshal(readClaudeState(t, settings), &got); err != nil {
+				t.Fatal(err)
+			}
+			for _, home := range []string{firstHome, nextHome} {
+				want := filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))
+				found := false
+				for _, exclude := range got.Excludes {
+					found = found || exclude == want
+				}
+				if !found {
+					t.Fatalf("repair did not retain exclusion %q", want)
+				}
+			}
+		})
+	}
+}
