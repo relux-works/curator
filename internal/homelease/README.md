@@ -110,7 +110,9 @@ refusal, ownership-conflict and relinking controls; Codex seed preservation is
 checked, while Claude Keychain and other credential backends remain unqualified.
 Install/import activation also refuses before publishing a new profile, including
 first activation with native-home physical overlap; real controls verify every
-native entry and the recorded choice after protection ends.
+native entry and the recorded choice after protection ends. Rendered-document
+batch repair is also paired across the admitted environments and both Claude
+forms, with actual document bytes restored after protection ends.
 Cache publication and sweep use the real APIs with synthetic artifact bytes, inputs,
 portable receipts and independent authority. The production profile compiled
 closure described in `docs/design/profile-skill-runtime.md` remains unqualified.

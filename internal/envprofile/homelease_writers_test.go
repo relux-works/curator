@@ -1075,3 +1075,109 @@ func TestHomeLeaseInstallImportActivation(t *testing.T) {
 		}
 	}
 }
+
+// W10: damage to actual manager-rendered documents cannot be repaired under
+// the matching lease, even though their managed links are unchanged. The
+// full rendered batch is restored after break while a disjoint lease stays.
+// Claude's copied root and immutable referenced modules are outside this test;
+// its real MCP document is included for both admitted forms. No provider runs.
+func TestHomeLeaseRenderedDocuments(t *testing.T) {
+	for _, tc := range []struct{ environment, form string }{
+		{envregistry.CodexCLI, envregistry.FormMonolithic},
+		{envregistry.ClaudeCode, envregistry.FormMonolithic},
+		{envregistry.ClaudeCode, envregistry.FormReferenced},
+		{envregistry.Muse, envregistry.FormMonolithic},
+	} {
+		t.Run(tc.environment+"/"+tc.form, func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx := writeManagedFixture(t, "render-fixture")
+			seedLiveNativeCredentials(t, fx)
+			if tc.environment == envregistry.Muse {
+				fx.native[envregistry.Muse] = t.TempDir()
+				if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-native\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			req := fx.request(tc.environment)
+			req.Machine.Forms = map[string]string{tc.environment: tc.form}
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatal(err)
+			}
+			checkDisjoint := preserveDisjointHomeLease(t, fx)
+			m, err := HomeLeaseManager(req, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := homelease.Request{Environment: tc.environment, Profile: fx.profile, LockSHA256: strings.TrimPrefix(fx.lockHash, "sha256:"), RequestID: "render-fixture", Holder: homelease.Holder{Kind: "prepared", Launcher: "curator-run", ManagerID: "fixture-manager", ManagerRegisteredAt: "2026-10-27T00:00:00Z", RequestID: "render-fixture"}}
+			out, reason, err := m.Acquire(context.Background(), request)
+			if err != nil || reason != "acquired" || !out.Changed || out.Lease == nil {
+				t.Fatalf("render admission: %+v %s %v", out, reason, err)
+			}
+			check := req
+			check.Repair = false
+			before, _ := captureFixtureState(t, fx)
+			if _, err := Resolve(check); err != nil {
+				t.Fatal("current leased render read", err)
+			}
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("current render read wrote fixture")
+			}
+			originals := map[string][]byte{}
+			root := ManagedHomeDir(fx.home, fx.profile, tc.environment)
+			marker := readManagedMarker(t, fx, tc.environment)
+			for _, surface := range marker.Surfaces {
+				for _, rel := range surface.Paths {
+					live := filepath.Join(root, filepath.FromSlash(rel))
+					target, err := os.Readlink(live)
+					if err != nil {
+						continue
+					}
+					if !filepath.IsAbs(target) {
+						target = filepath.Join(filepath.Dir(live), target)
+					}
+					// Select only the known rendered path for this surface, never
+					// an immutable pin or credential/native target.
+					target = filepath.Clean(target)
+					if target != storeDocPath(fx.home, fx.profile, tc.environment, rel) {
+						continue
+					}
+					payload, err := os.ReadFile(target)
+					if err != nil {
+						t.Fatal(err)
+					}
+					originals[target] = payload
+					if err := os.WriteFile(target, []byte("rendered fixture drift\n"), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if len(originals) == 0 {
+				t.Fatal("fixture exercised no actual rendered document")
+			}
+			before, _ = captureFixtureState(t, fx)
+			_, err = Resolve(req)
+			requireHomeLeaseRefusal(t, err, out.Lease.LeaseID)
+			after, _ = captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("leased rendered repair changed preimage")
+			}
+			breakFixtureLease(t, m, out.Lease)
+			if _, err := Resolve(req); err != nil {
+				t.Fatal("unleased rendered repair", err)
+			}
+			for path, want := range originals {
+				got, err := os.ReadFile(path)
+				if err != nil || !bytes.Equal(got, want) {
+					t.Fatal("rendered batch not restored", err)
+				}
+			}
+			if _, err := Resolve(check); err != nil {
+				t.Fatal("restored render not current", err)
+			}
+			t.Logf("qualified %d actual rendered documents", len(originals))
+			checkDisjoint()
+		})
+	}
+}
