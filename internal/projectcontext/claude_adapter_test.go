@@ -207,7 +207,12 @@ func TestClaudeCompositionMaterialization(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if string(settings) != "{\"permissions\":{\"allow\":[],\"defaultMode\":\"dontAsk\",\"deny\":[\"mcp__*\"]}}\n" {
+			var programmed map[string]json.RawMessage
+			if err := json.Unmarshal(settings, &programmed); err != nil {
+				t.Fatal(err)
+			}
+			if string(programmed["permissions"]) != `{"allow":[],"defaultMode":"dontAsk","deny":["mcp__*"]}` ||
+				len(programmed) != 2 || programmed["claudeMdExcludes"] == nil {
 				t.Fatal("repository permission imported")
 			}
 			if string(p.Files["skills/manual/SKILL.md"]) != compositionSkillDocument("manual", "# manual\n") || string(p.Files["skills/manual/references/manual.md"]) != "Whole skill reference.\n" {
@@ -266,8 +271,22 @@ func TestClaudeManagerControls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(granted.Files["settings.json"]) != "{\"permissions\":{\"allow\":[\"Read\"],\"defaultMode\":\"dontAsk\",\"deny\":[\"Write\",\"mcp__*\"]}}\n" {
+	var settings struct {
+		Permissions json.RawMessage `json:"permissions"`
+		Excludes    []string        `json:"claudeMdExcludes"`
+	}
+	if err := json.Unmarshal(granted.Files["settings.json"], &settings); err != nil {
+		t.Fatal(err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(settings.Permissions) != `{"allow":["Read"],"defaultMode":"dontAsk","deny":["Write","mcp__*"]}` {
 		t.Fatal("manager policy not programmed")
+	}
+	if !reflect.DeepEqual(settings.Excludes, []string{filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))}) {
+		t.Fatal("native memory exclusion not programmed")
 	}
 	if p.Record.PolicySHA256 == granted.Record.PolicySHA256 || p.Record.MaterializationSHA256 == granted.Record.MaterializationSHA256 {
 		t.Fatal("manager grants not bound")
