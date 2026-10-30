@@ -687,7 +687,7 @@ type seedBundle struct {
 	files map[string]seedFile
 	// xdg maps parent-relative names to operator absolute targets.
 	xdg map[string]string
-	// claudeInit marks the written (not copied) .claude.json seed.
+	// claudeInit marks the written (not copied) Claude state/settings seeds.
 	claudeInit     bool
 	claudePrepared *claudeSeedPlan
 	// codexSeedRecord is captured only when a codex_cli home is first
@@ -1382,6 +1382,9 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// or link replacement. Staging/rename I/O errors after this boundary are
 	// not an all-or-nothing home transaction (see atomicManagedFile).
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
+		if _, err := prepareClaudeSettings(root, homeRel); err != nil {
+			return op.recoveryRefusal(err)
+		}
 		seeds.claudePrepared, err = refreshClaudeSeed(op.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
 		if err != nil {
 			return op.recoveryRefusal(err)
@@ -1399,6 +1402,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	}
 	if seeds.claudeInit {
 		want[".claude.json"] = true
+		want["settings.json"] = true
 	}
 	for seed := range seeds.files {
 		want[seed] = true
@@ -1674,6 +1678,12 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
+		if err := publishClaudeSettings(root, homeRel); err != nil {
+			return nil, err
+		}
+		if !seenSeeds["settings.json"] {
+			recordedSeeds = append(recordedSeeds, "settings.json")
+		}
 		prepared, err := publishClaudeSeed(seeds.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
 		if err != nil {
 			return nil, err
@@ -2513,6 +2523,12 @@ func (v *verification) checkClaudeProject(req *ResolveRequest, plan *homePlan) {
 	if plan.adapter.ID != envregistry.ClaudeCode {
 		return
 	}
+	settings, settingsErr := prepareClaudeSettings(plan.homeDir, ".")
+	if settingsErr != nil {
+		v.reasons = append(v.reasons, settingsErr.Error())
+	} else if settings.payload != nil {
+		v.reasons = append(v.reasons, "managed Claude settings lack the native memory exclusion")
+	}
 	entries, err := claudeProjects(plan.homeDir)
 	if err != nil {
 		v.reasons = append(v.reasons, fmt.Sprintf("managed .claude.json is unreadable: %v", err))
@@ -3026,6 +3042,9 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 		if err != nil {
 			return err
 		}
+		if _, err := prepareClaudeSettings(root, homeRel); err != nil {
+			return err
+		}
 		// This callback holds the repair lock and precedes journal recovery,
 		// store rebuilding and legacy identity migration. Later refreshes do
 		// not replace this early refusal gate.
@@ -3182,6 +3201,10 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	}
 	if seeds.claudeInit {
 		writePaths[".claude.json"] = true
+		writePaths["settings.json"] = true
+		if err := checkManagedPrivateTarget(root, managedJoin(homeRel, "settings.json")); err != nil {
+			return nil, err
+		}
 	}
 	if seeds.claudeInit {
 		if err := checkManagedPrivateTarget(root, managedJoin(homeRel, ".claude.json")); err != nil {
