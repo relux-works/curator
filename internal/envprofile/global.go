@@ -63,6 +63,9 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 		}
 	}
 	defer closeOperation()
+	if err := homeLeaseGuard(home, op.lock, nil); err != nil {
+		return Info{}, err
+	}
 	if err := op.capture(ProfileDir(home, DefaultProfile), CurrentFile(home)); err != nil {
 		return Info{}, err
 	}

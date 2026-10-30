@@ -41,7 +41,26 @@ type operation struct {
 
 // newOperationEngine keeps recovery observation available to entry-point tests.
 var newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
-	return transaction.New(home, append(options, transaction.WithCommitCheck(projectlease.TransactionCheck(home)))...)
+	check := func(lock transaction.HomeLock, journal transaction.Journal) error {
+		if journal.ProjectIdentity == "project-leases" {
+			return projectlease.TransactionCheck(home)(lock, journal)
+		}
+		return guardProjectLeaseJournal(home, lock, journal)
+	}
+	return transaction.New(home, append(options, transaction.WithCommitCheck(check))...)
+}
+
+// Foreign publication and the complete recovery inventory use the same physical
+// project-home target gate. Project-owned journals retain their artifact policy.
+func guardProjectLeaseJournal(home string, lock transaction.HomeLock, journal transaction.Journal) error {
+	if journal.ProjectIdentity == "project-leases" {
+		return nil
+	}
+	targets := make([]string, 0, len(journal.Targets))
+	for _, target := range journal.Targets {
+		targets = append(targets, target.LivePath)
+	}
+	return projectlease.GuardMutation(home, lock, targets)
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
@@ -135,7 +154,7 @@ func beginOperationSelectedRecovery(home string, validate func() error, selectTa
 		_ = lock.Close()
 		return nil, err
 	}
-	if err := homeLeaseGuard(home, lock, targets); err != nil {
+	if err := homeLeaseGuardBeforeRecovery(home, lock, targets); err != nil {
 		_ = lock.Close()
 		return nil, err
 	}
@@ -146,7 +165,14 @@ func beginOperationSelectedRecovery(home string, validate func() error, selectTa
 	}
 	var recovered bool
 	if recoverPending {
-		recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+		// A commit refusal can abort its journal. Admit ALL foreign target sets
+		// read-only before replay so neither an earlier journal nor rollback writes.
+		_, err = engine.PendingRecoveryMatching(lock, func(journal transaction.Journal) (bool, error) {
+			return false, guardProjectLeaseJournal(home, lock, journal)
+		})
+		if err == nil {
+			recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+		}
 	}
 	if err != nil {
 		_ = lock.Close()
@@ -160,6 +186,14 @@ func beginOperationSelectedRecovery(home string, validate func() error, selectTa
 	if err := envauthority.Validate(home); err != nil {
 		_ = op.close()
 		return nil, op.recoveryRefusal(err)
+	}
+	// Generic lock/recovery acquisition does not declare a project-home write.
+	// Selected writers must qualify their complete target set after recovery.
+	if targets != nil {
+		if err := homeLeaseGuard(home, lock, targets); err != nil {
+			_ = op.close()
+			return nil, op.recoveryRefusal(err)
+		}
 	}
 	return op, nil
 }

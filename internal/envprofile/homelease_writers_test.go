@@ -17,6 +17,8 @@ import (
 	"github.com/relux-works/curator/internal/homelease"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/projectlease"
+	"github.com/relux-works/curator/internal/transaction"
 	"path/filepath"
 )
 
@@ -1476,5 +1478,248 @@ func TestHomeLeaseGlobalAddAndCompensation(t *testing.T) {
 				t.Fatal("actual managed skill projection missing", err)
 			}
 		})
+	}
+}
+
+type writerProjectAuthority struct {
+	home        string
+	composition projectlease.Composition
+}
+
+func (a writerProjectAuthority) Resolve(_ context.Context, held managerlock.Held, _, _ string) (projectlease.Composition, error) {
+	return a.composition, held.Validate(a.home)
+}
+func (a writerProjectAuthority) Authorize(_ context.Context, held managerlock.Held, _ projectlease.Composition, _ string) error {
+	return held.Validate(a.home)
+}
+func (a writerProjectAuthority) Observe(_ context.Context, session string, generation int64) (projectlease.Evidence, error) {
+	return projectlease.Evidence{SessionRef: session, Generation: generation, OwnerRef: "principal:operator", NoChildStarted: true, OwnershipReconciled: true}, nil
+}
+
+// W16: real native selection cannot write a busy project allocation, including
+// when no home-lease ledger exists. Reconciliation permits an actual write and
+// preserves a disjoint home lease. Composition/session authority is synthetic.
+func TestHomeLeaseNativeProjectBoundary(t *testing.T) {
+	for _, coexist := range []bool{false, true} {
+		t.Run(map[bool]string{false: "project-only", true: "disjoint-home-lease"}[coexist], func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx, _ := captureFixture(t)
+			checkDisjoint := func() {}
+			if coexist {
+				checkDisjoint = preserveDisjointHomeLease(t, fx)
+			}
+			c := projectlease.Composition{Ref: "composition:fixture", SHA256: strings.Repeat("a", 64), CheckoutID: "checkout", Profile: "project-fixture", Environment: envregistry.CodexCLI, HomeRef: "home:fixture", ConcurrentState: true, BuildKeys: []string{}, RuntimeEntries: []string{}, Generated: map[string]projectlease.Surface{}}
+			a := writerProjectAuthority{home: fx.home, composition: c}
+			p, err := projectlease.New(fx.home, a, a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = p.Update(context.Background(), c.Ref, c.SHA256, "principal:operator", map[string][]byte{}, false); err != nil {
+				t.Fatal(err)
+			}
+			binding, err := p.Acquire(context.Background(), projectlease.Request{LeaseID: "project-one", ContextRef: c.Ref, ContextSHA256: c.SHA256, OwnerRef: "principal:operator", SessionRef: "session:fixture", Generation: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			projectHome := filepath.Join(fx.home, "environments", "project-views", c.CheckoutID, c.Profile, c.Environment)
+			fx.native[envregistry.CodexCLI] = projectHome
+			t.Setenv("CODEX_HOME", projectHome)
+			// Physical aliases and absent suffixes must hit the same busy allocation;
+			// a disjoint path and an explicit empty target set must remain writable.
+			func() {
+				manager, err := managerlock.New(fx.home)
+				if err != nil {
+					t.Fatal(err)
+				}
+				lock, err := manager.AcquireHomeOnly(context.Background(), false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = lock.Close() }()
+				alias := filepath.Join(t.TempDir(), "project-alias")
+				if err = os.Symlink(projectHome, alias); err != nil {
+					t.Fatal(err)
+				}
+				for _, targets := range [][]string{nil, {projectHome}, {filepath.Join(alias, "absent-child")}} {
+					if err = projectlease.GuardMutation(fx.home, lock, targets); err == nil || !strings.Contains(err.Error(), projectlease.Busy) {
+						t.Fatalf("project target guard: %v", err)
+					}
+				}
+				for _, targets := range [][]string{{}, {fx.native[envregistry.ClaudeCode]}} {
+					if err = projectlease.GuardMutation(fx.home, lock, targets); err != nil {
+						t.Fatalf("disjoint/empty project targets: %v", err)
+					}
+				}
+				managerAlias := filepath.Join(t.TempDir(), "manager-alias")
+				if err = os.Symlink(fx.home, managerAlias); err != nil {
+					t.Fatal(err)
+				}
+				if err = projectlease.GuardMutation(managerAlias, lock, []string{projectHome}); err == nil || !strings.Contains(err.Error(), projectlease.Busy) {
+					t.Fatalf("same physical manager guard: %v", err)
+				}
+				foreignManager, err := managerlock.New(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				foreign, err := foreignManager.AcquireHomeOnly(context.Background(), false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = foreign.Close() }()
+				if err = projectlease.GuardMutation(fx.home, foreign, []string{projectHome}); !errors.Is(err, managerlock.ErrNotHeld) {
+					t.Fatalf("foreign project witness: %v", err)
+				}
+				if err = lock.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if err = projectlease.GuardMutation(fx.home, lock, []string{projectHome}); !errors.Is(err, managerlock.ErrNotHeld) {
+					t.Fatalf("closed project witness: %v", err)
+				}
+			}()
+			write := func() error {
+				rows, err := UseWithPolicy(fx.home, fx.profile, envregistry.CodexCLI, "", false, Policy{})
+				if err == nil && (len(rows) != 1 || !rows[0].OK) {
+					t.Fatalf("native write incomplete: %+v", rows)
+				}
+				return err
+			}
+			before, _ := captureFixtureState(t, fx)
+			err = write()
+			after, _ := captureFixtureState(t, fx)
+			if err == nil || !strings.Contains(err.Error(), projectlease.Busy) {
+				t.Fatalf("busy project native write: error=%v; protected preimage changed=%v", err, !bytes.Equal(before, after))
+			}
+			if !bytes.Equal(before, after) {
+				t.Fatal("busy project refusal changed full fixture preimage")
+			}
+			checkDisjoint()
+			if err = p.Reconcile(context.Background(), binding.LeaseID); err != nil {
+				t.Fatal(err)
+			}
+			if err = write(); err != nil {
+				t.Fatalf("reconciled native write: %v", err)
+			}
+			raw, err := os.ReadFile(filepath.Join(projectHome, "AGENTS.md"))
+			if err != nil || !bytes.Contains(raw, []byte("hello")) {
+				t.Fatalf("positive native document: %q %v", raw, err)
+			}
+			marker, markerErr := envmarker.Read(projectHome)
+			if markerErr != nil || marker == nil || marker.Profile.Name != fx.profile {
+				t.Fatalf("native profile: %+v", marker)
+			}
+			rows, err := p.Status(context.Background())
+			if err != nil || len(rows) != 1 || rows[0].Busy || rows[0].State != projectlease.Released {
+				t.Fatalf("project release changed: %+v %v", rows, err)
+			}
+			checkDisjoint()
+		})
+	}
+}
+
+// W16/W17: recovery must qualify the COMPLETE foreign-journal target inventory
+// before replay, even if a disjoint journal sorts first. Real project reconcile
+// then permits both writes. The pending history and session proof are synthetic.
+func TestHomeLeaseProjectJournalRecovery(t *testing.T) {
+	isolateHomeLeaseWriters(t)
+	fx, _ := captureFixture(t)
+	c := projectlease.Composition{Ref: "composition:fixture", SHA256: strings.Repeat("a", 64), CheckoutID: "checkout", Profile: "project-fixture", Environment: envregistry.CodexCLI, HomeRef: "home:fixture", ConcurrentState: true, BuildKeys: []string{}, RuntimeEntries: []string{}, Generated: map[string]projectlease.Surface{}}
+	a := writerProjectAuthority{home: fx.home, composition: c}
+	p, err := projectlease.New(fx.home, a, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = p.Update(context.Background(), c.Ref, c.SHA256, "principal:operator", map[string][]byte{}, false); err != nil {
+		t.Fatal(err)
+	}
+	b, err := p.Acquire(context.Background(), projectlease.Request{LeaseID: "project-one", ContextRef: c.Ref, ContextSHA256: c.SHA256, OwnerRef: "principal:operator", SessionRef: "session:fixture", Generation: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lm, err := managerlock.New(fx.home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := lm.Home()
+	lock, err := lm.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lock.Close() }()
+	engine, err := transaction.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type pendingWriter struct {
+		id, target  string
+		payload     []byte
+		journalPath string
+		journal     []byte
+	}
+	pending := []pendingWriter{
+		{id: "a-disjoint", target: filepath.Join(home, "journal-safe.txt"), payload: []byte("safe journal effect\n")},
+		{id: "z-project", target: filepath.Join(home, "environments", "project-views", c.CheckoutID, c.Profile, c.Environment, "journal-effect.txt"), payload: []byte("project journal effect\n")},
+	}
+	// The bare engine constructs real durable intent as a bounded fault plant;
+	// it does not stand in for admitted envprofile publication policy.
+	for i := range pending {
+		item := &pending[i]
+		source := filepath.Join(t.TempDir(), "staged")
+		if err = os.WriteFile(source, item.payload, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = engine.Prepare(lock, transaction.Plan{TransactionID: item.id, ProjectIdentity: "profiles", Targets: []transaction.Target{{Class: "profile-record", Identifier: item.target, LivePath: item.target, StagedSource: source, PreimageDigest: transaction.DigestAbsent}}}); err != nil {
+			t.Fatal(err)
+		}
+		item.journalPath = filepath.Join(home, "state", "transactions", "v1", item.id+".json")
+		item.journal, err = os.ReadFile(item.journalPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := captureFixtureState(t, fx)
+	op, err := beginOperation(home)
+	if op != nil {
+		_ = op.close()
+	}
+	if err == nil || !strings.Contains(err.Error(), projectlease.Busy) {
+		t.Fatalf("busy foreign-journal recovery: %v", err)
+	}
+	after, _ := captureFixtureState(t, fx)
+	if !bytes.Equal(before, after) {
+		t.Fatal("foreign-journal refusal changed full pending preimage or replayed disjoint first journal")
+	}
+	// Withdraw only our fault-planted journal receipts so the real project owner
+	// can reconcile without replaying foreign intent, then restore exact receipts.
+	for _, item := range pending {
+		if err = os.Remove(item.journalPath); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = p.Reconcile(context.Background(), b.LeaseID); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range pending {
+		if err = os.WriteFile(item.journalPath, item.journal, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	op, err = beginOperation(home)
+	if err != nil {
+		t.Fatalf("reconciled foreign-journal recovery: %v", err)
+	}
+	if err = op.close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range pending {
+		raw, readErr := os.ReadFile(item.target)
+		if readErr != nil || !bytes.Equal(raw, item.payload) {
+			t.Fatalf("recovery positive %s: %q %v", item.id, raw, readErr)
+		}
+		if _, err = os.Lstat(item.journalPath); !os.IsNotExist(err) {
+			t.Fatalf("recovered journal remains %s: %v", item.id, err)
+		}
 	}
 }
