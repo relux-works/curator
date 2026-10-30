@@ -3,6 +3,7 @@ package projectlease
 import (
 	"context"
 	"errors"
+	"github.com/relux-works/curator/internal/transaction"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,16 +56,26 @@ func TestAcquireArtifactsBeforeCommit(t *testing.T) {
 					t.Skipf("symlink unavailable: %v", err)
 				}
 			}
+			// Observe publication itself: a later commit rejection and clean
+			// rollback cannot stand in for the required earlier artifact preflight.
+			publicationEvents := 0
+			f.m.hooks = transaction.Hooks{Fault: func(transaction.Event) error { publicationEvents++; return nil }}
 			r := f.reserve("one")
 			_, err := f.m.Acquire(context.Background(), r)
 			if kind == "present" {
 				if err != nil {
 					t.Fatal("present artifact refused", err)
 				}
+				if publicationEvents == 0 {
+					t.Fatal("present artifact did not exercise publication observation")
+				}
 				return
 			}
 			if !errors.Is(err, ErrArtifactsUnavailable) {
 				t.Fatalf("missing artifact admission = %v, want typed refusal", err)
+			}
+			if publicationEvents != 0 {
+				t.Fatal("missing artifact admission entered publication")
 			}
 			if HasState(f.home) {
 				t.Fatal("missing artifact admission allocated lease namespace")
@@ -84,6 +95,9 @@ func TestAcquireArtifactsBeforeCommit(t *testing.T) {
 			}
 			if _, err = f.m.Acquire(context.Background(), r); err != nil {
 				t.Fatal("restored artifact retry refused", err)
+			}
+			if publicationEvents == 0 {
+				t.Fatal("restored artifact did not exercise publication observation")
 			}
 		})
 	}
