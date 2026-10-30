@@ -113,6 +113,12 @@ All notable implementation changes are recorded here.
     `-`, and endpoints over 4096 bytes. An identity with no recorded
   spelling still refreshes through its stored remotes, and exact-commit
   replay is unchanged.
+### Fixed
+
+- Claude settings exclude the operator's native `.claude/CLAUDE.md` from
+  parent-memory discovery while retaining project and profile instructions.
+  Managed-home repair preserves existing exclusions and unrelated settings,
+  refuses malformed input, and leaves satisfied settings untouched.
 
 ## v0.15.0-rc.9 — 2026-10-24
 
