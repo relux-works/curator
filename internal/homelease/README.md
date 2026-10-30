@@ -96,7 +96,7 @@ complete execution of all 68 semantic pairs.
 Consumer vectors HL21–HL24, including launcher `op.json` settlement and zero
 manager calls on terminal replay, require the actual consumer implementation.
 Writer coverage still needs a complete corpus adapter for all variants of the
-18 writer rows, especially global-add compensation and interrupted custom migration recovery.
+18 writer rows, especially global-add compensation and owner-specific recovery.
 Borrowed global continuation and a two-environment native MCP batch have paired
 real writer controls. Shared-store reconstruction with two consumers, unmanaged
 takeover/backup, first provisioning and resolve/use/explicit identity migration
@@ -104,7 +104,9 @@ also have real controls with disjoint protection retained. Native Codex selectio
 protects the old and new profiles, including scoped clear and direct pointer
 setters; these fixtures do not cover every environment or physical native alias.
 Selected explicit migration includes sibling environments; an actual legacy recovery journal
-retains its conservative manager-wide guard. These controls do not cover every
+retains its conservative manager-wide guard. Interrupted apply/rollback fixtures
+exercise actual generated credential-migration intent, refuse leased or foreign
+recovery writes, and restore prior state before fresh acquisition. These controls do not cover every
 ownership combination. Codex and Muse credential-link repairs also have real
 refusal, ownership-conflict and relinking controls; Codex seed preservation is
 checked, while Claude Keychain and other credential backends remain unqualified.
