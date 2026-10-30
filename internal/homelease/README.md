@@ -98,7 +98,12 @@ manager calls on terminal replay, require the actual consumer implementation.
 Writer coverage still needs a complete corpus adapter for all variants of the
 18 writer rows, especially global-add compensation and interrupted custom migration recovery.
 Borrowed global continuation and a two-environment native MCP batch have paired
-real writer controls; these do not cover every ownership combination. Cache
+real writer controls. Shared-store reconstruction with two consumers, unmanaged
+takeover/backup, first provisioning and resolve/use/explicit identity migration
+also have real controls with disjoint protection retained. Selected explicit
+migration includes sibling environments; an actual legacy recovery journal
+retains its conservative manager-wide guard. These controls do not cover every
+ownership combination. Cache
 publication and sweep use the real APIs with synthetic artifact bytes, inputs,
 portable receipts and independent authority. The production profile compiled
 closure described in `docs/design/profile-skill-runtime.md` remains unqualified.
