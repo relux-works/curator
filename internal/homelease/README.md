@@ -33,7 +33,11 @@ borrows one real `managerlock` acquisition and uses the existing transaction
 journal for staging, forward publication, compensation and recovery. The
 project-lease carrier and `project_view_busy` remain unchanged. Recovery checks
 the complete pending inventory before replaying its first write. A failed
-terminal publication retains pending intent until explicit recovery.
+publication either completes rollback or retains pending intent for explicit
+recovery. Completed rollback removes only unchanged, empty namespace directories
+created by that publication; pre-existing directories and unknown content remain.
+A failed first acquisition can therefore be retried after completed rollback
+without treating an unexplained missing ledger as authoritative absence.
 
 `state.Guard` compares a command's complete affected target set against every
 blocking record, including prepared and unknown holders. The same OS-lock
@@ -67,9 +71,7 @@ tombstone; it makes no claim to have killed any process.
 Run the store, schema, journal and writer regressions with:
 
 ```sh
-runner_home=$(mktemp -d)
-env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS HOME="$runner_home" \
-  go test ./internal/homelease/... ./internal/envprofile ./internal/transaction ./internal/projectlease ./internal/scopes ./cmd/curator
+bash .github/ci/isolated-test.sh go test ./internal/homelease/... ./internal/envprofile ./internal/transaction ./internal/projectlease ./internal/scopes ./cmd/curator
 ```
 
 The envprofile and CLI package entry points additionally isolate native defaults
