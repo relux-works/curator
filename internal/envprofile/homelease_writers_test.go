@@ -15,6 +15,8 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/homelease"
+	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/manifest"
 	"path/filepath"
 )
 
@@ -1341,6 +1343,137 @@ func TestHomeLeaseInterruptedCustomMigration(t *testing.T) {
 			replayed, _, err := m.Acquire(context.Background(), fresh)
 			if err != nil || replayed.Changed || replayed.Lease == nil || admitted.Lease == nil || replayed.Lease.LeaseID != admitted.Lease.LeaseID {
 				t.Fatal("recovered acquire replay changed reservation", err)
+			}
+		})
+	}
+}
+
+// W08/W18: standalone and borrowed real global additions refuse before
+// publication under a matching lease. After break, actual Git-backed skill
+// projection/declaration succeeds; a failed borrowed continuation restores
+// mutable profile/native/declaration preimages and permits a real retry.
+// Immutable admitted entries may remain. Legacy whole-manager disjoint
+// availability is not claimed. The repository transport and homes are fixtures.
+func TestHomeLeaseGlobalAddAndCompensation(t *testing.T) {
+	for _, mode := range []string{"standalone", "borrowed", "compensate"} {
+		t.Run(mode, func(t *testing.T) {
+			fx, m, lease := leasedManagedFixture(t)
+			globalRoot := filepath.Join(fx.home, "global")
+			if err := os.MkdirAll(globalRoot, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manifest.EnsureEmpty(globalRoot); err != nil {
+				t.Fatal(err)
+			}
+			originalDeclaration, err := os.ReadFile(manifest.PathIn(globalRoot))
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids := newGitIdentities(t)
+			repo := gitRepo(t, map[string]string{"SKILL.md": "# Global fixture\n"}, "v1.0.0")
+			commit := fixtureGitOutput(t, repo, "rev-parse", "HEAD")
+			operand := ids.serve(repo, "https://example.com/skills/global-added")
+			addition := DirectSkill{Name: "global-added", Git: operand, Revision: commit}
+			called := 0
+			planted := errors.New("fixture legacy continuation failed")
+			failContinuation := mode == "compensate"
+			assertDeclaration := func() {
+				t.Helper()
+				decl, err := manifest.Load(filepath.Join(fx.home, "global"))
+				if err != nil || decl == nil || len(decl.Skills) != 1 || decl.Skills[0].Name != addition.Name || decl.Skills[0].Ref.Kind != "revision" || decl.Skills[0].Ref.Value != commit {
+					t.Fatalf("actual added declaration missing: %+v %v", decl, err)
+				}
+			}
+			write := func() (Info, error) {
+				if mode == "standalone" {
+					return GlobalAdd(fx.home, addition, Policy{}, envregistry.DefaultMachineConfig(), fx.request(envregistry.CodexCLI).NativeHomeOf)
+				}
+				locks, err := managerlock.New(fx.home)
+				if err != nil {
+					return Info{}, err
+				}
+				lock, err := locks.AcquireHomeOnly(context.Background(), false)
+				if err != nil {
+					return Info{}, err
+				}
+				defer func() { _ = lock.Close() }()
+				return GlobalSkillTransaction(fx.home, Policy{}, envregistry.DefaultMachineConfig(), &addition, fx.request(envregistry.CodexCLI).NativeHomeOf, lock, func() error {
+					called++
+					assertDeclaration()
+					if failContinuation {
+						return planted
+					}
+					return nil
+				})
+			}
+			before, _ := captureFixtureState(t, fx)
+			_, err = write()
+			requireHomeLeaseRefusal(t, err, lease.LeaseID)
+			after, _ := captureFixtureState(t, fx)
+			if called != 0 || !bytes.Equal(before, after) {
+				t.Fatal("global-add refusal changed preimage or entered continuation")
+			}
+			breakFixtureLease(t, m, lease)
+			if mode == "compensate" {
+				mutable := func() map[string]map[string]string {
+					v := map[string]map[string]string{"profiles": captureTree(t, ProfilesDir(fx.home)), "managed": captureTree(t, EnvRoot(fx.home))}
+					for id, root := range fx.native {
+						v[id] = captureTree(t, root)
+					}
+					return v
+				}
+				prior := mutable()
+				_, err := write()
+				var compensation *GlobalCompensationError
+				if !errors.Is(err, planted) || errors.As(err, &compensation) || called != 1 {
+					t.Fatalf("intended compensated failure missing: calls=%d %v", called, err)
+				}
+				if !reflect.DeepEqual(prior, mutable()) {
+					t.Fatal("global compensation did not restore mutable profile/native preimages")
+				}
+				if got, err := os.ReadFile(manifest.PathIn(globalRoot)); err != nil || !bytes.Equal(got, originalDeclaration) {
+					t.Fatal("global compensation did not restore original declaration", err)
+				}
+				current, err := Current(fx.home)
+				if err != nil || current != fx.profile {
+					t.Fatal("compensation changed selection", err)
+				}
+				failContinuation = false
+			}
+			info, err := write()
+			if err != nil || info.Lock == nil {
+				t.Fatal("unleased global addition failed", err)
+			}
+			member, ok := info.Lock.Find("skill", addition.Name)
+			if !ok || member.Commit != commit {
+				t.Fatal("real global addition did not extend lock")
+			}
+			wantCalls := 0
+			if mode == "borrowed" {
+				wantCalls = 1
+			}
+			if mode == "compensate" {
+				wantCalls = 2
+			}
+			if called != wantCalls {
+				t.Fatalf("continuation calls %d want %d", called, wantCalls)
+			}
+			if mode != "standalone" {
+				assertDeclaration()
+			}
+			for _, adapter := range Adapters {
+				native, err := NativeHome(adapter)
+				if err != nil {
+					t.Fatal(err)
+				}
+				payload, err := os.ReadFile(filepath.Join(native, inPlaceSkillsDir(adapter.ID), addition.Name, "SKILL.md"))
+				if err != nil || string(payload) != "# Global fixture\n" {
+					t.Fatal("actual native skill projection missing", adapter.ID, err)
+				}
+			}
+			payload, err := os.ReadFile(filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), "skills", addition.Name, "SKILL.md"))
+			if err != nil || string(payload) != "# Global fixture\n" {
+				t.Fatal("actual managed skill projection missing", err)
 			}
 		})
 	}

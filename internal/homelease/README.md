@@ -96,9 +96,12 @@ complete execution of all 68 semantic pairs.
 Consumer vectors HL21–HL24, including launcher `op.json` settlement and zero
 manager calls on terminal replay, require the actual consumer implementation.
 Writer coverage still needs a complete corpus adapter for all variants of the
-18 writer rows, especially global-add compensation and owner-specific recovery.
+18 writer rows, especially remaining legacy disjoint variants and owner-specific recovery.
 Borrowed global continuation and a two-environment native MCP batch have paired
-real writer controls. Shared-store reconstruction with two consumers, unmanaged
+real writer controls. Actual standalone/borrowed global addition extends the lock
+and projects a Git-backed skill; a failed continuation restores mutable records,
+native trees and the declaration before a successful retry. Immutable admitted
+entries may remain. Shared-store reconstruction with two consumers, unmanaged
 takeover/backup, first provisioning and resolve/use/explicit identity migration
 also have real controls with disjoint protection retained. Native Codex selection
 protects the old and new profiles, including scoped clear and direct pointer
