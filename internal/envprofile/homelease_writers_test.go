@@ -362,3 +362,111 @@ func TestHomeLeaseReadOnlyPendingTargets(t *testing.T) {
 		})
 	}
 }
+
+// W09: a recorded managed skill copy remains current without writes, then a
+// prepared lease blocks its actual repair before any fixture-owned change.
+// After an explicit fixture break the same repair restores the full copied
+// tree in each managed environment, including removing a drifted extra file.
+// Initial symlink-failure selection and native copy fallback remain unqualified.
+func TestHomeLeaseRecordedCopyFallback(t *testing.T) {
+	for _, tc := range []struct{ environment, drift string }{
+		{envregistry.CodexCLI, "changed-bytes"}, {envregistry.CodexCLI, "extra-file"},
+		{envregistry.ClaudeCode, "changed-bytes"}, {envregistry.ClaudeCode, "extra-file"},
+		{envregistry.Muse, "changed-bytes"}, {envregistry.Muse, "extra-file"},
+	} {
+		t.Run(tc.environment+"/"+tc.drift, func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx, _ := captureFixture(t)
+			if tc.environment == envregistry.Muse {
+				fx.native[envregistry.Muse] = t.TempDir()
+				if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-native\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.environment != envregistry.CodexCLI {
+				provision := fx.request(tc.environment)
+				provision.Repair = true
+				if _, err := Resolve(provision); err != nil {
+					t.Fatal(err)
+				}
+			}
+			root := ManagedHomeDir(fx.home, fx.profile, tc.environment)
+			adapter, err := envregistry.ByID(tc.environment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rel := adapter.SkillsDir + "/myskill"
+			live := filepath.Join(root, filepath.FromSlash(rel))
+			source, err := os.Readlink(live)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := projectionFiles(t, source)
+			if err := os.Remove(live); err != nil {
+				t.Fatal(err)
+			}
+			if err := copyTree(source, root, rel); err != nil {
+				t.Fatal(err)
+			}
+			marker, err := envmarker.Read(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			surface := marker.Surfaces[envmarker.SurfaceSkills]
+			copies := []envmarker.Copy{}
+			if surface.Copies != nil {
+				copies = append(copies, (*surface.Copies)...)
+			}
+			copies = append(copies, envmarker.Copy{Path: rel, Reason: envmarker.ReasonSymlinkFallback})
+			surface.Copies = &copies
+			marker.Surfaces[envmarker.SurfaceSkills] = surface
+			raw, err := marker.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, envmarker.Name), raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := captureFixtureState(t, fx)
+			if _, err := Resolve(fx.request(tc.environment)); err != nil {
+				t.Fatalf("recorded copy is not current: %v", err)
+			}
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("current recorded-copy read changed state")
+			}
+			m, lease := leaseManagedFixture(t, fx, tc.environment)
+			path := filepath.Join(live, "SKILL.md")
+			if tc.drift == "extra-file" {
+				path = filepath.Join(live, "extra.md")
+			}
+			if err := os.WriteFile(path, []byte("isolated copy drift\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			before, _ = captureFixtureState(t, fx)
+			req := fx.request(tc.environment)
+			req.Repair = true
+			_, err = Resolve(req)
+			requireHomeLeaseRefusal(t, err, lease.LeaseID)
+			after, _ = captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("leased copy-fallback repair changed refusal preimage")
+			}
+			breakFixtureLease(t, m, lease)
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("unleased copy repair: %v", err)
+			}
+			info, err := os.Lstat(live)
+			if err != nil || !info.IsDir() {
+				t.Fatalf("recorded fallback no longer a copied directory: %v", err)
+			}
+			if !reflect.DeepEqual(projectionFiles(t, live), want) {
+				t.Fatal("copy repair did not restore the complete admitted projection")
+			}
+			req.Repair = false
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("repaired copy is not current: %v", err)
+			}
+		})
+	}
+}
