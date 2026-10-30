@@ -6,11 +6,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 // This optional exact-release oracle executes the distributed matcher and
@@ -86,13 +91,11 @@ const V6t={default:O6t()};
 			script = append(script, filter...)
 			script = append(script, []byte(`
 const entries=[{path:input.native,type:'Project'},{path:input.project,type:'Project'},{path:input.managed,type:'User'}];
-const actual=U2e(entries).map(x=>x.path);
-if(actual.includes(input.native))throw Error('native parent memory survived exclusion');
-if(!actual.includes(input.project)||!actual.includes(input.managed))throw Error('project or profile instructions were excluded');
-if(o5t(input.native,'Managed'))throw Error('managed policy was excluded');
+const configured=U2e(entries);
+const managedExcluded=o5t(input.native,'Managed');
 settings={};
-if(!U2e(entries).some(x=>x.path===input.native))throw Error('missing-exclusion control did not detect native parent memory');
-console.log('native excluded; project/profile retained; missing-exclusion control exposes native');
+const missing=U2e(entries);
+process.stdout.write(JSON.stringify({configured,missing,managedExcluded}));
 `)...)
 			file := filepath.Join(t.TempDir(), "native-memory.cjs")
 			if err := os.WriteFile(file, script, 0600); err != nil {
@@ -102,10 +105,97 @@ console.log('native excluded; project/profile retained; missing-exclusion contro
 			defer cancel()
 			command := exec.CommandContext(ctx, node, file)
 			command.Stdin = bytes.NewReader(input)
-			if output, err := command.CombinedOutput(); err != nil {
-				t.Fatalf("native memory filter control: %v\n%s", err, output)
-			} else {
-				t.Log(string(output))
+			output, err := command.CombinedOutput()
+			if command.Process != nil {
+				t.Logf("owned native filter PID=%d", command.Process.Pid)
+			}
+			if err != nil {
+				t.Fatalf("native memory filter invocation: %v\n%s", err, output)
+			}
+			if err := checkNativeMemoryResult(output, filepath.ToSlash(native), filepath.ToSlash(project), filepath.ToSlash(managed)); err != nil {
+				t.Fatal(err)
+			}
+			t.Log("native excluded; project/profile retained; Managed policy retained; missing-exclusion control exposes native")
+		})
+	}
+}
+
+// Authored verdict logic stays in Go; JavaScript returns the upstream subject's
+// results without deciding their validity. Pointer presence distinguishes a
+// missing/null Managed result from the required explicit false value.
+type nativeMemoryEntry struct {
+	Path string `json:"path"`
+	Type string `json:"type"`
+}
+
+type nativeMemoryResult struct {
+	Configured      []nativeMemoryEntry `json:"configured"`
+	Missing         []nativeMemoryEntry `json:"missing"`
+	ManagedExcluded *bool               `json:"managedExcluded"`
+}
+
+func checkNativeMemoryResult(payload []byte, native, project, profile string) error {
+	if err := protocoljson.Validate(payload); err != nil {
+		return fmt.Errorf("invalid native memory result: %w", err)
+	}
+	var result *nativeMemoryResult
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&result); err != nil {
+		return fmt.Errorf("invalid native memory result: %w", err)
+	}
+	if result == nil {
+		return fmt.Errorf("invalid native memory result: expected an object")
+	}
+	expected := []nativeMemoryEntry{{project, "Project"}, {profile, "User"}}
+	if !slices.Equal(result.Configured, expected) {
+		return fmt.Errorf("configured memory entries differ: %v", result.Configured)
+	}
+	missing := append([]nativeMemoryEntry{{native, "Project"}}, expected...)
+	if !slices.Equal(result.Missing, missing) {
+		return fmt.Errorf("missing-exclusion control entries differ: %v", result.Missing)
+	}
+	if result.ManagedExcluded == nil {
+		return fmt.Errorf("managed-policy exclusion result missing")
+	}
+	if *result.ManagedExcluded {
+		return fmt.Errorf("managed policy was excluded")
+	}
+	return nil
+}
+
+// The Go oracle accepts the retained-entry positive control, detects each
+// forbidden native result and refuses missing/malformed result data itself.
+func TestNativeMemoryResultOracle(t *testing.T) {
+	const valid = `{"configured":[{"path":"project","type":"Project"},{"path":"profile","type":"User"}],"missing":[{"path":"native","type":"Project"},{"path":"project","type":"Project"},{"path":"profile","type":"User"}],"managedExcluded":false}`
+	check := func(payload string) error {
+		return checkNativeMemoryResult([]byte(payload), "native", "project", "profile")
+	}
+	if err := check(valid); err != nil {
+		t.Fatalf("valid native result rejected: %v", err)
+	}
+	for _, tc := range []struct{ name, payload, witness string }{
+		{"empty", "", "invalid native memory result"},
+		{"truncated", "{", "invalid native memory result"},
+		{"null", "null", "invalid native memory result"},
+		{"missing-results", "{}", "configured memory entries differ"},
+		{"null-configured", strings.Replace(valid, `"configured":[{"path":"project","type":"Project"},{"path":"profile","type":"User"}]`, `"configured":null`, 1), "configured memory entries differ"},
+		{"native-survives", strings.Replace(valid, `"configured":[`, `"configured":[{"path":"native","type":"Project"},`, 1), "configured memory entries differ"},
+		{"project-lost", strings.Replace(valid, `{"path":"project","type":"Project"},`, "", 1), "configured memory entries differ"},
+		{"profile-lost", strings.Replace(valid, `,{"path":"profile","type":"User"}`, "", 1), "configured memory entries differ"},
+		{"wrong-type", strings.Replace(valid, `"type":"User"`, `"type":"Project"`, 1), "configured memory entries differ"},
+		{"missing-control", strings.Replace(valid, `"missing":[{"path":"native","type":"Project"},`, `"missing":[`, 1), "missing-exclusion control entries differ"},
+		{"null-control", strings.Replace(valid, `"missing":[{"path":"native","type":"Project"},{"path":"project","type":"Project"},{"path":"profile","type":"User"}]`, `"missing":null`, 1), "missing-exclusion control entries differ"},
+		{"missing-managed", strings.Replace(valid, `,"managedExcluded":false`, "", 1), "managed-policy exclusion result missing"},
+		{"null-managed", strings.Replace(valid, `"managedExcluded":false`, `"managedExcluded":null`, 1), "managed-policy exclusion result missing"},
+		{"wrong-managed-type", strings.Replace(valid, `"managedExcluded":false`, `"managedExcluded":"false"`, 1), "invalid native memory result"},
+		{"managed-excluded", strings.Replace(valid, `"managedExcluded":false`, `"managedExcluded":true`, 1), "managed policy was excluded"},
+		{"duplicate-result", strings.Replace(valid, `"managedExcluded":false`, `"managedExcluded":false,"managedExcluded":true`, 1), "invalid native memory result"},
+		{"trailing-result", valid + "{}", "invalid native memory result"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := check(tc.payload); err == nil || !strings.Contains(err.Error(), tc.witness) {
+				t.Fatalf("native result did not fail intended witness %q: %v", tc.witness, err)
 			}
 		})
 	}
