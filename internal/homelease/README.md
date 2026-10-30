@@ -31,8 +31,12 @@ unsafe paths and linked authority refuse admission.
 `persistence.Publish` is shared with the existing project-lease publisher. It
 borrows one real `managerlock` acquisition and uses the existing transaction
 journal for staging, forward publication, compensation and recovery. The
-project-lease carrier and `project_view_busy` remain unchanged. Recovery checks
-the complete pending inventory before replaying its first write. A failed
+project-lease carrier and `project_view_busy` remain unchanged. Native profile
+writers also preflight busy project homes under the same held acquisition, using
+physical path overlap even when no home-lease ledger exists. Codex selection has
+real busy-refusal and post-reconciliation write controls, including preservation
+of a disjoint home lease; composition and session evidence are synthetic.
+Recovery checks the complete pending inventory before replaying its first write. A failed
 publication either completes rollback or retains pending intent for explicit
 recovery. Completed rollback removes only unchanged, empty namespace directories
 created by that publication; pre-existing admitted directory permissions and

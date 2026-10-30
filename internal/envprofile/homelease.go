@@ -67,6 +67,15 @@ func (a homeLeaseAuthority) Admit(_ context.Context, held managerlock.Held, envi
 // homeLeaseGuard is shared by direct home writers and borrowed global phases.
 // Its caller keeps the same operation acquisition until the final write.
 func homeLeaseGuard(home string, lock transaction.HomeLock, targets []string) error {
+	if err := homeLeaseGuardBeforeRecovery(home, lock, targets); err != nil {
+		return err
+	}
+	return projectlease.GuardMutation(home, lock, targets)
+}
+
+// Recovery retains the original home-lease admission; project-owned intent is
+// qualified by its journal policy before selected native writer admission.
+func homeLeaseGuardBeforeRecovery(home string, lock transaction.HomeLock, targets []string) error {
 	if state.HasState(home) {
 		engine, err := transaction.New(home)
 		if err != nil {
