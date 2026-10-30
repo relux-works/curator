@@ -105,8 +105,10 @@ protects the old and new profiles, including scoped clear and direct pointer
 setters; these fixtures do not cover every environment or physical native alias.
 Selected explicit migration includes sibling environments; an actual legacy recovery journal
 retains its conservative manager-wide guard. These controls do not cover every
-ownership combination. Cache
-publication and sweep use the real APIs with synthetic artifact bytes, inputs,
+ownership combination. Codex and Muse credential-link repairs also have real
+refusal, ownership-conflict and relinking controls; Codex seed preservation is
+checked, while Claude Keychain and other credential backends remain unqualified.
+Cache publication and sweep use the real APIs with synthetic artifact bytes, inputs,
 portable receipts and independent authority. The production profile compiled
 closure described in `docs/design/profile-skill-runtime.md` remains unqualified.
 Remote installations whose final name is unresolved,
