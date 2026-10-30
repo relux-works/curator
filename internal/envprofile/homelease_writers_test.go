@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
@@ -189,21 +190,36 @@ func TestHomeLeaseBatchAndDisjointWriter(t *testing.T) {
 	}
 }
 
-// W03/13: a genuinely v1 home is admitted before enabling v2 writers. Both
-// resolve migration and explicit migration refuse, then publish v2 identities
-// after break. No credential payload is read by the lease guard.
+// W03/13: a genuinely v1 home is admitted before enabling v2 writers.
+// Resolve, use and explicit migration refuse, then publish v2 identities after
+// break while a disjoint profile remains leased. No credential payload is read
+// by the lease guard.
 func TestHomeLeaseIdentityMigration(t *testing.T) {
-	for _, explicit := range []bool{false, true} {
-		t.Run(map[bool]string{false: "resolve", true: "explicit"}[explicit], func(t *testing.T) {
+	for _, action := range []string{"resolve", "explicit", "explicit-sibling-env", "use"} {
+		t.Run(action, func(t *testing.T) {
 			isolateHomeLeaseWriters(t)
-			fx := legacyIdentityFixture(t, envregistry.CodexCLI)
+			var fx *managedFixture
+			if action == "explicit-sibling-env" {
+				fx = legacyIdentityFixture(t, envregistry.CodexCLI, envregistry.ClaudeCode)
+			} else {
+				fx = legacyIdentityFixture(t, envregistry.CodexCLI)
+			}
 			hashing.EnableV2Writers = false
+			checkDisjoint := preserveDisjointHomeLease(t, fx)
+			t.Setenv("CODEX_HOME", fx.native[envregistry.CodexCLI])
 			m, lease := leaseManagedFixture(t, fx, envregistry.CodexCLI)
 			hashing.EnableV2Writers = true
 			write := func() error {
-				if explicit {
+				if action == "use" {
+					_, err := UseWithPolicy(fx.home, fx.profile, envregistry.CodexCLI, "", false, Policy{})
+					return err
+				}
+				if action == "explicit" || action == "explicit-sibling-env" {
 					req := fx.migrateRequest()
 					req.Profile, req.EnvID = fx.profile, envregistry.CodexCLI
+					if action == "explicit-sibling-env" {
+						req.EnvID = envregistry.ClaudeCode
+					}
 					plan, err := PlanMigration(req)
 					if err != nil {
 						return err
@@ -231,6 +247,13 @@ func TestHomeLeaseIdentityMigration(t *testing.T) {
 			if err != nil || marker == nil || marker.HashVersion != 2 {
 				t.Fatalf("positive migration did not rehash: %+v %v", marker, err)
 			}
+			if action == "explicit-sibling-env" {
+				sibling, err := envmarker.Read(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode))
+				if err != nil || sibling == nil || sibling.HashVersion != 2 {
+					t.Fatalf("selected sibling not migrated: %+v %v", sibling, err)
+				}
+			}
+			checkDisjoint()
 		})
 	}
 }
@@ -467,6 +490,232 @@ func TestHomeLeaseRecordedCopyFallback(t *testing.T) {
 			if _, err := Resolve(req); err != nil {
 				t.Fatalf("repaired copy is not current: %v", err)
 			}
+		})
+	}
+}
+
+// preserveDisjointHomeLease installs and verifies an unrelated profile through
+// the real APIs. Its prepared reservation and protected surfaces must survive
+// the target writer's successful control, not merely its refusal.
+func preserveDisjointHomeLease(t *testing.T, fx *managedFixture) func() {
+	t.Helper()
+	source := t.TempDir()
+	writePackage(t, source, "lease-neighbor", "1.0.0", "independent fixture\n")
+	if _, _, _, err := Install(fx.home, InstallOptions{Operand: source}); err != nil {
+		t.Fatal(err)
+	}
+	neighbor := *fx
+	neighbor.profile = "lease-neighbor"
+	_, _, hash, err := loadResolveInputs(fx.home, neighbor.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	neighbor.lockHash = hash
+	req := neighbor.request(envregistry.CodexCLI)
+	req.Repair = true
+	if _, err := Resolve(req); err != nil {
+		t.Fatal(err)
+	}
+	m, err := HomeLeaseManager(neighbor.request(envregistry.CodexCLI), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := homelease.Request{Environment: envregistry.CodexCLI, Profile: neighbor.profile, LockSHA256: strings.TrimPrefix(hash, "sha256:"), RequestID: "disjoint-fixture", Holder: homelease.Holder{Kind: "prepared", Launcher: "curator-run", ManagerID: "fixture-manager", ManagerRegisteredAt: "2026-10-27T00:00:00Z", RequestID: "disjoint-fixture"}}
+	out, reason, err := m.Acquire(context.Background(), request)
+	if err != nil || !out.Changed || out.Lease == nil || reason != "acquired" {
+		t.Fatalf("disjoint admission: %+v %s %v", out, reason, err)
+	}
+	before := map[string]map[string]string{"profile": captureTree(t, ProfileDir(fx.home, neighbor.profile)), "home": captureTree(t, ManagedHomeDir(fx.home, neighbor.profile, envregistry.CodexCLI)), "source": captureTree(t, source)}
+	return func() {
+		t.Helper()
+		rows, err := m.List(context.Background(), envregistry.CodexCLI, neighbor.profile)
+		if err != nil || len(rows) != 1 || !reflect.DeepEqual(rows[0], *out.Lease) || !rows[0].Blocking() {
+			t.Fatalf("disjoint reservation changed: %+v %v", rows, err)
+		}
+		after := map[string]map[string]string{"profile": captureTree(t, ProfileDir(fx.home, neighbor.profile)), "home": captureTree(t, ManagedHomeDir(fx.home, neighbor.profile, envregistry.CodexCLI)), "source": captureTree(t, source)}
+		if !reflect.DeepEqual(before, after) {
+			t.Fatal("target writer changed disjoint protected surfaces")
+		}
+	}
+}
+
+// W02: two independently verified profile aliases consume the same pinned
+// source. Repair through the unleased consumer must still honor the other
+// consumer's reservation before changing any source or projection. After that
+// holder ends, the pinned content is restored and both consumers verify while
+// a separate disjoint profile remains leased. All credentials are synthetic.
+func TestHomeLeaseStoreTwoConsumers(t *testing.T) {
+	isolateHomeLeaseWriters(t)
+	fx, _ := captureFixture(t)
+	checkDisjoint := preserveDisjointHomeLease(t, fx)
+	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := os.ReadFile(sourcePath(fx.home, fx.profile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := *fx
+	other.profile = "second-consumer"
+	if err := os.MkdirAll(ProfileDir(fx.home, other.profile), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sourcePath(fx.home, other.profile), source, 0600); err != nil {
+		t.Fatal(err)
+	}
+	other.lockHash, err = contextlock.Write(lockPath(fx.home, other.profile), lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := other.request(envregistry.CodexCLI)
+	req.Repair = true
+	if _, err := Resolve(req); err != nil {
+		t.Fatalf("second consumer admission: %v", err)
+	}
+	member, ok := lock.Find("skill", "myskill")
+	if !ok {
+		t.Fatal("missing shared skill")
+	}
+	_, secondLock, _, err := loadResolveInputs(fx.home, other.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondMember, ok := secondLock.Find("skill", "myskill")
+	if !ok || member.PinKey() != secondMember.PinKey() {
+		t.Fatal("fixture consumers do not share a pin")
+	}
+	entry := contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey())
+	pinned, err := os.ReadFile(filepath.Join(entry, "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, lease := leaseManagedFixture(t, fx, envregistry.CodexCLI)
+	if err := os.WriteFile(filepath.Join(entry, "SKILL.md"), []byte("shared fixture drift"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := captureFixtureState(t, fx)
+	_, err = Resolve(req)
+	requireHomeLeaseRefusal(t, err, lease.LeaseID)
+	after, _ := captureFixtureState(t, fx)
+	if !bytes.Equal(before, after) {
+		t.Fatal("shared consumer refusal changed preimage")
+	}
+	breakFixtureLease(t, m, lease)
+	if _, err := Resolve(req); err != nil {
+		t.Fatalf("shared reconstruction: %v", err)
+	}
+	actual, err := os.ReadFile(filepath.Join(entry, "SKILL.md"))
+	if err != nil || !bytes.Equal(actual, pinned) {
+		t.Fatal("shared pin not restored", err)
+	}
+	for _, consumer := range []*managedFixture{fx, &other} {
+		if _, err := Resolve(consumer.request(envregistry.CodexCLI)); err != nil {
+			t.Fatalf("reconstructed consumer %s: %v", consumer.profile, err)
+		}
+	}
+	checkDisjoint()
+}
+
+// W01: takeover of an existing managed home and first provisioning through a
+// shared dependency both refuse without writes while that dependency is leased.
+// Ending that holder permits actual takeover/provisioning while disjoint
+// protection survives. No initial OS link failure or native fallback is claimed.
+func TestHomeLeaseProvisionAndTakeover(t *testing.T) {
+	for _, mode := range []string{"takeover", "first-provision"} {
+		t.Run(mode, func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx, _ := captureFixture(t)
+			checkDisjoint := preserveDisjointHomeLease(t, fx)
+			m, lease := leaseManagedFixture(t, fx, envregistry.CodexCLI)
+			req := fx.request(envregistry.CodexCLI)
+			req.Repair = true
+			if mode == "takeover" {
+				req.Policy.Takeover = true
+				path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.EnvID), "AGENTS.md")
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("takeover fixture drift"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				// A valid older marker does not own this newly desired surface.
+				root := ManagedHomeDir(fx.home, fx.profile, req.EnvID)
+				marker, err := envmarker.Read(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				delete(marker.Surfaces, envmarker.SurfaceRootContext)
+				raw, err := marker.Marshal()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(root, envmarker.Name), raw, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := envmarker.Read(root); err != nil {
+					t.Fatalf("takeover marker invalid: %v", err)
+				}
+			} else {
+				req.EnvID = envregistry.ClaudeCode
+				if _, err := os.Lstat(ManagedHomeDir(fx.home, fx.profile, req.EnvID)); !os.IsNotExist(err) {
+					t.Fatal("first home already provisioned", err)
+				}
+				_, lock, _, err := loadResolveInputs(fx.home, fx.profile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				member, ok := lock.Find("skill", "myskill")
+				if !ok {
+					t.Fatal("shared dependency missing")
+				}
+				if err := os.WriteFile(filepath.Join(contextstore.EntryDir(fx.home, member.Kind, member.Name, member.PinKey()), "SKILL.md"), []byte("first provision shared drift"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, _ := captureFixtureState(t, fx)
+			_, err := Resolve(req)
+			requireHomeLeaseRefusal(t, err, lease.LeaseID)
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("provision/takeover refusal changed preimage")
+			}
+			breakFixtureLease(t, m, lease)
+			if mode == "takeover" {
+				withoutConsent := req
+				withoutConsent.Policy.Takeover = false
+				before, _ := captureFixtureState(t, fx)
+				_, err := Resolve(withoutConsent)
+				if err == nil || !strings.Contains(err.Error(), DiagUnmanagedConflict) {
+					t.Fatalf("takeover consent not required: %v", err)
+				}
+				after, _ := captureFixtureState(t, fx)
+				if !bytes.Equal(before, after) {
+					t.Fatal("missing takeover consent changed preimage")
+				}
+			}
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("unleased provision/takeover: %v", err)
+			}
+			if mode == "takeover" {
+				backups, err := filepath.Glob(filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.EnvID), ".agent-environment-backup", "*", "AGENTS.md"))
+				if err != nil || len(backups) != 1 {
+					t.Fatalf("takeover backup inventory: %v %v", backups, err)
+				}
+				raw, err := os.ReadFile(backups[0])
+				if err != nil || string(raw) != "takeover fixture drift" {
+					t.Fatal("takeover did not preserve original bytes", err)
+				}
+			}
+			if _, err := Resolve(fx.request(req.EnvID)); err != nil {
+				t.Fatalf("written home not current: %v", err)
+			}
+			if mode == "first-provision" {
+				if _, err := os.Stat(ManagedHomeDir(fx.home, fx.profile, req.EnvID)); err != nil {
+					t.Fatal("home not provisioned", err)
+				}
+			}
+			checkDisjoint()
 		})
 	}
 }

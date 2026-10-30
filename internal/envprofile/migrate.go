@@ -978,7 +978,18 @@ type MigrateApplyResult struct {
 // a mix; a kill between mutations leaves the journal for the next apply
 // carrying a plan hash to recover.
 func ApplyMigration(req MigrateRequest) (*MigrateApplyResult, error) {
-	op, err := beginOperation(req.Home, req.transactionOptions...)
+	op, err := beginOperationSelected(req.Home, nil, func() ([]string, error) {
+		profiles, err := migrationProfiles(req.Home, req.Profile)
+		if err != nil {
+			return nil, err
+		}
+		targets := []string{}
+		for _, profile := range profiles {
+			// Identity migration includes sibling environments even with --env.
+			targets = append(targets, homeLeaseProfileTargets(req.Home, profile, "")...)
+		}
+		return targets, nil
+	}, req.transactionOptions...)
 	if err != nil {
 		// Admission must not recover an unreadable authority marker, but the
 		// read-only inventory still explains the existing migration conflict.
@@ -1845,9 +1856,6 @@ func recoverMigrationJournal(home string, op *operation, announce io.Writer, sym
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err
 	}
-	if err := homeLeaseGuard(home, op.lock, nil); err != nil {
-		return nil, err
-	}
 	journal, err := readMigrationJournal(home)
 	if err != nil {
 		return nil, fmt.Errorf("migration journal %s is unusable (%v): back it up out of band, verify every managed link by hand, and only then remove it and re-run `curator env migrate --plan`",
@@ -1855,6 +1863,11 @@ func recoverMigrationJournal(home string, op *operation, announce io.Writer, sym
 	}
 	if journal == nil {
 		return nil, nil
+	}
+	// An actual legacy journal still has manager-wide recovery scope. An
+	// absent journal is read-only and cannot widen the selected new writer.
+	if err := homeLeaseGuard(home, op.lock, nil); err != nil {
+		return nil, err
 	}
 	done := 0
 	for _, entry := range journal.Ops {
