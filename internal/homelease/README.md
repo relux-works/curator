@@ -35,7 +35,8 @@ project-lease carrier and `project_view_busy` remain unchanged. Recovery checks
 the complete pending inventory before replaying its first write. A failed
 publication either completes rollback or retains pending intent for explicit
 recovery. Completed rollback removes only unchanged, empty namespace directories
-created by that publication; pre-existing directories and unknown content remain.
+created by that publication; pre-existing admitted directory permissions and
+unknown content remain.
 A failed first acquisition can therefore be retried after completed rollback
 without treating an unexplained missing ledger as authoritative absence.
 
@@ -85,7 +86,9 @@ OS locks, journal recovery and writer entry points; synthetic observer evidence
 tests lifecycle decisions without qualifying a production observer. Refusals
 check preimages immediately, before their positive controls. The repair/acquire
 race uses a second process and a continuous real lock. Collector controls remove
-an unreferenced runtime neighbor while retaining prepared/unknown references.
+unreferenced runtime and protected cache neighbors while retaining
+prepared/unknown home references alongside durable project roots. A real pending
+acquisition refuses the full collector and preserves the fixture preimage.
 
 The [68-pair qualification map](qualification.md) names each semantic pair,
 its actual Go tests and its remaining limits. These tests do **not** constitute
@@ -95,9 +98,11 @@ manager calls on terminal replay, require the actual consumer implementation.
 Writer coverage still needs a complete corpus adapter for all variants of the
 18 writer rows, especially global-add compensation and interrupted custom migration recovery.
 Borrowed global continuation and a two-environment native MCP batch have paired
-real writer controls; these do not cover every ownership combination. Build-key
-marking is tested; compiled-artifact publication and sweep qualification belong
-to the build-cache suite. Remote installations whose final name is unresolved,
+real writer controls; these do not cover every ownership combination. Cache
+publication and sweep use the real APIs with synthetic artifact bytes, inputs,
+portable receipts and independent authority. The production profile compiled
+closure described in `docs/design/profile-skill-runtime.md` remains unqualified.
+Remote installations whose final name is unresolved,
 and several legacy whole-manager operations, currently guard conservatively;
 their full disjoint-write qualification remains open. This package must not be
 reported as fully conforming or enabled for hosted production sessions until

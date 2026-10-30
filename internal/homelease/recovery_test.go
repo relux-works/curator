@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/relux-works/curator/internal/homelease/state"
@@ -197,6 +198,10 @@ func TestAcquirePublicationFaultRecovery(t *testing.T) {
 					t.Fatalf("fresh acquisition replay: %+v %s %v", out, reason, err)
 				}
 				unchanged(t, before, f.m.home)
+				bindings, err := os.ReadDir(filepath.Join(state.Namespace(f.m.home), "bindings"))
+				if err != nil || len(bindings) != 1 {
+					t.Fatalf("fresh reservation inventory: %v %v", bindings, err)
+				}
 				return
 			}
 			if rows, err := f.m.List(context.Background(), "", ""); err == nil || len(rows) != 0 {
@@ -258,15 +263,25 @@ func TestAcquirePublicationFaultRecovery(t *testing.T) {
 // A pre-existing valid empty ledger retains its bytes and directory identity;
 // foreign content planted during rollback remains evidence and fails closed.
 func TestAcquireRollbackPreservesNamespaceEvidence(t *testing.T) {
-	for _, prior := range []string{"existing-ledger", "foreign-file"} {
+	cases := []string{"existing-ledger", "foreign-file"}
+	// Group/other read permission is an admitted Unix route, not a writable root.
+	if runtime.GOOS != "windows" {
+		cases = append(cases, "existing-readable-ledger")
+	}
+	for _, prior := range cases {
 		t.Run(prior, func(t *testing.T) {
 			f := newFixture(t)
 			namespace := state.Namespace(f.m.home)
 			var original os.FileInfo
 			var ledger []byte
-			if prior == "existing-ledger" {
+			if prior != "foreign-file" {
 				if err := privatedir.MakeAll(namespace); err != nil {
 					t.Fatal(err)
+				}
+				if prior == "existing-readable-ledger" {
+					if err := os.Chmod(namespace, 0755); err != nil {
+						t.Fatal(err)
+					}
 				}
 				var err error
 				original, err = os.Lstat(namespace)
@@ -279,6 +294,23 @@ func TestAcquireRollbackPreservesNamespaceEvidence(t *testing.T) {
 				}
 				if err := os.WriteFile(state.LedgerPath(f.m.home), ledger, 0600); err != nil {
 					t.Fatal(err)
+				}
+			}
+			if prior != "foreign-file" {
+				// Read-only admission requires the already-existing lock witness.
+				lm, err := managerlock.New(f.m.home)
+				if err != nil {
+					t.Fatal(err)
+				}
+				lock, err := lm.AcquireHomeOnly(context.Background(), false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := lock.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if rows, err := f.m.List(context.Background(), "", ""); err != nil || len(rows) != 0 {
+					t.Fatal("preceding ledger is not a valid read control", err)
 				}
 			}
 			foreign := filepath.Join(namespace, "foreign-evidence")
@@ -319,7 +351,7 @@ func TestAcquireRollbackPreservesNamespaceEvidence(t *testing.T) {
 					t.Fatalf("existing empty ledger: %+v %v", rows, err)
 				}
 				current, err := os.Lstat(namespace)
-				if err != nil || !os.SameFile(original, current) {
+				if err != nil || !os.SameFile(original, current) || original.Mode() != current.Mode() {
 					t.Fatal("existing namespace replaced", err)
 				}
 				raw, err := os.ReadFile(state.LedgerPath(f.m.home))
@@ -328,9 +360,19 @@ func TestAcquireRollbackPreservesNamespaceEvidence(t *testing.T) {
 				}
 			}
 			unchanged(t, before, f.m.home)
-			if prior == "existing-ledger" {
+			if prior != "foreign-file" {
 				acquire(t, f)
 			}
 		})
 	}
+}
+
+// NewPublicationFaultManagerForTest exposes the existing journal fault seam only
+// to this package's external collector tests; production builds omit it.
+func NewPublicationFaultManagerForTest(home string, authority Authority, hooks transaction.Hooks) (*Manager, error) {
+	m, err := New(home, authority, nil)
+	if err == nil {
+		m.hooks = hooks
+	}
+	return m, err
 }

@@ -143,7 +143,12 @@ func (d *publicationDirectories) makeAll(path string) error {
 	}
 	info, err := os.Lstat(path)
 	if err == nil {
-		return privatedir.Validate(path)
+		// The caller already admitted this route. Preserve existing directory
+		// permissions; only directories created here acquire a private mode.
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("publication parent is not a real directory")
+		}
+		return nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return err
