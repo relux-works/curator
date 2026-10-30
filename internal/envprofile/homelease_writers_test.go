@@ -719,3 +719,125 @@ func TestHomeLeaseProvisionAndTakeover(t *testing.T) {
 		})
 	}
 }
+
+// W05: actual native selection distinguishes the old, new and scoped-clear
+// targets. Each entry refuses before changing any fixture surface; after the
+// relevant break, the pointer/native document really changes while an unrelated
+// profile remains leased. Native homes and credentials are synthetic fixtures.
+func TestHomeLeaseSelectionAliases(t *testing.T) {
+	for _, action := range []string{"use-from", "use-to", "clear-scoped", "current", "scoped"} {
+		t.Run(action, func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx, _ := captureFixture(t)
+			t.Setenv("CODEX_HOME", fx.native[envregistry.CodexCLI])
+			checkDisjoint := preserveDisjointHomeLease(t, fx)
+			source := t.TempDir()
+			writePackage(t, source, "selection-target", "1.0.0", "selection fixture\n")
+			if _, _, _, err := Install(fx.home, InstallOptions{Operand: source}); err != nil {
+				t.Fatal(err)
+			}
+			other := *fx
+			other.profile = "selection-target"
+			provision := other.request(envregistry.CodexCLI)
+			provision.Repair = true
+			if _, err := Resolve(provision); err != nil {
+				t.Fatal(err)
+			}
+			use := func(profile string, clear bool) error {
+				rows, err := UseWithPolicy(fx.home, profile, envregistry.CodexCLI, "", clear, Policy{})
+				if err == nil {
+					if len(rows) != 1 || !rows[0].OK {
+						t.Fatalf("native selection did not complete: %+v", rows)
+					}
+				}
+				return err
+			}
+			if action == "use-to" || action == "clear-scoped" {
+				if err := SetCurrent(fx.home, other.profile); err != nil {
+					t.Fatal(err)
+				}
+			}
+			initial := fx.profile
+			if action == "use-to" {
+				initial = other.profile
+			}
+			if err := use(initial, false); err != nil {
+				t.Fatalf("initial native selection: %v", err)
+			}
+			initialBytes, err := os.ReadFile(filepath.Join(fx.native[envregistry.CodexCLI], "AGENTS.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			m, lease := leaseManagedFixture(t, fx, envregistry.CodexCLI)
+			write := func() error {
+				switch action {
+				case "use-from":
+					return use(other.profile, false)
+				case "use-to":
+					return use(fx.profile, false)
+				case "clear-scoped":
+					return use("", true)
+				case "current":
+					return SetCurrent(fx.home, other.profile)
+				case "scoped":
+					return SetScoped(fx.home, "env:codex_cli", other.profile, false)
+				default:
+					t.Fatal("unknown action")
+					return nil
+				}
+			}
+			before, _ := captureFixtureState(t, fx)
+			requireHomeLeaseRefusal(t, write(), lease.LeaseID)
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("selection refusal changed preimage")
+			}
+			breakFixtureLease(t, m, lease)
+			before, _ = captureFixtureState(t, fx)
+			if err := write(); err != nil {
+				t.Fatalf("unleased selection: %v", err)
+			}
+			after, _ = captureFixtureState(t, fx)
+			if bytes.Equal(before, after) {
+				t.Fatal("selection control made no actual change")
+			}
+			current, err := Current(fx.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			scoped, err := ScopedCurrents(fx.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch action {
+			case "current":
+				if current != other.profile {
+					t.Fatalf("machine selection unchanged: %q", current)
+				}
+			case "clear-scoped":
+				if current != other.profile || scoped["env:codex_cli"] != "" {
+					t.Fatalf("scoped clear did not restore machine: %q %+v", current, scoped)
+				}
+			case "use-to":
+				if scoped["env:codex_cli"] != fx.profile {
+					t.Fatalf("new target not selected: %+v", scoped)
+				}
+			default:
+				if scoped["env:codex_cli"] != other.profile {
+					t.Fatalf("other target not selected: %+v", scoped)
+				}
+			}
+			if strings.HasPrefix(action, "use-") || action == "clear-scoped" {
+				actual, err := os.ReadFile(filepath.Join(fx.native[envregistry.CodexCLI], "AGENTS.md"))
+				want := []byte("selection fixture")
+				if action == "use-to" {
+					want = []byte("hello")
+				}
+				if err != nil || bytes.Equal(actual, initialBytes) || !bytes.Contains(actual, want) {
+					t.Fatal("native context did not switch to intended profile", err)
+				}
+			}
+			checkDisjoint()
+		})
+	}
+}
