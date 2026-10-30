@@ -841,3 +841,129 @@ func TestHomeLeaseSelectionAliases(t *testing.T) {
 		})
 	}
 }
+
+// W12: real missing credential-link repair refuses before writes under a
+// matching lease, then relinks the exact native fixture target after break.
+// An unowned regular-file conflict still refuses without changing state.
+// The Codex tool-owned seed and marker inventory survive native seed drift;
+// Muse seeds originate in its locked context, so no native-seed claim is made.
+// A disjoint lease survives all controls. No real credential/Keychain is used.
+func TestHomeLeaseCredentialLinkRepair(t *testing.T) {
+	for _, tc := range []struct{ environment, link, target, seed, initial, changed string }{
+		{envregistry.CodexCLI, "auth.json", "auth.json", "config.toml", "operator = true\n", "operator = false\n"},
+		{envregistry.Muse, "config/muse/auth.json", "auth.json", "", "", ""},
+	} {
+		t.Run(tc.environment, func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx := writeManagedFixture(t, "credential-fixture")
+			seedLiveNativeCredentials(t, fx)
+			if tc.environment == envregistry.Muse {
+				fx.native[envregistry.Muse] = t.TempDir()
+				if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], tc.target), []byte("synthetic-native\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.seed != "" {
+				if err := os.WriteFile(filepath.Join(fx.native[tc.environment], tc.seed), []byte(tc.initial), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			req := fx.request(tc.environment)
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatal(err)
+			}
+			checkDisjoint := preserveDisjointHomeLease(t, fx)
+			root := ManagedHomeDir(fx.home, fx.profile, tc.environment)
+			link := filepath.Join(root, filepath.FromSlash(tc.link))
+			target := filepath.Join(fx.native[tc.environment], filepath.FromSlash(tc.target))
+			if got, err := os.Readlink(link); err != nil || got != target {
+				t.Fatalf("initial credential target %q, err %v", got, err)
+			}
+			marker := readManagedMarker(t, fx, tc.environment)
+			recorded := false
+			if marker.Passthrough != nil {
+				for _, row := range *marker.Passthrough {
+					if row.Path == tc.link && row.Backend == "file" && (row.Strategy == envregistry.StrategyFileLink || (tc.environment == envregistry.CodexCLI && row.Strategy == envregistry.StrategyKeyringPreferred)) {
+						recorded = true
+					}
+				}
+			}
+			if !recorded {
+				t.Fatal("fixture does not have a recorded file-link")
+			}
+			if tc.seed != "" {
+				seed, err := os.ReadFile(filepath.Join(root, tc.seed))
+				if err != nil || string(seed) != tc.initial {
+					t.Fatal("initial tool seed not provisioned", err)
+				}
+			}
+			m, lease := leaseManagedFixture(t, fx, tc.environment)
+			if err := os.Remove(link); err != nil {
+				t.Fatal(err)
+			}
+			if tc.seed != "" {
+				if err := os.WriteFile(filepath.Join(fx.native[tc.environment], tc.seed), []byte(tc.changed), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, _ := captureFixtureState(t, fx)
+			_, err := Resolve(req)
+			requireHomeLeaseRefusal(t, err, lease.LeaseID)
+			after, _ := captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("leased credential repair changed preimage")
+			}
+			breakFixtureLease(t, m, lease)
+			// Existing credential ownership remains independent of lease admission.
+			if err := os.WriteFile(link, []byte("unowned-synthetic\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			before, _ = captureFixtureState(t, fx)
+			_, err = Resolve(req)
+			if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
+				t.Fatalf("unowned credential not refused: %v", err)
+			}
+			after, _ = captureFixtureState(t, fx)
+			if !bytes.Equal(before, after) {
+				t.Fatal("unowned credential conflict changed preimage")
+			}
+			if err := os.Remove(link); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("unleased credential repair: %v", err)
+			}
+			if got, err := os.Readlink(link); err != nil || got != target {
+				t.Fatalf("repaired credential target %q, err %v", got, err)
+			}
+			repaired := readManagedMarker(t, fx, tc.environment)
+			if !reflect.DeepEqual(marker.Seeds, repaired.Seeds) || !reflect.DeepEqual(marker.CodexSeedRecord, repaired.CodexSeedRecord) {
+				t.Fatal("credential repair changed seed inventory")
+			}
+			if repaired.Passthrough == nil || len(*marker.Passthrough) != len(*repaired.Passthrough) {
+				t.Fatal("credential repair changed credential inventory")
+			}
+			for i, row := range *repaired.Passthrough {
+				before := (*marker.Passthrough)[i]
+				if before.Provenance != "provisioned" || row.Provenance != "repaired" {
+					t.Fatal("credential marker did not record the actual publication transition")
+				}
+				before.Provenance, row.Provenance = "", ""
+				if !reflect.DeepEqual(before, row) {
+					t.Fatal("credential backend/target record changed")
+				}
+			}
+			if tc.seed != "" {
+				seed, err := os.ReadFile(filepath.Join(root, tc.seed))
+				if err != nil || string(seed) != tc.initial {
+					t.Fatal("credential repair refreshed a tool-owned seed", err)
+				}
+			}
+			if _, err := Resolve(fx.request(tc.environment)); err != nil {
+				t.Fatalf("repaired home not current: %v", err)
+			}
+			checkDisjoint()
+		})
+	}
+}
