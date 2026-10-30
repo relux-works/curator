@@ -33,7 +33,11 @@ func (a retentionAuthority) Admit(_ context.Context, held managerlock.Held, envi
 func TestHomeLeaseCollectorRetention(t *testing.T) {
 	for _, phase := range []string{"prepared", "unknown"} {
 		t.Run(phase, func(t *testing.T) {
-			home := t.TempDir()
+			identity, err := managerlock.New(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			home := identity.Home()
 			if err := privatedir.Protect(home); err != nil {
 				t.Fatal(err)
 			}
@@ -102,6 +106,87 @@ func TestHomeLeaseCollectorRetention(t *testing.T) {
 			rows, err := m.List(context.Background(), "", "")
 			if err != nil || len(rows) != 1 || rows[0].Phase != phase {
 				t.Fatalf("collector expired lease: %+v %v", rows, err)
+			}
+		})
+	}
+}
+
+// HL03/16: the same physical manager has the same retained roots through a
+// directory alias. A foreign or closed acquisition cannot authorize that read;
+// both refusals and successful reference reads preserve the complete preimage.
+func TestHomeLeaseCollectorManagerAlias(t *testing.T) {
+	for _, spelling := range []string{"canonical", "alias"} {
+		t.Run(spelling, func(t *testing.T) {
+			base := t.TempDir()
+			configured := filepath.Join(base, "manager")
+			if err := privatedir.MakeAll(configured); err != nil {
+				t.Fatal(err)
+			}
+			locks, err := managerlock.New(configured)
+			if err != nil {
+				t.Fatal(err)
+			}
+			home := locks.Home()
+			query := home
+			if spelling == "alias" {
+				query = filepath.Join(base, "manager-alias")
+				if err := os.Symlink(home, query); err != nil {
+					t.Fatal(err)
+				}
+			}
+			retained := "leased/" + strings.Repeat("a", 40)
+			key := "sha256:" + strings.Repeat("c", 64)
+			m, err := homelease.New(query, retentionAuthority{home, retained, key}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := homelease.Request{Environment: "claude", Profile: "sample", LockSHA256: strings.Repeat("d", 64), RequestID: "alias-retention", Holder: homelease.Holder{Kind: "prepared", Launcher: "curator-run", ManagerID: "dead-launcher-manager", ManagerRegisteredAt: "2020-01-01T00:00:00Z", RequestID: "alias-retention"}}
+			if _, _, err := m.Acquire(context.Background(), req); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := state.Load(home); err != nil {
+				t.Fatalf("canonical ledger control: %v", err)
+			}
+			lock, err := locks.AcquireHomeOnly(context.Background(), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer lock.Close()
+			before := boundarySnapshot(t, home)
+			roots, err := homelease.ReferencesUnderLock(query, lock)
+			if err != nil || !reflect.DeepEqual(roots.RuntimeEntries, []string{retained}) || !reflect.DeepEqual(roots.BuildKeys, []string{key}) {
+				t.Errorf("same-root retained references: %+v %v", roots, err)
+			}
+			if !reflect.DeepEqual(before, boundarySnapshot(t, home)) {
+				t.Fatal("reference read changed preimage")
+			}
+			foreignManager, err := managerlock.New(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			foreign, err := foreignManager.AcquireHomeOnly(context.Background(), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			roots, err = homelease.ReferencesUnderLock(query, foreign)
+			if closeErr := foreign.Close(); closeErr != nil {
+				t.Fatal(closeErr)
+			}
+			if !errors.Is(err, managerlock.ErrNotHeld) || !reflect.DeepEqual(roots, homelease.Roots{}) {
+				t.Errorf("foreign lock: %+v %v", roots, err)
+			}
+			if !reflect.DeepEqual(before, boundarySnapshot(t, home)) {
+				t.Fatal("foreign-lock refusal changed preimage")
+			}
+			if err := lock.Close(); err != nil {
+				t.Fatal(err)
+			}
+			roots, err = homelease.ReferencesUnderLock(query, lock)
+			if !errors.Is(err, managerlock.ErrNotHeld) || !reflect.DeepEqual(roots, homelease.Roots{}) {
+				t.Errorf("closed lock: %+v %v", roots, err)
+			}
+			if !reflect.DeepEqual(before, boundarySnapshot(t, home)) {
+				t.Fatal("closed-lock refusal changed preimage")
 			}
 		})
 	}

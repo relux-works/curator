@@ -21,6 +21,16 @@ func ReferencesUnderLock(home string, lock transaction.HomeLock) (Roots, error) 
 	if err := w.Held().Validate(home); err != nil {
 		return roots, err
 	}
+	// Stored root identity and state routes use the same physical manager
+	// identity as acquisition, including when the caller supplied an alias.
+	identity, err := managerlock.New(home)
+	if err != nil {
+		return roots, err
+	}
+	home = identity.Home()
+	if err := w.Held().Validate(home); err != nil {
+		return roots, err
+	}
 	if err := state.LegacyPending(home); err != nil {
 		return roots, err
 	}
