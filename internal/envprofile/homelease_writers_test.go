@@ -1181,3 +1181,167 @@ func TestHomeLeaseRenderedDocuments(t *testing.T) {
 		})
 	}
 }
+
+// W13/W17: actual interrupted apply and interrupted rollback leave durable
+// custom migration journals. Replant their exact synthetic postimages around
+// a real lease admission: public apply and borrowed recovery must refuse before
+// any writes. After explicit break, real recovery restores prior link/marker,
+// removes intent and admits a fresh replayable reservation. This fault plant
+// does not claim that guarded production can create a journal under a lease,
+// or that conservative whole-manager legacy recovery is disjoint-qualified.
+func TestHomeLeaseInterruptedCustomMigration(t *testing.T) {
+	for _, phase := range []string{"forward", "rollback"} {
+		t.Run(phase, func(t *testing.T) {
+			isolateHomeLeaseWriters(t)
+			fx, _ := captureFixture(t)
+			root := ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI)
+			link := filepath.Join(root, "auth.json")
+			priorTarget, err := os.Readlink(link)
+			if err != nil {
+				t.Fatal(err)
+			}
+			markerPath := filepath.Join(root, envmarker.Name)
+			priorMarker, err := os.ReadFile(markerPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := fx.migrateRequest()
+			req.Profile, req.EnvID = fx.profile, envregistry.CodexCLI
+			req.Machine.Isolation = map[string]map[string]string{fx.profile: {envregistry.CodexCLI: envregistry.IsolationIsolated}}
+			plan, err := PlanMigration(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Ops()) != 1 || plan.Ops()[0].Kind != MigrateOpUnlink {
+				t.Fatal("fixture lacks actual credential unlink plan")
+			}
+			req.Expect = plan.Hash
+			rollbackStarted, rollbackFailures := false, 0
+			req.InjectFault = func(point string, applied int) error {
+				if phase == "forward" && point == MigrateFaultCrash && applied == 1 {
+					return errors.New("fixture forward interruption")
+				}
+				if phase == "rollback" && point == MigrateFaultPublish {
+					rollbackStarted = true
+					return errors.New("fixture publication interruption")
+				}
+				return nil
+			}
+			req.symlink = func(target, path string) error {
+				if rollbackStarted {
+					rollbackFailures++
+					return errors.New("fixture rollback interruption")
+				}
+				return os.Symlink(target, path)
+			}
+			_, err = ApplyMigration(req)
+			if err == nil || (phase == "forward" && !strings.Contains(err.Error(), "interrupted")) || (phase == "rollback" && (!strings.Contains(err.Error(), "rollback incomplete") || rollbackFailures != 1)) {
+				t.Fatalf("intended migration fault not reached: %v", err)
+			}
+			journal, err := readMigrationJournal(fx.home)
+			if err != nil || journal == nil || journal.Complete || len(journal.Ops) != 1 || !journal.Ops[0].Done {
+				t.Fatalf("real interruption journal absent: %+v %v", journal, err)
+			}
+			pending, err := os.ReadFile(migrationJournalPath(fx.home))
+			if err != nil {
+				t.Fatal(err)
+			}
+			pendingMarker, err := os.ReadFile(markerPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Lstat(link); !os.IsNotExist(err) {
+				t.Fatal("real interrupted unlink not exercised", err)
+			}
+			// Fault setup restores currentness only to obtain an actual lease;
+			// no pending state is treated as safe by the admission implementation.
+			if err := os.Remove(migrationJournalPath(fx.home)); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(priorTarget, link); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(markerPath, priorMarker, 0600); err != nil {
+				t.Fatal(err)
+			}
+			m, lease := leaseManagedFixture(t, fx, envregistry.CodexCLI)
+			if err := os.Remove(link); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(markerPath, pendingMarker, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(migrationJournalPath(fx.home), pending, 0600); err != nil {
+				t.Fatal(err)
+			}
+			req.InjectFault, req.symlink = nil, nil
+			before, _ := captureFixtureState(t, fx)
+			_, err = ApplyMigration(req)
+			requireHomeLeaseRefusal(t, err, lease.LeaseID)
+			linkCalls := 0
+			recover := func() (*MigrateRecovery, error) {
+				op, err := beginOperationGuarded(fx.home, nil, []string{})
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = op.close() }()
+				return recoverMigrationJournal(fx.home, op, nil, func(target, path string) error { linkCalls++; return os.Symlink(target, path) }, os.Rename)
+			}
+			_, err = recover()
+			requireHomeLeaseRefusal(t, err, lease.LeaseID)
+			after, _ := captureFixtureState(t, fx)
+			if linkCalls != 0 || !bytes.Equal(before, after) {
+				t.Fatal("leased custom recovery changed preimage or entered link syscall")
+			}
+			if err := os.Remove(migrationJournalPath(fx.home)); err != nil {
+				t.Fatal(err)
+			}
+			breakFixtureLease(t, m, lease)
+			if err := os.WriteFile(migrationJournalPath(fx.home), pending, 0600); err != nil {
+				t.Fatal(err)
+			}
+			// Recovery inventory must still reject a foreign credential entry
+			// after the independent lease gate is gone.
+			if err := os.WriteFile(link, []byte("synthetic-unowned\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			before, _ = captureFixtureState(t, fx)
+			_, err = recover()
+			if err == nil || !strings.Contains(err.Error(), "recovery found") || !strings.Contains(err.Error(), "regular file") {
+				t.Fatalf("foreign recovery entry not refused: %v", err)
+			}
+			after, _ = captureFixtureState(t, fx)
+			if linkCalls != 0 || !bytes.Equal(before, after) {
+				t.Fatal("foreign inventory refusal changed preimage")
+			}
+			if err := os.Remove(link); err != nil {
+				t.Fatal(err)
+			}
+			recovered, err := recover()
+			if err != nil || recovered == nil || recovered.Plan != plan.Hash || recovered.Done != 1 || recovered.Ops != 1 || linkCalls != 1 {
+				t.Fatalf("actual recovery control: %+v calls=%d %v", recovered, linkCalls, err)
+			}
+			if got, err := os.Readlink(link); err != nil || got != priorTarget {
+				t.Fatal("prior credential link not restored", err)
+			}
+			if got, err := os.ReadFile(markerPath); err != nil || !bytes.Equal(got, priorMarker) {
+				t.Fatal("prior marker not restored", err)
+			}
+			if _, err := os.Lstat(migrationJournalPath(fx.home)); !os.IsNotExist(err) {
+				t.Fatal("custom journal not removed", err)
+			}
+			if _, err := Resolve(fx.request(envregistry.CodexCLI)); err != nil {
+				t.Fatal("recovered home not current", err)
+			}
+			fresh := homelease.Request{Environment: envregistry.CodexCLI, Profile: fx.profile, LockSHA256: strings.TrimPrefix(fx.lockHash, "sha256:"), RequestID: "after-recovery", Holder: homelease.Holder{Kind: "prepared", Launcher: "curator-run", ManagerID: "fixture-manager", ManagerRegisteredAt: "2026-10-27T00:00:00Z", RequestID: "after-recovery"}}
+			admitted, reason, err := m.Acquire(context.Background(), fresh)
+			if err != nil || reason != "acquired" || !admitted.Changed {
+				t.Fatalf("recovery did not admit fresh acquire: %s %v", reason, err)
+			}
+			replayed, _, err := m.Acquire(context.Background(), fresh)
+			if err != nil || replayed.Changed || replayed.Lease == nil || admitted.Lease == nil || replayed.Lease.LeaseID != admitted.Lease.LeaseID {
+				t.Fatal("recovered acquire replay changed reservation", err)
+			}
+		})
+	}
+}
