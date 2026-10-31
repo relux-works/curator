@@ -9,21 +9,36 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relux-works/curator/internal/claudememory"
 	"github.com/relux-works/curator/internal/envregistry"
 )
+
+// These native HOME values are references only; the managed fixture supplies
+// separate temporary native adapter files. Native memory is never opened.
+// Explicit expected literals avoid depending on production quoting or temp roots.
+type claudeMemoryHomeCase struct{ form, name, first, next, firstPattern, nextPattern string }
+
+func claudeMemoryHomeCases(t *testing.T) []claudeMemoryHomeCase {
+	t.Helper()
+	base := filepath.ToSlash(filepath.VolumeName(t.TempDir())+string(filepath.Separator)) + "curator-memory-fixture/"
+	var cases []claudeMemoryHomeCase
+	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
+		cases = append(cases,
+			claudeMemoryHomeCase{form, "plain", filepath.FromSlash(base + "operator"), filepath.FromSlash(base + "next-operator"), base + "operator/.claude/CLAUDE.md", base + "next-operator/.claude/CLAUDE.md"},
+			claudeMemoryHomeCase{form, "metacharacter", filepath.FromSlash(base + "operator[1]"), filepath.FromSlash(base + "next-operator[2]"), base + "operator[[]1[]]/.claude/CLAUDE.md", base + "next-operator[[]2[]]/.claude/CLAUDE.md"},
+		)
+	}
+	return cases
+}
 
 // Both home forms provision the native exclusion, repair its removal without
 // dropping other settings/exclusions, and leave satisfied settings untouched.
 func TestClaudeNativeMemorySettings(t *testing.T) {
-	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
-		t.Run(form, func(t *testing.T) {
-			_, req, seed := claudeRepairFixture(t, form)
+	for _, tc := range claudeMemoryHomeCases(t) {
+		t.Run(tc.form+"/"+tc.name, func(t *testing.T) {
+			t.Setenv("HOME", tc.first)
+			t.Setenv("USERPROFILE", tc.first)
+			_, req, seed := claudeRepairFixture(t, tc.form)
 			path := filepath.Join(filepath.Dir(seed), "settings.json")
-			native, err := claudememory.NativeFile()
-			if err != nil {
-				t.Fatal(err)
-			}
 			assert := func() {
 				t.Helper()
 				var settings struct {
@@ -34,7 +49,7 @@ func TestClaudeNativeMemorySettings(t *testing.T) {
 				}
 				found := false
 				for _, s := range settings.Excludes {
-					found = found || s == filepath.ToSlash(native)
+					found = found || s == tc.firstPattern
 				}
 				if !found {
 					t.Fatal("native parent memory is not excluded")
@@ -162,12 +177,12 @@ func TestClaudeNativeMemorySettingsFileKinds(t *testing.T) {
 // Changing the operator home makes its old exclusion stale without read-only
 // writes; repair preserves that exclusion and admits the new home in both forms.
 func TestClaudeNativeMemoryChangedHome(t *testing.T) {
-	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
-		t.Run(form, func(t *testing.T) {
-			firstHome := t.TempDir()
+	for _, tc := range claudeMemoryHomeCases(t) {
+		t.Run(tc.form+"/"+tc.name, func(t *testing.T) {
+			firstHome := tc.first
 			t.Setenv("HOME", firstHome)
 			t.Setenv("USERPROFILE", firstHome)
-			_, req, seed := claudeRepairFixture(t, form)
+			_, req, seed := claudeRepairFixture(t, tc.form)
 			req.Repair = false
 			if _, err := Resolve(req); err != nil {
 				t.Fatalf("original home positive: %v", err)
@@ -175,7 +190,7 @@ func TestClaudeNativeMemoryChangedHome(t *testing.T) {
 			root := filepath.Join(filepath.Dir(seed), "CLAUDE.md")
 			settings := filepath.Join(filepath.Dir(seed), "settings.json")
 			beforeRoot, beforeSeed, beforeSettings := readClaudeState(t, root), readClaudeState(t, seed), readClaudeState(t, settings)
-			nextHome := t.TempDir()
+			nextHome := tc.next
 			t.Setenv("HOME", nextHome)
 			t.Setenv("USERPROFILE", nextHome)
 			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), DiagHomeStale) || !strings.Contains(err.Error(), "native memory exclusion") {
@@ -198,8 +213,7 @@ func TestClaudeNativeMemoryChangedHome(t *testing.T) {
 			if err := json.Unmarshal(readClaudeState(t, settings), &got); err != nil {
 				t.Fatal(err)
 			}
-			for _, home := range []string{firstHome, nextHome} {
-				want := filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))
+			for _, want := range []string{tc.firstPattern, tc.nextPattern} {
 				found := false
 				for _, exclude := range got.Excludes {
 					found = found || exclude == want

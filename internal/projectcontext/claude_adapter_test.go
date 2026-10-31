@@ -262,6 +262,24 @@ func TestClaudeCompositionMaterialization(t *testing.T) {
 // grants/denies affect settings and protected policy identity, while invalid
 // versions, unsorted/duplicate names and native permission expressions refuse.
 func TestClaudeManagerControls(t *testing.T) {
+	// HOME selects a memory path only; native memory is never opened.
+	// Choose it before provisioning, with independently specified literal globs.
+	base := filepath.ToSlash(filepath.VolumeName(t.TempDir())+string(filepath.Separator)) + "curator-memory-fixture/"
+	for _, tc := range []struct{ name, pattern string }{
+		{"operator", "operator"},
+		{"operator[1]", "operator[[]1[]]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := filepath.FromSlash(base + tc.name)
+			t.Setenv("HOME", home)
+			t.Setenv("USERPROFILE", home)
+			testClaudeManagerControls(t, base+tc.pattern+"/.claude/CLAUDE.md")
+		})
+	}
+}
+
+func testClaudeManagerControls(t *testing.T, want string) {
+	t.Helper()
 	f, req, p, owner := claudeFixture(t, false, false)
 	if string(p.Files[contextmaterialize.MCPClaudePath]) != "{\"mcpServers\":{}}\n" {
 		t.Fatal("empty MCP channel missing")
@@ -278,14 +296,10 @@ func TestClaudeManagerControls(t *testing.T) {
 	if err := json.Unmarshal(granted.Files["settings.json"], &settings); err != nil {
 		t.Fatal(err)
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
 	if string(settings.Permissions) != `{"allow":["Read"],"defaultMode":"dontAsk","deny":["Write","mcp__*"]}` {
 		t.Fatal("manager policy not programmed")
 	}
-	if !reflect.DeepEqual(settings.Excludes, []string{filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))}) {
+	if !reflect.DeepEqual(settings.Excludes, []string{want}) {
 		t.Fatal("native memory exclusion not programmed")
 	}
 	if p.Record.PolicySHA256 == granted.Record.PolicySHA256 || p.Record.MaterializationSHA256 == granted.Record.MaterializationSHA256 {
