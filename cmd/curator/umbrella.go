@@ -724,7 +724,7 @@ func (c cli) cmdUmbrella(cfg *config.Config, home string, args []string) int {
 	command.Stdin = os.Stdin
 	command.Stdout = c.stdout
 	command.Stderr = c.stderr
-	if err := command.Run(); err != nil {
+	if err := runUmbrellaProvider(command); err != nil {
 		if exit, ok := err.(*exec.ExitError); ok {
 			return exit.ExitCode()
 		}
