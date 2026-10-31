@@ -389,6 +389,49 @@ platform-control	internal/projectlease	TestIdleRepairGeneratedDrift/mode	exact m
 TRAIN_SKIPS
 done
 
+# Claim: only the exact absent-selector reason for the optional pinned memory
+# specimen is admitted on each CI platform. Neighboring reasons and a removed
+# declaration remain unclassified; an explicitly required case still cannot skip.
+claude_specimen_reason='set CURATOR_CLAUDE_MEMORY_SPECIMEN to the pinned public Claude 2.1.314 distribution'
+claude_specimen_pattern='^set CURATOR_CLAUDE_MEMORY_SPECIMEN to the pinned public Claude 2[.]1[.]314 distribution$'
+claude_specimen_case='TestPinnedClaudeMemoryExclusion'
+claude_specimen_stream() {
+  ev pass internal/buildcache TestWindowsProtectedStateMatrix
+  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+  evout internal/claudememory "$claude_specimen_case" "$1"
+  ev skip internal/claudememory "$claude_specimen_case"
+}
+awk -F'\t' -v pattern="$claude_specimen_pattern" '$2 != pattern' "$CLASSES" >"$WORK/claude-specimen-classes-minus.tsv"
+cp "$LEDGER" "$WORK/claude-specimen-required.tsv"
+printf 'internal/claudememory\t%s\tlinux,darwin,windows\t-\t-\tExplicitly required memory specimen\n' "$claude_specimen_case" >>"$WORK/claude-specimen-required.tsv"
+for claude_goos in linux darwin windows; do
+  claude_specimen_stream "$claude_specimen_reason" >"$S"
+  assert "optional pinned memory specimen skip passes on $claude_goos" 0 \
+    run_gate "$S" env CI_GATE_GOOS="$claude_goos"
+  assert_contains 'optional memory specimen records its opt-in class' \
+    "$(printf '%s\topt-in\tallowed-' "$claude_specimen_case")" "$WORK/gate-ev/skips-observed.tsv"
+
+  assert "removed memory specimen declaration refuses on $claude_goos" 1 \
+    run_gate "$S" env CI_GATE_GOOS="$claude_goos" CI_SKIP_CLASSES="$WORK/claude-specimen-classes-minus.tsv"
+  assert_contains 'removed memory specimen declaration is unclassified' \
+    "$(printf '%s\tUNCLASSIFIED\tFATAL-' "$claude_specimen_case")" "$WORK/gate-ev/skips-observed.tsv"
+
+  assert "required memory specimen cannot skip on $claude_goos" 1 \
+    run_gate "$S" env CI_GATE_GOOS="$claude_goos" CI_PLATFORM_CASES="$WORK/claude-specimen-required.tsv"
+  assert_contains 'required memory specimen fails for the intended ledger case' \
+    "ledger case skipped where the ledger does not tolerate it ($claude_goos): internal/claudememory :: $claude_specimen_case" "$WORK/out.txt"
+
+  for claude_nearby in "prefix $claude_specimen_reason" "$claude_specimen_reason unexpectedly" \
+    'set CURATOR_CLAUDE_MEMORY_SPECIMEN to the pinned public Claude 2x1x314 distribution'; do
+    claude_specimen_stream "$claude_nearby" >"$S"
+    assert "nearby memory specimen reason refuses on $claude_goos: $claude_nearby" 1 \
+      run_gate "$S" env CI_GATE_GOOS="$claude_goos"
+    assert_contains 'nearby memory specimen reason stays unclassified' \
+      "$(printf '%s\tUNCLASSIFIED\tFATAL-' "$claude_specimen_case")" "$WORK/gate-ev/skips-observed.tsv"
+  done
+done
+
 # Claim: exact book tool-absence and Unix-only skips keep their declared
 # classes on each platform. Nearby undeclared reasons and removal of the one
 # accepting declaration fail for that skip; no broad unavailable-tool waiver.

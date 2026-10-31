@@ -123,6 +123,66 @@ func TestClaudeNativeMemoryMalformedSettings(t *testing.T) {
 	}
 }
 
+// Enumerate the literal directory: metacharacters in its path are not patterns.
+func claudeSettingsStagingEntries(root string) ([]string, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	var staged []string
+	for _, entry := range entries {
+		if name := entry.Name(); strings.HasPrefix(name, ".curator-write-") && strings.HasSuffix(name, ".tmp") {
+			staged = append(staged, name)
+		}
+	}
+	return staged, nil
+}
+
+// The detector sees planted staging residue in plain, bracketed and unmatched-
+// bracket directories, ignores neighboring names, and exposes enumeration errors.
+func TestClaudeNativeMemoryStagingResidueDetector(t *testing.T) {
+	for _, name := range []string{"operator", "operator[1]", "operator["} {
+		t.Run(name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), name)
+			if err := os.Mkdir(root, 0700); err != nil {
+				t.Fatal(err)
+			}
+			assertEmpty := func(t *testing.T) {
+				t.Helper()
+				if staged, err := claudeSettingsStagingEntries(root); err != nil || len(staged) != 0 {
+					t.Fatalf("empty staging positive: %v, %v", staged, err)
+				}
+			}
+			t.Run("empty", assertEmpty)
+			for _, neighbor := range []string{"settings.json", "curator-write-neighbor.tmp", ".curator-write-neighbor.tmp.extra", ".curator-write-neighbor"} {
+				if err := os.WriteFile(filepath.Join(root, neighbor), []byte("control"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Run("neighbors", assertEmpty)
+			const residue = ".curator-write-planted.tmp"
+			if err := os.WriteFile(filepath.Join(root, residue), []byte("control"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			t.Run("planted", func(t *testing.T) {
+				if staged, err := claudeSettingsStagingEntries(root); err != nil || len(staged) != 1 || staged[0] != residue {
+					t.Fatalf("planted staging residue undetected: %v, %v", staged, err)
+				}
+			})
+			if err := os.Remove(filepath.Join(root, residue)); err != nil {
+				t.Fatal(err)
+			}
+			t.Run("removed", assertEmpty)
+			t.Run("enumeration-error", func(t *testing.T) {
+				if staged, err := claudeSettingsStagingEntries(filepath.Join(root, "absent")); !os.IsNotExist(err) || len(staged) != 0 {
+					t.Fatalf("missing directory must return enumeration error: %v, %v", staged, err)
+				}
+			})
+			t.Run("after-error", assertEmpty)
+		})
+	}
+}
+
 // An absent file can be created, while directory and symlink destinations must
 // survive a refused publication without changing their target or staging files.
 func TestClaudeNativeMemorySettingsFileKinds(t *testing.T) {
@@ -167,7 +227,7 @@ func TestClaudeNativeMemorySettingsFileKinds(t *testing.T) {
 			if string(readClaudeState(t, target)) != `{"unrelated":true}` {
 				t.Fatal("publication changed symlink target")
 			}
-			if staged, err := filepath.Glob(filepath.Join(root, ".curator-write-*.tmp")); err != nil || len(staged) != 0 {
+			if staged, err := claudeSettingsStagingEntries(root); err != nil || len(staged) != 0 {
 				t.Fatalf("publication left staging files: %v, %v", staged, err)
 			}
 		})
