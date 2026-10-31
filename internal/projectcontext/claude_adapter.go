@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/relux-works/curator/internal/claudememory"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envregistry"
@@ -144,7 +145,15 @@ func claudeOutputs(files map[string][]byte, controls ClaudeControls) error {
 	if err != nil {
 		return err
 	}
-	files["settings.json"] = append(settings, '\n')
+	native, err := claudememory.NativeFile()
+	if err != nil {
+		return err
+	}
+	settings, err = claudememory.Merge(settings, native)
+	if err != nil {
+		return err
+	}
+	files["settings.json"] = settings
 	if _, ok := files[contextmaterialize.MCPClaudePath]; !ok {
 		files[contextmaterialize.MCPClaudePath] = []byte("{\"mcpServers\":{}}\n")
 	}

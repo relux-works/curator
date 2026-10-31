@@ -187,6 +187,18 @@ the existing rename helper and its residual preparation window. External writers
 do not share the manager lock: scheduling between the final read and rename can
 still race, so this is not an atomic compare-and-swap guarantee.
 
+Claude `settings.json` carries a separate manager-owned `claudeMdExcludes`
+entry for the operator's native `.claude/CLAUDE.md`. Its path comes from the OS
+user home, independently of `CLAUDE_CONFIG_DIR`, and glob metacharacters are
+quoted. Curator does not read or move that native file. Provisioning and repair
+merge this entry into the managed settings, preserving existing exclusions and
+unrelated values; satisfied settings retain their bytes. Malformed settings or
+nonregular destinations refuse rather than being replaced with defaults.
+Read-only resolve reports a missing entry as stale. The publication uses the
+same prepare-before-final-read rename boundary described above, with the same
+external-writer race limit. This exclusion does not match project or managed
+profile instruction files and does not disable managed policy memory.
+
 ## Logging in to managed homes
 
 See [Agent logins](agent-logins.md) for versioned Claude Code, Codex CLI and

@@ -199,6 +199,9 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 	for _, entry := range entries {
 		for _, node := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/node=%v", entry.name, node), func(t *testing.T) {
+				// Provision HOME-derived settings against the same isolated home used by the entry.
+				t.Setenv("HOME", t.TempDir())
+				t.Setenv("USERPROFILE", os.Getenv("HOME"))
 				fx, _, seed := claudeRepairFixture(t, envregistry.FormReferenced)
 				isolateAuthorityNativeHomes(t, fx)
 				if err := EnsureDefaultWithPolicy(fx.home, Policy{}); err != nil {
@@ -287,8 +290,6 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 
 func isolateAuthorityNativeHomes(t *testing.T, fx *managedFixture) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	for _, adapter := range envregistry.Registry {
 		path := fx.native[adapter.ID]
 		if adapter.ID == envregistry.OpenCode {
