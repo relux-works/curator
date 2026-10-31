@@ -116,6 +116,7 @@ host-capability	^book checker prerequisite unavailable: (bash|grep|sed|sort|base
 # --- opt-in probes ----------------------------------------------------------
 opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
 opt-in	set CURATOR_TEST_YARN_MODERN_JS to the @yarnpkg/cli-dist 4[.]9[.]2 bin/yarn[.]js integration tool	allow	enabled by an explicit path to the exact modern Yarn integration entry point
+opt-in	^set CURATOR_CLAUDE_MEMORY_SPECIMEN to the pinned public Claude 2[.]1[.]314 distribution$	allow	enabled only by an explicit path to the pinned public native-memory filter specimen; present invalid selections fail
 opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
 opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
 
