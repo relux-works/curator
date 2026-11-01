@@ -82,13 +82,38 @@ func Binary(t *testing.T) string {
 // environment, feeds stdin when non-empty, and returns the exit code
 // with captured stdout and stderr. dir == "" inherits the working
 // directory. A start failure (as opposed to a non-zero exit) is
-// fatal.
+// fatal. Invocation lifetime is capped at two minutes or the test deadline
+// minus cleanup time, whichever is earlier. POSIX cleanup covers the owned
+// process group; Windows cancellation covers the direct child.
 func Run(t *testing.T, dir string, env []string, stdin, name string, args ...string) (int, string, string) {
 	t.Helper()
-	cmd := exec.Command(name, args...) // #nosec G204 -- test-only seam; callers pass the built manager binary or fixed fixture tools.
-	if dir != "" {
-		cmd.Dir = dir
+	ctx, cancel := fixtureContext(t)
+	defer cancel()
+	code, stdout, stderr, err := runCommand(ctx, dir, env, stdin, name, args...)
+	if err != nil {
+		t.Fatalf("run %s %v: %v\n%s", name, args, err, stderr)
 	}
+	return code, stdout, stderr
+}
+
+// fixtureContext leaves time for cleanup before the test binary's deadline.
+// Each fixture invocation also has its own two-minute ceiling.
+func fixtureContext(t *testing.T) (context.Context, context.CancelFunc) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Minute)
+	if outer, ok := t.Deadline(); ok && outer.Add(-2*time.Second).Before(deadline) {
+		deadline = outer.Add(-2 * time.Second)
+	}
+	return context.WithDeadline(t.Context(), deadline)
+}
+
+func runCommand(ctx context.Context, dir string, env []string, stdin, name string, args ...string) (int, string, string, error) {
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- test-only seam; callers pass the built manager binary or fixed fixture tools.
+	configureFixtureProcess(cmd)
+	// Bound inherited-pipe draining even if a descendant leaves the group.
+	cmd.WaitDelay = time.Second
+	defer cleanupFixtureProcess(cmd)
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), env...)
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
@@ -98,32 +123,24 @@ func Run(t *testing.T, dir string, env []string, stdin, name string, args ...str
 	err := cmd.Run()
 	code := 0
 	if err != nil {
-		exit, ok := err.(*exec.ExitError)
-		if !ok {
-			t.Fatalf("run %s %v: %v", name, args, err)
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
+			return 0, stdout.String(), stderr.String(), err
 		}
 		code = exit.ExitCode()
 	}
-	return code, stdout.String(), stderr.String()
+	return code, stdout.String(), stderr.String(), nil
 }
 
-// Output runs one child process and returns its trimmed stdout. Any
+// Output runs one bounded child process and returns its trimmed stdout. Any
 // failure is fatal.
 func Output(t *testing.T, dir string, env []string, name string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(name, args...) // #nosec G204 -- test-only seam; callers pass fixed fixture tools.
-	if dir != "" {
-		cmd.Dir = dir
+	code, stdout, stderr := Run(t, dir, env, "", name, args...)
+	if code != 0 {
+		t.Fatalf("%s %v: exit %d\n%s", name, args, code, stderr)
 	}
-	cmd.Env = append(os.Environ(), env...)
-	out, err := cmd.Output()
-	if err != nil {
-		if exit, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("%s %v: %v\n%s", name, args, err, exit.Stderr)
-		}
-		t.Fatalf("%s %v: %v", name, args, err)
-	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(stdout)
 }
 
 // LookPath resolves a host tool without failing.

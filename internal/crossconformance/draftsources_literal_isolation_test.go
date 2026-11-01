@@ -139,8 +139,9 @@ func assertSanitized(t *testing.T, stderr string, forbidden ...string) {
 // TestDraftLiteralIgnoresGitSSHCommand is row (a): an ambient
 // GIT_SSH_COMMAND pointing at a script that would serve the evil
 // repository must not redirect the literal ssh:// clone. The lane fails
-// closed on the declared endpoint with bounded SSH connection setup and the
-// evil script never invoked. Mutant "pass the ambient GIT_SSH_COMMAND
+// closed through a rejecting PATH ssh fixture and retains the pinned SSH
+// connection-timeout option; this row does not contact the endpoint. The
+// evil script is never invoked. Mutant "pass the ambient GIT_SSH_COMMAND
 // through" succeeds with the evil commit and is KILLED by the exit code,
 // the missing lock, and the invocation log.
 func TestDraftLiteralIgnoresGitSSHCommand(t *testing.T) {
@@ -161,12 +162,14 @@ func TestDraftLiteralIgnoresGitSSHCommand(t *testing.T) {
 	if got := draftGitOutput(t, control, "rev-parse", "HEAD"); got != evilCommit {
 		t.Fatalf("control HEAD = %s, want evil %s (payload not live)", got, evilCommit)
 	}
+
 	if probe, err := os.ReadFile(invokedLog); err != nil || len(probe) == 0 {
 		t.Fatal("control left no evil-ssh invocation (payload not live)")
 	}
 	_ = os.Remove(invokedLog)
 
 	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, "", "", realGit)
+	sshArgvLog := writeFakeSSH(t, fakeDir)
 	pathEnv := draftTransportPATH(t, fakeDir)
 	configPath, project, home := setupCLIProject(t, root)
 	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationSSH + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
@@ -193,6 +196,14 @@ func TestDraftLiteralIgnoresGitSSHCommand(t *testing.T) {
 	if !strings.Contains(envSeen, "ssh -F ") || !strings.Contains(envSeen, "BatchMode=yes") || !strings.Contains(envSeen, "ConnectTimeout=15") {
 		t.Fatalf("git missed the pinned curator-owned command:\n%s", envSeen)
 	}
+	// The owned ssh command must reach the declared host through the PATH
+	// fixture. Real OpenSSH configuration behavior is checked separately by
+	// TestDraftSSHEmptyConfigIgnoresHostileFile; this row tests environment isolation.
+	argv, argvErr := os.ReadFile(sshArgvLog)
+	if argvErr != nil || !strings.Contains(string(argv), "<git@fixture.test>") {
+		t.Fatalf("owned ssh did not reach declared fixture host: %v, %q", argvErr, argv)
+	}
+
 	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
 		t.Fatalf("evil GIT_SSH_COMMAND was invoked: %q", probe)
 	}
@@ -214,6 +225,7 @@ func TestDraftLiteralIgnoresGitSSH(t *testing.T) {
 	evilBare, _ := writeEvilBare(t, root, declaredCommit)
 	evilSSH, invokedLog := writeEvilSSHCommand(t, evilBare, realGit)
 	fakeDir, cloneLog, envLog := literalIsolationGitShim(t, "", "", realGit)
+	sshArgvLog := writeFakeSSH(t, fakeDir)
 	pathEnv := draftTransportPATH(t, fakeDir)
 	configPath, project, home := setupCLIProject(t, root)
 	payload := `{"schema_version":2,"sources":{"kit":{"git":"` + literalIsolationSSH + `","tag":"v1"}},"skills":[{"name":"review","from":"kit","directory":"skills/review"}]}`
@@ -234,6 +246,14 @@ func TestDraftLiteralIgnoresGitSSH(t *testing.T) {
 	if envSeen := literalIsolationEnvLog(t, envLog); strings.Contains(envSeen, evilSSH) {
 		t.Fatalf("git saw the ambient GIT_SSH:\n%s", envSeen)
 	}
+	// The owned ssh command must reach the declared host through the PATH
+	// fixture. Real OpenSSH configuration behavior is checked separately by
+	// TestDraftSSHEmptyConfigIgnoresHostileFile; this row tests environment isolation.
+	argv, argvErr := os.ReadFile(sshArgvLog)
+	if argvErr != nil || !strings.Contains(string(argv), "<git@fixture.test>") {
+		t.Fatalf("owned ssh did not reach declared fixture host: %v, %q", argvErr, argv)
+	}
+
 	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
 		t.Fatalf("evil GIT_SSH was invoked: %q", probe)
 	}
