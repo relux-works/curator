@@ -206,6 +206,11 @@ issues array; other results contain one issue code without input values or paths
 Exit codes are 0 (valid), 1 (invalid content), 2 (invalid usage) and 3 (input I/O
 failure). Ordinary command help retains its normal text output.
 
+Profile skill dependencies with a Git `directory` extract and verify the selected
+package independently of sibling discovery links. See
+[profile skill directories](docs/profile-skill-directories.md) for selection and
+snapshot integrity rules.
+
 </details>
 
 <details>

@@ -334,7 +334,7 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 		return nil, err
 	}
 	defer func() { _ = os.RemoveAll(snapshot) }()
-	if err := gitops.Extract(dir, commit, snapshot); err != nil {
+	if err := extractMemberSnapshot(dir, commit, kind, directory, snapshot); err != nil {
 		return nil, fmt.Errorf("%s: extract %s at %s: %v", DiagSourceInvalid, name, commit, err)
 	}
 	root, err := selectedPackageRoot(snapshot, directory)
@@ -821,18 +821,32 @@ func packageRoot(entry, directory string) string {
 // creating it.
 func (m *gitManager) entryPath(home string, resolved contextresolve.Resolved) string {
 	if resolved.Commit != "" {
-		return contextstore.EntryDir(home, resolved.Kind, resolved.Name, resolved.Commit)
+		scoped := contextstore.GitEntryDir(home, resolved.Kind, resolved.Name, resolved.Commit, skillSnapshotDirectory(resolved.Kind, resolved.Directory))
+		if skillSnapshotDirectory(resolved.Kind, resolved.Directory) == "" {
+			return scoped
+		}
+		// Prefer the scoped entry, including its read errors. A pre-existing legacy
+		// whole snapshot remains usable only through the whole-tree pin verifier.
+		state, err := stateread.Lstat(scoped)
+		if err != nil || state.Kind != stateread.KindAbsent {
+			return scoped
+		}
+		legacy := contextstore.EntryDir(home, resolved.Kind, resolved.Name, resolved.Commit)
+		state, err = stateread.Lstat(legacy)
+		if err != nil || state.Kind != stateread.KindAbsent {
+			return legacy
+		}
+		return scoped
 	}
 	return contextstore.EntryDir(home, resolved.Kind, resolved.Name, resolved.StateHash)
 }
 
 // ensureEntry installs the store entry of a resolved member and returns its
-// path: commit members extract from the object database under their commit
-// key (a directory requirement reads below that entry at use time), while
-// state members are already in the store under their hash.
+// path. Selected skill snapshots bind both commit and directory in their key;
+// whole snapshots retain the commit key, and state entries retain their hash.
 func (m *gitManager) ensureEntry(home string, resolved contextresolve.Resolved) (string, error) {
 	if resolved.Commit != "" {
-		return contextstore.EnsureGit(home, resolved.Kind, resolved.Name, m.repoDir(resolved.Source), resolved.Commit)
+		return contextstore.EnsureGitDirectory(home, resolved.Kind, resolved.Name, m.repoDir(resolved.Source), resolved.Commit, skillSnapshotDirectory(resolved.Kind, resolved.Directory))
 	}
 	return contextstore.EntryDir(home, resolved.Kind, resolved.Name, resolved.StateHash), nil
 }
@@ -885,7 +899,7 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 	if err != nil {
 		return "", func() {}, err
 	}
-	if err := gitops.Extract(repo, resolved.Commit, snapshot); err != nil {
+	if err := extractMemberSnapshot(repo, resolved.Commit, resolved.Kind, resolved.Directory, snapshot); err != nil {
 		_ = os.RemoveAll(snapshot)
 		return "", func() {}, err
 	}
@@ -935,3 +949,18 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 
 // lookPath resolves an executable on PATH.
 func lookPath(command string) (string, error) { return exec.LookPath(command) }
+
+// Directory scoping is the schema-4 selected-skill contract. Context and MCP
+// snapshots keep their established whole-repository pin and extraction rules.
+func skillSnapshotDirectory(kind, directory string) string {
+	if kind == contextlock.KindSkill {
+		return directory
+	}
+	return ""
+}
+func extractMemberSnapshot(repo, commit, kind, directory, destination string) error {
+	return gitops.ExtractDirectory(repo, commit, skillSnapshotDirectory(kind, directory), destination)
+}
+func memberEntryPath(home string, member contextlock.Member) string {
+	return newGitManager(home).entryPath(home, resolvedOf(member))
+}

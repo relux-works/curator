@@ -564,3 +564,113 @@ func directoryAssertAudit(t *testing.T, home string, lock *contextlock.Lock, roo
 		t.Fatal("no selected-skill audit verdict persisted")
 	}
 }
+
+// A clean selected skill installs and resolves despite sibling discovery links;
+// the existing inside-selection and ancestor-link vectors remain refusals.
+func TestSkillDirectoryOutsideDiscoveryLinks(t *testing.T) {
+	driveDirectoryVector(t, directoryVector{
+		Name: "outside-discovery-links", Entry: "profile install",
+		Changes: map[string]any{"snapshot.symlinks": map[string]any{
+			".claude/skills/formatter": "../../skills/formatter",
+			".codex/skills/formatter":  "../../skills/formatter",
+		}},
+		Expected: map[string]any{"outcome": "materialized"},
+	})
+}
+
+// Two profiles selecting different directories of the same name/commit keep
+// separate authenticated snapshots. Both selected-byte edits and added siblings
+// fail pin verification. Existing complete snapshots retain whole-tree checking.
+func TestSkillDirectorySnapshotIdentity(t *testing.T) {
+	home := gitFixtureHome(t)
+	pinOperatorHome(t, t.TempDir())
+	native := pinHomes(t)
+	ids := newGitIdentities(t)
+	files := map[string]string{
+		"skills/a/SKILL.md": "---\nname: formatter\ndescription: First\n---\n# First\n",
+		"skills/b/SKILL.md": "---\nname: formatter\ndescription: Second\n---\n# Second\n",
+		"outside.txt":       "whole-tree legacy witness\n",
+	}
+	repo := gitRepo(t, files, "v1.0.0")
+	commit := fixtureGitOutput(t, repo, "rev-parse", "HEAD")
+	skillURL := "https://github.com/example/selected-shared.git"
+	ids.serve(repo, skillURL)
+	var first Info
+	var selected contextlock.Member
+	var entries []string
+	for i, dir := range []string{"skills/a", "skills/b"} {
+		name := []string{"first-profile", "second-profile"}[i]
+		root := gitRepo(t, map[string]string{"agent-context.json": directoryJSON(t, map[string]any{
+			"schema_version": 2, "name": name, "version": "1.0.0", "requires": map[string]any{"skills": map[string]any{"formatter": map[string]any{"git": skillURL, "revision": commit, "directory": dir}}},
+		})}, "v1.0.0")
+		operand := ids.serve(root, "https://github.com/example/"+name+".git")
+		info, _, _, err := Install(home, InstallOptions{Operand: operand, Range: "*"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		member, ok := info.Lock.Find(contextlock.KindSkill, "formatter")
+		if !ok {
+			t.Fatal("missing skill")
+		}
+		entry := memberEntryPath(home, member)
+		entries = append(entries, entry)
+		b, err := os.ReadFile(filepath.Join(entry, dir, "SKILL.md"))
+		if err != nil || string(b) != files[dir+"/SKILL.md"] {
+			t.Fatalf("selected snapshot changed: %q %v", b, err)
+		}
+		if err := validateNamedStorePins(home, info.Lock); err != nil {
+			t.Fatalf("valid selected pin refused: %v", err)
+		}
+		if i == 0 {
+			first = info
+			selected = member
+		}
+	}
+	if entries[0] == entries[1] {
+		t.Fatal("different selections share a snapshot")
+	}
+	if err := os.WriteFile(filepath.Join(entries[0], "outside.txt"), []byte("injected"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateNamedStorePins(home, first.Lock); err == nil || err.Check != diagPinHash {
+		t.Fatalf("unexpected sibling admitted: %v", err)
+	}
+	if err := os.Remove(filepath.Join(entries[0], "outside.txt")); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(entries[0], selected.Directory, "SKILL.md")
+	if err := os.WriteFile(path, []byte("tampered"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateNamedStorePins(home, first.Lock); err == nil || err.Check != diagPinHash {
+		t.Fatalf("selected tampering admitted: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(files[selected.Directory+"/SKILL.md"]), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateNamedStorePins(home, first.Lock); err != nil {
+		t.Fatalf("restored valid pin refused: %v", err)
+	}
+	// Remove only this isolated fixture's newly created scoped entry to exercise
+	// an old installation that already has a complete commit-keyed snapshot.
+	legacy, err := contextstore.EnsureGit(home, selected.Kind, selected.Name, repo, commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(entries[0]); err != nil {
+		t.Fatal(err)
+	}
+	if entry := memberEntryPath(home, selected); entry != legacy {
+		t.Fatalf("legacy snapshot not retained: %s", entry)
+	}
+	if err := validateNamedStorePins(home, first.Lock); err != nil {
+		t.Fatalf("valid legacy snapshot refused: %v", err)
+	}
+	directoryAssertLinks(t, home, first.Name, native, packageRoot(legacy, selected.Directory))
+	if err := os.WriteFile(filepath.Join(legacy, "outside.txt"), []byte("legacy tampering"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateNamedStorePins(home, first.Lock); err == nil || err.Check != diagPinHash {
+		t.Fatalf("legacy whole-tree tampering admitted: %v", err)
+	}
+}

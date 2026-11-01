@@ -1,16 +1,15 @@
 // Package contextstore keeps the profile store of environments §4: one
 // immutable regular-file tree per closure member below the manager home,
-// keyed by the member's pin — the resolved commit of a git package, the state
-// hash of a path package or the synthesized local root — on the runtime-store
-// pattern, so two profiles whose locks name one member at one pin share its
-// entry.
+// keyed by the member's pin and, for selected Git skills, its directory.
+// Whole snapshots retain the commit key; selected snapshots add a selector
+// digest, so profiles share only the same immutable closure.
 //
-// A git entry is extracted from the object database through gitops.Extract,
-// so its bytes are a function of the commit alone (environments §1.2). A
-// state entry is a copied regular-file tree keyed by its core §8 content hash.
+// Git entries come directly from the object database, without worktree
+// conversions. State entries use their core §8 content hash.
 package contextstore
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io/fs"
 	"os"
@@ -73,10 +72,30 @@ func ContentHash(dir string) (string, error) {
 // is extracted beside its final path and renamed into place only after the
 // extraction succeeded.
 func EnsureGit(home, kind, name, repo, commit string) (string, error) {
+	return EnsureGitDirectory(home, kind, name, repo, commit, "")
+}
+
+// GitEntryDir gives a selected snapshot its own commit-and-directory cache
+// namespace. Root snapshots retain their existing paths. The selector is hashed
+// as bytes, so different selections cannot reuse a partial sibling snapshot.
+func GitEntryDir(home, kind, name, commit, directory string) string {
+	if directory == "" {
+		return EntryDir(home, kind, name, commit)
+	}
+	return EntryDir(home, kind, name, fmt.Sprintf("%s.dir-%x", commit, sha256.Sum256([]byte(directory))))
+}
+
+// EnsureGitDirectory publishes only the selected immutable closure. It never
+// modifies an existing whole snapshot or an entry for a different directory.
+func EnsureGitDirectory(home, kind, name, repo, commit, directory string) (string, error) {
+	if directory != "" && !identifiers.PortablePath(directory) {
+		return "", fmt.Errorf("invalid selected directory")
+	}
+
 	if !identifiers.Valid(name) {
 		return "", fmt.Errorf("store entry name %q is not a portable identifier", name)
 	}
-	target := EntryDir(home, kind, name, commit)
+	target := GitEntryDir(home, kind, name, commit, directory)
 	parent := filepath.Dir(target)
 	if err := privatedir.MakeAll(parent); err != nil {
 		return "", err
@@ -101,7 +120,7 @@ func EnsureGit(home, kind, name, repo, commit string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := gitops.Extract(repo, commit, staging); err != nil {
+	if err := gitops.ExtractDirectory(repo, commit, directory, staging); err != nil {
 		_ = os.RemoveAll(staging)
 		return "", err
 	}

@@ -122,7 +122,7 @@ func identityMigrationInputs(req *MigrateRequest, profiles []string) (map[string
 		}
 		paths := map[string]bool{lockPath(req.Home, profile): true, sourcePath(req.Home, profile): true}
 		for _, member := range lock.Members {
-			paths[contextstore.EntryDir(req.Home, member.Kind, member.Name, member.PinKey())] = true
+			paths[memberEntryPath(req.Home, member)] = true
 		}
 		for _, adapter := range adapters {
 			if err := validateMarkerBoundary(req.Home, profile, adapter.ID, nil); err != nil {
@@ -207,7 +207,7 @@ func prepareIdentityMigration(op *operation, req *ResolveRequest, profiles []str
 			if member.StateHash == "" {
 				continue
 			}
-			entry := contextstore.EntryDir(req.Home, member.Kind, member.Name, member.PinKey())
+			entry := memberEntryPath(req.Home, member)
 			dir, key, err := contextstore.EnsureState(req.Home, member.Kind, member.Name, entry)
 			if err != nil {
 				return nil, err

@@ -572,13 +572,21 @@ func Extract(repo, commit, destination string) error {
 	if err != nil {
 		return err
 	}
+	return extractEntries(repo, entries, destination)
+}
+
+func extractEntries(repo string, entries []treeEntry, destination string) error {
 	destRoot, err := filepath.Abs(destination)
 	if err != nil {
 		return err
 	}
 	created := false
-	if _, err := os.Lstat(destRoot); os.IsNotExist(err) {
+	if info, err := os.Lstat(destRoot); os.IsNotExist(err) {
 		created = true
+	} else if err != nil {
+		return err
+	} else if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("snapshot destination is not a regular directory")
 	}
 	if err := os.MkdirAll(destRoot, 0o755); err != nil {
 		return err
@@ -771,6 +779,14 @@ func planWrites(destRoot string, entries []treeEntry) ([]treeEntry, error) {
 				prefix += "/" + component
 			}
 			prefixTarget := filepath.Join(destRoot, filepath.FromSlash(prefix))
+			if info, err := os.Lstat(prefixTarget); err == nil {
+				if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+					return nil, fmt.Errorf("snapshot destination traverses a link or non-directory: %q", prefix)
+				}
+			} else if !os.IsNotExist(err) {
+				return nil, err
+			}
+
 			prefixKey := strings.ToLower(prefixTarget)
 			if first, ok := foldedDirs[prefixKey]; ok {
 				// The same directory shared by many entries is admitted;

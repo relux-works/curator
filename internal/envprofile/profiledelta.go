@@ -12,8 +12,6 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
-	"github.com/relux-works/curator/internal/contextstore"
-	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -188,7 +186,7 @@ func mcpDeclaration(home string, manager *gitManager, member contextlock.Member,
 }
 
 func deltaMemberRoot(home string, manager *gitManager, member contextlock.Member, allowExtract bool) (string, func(), error) {
-	entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
+	entry := memberEntryPath(home, member)
 	metadata, err := stateread.Stat(entry)
 	if err != nil {
 		return "", func() {}, err
@@ -232,7 +230,7 @@ func deltaMemberRoot(home string, manager *gitManager, member contextlock.Member
 	if err != nil {
 		return "", func() {}, err
 	}
-	if err := gitops.Extract(repo, member.Commit, snapshot); err != nil {
+	if err := extractMemberSnapshot(repo, member.Commit, member.Kind, member.Directory, snapshot); err != nil {
 		_ = os.RemoveAll(snapshot)
 		return "", func() {}, err
 	}
