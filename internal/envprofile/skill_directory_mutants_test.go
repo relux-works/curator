@@ -45,25 +45,26 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
 			{"contextresolve/contextresolve.go", `if directorySeen && directory != c.requirement.Directory {`, `if directorySeen && directory != c.requirement.Directory && directory != "" && c.requirement.Directory != "" {`},
 		}},
 		{"parent-component", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^parent-component-refused$", "TestSkillDirectoryLifecycleVectors/parent-component-refused", "got <nil>", []directoryMutation{
-			{"contextpkg/contextpkg.go", `if !ok || !identifiers.PortablePath(text) {`, `if !ok || (!identifiers.PortablePath(text) && text != "skills/../formatter") {`},
-			{"envprofile/gitsource.go", `if !identifiers.PortablePath(directory) {`, `if !identifiers.PortablePath(directory) && directory != "skills/../formatter" {`},
-			{"contextlock/contextlock.go", `if member.Directory != "" && !identifiers.PortablePath(member.Directory) {`, `if member.Directory != "" && !identifiers.PortablePath(member.Directory) && member.Directory != "skills/../formatter" {`},
-			{"contextlock/contextlock.go", `if err := json.Unmarshal(member.Directory, &directory); err != nil || !identifiers.PortablePath(directory) {`, `if err := json.Unmarshal(member.Directory, &directory); err != nil || (!identifiers.PortablePath(directory) && directory != "skills/../formatter") {`},
+			// Model an unsafe cleaner across the selector grammar and both scoped
+			// extraction/pin paths. The fixture has a valid normalized target;
+			// a later missing-tree or pin error must not mask this witness.
+			{"identifiers/identifiers.go", `func PortablePath(value string) bool {`, `func PortablePath(value string) bool {
+ if value == "skills/../formatter" { return true }`},
+			{"envprofile/gitsource.go", `func selectedPackageRoot(entry, directory string) (string, error) {`, `func selectedPackageRoot(entry, directory string) (string, error) {
+ if directory == "skills/../formatter" { directory = "formatter" }`},
+			{"gitops/directory.go", `func ExtractDirectory(repo, commit, directory, destination string) error {`, `func ExtractDirectory(repo, commit, directory, destination string) error {
+ if directory == "skills/../formatter" { directory = "formatter" }`},
+			{"gitops/treehash.go", `func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {`, `func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {
+ if directory == "skills/../formatter" { directory = "formatter" }`},
 		}},
 		{"inside-directory-symlink", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^symlinked-leaf-inside-refused$", "TestSkillDirectoryLifecycleVectors/symlinked-leaf-inside-refused", "got <nil>", []directoryMutation{
-			// Admit only this one tree link, preserving all other link refusals.
-			// Expand its valid in-snapshot target as an unsafe following extractor
-			// would; otherwise the directory-exists gate would mask the witness.
-			{"gitops/gitops.go", `case entry.mode == "120000":`, `case entry.mode == "120000" && entry.path == "skills/formatter":
- entry.mode = "100644"
- case entry.mode == "120000":`},
-			{"gitops/gitops.go", `plan, err := planWrites(destRoot, entries)`, `var admitted []treeEntry
- for _, entry := range entries {
- if entry.path != "skills/formatter" { admitted = append(admitted, entry); continue }
- for _, target := range entries { if strings.HasPrefix(target.path, "sibling/") { target.path = "skills/formatter/" + strings.TrimPrefix(target.path, "sibling/"); admitted = append(admitted, target) } }
- }
- entries = admitted
- plan, err := planWrites(destRoot, entries)`},
+			// Narrow the actual selected-tree walker, following only the fixture's
+			// valid sibling target in extraction and projected pin verification.
+			// Whole-root extraction is no longer on this profile-selected route.
+			{"gitops/directory.go", `walked := ""`, `rootTree := tree
+ walked := ""`},
+			{"gitops/directory.go", `if fields[0] == "120000" {`, `if fields[0] == "120000" && walked == "skills/formatter" { return revParse(repo, rootTree+":sibling") }
+ if fields[0] == "120000" {`},
 		}},
 		{"borrow-root-capabilities", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^selected-root-undeclared-contact$", "TestSkillDirectoryLifecycleVectors/selected-root-undeclared-contact", "want refusal audit.capability.network-undeclared", []directoryMutation{
 			{"envprofile/envprofile.go", `declared = spec.Capabilities`, `declared = spec.Capabilities

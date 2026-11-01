@@ -188,6 +188,11 @@ curator project resolve  # resolve transitive dependencies for a project closure
 curator skill check  # validate a skill package directory against schemas
 ```
 
+Profile skill dependencies with a Git `directory` extract and verify the selected
+package independently of sibling discovery links. See
+[profile skill directories](docs/profile-skill-directories.md) for selection and
+snapshot integrity rules.
+
 </details>
 
 <details>

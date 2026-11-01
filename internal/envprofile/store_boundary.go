@@ -150,7 +150,7 @@ func dryRunStoreEntryFailure(failure *storeEntryFailure) error {
 func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pathboundary.OwnerLookup) *storeEntryFailure {
 	root := contextstore.Root(home)
 	for _, member := range lock.Members {
-		entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
+		entry := memberEntryPath(home, member)
 		if err := pathboundary.ValidateWithinWithOwner(root, entry, boundaryOwner(owner)); err != nil {
 			return &storeEntryFailure{Member: member, Path: entry, Check: boundaryCheck(err), Err: err}
 		}
@@ -160,7 +160,7 @@ func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pat
 
 func validateNamedStorePins(home string, lock *contextlock.Lock) *storeEntryFailure {
 	for _, member := range lock.Members {
-		entry := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
+		entry := memberEntryPath(home, member)
 		actual, expected, err := storeEntryPinHashes(home, member, entry, lock.ContentHashVersion())
 		if err != nil {
 			return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: err}
@@ -193,9 +193,9 @@ func validateProfileStoreState(home, profile string, readRegularFile func(string
 	return nil
 }
 
-func expectedStoreHash(home string, member contextlock.Member) (string, string, error) {
+func expectedStoreHash(home string, member contextlock.Member, entry string) (string, string, error) {
 	if member.Commit != "" {
-		return pinnedCommitTree(home, member)
+		return pinnedCommitTree(home, member, entry)
 	}
 	if member.StateHash != "" {
 		return "sha256:" + member.StateHash, "", nil
@@ -208,7 +208,7 @@ func storeEntryPinHashes(home string, member contextlock.Member, entry string, v
 	// lookup for commit pins, a string format for state pins), so it
 	// stays first and a missing pinned-commit object keeps its
 	// repair-routing diagnosis.
-	expected, format, err := expectedStoreHash(home, member)
+	expected, format, err := expectedStoreHash(home, member, entry)
 	if err != nil {
 		return "", "", err
 	}
@@ -249,12 +249,16 @@ func pinnedCommitObjectUnavailable(failure *storeEntryFailure) bool {
 		strings.Contains(failure.Err.Error(), "pinned commit object unavailable")
 }
 
-func pinnedCommitTree(home string, member contextlock.Member) (string, string, error) {
+func pinnedCommitTree(home string, member contextlock.Member, entry string) (string, string, error) {
 	if member.Commit == "" || member.Source == "" {
 		return "", "", fmt.Errorf("member %s/%s has no recomputable commit pin", member.Kind, member.Name)
 	}
 	repo := newGitManager(home).repoDir(member.Source)
-	treeID, format, err := gitops.PinnedCommitTree(repo, member.Commit)
+	directory := skillSnapshotDirectory(member.Kind, member.Directory)
+	if entry == contextstore.EntryDir(home, member.Kind, member.Name, member.Commit) {
+		directory = ""
+	}
+	treeID, format, err := gitops.PinnedDirectorySnapshotTree(repo, member.Commit, directory)
 	if err != nil {
 		return "", "", fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)
 	}
@@ -271,7 +275,7 @@ func extractPinnedSnapshot(home string, member contextlock.Member) (string, func
 	}
 	cleanup := func() { _ = os.RemoveAll(snapshot) }
 	repo := newGitManager(home).repoDir(member.Source)
-	if err := gitops.Extract(repo, member.Commit, snapshot); err != nil {
+	if err := extractMemberSnapshot(repo, member.Commit, member.Kind, member.Directory, snapshot); err != nil {
 		cleanup()
 		return "", nil, "", fmt.Errorf("extract pinned snapshot %s: %w", member.Commit, err)
 	}
@@ -377,7 +381,7 @@ func validateNamedStorePinsExcept(home string, lock *contextlock.Lock, skip cont
 
 func publishRebuiltStoreEntry(home string, member contextlock.Member, snapshot, expectedHash string, owner pathboundary.OwnerLookup) error {
 	root := contextstore.Root(home)
-	target := contextstore.EntryDir(home, member.Kind, member.Name, member.PinKey())
+	target := contextstore.GitEntryDir(home, member.Kind, member.Name, member.Commit, skillSnapshotDirectory(member.Kind, member.Directory))
 	parent := filepath.Dir(target)
 	if err := ensureStoreEntryParent(root, parent, owner); err != nil {
 		return err

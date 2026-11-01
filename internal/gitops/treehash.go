@@ -175,3 +175,42 @@ func gitHasher(objectFormat string) (func() hash.Hash, error) {
 		return nil, fmt.Errorf("unsupported Git object format %q", objectFormat)
 	}
 }
+
+// PinnedDirectorySnapshotTree verifies the exact commit without refs or network
+// and returns the tree ID of its selected projection, including only directory
+// ancestors around the selected tree. Comparing the entire projected snapshot
+// also detects unexpected sibling files added to the store.
+func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {
+	tree, format, err := PinnedCommitTree(repo, commit)
+	if err != nil || directory == "" {
+		return tree, format, err
+	}
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return "", "", err
+	}
+	defer cleanup()
+	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
+	tree, err = directoryTree(repo, tree, directory, env)
+	if err != nil {
+		return "", "", err
+	}
+	newHash, err := gitHasher(format)
+	if err != nil {
+		return "", "", err
+	}
+	oid, err := hex.DecodeString(tree)
+	if err != nil {
+		return "", "", err
+	}
+	components := strings.Split(directory, "/")
+	for i := len(components) - 1; i >= 0; i-- {
+		var body bytes.Buffer
+		body.WriteString("40000 ")
+		body.WriteString(components[i])
+		body.WriteByte(0)
+		body.Write(oid)
+		oid = gitObjectID("tree", body.Bytes(), newHash)
+	}
+	return hex.EncodeToString(oid), format, nil
+}
