@@ -275,6 +275,7 @@ curator ui          # open interactive terminal status dashboard
 
 ```bash
 curator config show         # display active configuration parameters
+curator config launcher     # export selected launcher metadata as JSON
 curator config build-ssh    # configure SSH credentials for external build repos
 curator config build-https  # configure HTTPS credentials for external build repos
 ```
