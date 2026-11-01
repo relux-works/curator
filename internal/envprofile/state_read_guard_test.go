@@ -93,7 +93,7 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/closure/resolve.go:openGitFrozen",
 		"internal/closure/resolve.go:serveGitSubtree",
 		"internal/closure/resolve.go:stagePriorFile",
-		"internal/gitops/gitops.go:Extract",
+		"internal/gitops/gitops.go:extractEntries",
 		"internal/gitops/gitops.go:destinationFoldsCase",
 		"internal/gitops/gitops.go:planWrites",
 		"internal/gitops/gitops.go:writeBlobs",

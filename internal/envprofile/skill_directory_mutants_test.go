@@ -66,7 +66,14 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
 			{"gitops/directory.go", `if fields[0] == "120000" {`, `if fields[0] == "120000" && walked == "skills/formatter" { return revParse(repo, rootTree+":sibling") }
  if fields[0] == "120000" {`},
 		}},
+		// Reintroduce whole-root snapshots for these scope controls so the
+		// forbidden root metadata exists. Both extraction and pin projection
+		// change together; a missing root or pin mismatch is not a kill.
 		{"borrow-root-capabilities", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^selected-root-undeclared-contact$", "TestSkillDirectoryLifecycleVectors/selected-root-undeclared-contact", "want refusal audit.capability.network-undeclared", []directoryMutation{
+			{"gitops/directory.go", `func ExtractDirectory(repo, commit, directory, destination string) error {`, `func ExtractDirectory(repo, commit, directory, destination string) error {
+ if directory == "skills/formatter" { directory = "" }`},
+			{"gitops/treehash.go", `func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {`, `func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {
+ if directory == "skills/formatter" { directory = "" }`},
 			{"envprofile/envprofile.go", `declared = spec.Capabilities`, `declared = spec.Capabilities
  if resolved.Directory == "skills/formatter" && len(declared.Network) == 0 {
  rootSpec, rootErr := skillspec.Load(entry); if rootErr == nil { declared = rootSpec.Capabilities }
@@ -79,7 +86,13 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
 			{"contextlock/contextlock.go", `object["directory"] = member.Directory`, `object["directory"] = member.Directory
  if member.Kind == KindSkill && member.Directory == "skills/alternate" { object["directory"] = "skills/formatter" }`},
 		}},
+		// A valid repository-root package keeps the wrong-root materializer
+		// reachable; the production link assertion must detect its wrong target.
 		{"materialize-repository-root", "envprofile", "^TestSkillDirectoryLifecycleVectors$/^profile-install-selected-root$", "TestSkillDirectoryLifecycleVectors/profile-install-selected-root", "skill target=", []directoryMutation{
+			{"gitops/directory.go", `func ExtractDirectory(repo, commit, directory, destination string) error {`, `func ExtractDirectory(repo, commit, directory, destination string) error {
+ if directory == "skills/formatter" { directory = "" }`},
+			{"gitops/treehash.go", `func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {`, `func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {
+ if directory == "skills/formatter" { directory = "" }`},
 			{"envprofile/managed.go", `root := packageRoot(entry, member.Directory)`, `root := packageRoot(entry, member.Directory)
  if member.Name == "formatter" && member.Directory == "skills/formatter" { root = entry }`},
 		}},
