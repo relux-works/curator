@@ -39,6 +39,19 @@ Schema 2 retains closed fields and admits only absent or empty
 required empty settings and contributions. Lock schemas 1–2 remain readable
 and reject skill directories. Draft lock schema 3 remains unsupported.
 
+Profile-selected Git skills extract only their declared directory and its
+regular-file descendants. Discovery links elsewhere in the repository do not
+enter the snapshot. A link in the selected directory or any ancestor, a
+non-directory selection, unsafe path, or destination conflict is refused before
+blob writes. Repository-root extraction, context packages and MCP packages keep
+their strict whole-tree behavior.
+
+New selected snapshots use a commit-and-directory store key. Pin verification
+compares the complete stored projection, including its directory ancestors, to
+the corresponding Git tree, so added sibling files and selected-byte tampering
+both fail. Existing commit-keyed complete snapshots remain readable and keep
+whole-tree verification. The lock's commit, directory and hash are unchanged.
+
 Audit content identity, manifest capabilities and findings use the selected
 package tree. For skills, Markdown guidance participates in network-declaration detection only within
 agent-facing context (core section 3), using the shared context roots and
