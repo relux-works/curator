@@ -347,6 +347,22 @@ var (
 // directory numbers, and full object IDs.
 func normalizeDraftCLI(t *testing.T, root, value string) string {
 	t.Helper()
+	// Go may place the test/askpass image outside os.TempDir when GOTMPDIR
+	// is selected. Normalize only its Go action path, never sibling prefixes
+	// or arbitrary arguments containing the selected directory's spelling.
+	if goTmp := os.Getenv("GOTMPDIR"); goTmp != "" {
+		goPrefixes := []string{goTmp}
+		if resolved, err := filepath.EvalSymlinks(goTmp); err == nil && resolved != goTmp {
+			goPrefixes = append(goPrefixes, resolved)
+		}
+		// Resolve the longest spelling first: on macOS /var may be a suffix
+		// of /private/var, so replacing the short form first leaves /private.
+		sort.Slice(goPrefixes, func(i, j int) bool { return len(goPrefixes[i]) > len(goPrefixes[j]) })
+		for _, prefix := range goPrefixes {
+			pattern := regexp.QuoteMeta(filepath.Join(prefix, "go-build")) + `[0-9]+([/\\])b[0-9]+([/\\])`
+			value = regexp.MustCompile(pattern).ReplaceAllString(value, `$$T${1}go-build$$N${1}b$$N${2}`)
+		}
+	}
 	prefixes := []string{root}
 	if resolved, err := filepath.EvalSymlinks(root); err == nil && resolved != root {
 		prefixes = append(prefixes, resolved)
@@ -391,6 +407,39 @@ func TestDraftCLIGoBuildNormalization(t *testing.T) {
 	if got, want := normalizeDraftCLI(t, root, input), "go-build$N/b$N/other.test --upload-pack=custom-pack"; got != want {
 		t.Errorf("binary or transport arguments changed: got %q, want %q", got, want)
 	}
+}
+
+// A selected Go temporary directory normalizes only its descendants, including
+// its resolved spelling. A sibling prefix and the transport arguments survive.
+func TestDraftCLIGoTmpDirNormalization(t *testing.T) {
+	root := t.TempDir()
+	goTmp := t.TempDir()
+	t.Setenv("GOTMPDIR", goTmp)
+	for _, prefix := range []string{goTmp, mustResolveDraftTemp(t, goTmp)} {
+		input := filepath.Join(prefix, "go-build123", "b338", "curator.test") + " --upload-pack=custom-pack"
+		want := "$T" + string(os.PathSeparator) + "go-build$N" + string(os.PathSeparator) + "b$N" + string(os.PathSeparator) + "curator.test --upload-pack=custom-pack"
+		if got := normalizeDraftCLI(t, root, input); got != want {
+			t.Errorf("Go temporary path = %q, want %q", got, want)
+		}
+	}
+	// Compare against the same normalizer with the selector absent so its
+	// existing platform-temp replacement is retained in the expected value.
+	neighbor := goTmp + "-neighbor" + string(os.PathSeparator) + "artifact --upload-pack=custom-pack"
+	t.Setenv("GOTMPDIR", "")
+	want := normalizeDraftCLI(t, root, neighbor)
+	t.Setenv("GOTMPDIR", goTmp)
+	if got := normalizeDraftCLI(t, root, neighbor); got != want {
+		t.Errorf("sibling prefix changed: %q, want %q", got, want)
+	}
+}
+
+func mustResolveDraftTemp(t *testing.T, path string) string {
+	t.Helper()
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved
 }
 
 func draftCLIShellQuote(value string) string {
