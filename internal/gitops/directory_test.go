@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,8 @@ func directoryRepo(t *testing.T, links map[string]string) (string, string) {
 }
 
 // Sibling discovery links and files do not enter the selected closure; original
-// blob bytes and executable mode survive, while full-root extraction still fails.
+// blob bytes survive; executable mode is checked where portable permission bits
+// exist. Full-root extraction still fails.
 func TestExtractDirectoryOutsideLinks(t *testing.T) {
 	repo, commit := directoryRepo(t, map[string]string{".claude/skills/demo": "../../agents/skills/demo", ".codex/skills/demo": "../../agents/skills/demo"})
 	dst := filepath.Join(t.TempDir(), "snapshot")
@@ -52,8 +54,11 @@ func TestExtractDirectoryOutsideLinks(t *testing.T) {
 		}
 	}
 	info, err := os.Stat(filepath.Join(dst, "agents/skills/demo/run"))
-	if err != nil || info.Mode().Perm()&0111 == 0 {
-		t.Fatalf("executable mode lost: %v", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0111 == 0 {
+		t.Fatalf("executable mode lost: %v", info.Mode())
 	}
 	for _, dir := range []string{"", "."} {
 		out := filepath.Join(t.TempDir(), "root")
@@ -78,7 +83,8 @@ func TestExtractDirectoryRefusals(t *testing.T) {
 		{"inside", "agents/skills/demo", map[string]string{"agents/skills/demo/escape": "../../../../outside"}, "agents/skills/demo/escape"},
 		{"ancestor", "alias/demo", map[string]string{"alias": "agents/skills"}, "alias"},
 		{"leaf", "alias", map[string]string{"alias": "agents/skills/demo"}, "alias"},
-		{"missing", "absent", nil, ""}, {"blob", "SKILL.md", nil, ""},
+		{"missing", "absent", nil, ""}, {"blob", "agents/skills/demo/SKILL.md", nil, ""},
+		{"blob-ancestor", "agents/skills/demo/SKILL.md/child", nil, ""},
 		{"parent", "agents/../skills", nil, ""}, {"absolute", "/agents/skills/demo", nil, ""},
 		{"dot", "agents/./skills/demo", nil, ""}, {"backslash", `agents\skills\demo`, nil, ""},
 	} {
@@ -88,6 +94,9 @@ func TestExtractDirectoryRefusals(t *testing.T) {
 			err := ExtractDirectory(repo, commit, tc.dir, dst)
 			if err == nil {
 				t.Fatal("invalid selection admitted")
+			}
+			if strings.HasPrefix(tc.name, "blob") && !strings.Contains(err.Error(), "is not a Git tree") {
+				t.Fatalf("non-tree selection reached the wrong refusal: %v", err)
 			}
 			if tc.link != "" {
 				var e *UnsupportedLinkError
@@ -192,6 +201,46 @@ func TestPinnedDirectorySnapshotTree(t *testing.T) {
 			whole, _, err := PinnedCommitTree(repo, commit)
 			if err != nil || whole == pin {
 				t.Fatalf("whole tree reused as selected identity: %s %v", whole, err)
+			}
+		})
+	}
+}
+
+// A Git submodule inside or along the selection refuses without a destination;
+// the same outside submodule leaves the valid selected package extractable.
+// Git-index fixtures exercise this contract without OS symlink privileges.
+func TestExtractDirectorySubmodules(t *testing.T) {
+	for _, tc := range []struct{ name, submodule, selection, refusal string }{
+		{"leaf", "dependency", "dependency", "is not a Git tree"},
+		{"ancestor", "dependency", "dependency/child", "is not a Git tree"},
+		{"inside", "agents/skills/demo/dependency", "agents/skills/demo", "submodule"},
+		{"outside", "dependency", "agents/skills/demo", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, child := directoryRepo(t, nil)
+			gitRun(t, repo, "update-index", "--add", "--cacheinfo", "160000,"+child+","+tc.submodule)
+			tree := gitRun(t, repo, "write-tree")
+			commit := gitRun(t, repo, "commit-tree", tree, "-m", "submodule selection fixture")
+			dst := filepath.Join(t.TempDir(), "snapshot")
+			err := ExtractDirectory(repo, commit, tc.selection, dst)
+			if tc.refusal != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.refusal) {
+					t.Fatalf("want %s refusal, got %v", tc.refusal, err)
+				}
+				if _, e := os.Lstat(dst); !os.IsNotExist(e) {
+					t.Fatalf("refusal wrote destination: %v", e)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, err := os.ReadFile(filepath.Join(dst, tc.selection, "SKILL.md"))
+			if err != nil || string(b) != "selected\x00bytes\r\n" {
+				t.Fatalf("selected bytes=%q err=%v", b, err)
+			}
+			if _, e := os.Lstat(filepath.Join(dst, tc.submodule)); !os.IsNotExist(e) {
+				t.Fatalf("outside submodule materialized: %v", e)
 			}
 		})
 	}
