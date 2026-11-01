@@ -19,10 +19,12 @@ type LauncherExtensions struct {
 	ClaudeAuth *LauncherClaudeAuth `json:"claude_auth,omitempty"`
 }
 
+// LauncherProxy selects a named network profile from the admitted catalog.
 type LauncherProxy struct {
 	Profile string `json:"profile"`
 }
 
+// LauncherClaudeAuth selects OAuth through a file or Keychain reference.
 type LauncherClaudeAuth struct {
 	Type  string            `json:"type"`
 	Store LauncherAuthStore `json:"store"`
@@ -45,6 +47,7 @@ type LauncherConfigProjection struct {
 	Extensions   LauncherExtensions `json:"extensions"`
 }
 
+// LauncherProjection returns the effective launcher metadata without reading credentials.
 func (c *Config) LauncherProjection() LauncherConfigProjection {
 	p := LauncherConfigProjection{Schema: "curator.launcher-config/1", ConfigSchema: c.Schema, ConfigPath: c.Path}
 	if c.Extensions != nil {
