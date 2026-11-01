@@ -39,8 +39,8 @@ curator env config unset credential_store.example.codex
 ```
 
 Values are exactly `native`, `file`, or `keychain`; absent entries mean
-`native`. Set promotes the machine file to schema 5; unset leaves that
-version in place. The persisted member is `environments.credential_store`,
+`native`. Set promotes older supported machine files to schema 5 and preserves an
+existing schema 7; unset leaves the current version in place. The persisted member is `environments.credential_store`,
 a profile map of canonical environment IDs (`claude_code`, `codex_cli`,
 `muse`, `pi`, `opencode`). CLI environment positions also accept `claude`
 and `codex`. Profile names are preserved, including internal dots: in
@@ -406,3 +406,47 @@ knob of the three with a `null` meaning:
 Lockable subset (§12.2): `transitive_system_modules` (only toward
 `error`), `provider_directories`, and `passable_env_names`.
 `system_module_waivers` MUST NOT be lockable.
+
+## Selected launcher metadata (schema 7)
+
+Schema 7 extends the implemented schema-5 envelope with one optional closed
+`extensions` object. Schema 6 remains reserved for the separate node-source
+configuration family. Existing fields and environment settings retain their
+semantics. Ordinary configuration edits preserve both extensions and unrelated
+admitted fields.
+
+```json
+{
+  "schema_version": 7,
+  "skills_root": "/srv/curator/skills",
+  "projects": {},
+  "extensions": {
+    "proxy": {"profile": "filtered"},
+    "claude_auth": {
+      "type": "oauth",
+      "store": {"type": "keychain", "service": "curator-example", "account": "subscription"}
+    }
+  }
+}
+```
+
+Both members are optional; absence and an empty object are valid. `proxy`
+contains exactly one nonempty `profile` reference to the existing network
+catalog. `claude_auth` has exactly `type: "oauth"` and a closed `store` reference:
+`{"type":"file","path":"/absolute/normalized/token-file"}` or
+`{"type":"keychain","service":"service-name","account":"account-name"}`.
+References must be valid UTF-8, at most 4096 bytes, nonempty, without control
+characters or surrounding whitespace. File paths must be absolute and clean.
+No token, endpoint, node enrollment, mixed store fields or unknown members are
+accepted. Null, duplicate and malformed selections refuse without mutation;
+errors do not reproduce supplied member names or values.
+
+Only the Core-selected machine configuration supplies these selections. System
+configuration cannot supply or lock `extensions`; the launcher's `launcher.json`
+files are not an alternate source. `host_mode` and `delegated_trial` retain their
+existing launcher policy route. Reading, editing and exporting metadata accesses
+no selected file or Keychain entry and does not qualify a runtime or credential
+backend. `curator config launcher` exports the narrow typed projection, including
+the selected source path. Consumers must independently enforce the selected
+launch policy. Older binaries reject schema 7 with a newer-tool requirement;
+there is no silent downgrade or fallback to an older envelope.

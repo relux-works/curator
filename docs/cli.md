@@ -1183,6 +1183,26 @@ curator config show
 
 The command prints current JSON configuration parameters.
 
+### curator config launcher
+
+```bash
+curator config launcher
+```
+
+Export the effective selected machine configuration's launcher metadata as one
+JSON object. Configuration discovery, trust and system-policy validation use the
+same path as ordinary Core commands; `CURATOR_CONFIG` selects the same source.
+The command takes no arguments. It reads no credential store, repairs no
+managed home and starts no runtime. Invalid configuration produces a nonzero
+exit and no projection.
+
+The closed transport is `curator.launcher-config/1`, with `config_schema`,
+`config_path` (the actual selected source) and `extensions`. Older supported
+schemas export an empty `extensions` object. Schema 7 may export typed `proxy`
+and `claude_auth` references; see [machine configuration](environment-config.md).
+The output contains references, never credential material. Do not use it as an
+authentication or proxy qualification result.
+
 ### curator config build-ssh
 
 `curator config build-ssh` configures SSH credentials for external build repositories.
