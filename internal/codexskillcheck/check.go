@@ -53,7 +53,7 @@ func (r Result) ExitCode() int {
 // Check reads only the explicitly selected directory's SKILL.md. It performs
 // no configuration loading, dependency resolution, download or input writes.
 func Check(dir string) Result {
-	data, err := os.ReadFile(filepath.Join(dir, "SKILL.md"))
+	data, err := os.ReadFile(filepath.Join(dir, "SKILL.md")) // #nosec G304 -- SKILL.md is an explicit caller-selected input; validation performs no writes.
 	if err != nil {
 		return result("setup_error", "skill_io")
 	}
