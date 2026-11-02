@@ -15,21 +15,7 @@ import (
 // resolution and status: passable_env_names with its presence bit, and the
 // isolation map, pre-overlay user values, and system-lock source.
 func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
-	machine := envregistry.DefaultMachineConfig()
-	if cfg == nil {
-		return machine
-	}
-	machine.Forms = cfg.Env.Forms
-	machine.PassableEnvNames = cfg.Env.PassableEnvNames
-	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet
-	machine.Isolation = cfg.Env.Isolation
-	machine.CredentialStore = cfg.Env.CredentialStore
-	machine.UserIsolation = cfg.UserIsolation
-	machine.IsolationLocked = cfg.Locked["environments.isolation"]
-	machine.IsolationLockSource = cfg.SystemConfigPath
-	machine.Permissions = cfg.Env.Permissions
-	machine.PermissionsLocked = cfg.Locked["environments.permissions"]
-	return machine
+	return envprofile.MachineFromConfig(cfg)
 }
 
 // profileNativeHomeResolver keeps injected CLI homes consistent across the
@@ -63,11 +49,11 @@ func (c cli) profileNativeHomeResolver() func(string) (string, error) {
 
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | unmanage")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config | migrate | adopt | unmanage")
 		return exitUsage
 	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|adopt|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
@@ -75,6 +61,8 @@ func (c cli) cmdEnv(args []string) int {
 		return code
 	}
 	switch args[0] {
+	case "adopt":
+		return c.cmdEnvAdopt(cfg, args[1:])
 	case "resolve":
 		return c.cmdEnvResolve(cfg, args[1:])
 	case "status":

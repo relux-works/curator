@@ -61,8 +61,10 @@ The configuration slice stores policy and threads its typed selection into
 resolve. Native managed-home resolution now computes one operation-local
 credential policy: selection admission, native Codex store, isolation admission,
 links and marker records. Resolve (including repair), status verification and
-credential migration use this projection. Each new operation observes native
-configuration again. The one-time provisioning seed is a separate read; this
+credential migration use this projection. Each new operation observes configuration at the verified recorded native
+origin again, independently of today's caller selectors. See the unreleased
+[provisioning-origin contract](provisioning-origin.md) for legacy attestation and
+lifecycle admission. The one-time provisioning seed is a separate read; this
 projection is not an atomic snapshot of vendor-owned state. Muse native/unset/file now resolves to effective file and emits v4 with the
 mandatory `TBH_CREDENTIAL_BACKEND=file` literal and all four managed XDG paths.
 The selector remains unchanged. Shared requires a native file-backed login
@@ -171,9 +173,10 @@ The file mode table is defined beside `EnvRootName` in
 
 Copy seeds remain tool-owned after provisioning: repair never refreshes their
 bytes or modes from the native source. Symlinked, unreadable and special-file
-seeds still refuse with `environment_seed_unreadable`. Credential passthrough
-and XDG seed links retain their native targets; the manager does not copy login
-bytes. On Windows the existing private-file backend uses protected owner-only
+seeds still refuse with `environment_seed_unreadable`. Credential passthrough retains the verified recorded native authority. OpenCode
+reconciles recorded XDG config seed links against the current operator XDG parent
+without taking over unrecorded shadows; Muse does not seed foreign XDG entries.
+The manager does not copy login bytes. On Windows the existing private-file backend uses protected owner-only
 DACLs; POSIX permission-bit preservation is a Unix guarantee.
 
 Claude `.claude.json` trust repair compares the tool-owned input again before
@@ -214,7 +217,7 @@ login in one of two ways, chosen per profile × environment with
 | `muse` | `shared` | file backend; `config/muse/auth.json` links to the captured native file | file backend; no passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
 | `opencode` | `shared` (ambient) | its login lives outside the swapped config home, so nothing is linked | not applicable: refused, since the login is outside the home |
 
-For `codex_cli`, sharing follows the storage selected by your **native**
+For `codex_cli`, sharing follows the storage selected by your **recorded native origin's**
 `config.toml`. A managed `config.toml` that selects differently changes
 nothing, and Curator never rewrites either file to align them.
 

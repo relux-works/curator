@@ -28,6 +28,9 @@ type nativeGlobalFixture struct {
 
 func newNativeGlobalFixture(t *testing.T) nativeGlobalFixture {
 	t.Helper()
+	priorSnapshot := installExecutablePaths
+	installExecutablePaths = func() ([]string, error) { return nil, nil }
+	t.Cleanup(func() { installExecutablePaths = priorSnapshot })
 	home := testgitenv.ShortTempDir(t)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -145,6 +148,57 @@ func TestGlobalNativeOwnerCleanBootstrapInstall(t *testing.T) {
 			if link != links[agent] {
 				t.Fatalf("profile link changed after %v", args)
 			}
+		}
+	}
+}
+
+// Flags and upgrade use the same production whole-unit owner as plain install.
+// A genuine unmanaged native conflict retains L1 while both native trees stay
+// byte/entry equivalent; the healthy neighbor must publish profile ownership.
+// Only the cache collector's process snapshot is synthetic in this fixture.
+func TestProvisioningOriginGlobalCLIFlagOwners(t *testing.T) {
+	for _, command := range []string{"install", "upgrade"} {
+		for _, conflict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/conflict-%t", command, conflict), func(t *testing.T) {
+				fixture := newNativeGlobalFixture(t)
+				fixture.declare(t, "v1.0.0")
+				// Upgrade first scans the configured local checkout directory;
+				// supply that empty fixture transport before testing publication.
+				if err := os.MkdirAll(filepath.Join(fixture.home, "sources"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if conflict {
+					writeFile(t, filepath.Join(fixture.home, ".codex", "skills", "shared-skill", "SKILL.md"), "foreign fixture\n")
+				}
+				before := map[string]map[string]helpTreeEntry{}
+				for _, adapter := range []string{".claude", ".codex"} {
+					before[adapter] = nativeOwnerSnapshot(t, filepath.Join(fixture.home, adapter))
+				}
+				want := exitOK
+				if conflict {
+					want = exitFail
+				}
+				_, stderr := fixture.command(t, want, "global", command, "--verbose")
+				if !conflict {
+					fixture.requireProfileOwner(t)
+					return
+				}
+				if !strings.Contains(stderr, "environment_surface_unmanaged_conflict") {
+					t.Fatalf("wrong conflict diagnostic: %s", stderr)
+				}
+				for adapter, prior := range before {
+					if after := nativeOwnerSnapshot(t, filepath.Join(fixture.home, adapter)); !reflect.DeepEqual(prior, after) {
+						t.Fatalf("handled conflict changed native preimages: %s", nativeOwnerDiff(prior, after))
+					}
+				}
+				lock, _, err := contextlock.Read(filepath.Join(fixture.home, ".curator", "profiles", "default", "lock.json"))
+				if err != nil {
+					t.Fatalf("handled conflict dropped retained L1: %v", err)
+				}
+				if _, found := lock.Find(contextlock.KindSkill, "shared-skill"); !found {
+					t.Fatal("retained L1 lost the exact global skill")
+				}
+			})
 		}
 	}
 }
@@ -323,20 +377,9 @@ func TestGlobalNativeOwnerCommitRollback(t *testing.T) {
 		}
 		return nil
 	}}}}
-	opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) (install.Result, error) {
-		var result install.Result
-		_, err := envprofile.GlobalSkillTransaction(fixture.home, envprofile.PolicyFromConfig(fixture.source.cfg), envregistry.MachineConfig{}, nil, nil, lock, func() error {
-			result = next()
-			if result.Status == "failed" {
-				return fmt.Errorf("%s", strings.Join(result.Errors, "; "))
-			}
-			return nil
-		})
-		if err != nil {
-			result.Status = "failed"
-			result.Errors = append(result.Errors, err.Error())
-		}
-		return result, err
+	opts.PublishGlobalPlan = func(lock install.HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
+		_, err := envprofile.PublishGlobalSkillPlanWithPlanner(fixture.home, envprofile.PolicyFromConfig(fixture.source.cfg), envregistry.MachineConfig{}, nil, nil, lock, stage, transaction.WithHooks(opts.Commit.Hooks))
+		return err
 	}
 	result := install.Global(fixture.source.cfg, filepath.Dir(fixture.codex), opts)
 	if !fired || result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "planted legacy commit failure") {

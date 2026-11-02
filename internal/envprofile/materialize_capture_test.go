@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/relux-works/curator/internal/envlifecycle"
+	"github.com/relux-works/curator/internal/envorigin"
+	"github.com/relux-works/curator/internal/envunit"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -359,7 +362,8 @@ func TestMaterializeCaptureWaitReselectsAndTimeout(t *testing.T) {
 		t.Fatal("machine selected while lock held")
 	case <-time.After(30 * time.Millisecond):
 	}
-	if err := SetCurrent(fx.home, "capture"); err != nil {
+	// Simulate the already locked writer without recursively acquiring its lock.
+	if err := os.WriteFile(CurrentFile(fx.home), []byte("capture\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	_ = lock.Close()
@@ -792,7 +796,7 @@ func TestMaterializeCaptureStoreObjectIdentity(t *testing.T) {
 // Failed final reads and same-byte replacements of authorizing records cannot
 // be hidden by a valid, equal fragment. Callback mutations are the only writes.
 func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
-	for _, change := range []string{"policy-read", "selection", "marker-identity", "lock-identity"} {
+	for _, change := range []string{"policy-read", "selection", "marker-identity", "lock-identity", "origin-identity", "origin-bytes", "origin-mode"} {
 		t.Run(change, func(t *testing.T) {
 			fx, req := captureFixture(t)
 			if _, err := CaptureMaterialize(req); err != nil {
@@ -811,6 +815,8 @@ func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
 				return envregistry.DefaultMachineConfig(), Policy{}, nil
 			}
 			var expected []byte
+			var originPath string
+			var planted envunit.Image
 			req.Capture = func(c *MaterializeCapture) ([]byte, error) {
 				data, err := original(c)
 				if err != nil {
@@ -818,12 +824,15 @@ func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
 				}
 				switch change {
 				case "selection":
-					if err := SetCurrent(fx.home, "replacement-current"); err != nil {
+					// Deliberate noncooperating fixture edit under the capture lock.
+					if err := os.WriteFile(CurrentFile(fx.home), []byte("replacement-current\n"), 0600); err != nil {
 						return nil, err
 					}
-				case "marker-identity", "lock-identity":
+				case "marker-identity", "lock-identity", "origin-identity", "origin-bytes", "origin-mode":
 					var path string
-					if change == "marker-identity" {
+					if strings.HasPrefix(change, "origin-") {
+						path = filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.Resolve.EnvID), envorigin.Name)
+					} else if change == "marker-identity" {
 						path = c.objects[2].path
 					} else {
 						paths, err := filepath.Glob(filepath.Join(fx.home, "state", "locks", "v1", "*.lock"))
@@ -837,13 +846,38 @@ func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
 						return nil, err
 					}
 					var payload []byte
-					if change == "marker-identity" {
+					if change == "marker-identity" || strings.HasPrefix(change, "origin-") {
 						payload, err = os.ReadFile(path)
 						if err != nil {
 							return nil, err
 						}
 					} else if info.Size() != 0 {
 						return nil, errors.New("lock fixture is not empty")
+					}
+					if change == "origin-mode" {
+						if err := os.Chmod(path, 0400); err != nil {
+							return nil, err
+						}
+						expected, _ = captureFixtureState(t, fx)
+						if strings.HasPrefix(change, "origin-") {
+							originPath = filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.Resolve.EnvID), envorigin.Name)
+							planted, err = envunit.ObserveEntry(originPath, false)
+							if err != nil {
+								return nil, err
+							}
+						}
+						return data, nil
+					}
+					if change == "origin-bytes" {
+						var record envorigin.Record
+						if err := json.Unmarshal(payload, &record); err != nil {
+							return nil, err
+						}
+						record.Capture.Time = "2026-10-28T00:00:00Z"
+						payload, err = record.Marshal()
+						if err != nil {
+							return nil, err
+						}
 					}
 					replacement := path + ".new"
 					if err := os.WriteFile(replacement, payload, info.Mode()); err != nil {
@@ -857,9 +891,22 @@ func TestMaterializeCaptureAuthorizingDrift(t *testing.T) {
 					}
 				}
 				expected, _ = captureFixtureState(t, fx)
+				if strings.HasPrefix(change, "origin-") {
+					originPath = filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.Resolve.EnvID), envorigin.Name)
+					planted, err = envunit.ObserveEntry(originPath, false)
+					if err != nil {
+						return nil, err
+					}
+				}
 				return data, nil
 			}
 			requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
+			if originPath != "" {
+				got, err := envunit.ObserveEntry(originPath, false)
+				if err != nil || got != planted {
+					t.Fatalf("private origin plant overwritten: %+v %+v %v", planted, got, err)
+				}
+			}
 			after, _ := captureFixtureState(t, fx)
 			if !bytes.Equal(expected, after) {
 				t.Fatal("refusal mutated source")
@@ -1027,5 +1074,34 @@ func TestMaterializeCaptureCredentialPolicyReleaseCache(t *testing.T) {
 	p, err := req.resolveCredentialPolicyObserved(adapter, "unknown")
 	if err != nil || p == nil || p.isolation != envregistry.IsolationIsolated {
 		t.Fatalf("old refusal reused for unknown release: %+v, %v", p, err)
+	}
+}
+
+// Capture retains private recorded A under a caller selecting B; its portable
+// result contains neither private origin nor lifecycle authority. No discovery
+// callback is permitted, and the fixture callback reaches actual content reads.
+func TestMaterializeCaptureRecordedOrigin(t *testing.T) {
+	fx, req := captureFixture(t)
+	originPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, req.Resolve.EnvID), envorigin.Name)
+	before := nativeRead(t, originPath)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	req.Resolve.originAccountLookup = func() (envorigin.Account, error) {
+		t.Fatal("capture discovered caller B")
+		return envorigin.Account{}, errors.New("forbidden lookup")
+	}
+	reached := false
+	capture := req.Capture
+	req.Capture = func(c *MaterializeCapture) ([]byte, error) { reached = true; return capture(c) }
+	got, err := CaptureMaterialize(req)
+	if err != nil || got == nil || !reached || len(got.Content) == 0 {
+		t.Fatalf("recorded A capture: reached=%t %v", reached, err)
+	}
+	if !bytes.Equal(nativeRead(t, originPath), before) {
+		t.Fatal("capture changed origin authority")
+	}
+	for _, output := range [][]byte{got.Fragment, got.Content} {
+		if bytes.Contains(output, []byte(envorigin.Version)) || bytes.Contains(output, []byte(envlifecycle.Version)) {
+			t.Fatal("portable capture leaked private authority")
+		}
 	}
 }

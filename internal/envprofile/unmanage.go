@@ -142,7 +142,7 @@ func planUnmanageHomes(req UnmanageRequest) ([]unmanagePlan, error) {
 		if req.NativeHomeOf != nil {
 			native, err = req.NativeHomeOf(adapter.ID)
 		} else {
-			native, err = NativeHome(adapter)
+			native, err = resolveNativeHome(req.Home, adapter, nil)
 		}
 		if err != nil {
 			return nil, err

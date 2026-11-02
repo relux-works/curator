@@ -17,6 +17,7 @@ import (
 // These controls exercise Resolve or its real fallback writer, never a
 // source-token checker.
 func TestManagedModesNarrowingMutants(t *testing.T) {
+	isolateDetectorParent(t)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -37,16 +38,16 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 			"TestManagedFallbackPermissions/tree-true", "0755 mode = 0755, want 0700",
 		},
 		{
-			"private-seed-0644", "managed.go",
-			"file.payload, file.mode)",
-			"file.payload, func() os.FileMode { if file.mode == 0o600 { return 0o644 }; return file.mode }())",
+			"private-seed-0644", "home_publication.go",
+			"seed.payload, seed.mode, false)",
+			"seed.payload, func() os.FileMode { if seed.mode == 0o600 { return 0o644 }; return seed.mode }(), false)",
 			"^TestManagedSeedPreservesNativePermissions$/^0600$",
 			"TestManagedSeedPreservesNativePermissions/0600", "mode = 0644, want 0600",
 		},
 		{
 			"claude-trust-0644", "managed.go",
-			"file.Chmod(managedAuthoredFileMode)",
-			"file.Chmod(0o644)",
+			"prepared.payload, managedAuthoredFileMode, false)",
+			"prepared.payload, 0o644, false)",
 			"^TestManagedAuthoredFilesArePrivate$",
 			"TestManagedAuthoredFilesArePrivate", ".claude.json mode = 0644, want 0600",
 		},
@@ -58,11 +59,11 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 			"TestManagedHomeRepairTightensDirectories/codex_cli", "wide home must be stale: <nil>",
 		},
 		{
-			"codex-directory-not-tightened", "nofollow.go",
-			"if err := privatedir.Protect(current); err != nil {",
-			"if err := func() error { if filepath.Base(current) == \"codex_cli\" { return nil }; return privatedir.Protect(current) }(); err != nil {",
+			"codex-directory-not-tightened", "../transaction/directories.go",
+			"if before.Mode != 0700 {",
+			"if before.Mode != 0700 && filepath.Base(parent) != \"codex_cli\" {",
 			"^TestManagedHomeRepairTightensDirectories$/^codex_cli$",
-			"TestManagedHomeRepairTightensDirectories/codex_cli", "managed directory permissions:",
+			"TestManagedHomeRepairTightensDirectories/codex_cli", "repair failed to restore private directories: environment_repair_failed: managed directory permissions:",
 		},
 	} {
 		t.Run(mutant.name, func(t *testing.T) {
@@ -76,7 +77,7 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 				t.Fatal("mutation anchor is not unique")
 			}
 			dir := t.TempDir()
-			replacement := filepath.Join(dir, mutant.file)
+			replacement := filepath.Join(dir, filepath.Base(mutant.file))
 			if err := os.WriteFile(replacement, []byte(strings.Replace(source, mutant.before, mutant.after, 1)), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -90,6 +91,7 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 			}
 			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, "./internal/envprofile")
 			command.Dir = root
+			command.Env = detectorChildEnv()
 			var buffer bytes.Buffer
 			command.Stdout = &buffer
 			command.Stderr = &buffer

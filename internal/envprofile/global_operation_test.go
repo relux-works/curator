@@ -12,11 +12,12 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/envmarker"
-	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
+// Historical test-only model: this does not qualify production rollback.
 // Compensation restores bytes, modes, link text, removed backup trees and
 // absence without tightening an unchanged ancestor. It never follows a captured
 // symlink into its unrelated target.
@@ -45,7 +46,7 @@ func TestGlobalProfileCompensationImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}, managerHome: root}}
+	op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}, managerHome: root}}
 	if err := op.capture(dir, filepath.Join(root, "new", "leaf")); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +109,7 @@ func TestGlobalProfileCompensationPostimages(t *testing.T) {
 				if err := os.WriteFile(path, []byte("preimage"), 0640); err != nil {
 					t.Fatal(err)
 				}
-				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 				if err := op.capture(path, other); err != nil {
 					t.Fatal(err)
 				}
@@ -180,7 +181,7 @@ func TestGlobalProfileCompensationParentLinkRefuses(t *testing.T) {
 	if err := os.Symlink(foreign, filepath.Join(root, "parent")); err != nil {
 		t.Fatal(err)
 	}
-	op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}, managerHome: root}}
+	op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}, managerHome: root}}
 	if err := op.capture(filepath.Join(root, "parent", "child")); err == nil {
 		t.Fatal("snapshot followed a manager parent link")
 	}
@@ -201,7 +202,7 @@ func TestGlobalProfileCompensationParentReplacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(parent, "entry")
-	op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+	op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 	if err := op.capture(path); err != nil {
 		t.Fatal(err)
 	}
@@ -228,14 +229,13 @@ func TestGlobalProfileCompensationParentReplacement(t *testing.T) {
 	}
 }
 
-// The actual paired transaction returns a typed compensation error, retaining
-// the original failure and published install record when its native marker is
-// replaced by an operator. This tests the exported error chain, not its text.
-func TestGlobalProfileCompensationFailureType(t *testing.T) {
-	pinOperatorHome(t, t.TempDir())
-	homes := pinHomes(t)
-	home := t.TempDir()
-	manager, err := managerlock.New(home)
+// A later failure and an unknown replacement of a committed marker preserve
+// the original error and report transaction corruption. Durable recovery must
+// also refuse the unknown bytes; it cannot bless them or pretend rollback was
+// complete. The healthy/ordinary rollback pair lives in the joined owner test.
+func TestProvisioningOriginGlobalRollbackConflict(t *testing.T) {
+	fx, resolver := recordedGlobalOriginFixture(t)
+	manager, err := managerlock.New(fx.home)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,26 +243,55 @@ func TestGlobalProfileCompensationFailureType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = lock.Close() }()
-	planted := errors.New("planted continuation failure")
-	path := filepath.Join(homes[envregistry.CodexCLI], envmarker.Name)
-	called := false
-	_, err = GlobalSkillTransaction(home, Policy{}, envregistry.MachineConfig{}, nil, nil, lock, func() error {
-		called = true
-		if err := os.WriteFile(path, []byte("operator marker"), 0600); err != nil {
-			t.Fatal(err)
+	defer func() {
+		if err := lock.Close(); err != nil {
+			t.Error(err)
 		}
-		return planted
-	})
-	var compensation *GlobalCompensationError
-	if !called || !errors.As(err, &compensation) || !errors.Is(err, planted) || !errors.Is(compensation, transaction.ErrImplementationCorruption) {
-		t.Fatalf("paired compensation lost typed error chain: called=%v error=%v", called, err)
+	}()
+	planted := errors.New("planted joined publication failure")
+	path := filepath.Join(fx.native["codex_cli"], envmarker.Name)
+	saved := newOperationEngine
+	t.Cleanup(func() { newOperationEngine = saved })
+	called := false
+	newOperationEngine = func(home string, opts ...transaction.Option) (*transaction.Engine, error) {
+		return saved(home, append(opts, transaction.WithHooks(transaction.Hooks{Fault: func(e transaction.Event) error {
+			if e.Point == transaction.PointAfterInstall && e.LivePath == path && !called {
+				called = true
+				if err := os.WriteFile(path, []byte("operator marker"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				return planted
+			}
+			return nil
+		}}))...)
 	}
-	if data, err := os.ReadFile(path); err != nil || string(data) != "operator marker" {
-		t.Fatalf("foreign marker changed: %q %v", data, err)
+	calls := 0
+	_, err = publishGlobalContinuationFixture(t, fx.home, resolver, lock, &calls)
+	newOperationEngine = saved
+	if !called || !errors.Is(err, planted) || !errors.Is(err, transaction.ErrImplementationCorruption) {
+		t.Fatalf("joined rollback lost failure/corruption: called=%v error=%v", called, err)
 	}
-	if _, err := os.Stat(sourcePath(home, DefaultProfile)); err != nil {
-		t.Fatalf("compensation lost pending install record: %v", err)
+	if raw, e := os.ReadFile(path); e != nil || string(raw) != "operator marker" {
+		t.Fatalf("foreign marker changed: %q %v", raw, e)
+	}
+	engine, err := saved(fx.home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := map[string]string{}
+	for _, root := range []string{fx.native["codex_cli"], EnvRoot(fx.home), filepath.Join(fx.home, "state", "transactions")} {
+		before[root] = nativeSnapshot(t, root)
+	}
+	if err = engine.Recover(lock); err == nil || !strings.Contains(err.Error(), envorigin.DiagInvalid) || !strings.Contains(err.Error(), "unreachable live/backup state for native-marker") {
+		t.Fatalf("fresh recovery blessed unknown marker: %v", err)
+	}
+	for root, snapshot := range before {
+		if nativeSnapshot(t, root) != snapshot {
+			t.Fatal("fresh refusal changed pending unit or surface preimages")
+		}
+	}
+	if raw, e := os.ReadFile(path); e != nil || string(raw) != "operator marker" {
+		t.Fatalf("fresh recovery changed foreign marker: %q %v", raw, e)
 	}
 }
 
@@ -289,7 +318,7 @@ func TestGlobalProfileCompensationNestedNativeHome(t *testing.T) {
 			if err := os.WriteFile(record, []byte("old lock"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			op := &operation{undo: &globalUndo{managerHome: home, entries: map[string]*globalImage{}}}
+			op := &legacyCompensationModel{undo: &globalUndo{managerHome: home, entries: map[string]*globalImage{}}}
 			if err := op.capture(native, record); err != nil {
 				t.Fatal(err)
 			}
@@ -353,7 +382,7 @@ func TestGlobalProfileCompensationParentModes(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 				if err := op.capture(leaf); err != nil {
 					t.Fatal(err)
 				}
@@ -419,7 +448,7 @@ func TestGlobalProfileCompensationMetadata(t *testing.T) {
 				}
 				root := t.TempDir()
 				path := filepath.Join(root, "entry")
-				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 				if kind == "existing-file-mode" {
 					if err := os.WriteFile(path, []byte("original"), 0644); err != nil {
 						t.Fatal(err)
@@ -507,7 +536,7 @@ func TestGlobalProfileCompensationCreatedEmptyParentMode(t *testing.T) {
 		t.Run(fmt.Sprintf("changed=%v", changed), func(t *testing.T) {
 			parent := filepath.Join(t.TempDir(), "created")
 			leaf := filepath.Join(parent, "absent")
-			op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+			op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 			if err := op.capture(leaf); err != nil {
 				t.Fatal(err)
 			}
@@ -560,7 +589,7 @@ func TestGlobalProfileCompensationLateParentMode(t *testing.T) {
 			if err := os.Chmod(parent, original); err != nil {
 				t.Fatal(err)
 			}
-			op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+			op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 			leaf := filepath.Join(parent, "absent")
 			if err := op.capture(leaf); err != nil {
 				t.Fatal(err)
@@ -616,7 +645,7 @@ func TestGlobalProfileCompensationDirectoryOnlyParents(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				op := &operation{undo: &globalUndo{entries: map[string]*globalImage{}}}
+				op := &legacyCompensationModel{undo: &globalUndo{entries: map[string]*globalImage{}}}
 				if err := op.capture(marker); err != nil {
 					t.Fatal(err)
 				}

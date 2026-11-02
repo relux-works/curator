@@ -3,6 +3,7 @@ package projectlease
 import (
 	"fmt"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -35,9 +36,16 @@ func RecoverUnderLock(home string, lock transaction.HomeLock, engine *transactio
 	if err != nil {
 		return recovered, fmt.Errorf("recovered project lease evidence unreadable; retain all roots: %w", err)
 	}
+	frozen, err := envauthority.CapturedLeaseProfiles(home)
+	if err != nil {
+		return recovered, err
+	}
 	changed := false
 	for id, e := range l.Leases {
-		if e.State != Released && e.State != Unknown {
+		// A retained conflict freezes its original mutable preimages. Status
+		// reports that profile as nonlaunchable/unknown; unrelated recovery may
+		// classify Q without rewriting P's captured reference state.
+		if !frozen[e.Composition.Profile] && e.State != Released && e.State != Unknown {
 			e.State = Unknown
 			l.Leases[id] = e
 			changed = true

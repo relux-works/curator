@@ -80,6 +80,29 @@ func (s *DiskProtectedStore) PrepareNamespaces(receiptSchemaVersions ...int) err
 	return nil
 }
 
+// CheckNamespaces never creates or adopts final store directories. It proves
+// every existing protected namespace; absent tails remain journal preimages.
+func (s *DiskProtectedStore) CheckNamespaces(versions ...int) error {
+	paths := []string{s.Root, filepath.Join(s.Root, "snapshots")}
+	for _, v := range versions {
+		if v != LegacyReceiptSchemaVersion && v != SourceAwareReceiptSchemaVersion {
+			return fmt.Errorf("unknown receipt schema version %d", v)
+		}
+		paths = append(paths, filepath.Join(s.Root, ArtifactsDir(v)))
+	}
+	for _, path := range paths {
+		if _, err := os.Lstat(path); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		if err := s.protectedDir(path, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func cacheName(key string) (string, error) {
 	value := strings.TrimPrefix(key, "sha256:")
 	if len(value) != 64 {
@@ -397,6 +420,15 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 // a receipt of another schema version is an error, and a failing entry is left
 // in place unquarantined so the evidence survives for the next lookup.
 func (s *DiskProtectedStore) AdoptArtifact(receiptSchemaVersion int, key string) error {
+	return s.verifyArtifact(receiptSchemaVersion, key, true)
+}
+
+// VerifyArtifact proves a durably protected publication without changing its
+// protection, contents, namespaces or quarantine state.
+func (s *DiskProtectedStore) VerifyArtifact(receiptSchemaVersion int, key string) error {
+	return s.verifyArtifact(receiptSchemaVersion, key, false)
+}
+func (s *DiskProtectedStore) verifyArtifact(receiptSchemaVersion int, key string, secure bool) error {
 	if receiptSchemaVersion != LegacyReceiptSchemaVersion && receiptSchemaVersion != SourceAwareReceiptSchemaVersion {
 		return fmt.Errorf("unknown receipt schema version %d", receiptSchemaVersion)
 	}
@@ -404,7 +436,7 @@ func (s *DiskProtectedStore) AdoptArtifact(receiptSchemaVersion int, key string)
 	if err != nil {
 		return err
 	}
-	entry, err := s.adoptionEntry(filepath.Join(s.Root, ArtifactsDir(receiptSchemaVersion)), name)
+	entry, err := s.publishedEntry(filepath.Join(s.Root, ArtifactsDir(receiptSchemaVersion)), name, secure)
 	if err != nil {
 		return err
 	}
@@ -441,12 +473,16 @@ func (s *DiskProtectedStore) AdoptArtifact(receiptSchemaVersion int, key string)
 
 // AdoptSnapshot is AdoptArtifact for a protected snapshot entry the install
 // transaction materialized below the prepared snapshot namespace.
-func (s *DiskProtectedStore) AdoptSnapshot(key string) error {
+func (s *DiskProtectedStore) AdoptSnapshot(key string) error { return s.verifySnapshot(key, true) }
+
+// VerifySnapshot is the read-only counterpart of VerifyArtifact.
+func (s *DiskProtectedStore) VerifySnapshot(key string) error { return s.verifySnapshot(key, false) }
+func (s *DiskProtectedStore) verifySnapshot(key string, secure bool) error {
 	name, err := cacheName(key)
 	if err != nil {
 		return err
 	}
-	if _, err = s.adoptionEntry(filepath.Join(s.Root, "snapshots"), name); err != nil {
+	if _, err = s.publishedEntry(filepath.Join(s.Root, "snapshots"), name, secure); err != nil {
 		return err
 	}
 	if _, err = s.LoadSnapshot(key, false); err != nil {
@@ -459,7 +495,7 @@ func (s *DiskProtectedStore) AdoptSnapshot(key string) error {
 // creating either), requires the entry to be an existing real directory, and
 // re-secures the entry tree with the store's securing routine (a reparse point
 // or symbolic link inside it is refused).
-func (s *DiskProtectedStore) adoptionEntry(parent, name string) (string, error) {
+func (s *DiskProtectedStore) publishedEntry(parent, name string, secure bool) (string, error) {
 	if err := s.protectedDir(s.Root, false); err != nil {
 		return "", fmt.Errorf("adopt protected entry %s: store root: %w", name, err)
 	}
@@ -485,8 +521,10 @@ func (s *DiskProtectedStore) adoptionEntry(parent, name string) (string, error) 
 	}); err != nil {
 		return "", fmt.Errorf("adopt protected entry %s: %w", name, err)
 	}
-	if err := secureProtectedTree(entry); err != nil {
-		return "", fmt.Errorf("adopt protected entry %s: secure: %w", name, err)
+	if secure {
+		if err := secureProtectedTree(entry); err != nil {
+			return "", fmt.Errorf("adopt protected entry %s: secure: %w", name, err)
+		}
 	}
 	return entry, nil
 }

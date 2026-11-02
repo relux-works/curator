@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 // bounded child must fail at the specific behavioral assertion; setup errors,
 // compilation failures, skips and timeouts cannot count as killed mutants.
 func TestMCPCredentialAuthorityNarrowingControls(t *testing.T) {
+	isolateDetectorParent(t)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +28,11 @@ func TestMCPCredentialAuthorityNarrowingControls(t *testing.T) {
 		{"project-publication", "project_mcp.go", "func PublishProjectMCPLock(", "^TestProjectMCPAuthorityBeforeState$/^publish$/^node=true$", "MCP early authority admission missing"},
 		{"project-replay", "project_mcp.go", "func replayProjectMCP(", "^TestProjectMCPAuthorityBeforeState$/^replay$/^node=true$", "MCP early authority admission missing"},
 		{"project-restore", "project_mcp.go", "func replayProjectMCP(", "^TestProjectMCPAuthorityBeforeState$/^restore$/^node=true$", "MCP early authority admission missing"},
-		{"profile-publication", "native_mcp.go", "validateInputs := func() error {", "^TestProfileMCPCredentialPublicationBoundary$/^node=true$", "MCP publication authority refusal wrote after the marker changed"},
+		// Removing one redundant prepublication admission is no longer a policy
+		// violation: the unit and engine independently re-admit authority. Plant
+		// the actual IR5 omission instead; healthy publication must reach and
+		// reject a missing complete unit at the engine, never a setup failure.
+		{"profile-unit-omitted", "native_mcp.go", "Unit: unit, Directories: directories", "^TestProfileMCPFirstInstall$", "managed home effect requires a complete environment unit"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(root, "internal", "envprofile", tc.file)
@@ -40,7 +46,12 @@ func TestMCPCredentialAuthorityNarrowingControls(t *testing.T) {
 				call = "envauthority.Validate(req.Home)"
 			}
 			replacement := "func() error { _ = envauthority.Validate; return nil }()"
-			if tc.anchor == "" {
+			if tc.name == "profile-unit-omitted" {
+				if strings.Count(source, tc.anchor) != 1 {
+					t.Fatal("unit plant anchor must match once")
+				}
+				source = strings.Replace(source, tc.anchor, "Unit: nil, Directories: directories", 1)
+			} else if tc.anchor == "" {
 				if strings.Count(source, call) != 2 {
 					t.Fatal("profile authority plants must match twice")
 				}
@@ -80,13 +91,16 @@ func TestMCPCredentialAuthorityNarrowingControls(t *testing.T) {
 			defer cancel()
 			cmd := exec.CommandContext(ctx, binary, "test", "-overlay", overlay, "-count=1", "-timeout=4m", "-v", "-run", tc.run, "./internal/envprofile") // #nosec G204 -- fixed bounded test arguments and selected Go toolchain
 			cmd.Dir = root
-			for _, entry := range os.Environ() {
-				name, _, _ := strings.Cut(entry, "=")
-				if !strings.EqualFold(name, "GIT_DIR") && !strings.EqualFold(name, "GIT_WORK_TREE") {
-					cmd.Env = append(cmd.Env, entry)
-				}
+			cmd.Env = detectorChildEnv()
+			var buffer bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &buffer, &buffer
+			if err := cmd.Start(); err != nil {
+				t.Fatal(err)
 			}
-			output, err := cmd.CombinedOutput()
+			pid := cmd.Process.Pid
+			err = cmd.Wait()
+			t.Logf("detector child PID %d reaped; exit %d", pid, cmd.ProcessState.ExitCode())
+			output := buffer.Bytes()
 			var exit *exec.ExitError
 			if ctx.Err() != nil || !errors.As(err, &exit) || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: ") || !strings.Contains(string(output), tc.witness) {
 				t.Fatalf("MCP authority plant did not reach intended assertion: %v\n%s", err, output)

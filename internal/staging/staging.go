@@ -57,11 +57,15 @@ const (
 // Target is one journaled replacement. An empty StagedPath means the desired
 // state is absence, which is how a stale managed path is removed.
 type Target struct {
-	Class      string
-	Identifier string
-	Kind       string
-	LivePath   string
-	StagedPath string
+	// CopyFallback is an auto-mode adapter's prepared link-free alternative.
+	// Destination capability is decided by the journaled staging syscall, never
+	// by probing or deleting an entry in a live native parent.
+	CopyFallback string
+	Class        string
+	Identifier   string
+	Kind         string
+	LivePath     string
+	StagedPath   string
 }
 
 // Removal reports whether the desired state of the target is absence.

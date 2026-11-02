@@ -8,6 +8,41 @@ import (
 	"testing"
 )
 
+// Removing a live entry has no staged sidecar. That absent path must not
+// overlap an independent frozen input; real sidecar aliases still refuse in
+// TestFrozenReadInputValidation. Commit must reach the intended removal.
+func TestFrozenReadInputRemoval(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "live"))
+	mustMkdirAll(t, filepath.Join(root, "stage"))
+	input := filepath.Join(root, "policy")
+	if err := os.WriteFile(input, []byte("allowed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := DigestPath(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := fileTarget(t, "native", "one", filepath.Join(root, "live", "one"), filepath.Join(root, "stage", "one"), "old", "unused")
+	target.StagedSource = ""
+	home := filepath.Join(root, "home")
+	mustMkdirAll(t, home)
+	engine := mustEngine(t, home)
+	j, err := engine.Prepare(testLock{}, Plan{TransactionID: "txn-input-removal", ProjectIdentity: "profile", Targets: []Target{target}, ReadInputs: map[string]string{input: digest}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = engine.Commit(testLock{}, j.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = os.Lstat(target.LivePath); !os.IsNotExist(err) {
+		t.Fatalf("removal did not reach live target: %v", err)
+	}
+	if got := mustRead(t, input); got != "allowed" {
+		t.Fatalf("independent input changed: %q", got)
+	}
+}
+
 // Frozen bytes survive loss of the process-local guard. In-place policy edits
 // refuse both same-process commit and fresh-engine recovery, preserving targets;
 // identical input permits recovery of the prepared new generation.

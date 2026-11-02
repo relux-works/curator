@@ -40,16 +40,14 @@ import (
 	"github.com/relux-works/curator/internal/skillcheck"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/sourcelock"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // Options control one installation run.
 type Options struct {
-	// WithGlobalProfile runs the profile and legacy publishers under one held
-	// manager-home lock after private staging and revalidation. The wrapper
-	// compensates profile state on refusal.
-	// A returned profile error stops automatic restarts, including when the
-	// continuation requested one but its compensation could not finish.
-	WithGlobalProfile func(HomeLock, func() Result) (Result, error)
+	// PublishGlobalPlan joins the fully staged install plan with profile/home
+	// publication under this same held lock, before any consumer target writes.
+	PublishGlobalPlan func(HomeLock, func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error
 	// GlobalAddition is staged as a prospective declaration; the profile
 	// transaction publishes it only after every private build succeeds.
 	GlobalAddition *envprofile.DirectSkill

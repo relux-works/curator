@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/relux-works/curator/internal/linkcap"
 	"github.com/relux-works/curator/internal/staging"
 )
 
@@ -253,7 +254,8 @@ func (mirror *Mirror) stageStale(key, name, target string) error {
 }
 
 // stageEntry stages one mirror entry. "auto" prefers a link and falls back to a
-// journaled copy when the staging root or the adapter root refuses one.
+// journaled copy only when an actual staging syscall reports a capability
+// limitation. It never probes or changes a live destination during planning.
 //
 // A link always points at the canonical path, never at the staged content: the
 // staged tree is operation-private and disappears when the run ends.
@@ -264,10 +266,21 @@ func (mirror *Mirror) stageEntry(stageRoot, key, name, content, canonical, targe
 	case "symlink":
 		return mirror.stageLink(stageRoot, key, name, canonical, target)
 	default:
-		if linksSupported(stageRoot, target) {
-			return mirror.stageLink(stageRoot, key, name, canonical, target)
+		before := len(mirror.plan.Targets)
+		if err := mirror.stageLink(stageRoot, key, name, canonical, target); err != nil {
+			if !linkcap.Unavailable(err) {
+				return err
+			}
+			return mirror.stageCopy(stageRoot, key, name, content, target)
 		}
-		return mirror.stageCopy(stageRoot, key, name, content, target)
+		if len(mirror.plan.Targets) != before {
+			alternative, err := stageCopySource(stageRoot, key, name, content, target)
+			if err != nil {
+				return err
+			}
+			mirror.plan.Targets[len(mirror.plan.Targets)-1].CopyFallback = alternative
+		}
+		return nil
 	}
 }
 
@@ -295,20 +308,28 @@ func (mirror *Mirror) stageLink(stageRoot, key, name, canonical, target string) 
 }
 
 func (mirror *Mirror) stageCopy(stageRoot, key, name, content, target string) error {
+	stagedEntry, err := stageCopySource(stageRoot, key, name, content, target)
+	if err != nil {
+		return err
+	}
+	mirror.plan.ReplaceEntry(staging.ClassAdapterLedger, key+"/entry/"+name, target, stagedEntry)
+	return nil
+}
+
+func stageCopySource(stageRoot, key, name, content, target string) (string, error) {
 	stagedEntry := filepath.Join(stageRoot, "adapters", key, "entries", name)
 	if err := os.MkdirAll(filepath.Dir(stagedEntry), 0o700); err != nil {
-		return fmt.Errorf("stage adapter mirror %s: %w", target, err)
+		return "", fmt.Errorf("stage adapter mirror %s: %w", target, err)
 	}
 	if err := os.RemoveAll(stagedEntry); err != nil {
-		return fmt.Errorf("stage adapter mirror %s: %w", target, err)
+		return "", fmt.Errorf("stage adapter mirror %s: %w", target, err)
 	}
 	if err := copyTree(content, stagedEntry); err != nil {
-		return fmt.Errorf("stage adapter mirror %s: %w", target, err)
+		return "", fmt.Errorf("stage adapter mirror %s: %w", target, err)
 	}
 	// The live entry may currently be a link from an earlier symlink-mode run,
 	// so the copy replaces the directory entry itself, not what it points at.
-	mirror.plan.ReplaceEntry(staging.ClassAdapterLedger, key+"/entry/"+name, target, stagedEntry)
-	return nil
+	return stagedEntry, nil
 }
 
 // linkDestination renders the exact destination string a mirror link carries:
@@ -319,51 +340,6 @@ func linkDestination(canonical, target string) string {
 		return canonical
 	}
 	return rel
-}
-
-// linksSupported probes every filesystem an auto-mode link has to exist on: the
-// operation-private staging root, and the adapter root that will hold both the
-// transaction sidecar and the published entry. Discovering the limitation here
-// keeps it out of the middle of a commit.
-func linksSupported(stageRoot, target string) bool {
-	if err := os.MkdirAll(stageRoot, 0o700); err != nil {
-		return false
-	}
-	return linkProbe(stageRoot) && linkProbe(nearestExistingDirectory(filepath.Dir(target)))
-}
-
-// linkProbe creates and removes one private link. The name carries the process
-// id so a probe is never mistaken for managed state and never collides with
-// another manager home that happens to reach the same directory.
-func linkProbe(directory string) bool {
-	if directory == "" {
-		return false
-	}
-	probe := filepath.Join(directory, fmt.Sprintf(".curator-symlink-probe-%d", os.Getpid()))
-	_ = os.Remove(probe)
-	if err := os.Symlink(".", probe); err != nil {
-		return false
-	}
-	return os.Remove(probe) == nil
-}
-
-// nearestExistingDirectory walks up to the closest directory that exists, which
-// is the filesystem the missing ones will be created on.
-func nearestExistingDirectory(path string) string {
-	current := filepath.Clean(path)
-	for {
-		if info, err := os.Lstat(current); err == nil {
-			if info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
-				return current
-			}
-			return ""
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			return ""
-		}
-		current = parent
-	}
 }
 
 func rootKey(adapterRoot string) string {

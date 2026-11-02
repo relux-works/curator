@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 // store/currentness gate. Only exit 1 and the intended behavioral assertion
 // count; unrelated setup failures and crashes cannot satisfy these controls.
 func TestSkillProjectionNarrowingMutants(t *testing.T) {
+	isolateDetectorParent(t)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -24,7 +26,10 @@ func TestSkillProjectionNarrowingMutants(t *testing.T) {
 		{"omit-runtime-build-exclusions", "skill_projection.go", "whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)", "nil", "^TestProfileSkillProjectionPublication$/^commands-true$", "TestProfileSkillProjectionPublication/commands-true/", "skill publication differs from projection"},
 		{"legacy-plan-framing", "skill_projection.go", "if err := opaquescan.RefuseNULV1(source, version); err != nil {", "if err := opaquescan.RefuseNULV1(source, version); false && err != nil {", "^TestSkillProjectionLegacyFraming$/^plan$", "TestSkillProjectionLegacyFraming/plan", "legacy projection hashed or admitted NUL"},
 		{"legacy-tree-framing", "skill_projection.go", "if err := opaquescan.RefuseNULV1(root, version); err != nil {", "if err := opaquescan.RefuseNULV1(root, version); false && err != nil {", "^TestSkillProjectionLegacyFraming$/^(stage|verify)$", "TestSkillProjectionLegacyFraming/", "legacy projection hashed or admitted NUL"},
-		{"old-tree-copy", "managed.go", "if recordedSkillFallback(prior, path) {", "if false && recordedSkillFallback(prior, path) {", "^TestProfileSkillProjectionRepair$/./^raw-copy$", "TestProfileSkillProjectionRepair/", "repair required takeover"},
+		// Both link and copy are supported today, so merely choosing a link is
+		// no violation. Reuse the stale owned tree instead of the filtered
+		// store projection at the actual copy publisher to plant the defect.
+		{"old-tree-copy", "home_publication.go", "pub.tree(filepath.Join(plan.homeDir, filepath.FromSlash(path)), target)", "pub.tree(filepath.Join(plan.homeDir, filepath.FromSlash(path)), filepath.Join(plan.homeDir, filepath.FromSlash(path)))", "^TestProfileSkillProjectionRepair$/./^raw-copy$", "TestProfileSkillProjectionRepair/", "repair failed to publish filtered projection: environment_repair_failed: surface file skills/myskill is drifted: content hash differs"},
 		{"old-surface-identity", "skill_projection.go", `skillProjectionVersion + ":" + skill.hash`, `skill.hash`, "^TestProfileSkillProjectionRepair$/./^old-marker$", "TestProfileSkillProjectionRepair/", "old native surface current"},
 		{"missing-managed-projection", "managed.go", "if err := verifySkillProjection(req.Home, skill); err != nil {", "if err := verifySkillProjection(req.Home, skill); false && err != nil {", "^TestProfileSkillProjectionMissingStore$", "TestProfileSkillProjectionMissingStore", "missing projection current"},
 		{"missing-native-projection", "native_skills.go", "if err := verifySkillProjection(home, skill); err != nil {", "if err := verifySkillProjection(home, skill); false && err != nil {", "^TestProfileSkillProjectionMissingStore$", "TestProfileSkillProjectionMissingStore", "missing native projection current"},
@@ -59,7 +64,17 @@ func TestSkillProjectionNarrowingMutants(t *testing.T) {
 			}
 			command := exec.Command("env", "-u", "GIT_DIR", "-u", "GIT_WORK_TREE", "go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "./internal/envprofile", "-run", tc.run)
 			command.Dir = root
-			output, err := command.CombinedOutput()
+			command.Env = detectorChildEnv()
+			var buffer bytes.Buffer
+			command.Stdout = &buffer
+			command.Stderr = &buffer
+			if err := command.Start(); err != nil {
+				t.Fatal(err)
+			}
+			pid := command.Process.Pid
+			err = command.Wait()
+			t.Logf("detector child PID %d reaped; exit %d", pid, command.ProcessState.ExitCode())
+			output := buffer.Bytes()
 			exit, ok := err.(*exec.ExitError)
 			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+tc.fail) || !strings.Contains(string(output), tc.message) {
 				t.Fatalf("mutant survived or lacked intended failure: %v\n%s", err, output)

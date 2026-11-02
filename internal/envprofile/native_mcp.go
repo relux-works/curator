@@ -20,7 +20,9 @@ import (
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
+	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
@@ -719,30 +721,47 @@ func stageMCPContextFiles(destination string, skill skillOf, writes map[string][
 	return nil
 }
 
-func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]byte, preimages, inputs map[string]string, planning staging.Snapshot, validate func() error) error {
+func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]byte, preimages, inputs map[string]string, planning staging.Snapshot, validate func() error) (resultErr error) {
 	if err := validate(); err != nil {
 		return err
 	}
-	// Private parents are created only after all pair/source refusals. Capture
-	// their identities after creation and before staging. No native credential
-	// path is inspected or copied by this writer.
+	// Parent existence/protection is part of the durable publication, never
+	// a planning-time mutation. Every materialized adapter binds the unchanged
+	// installed lock, including inactive homes omitted by the MCP operand.
+	unit, err := nativeMCPUnit(req)
+	if err != nil {
+		return err
+	}
 	targets := staging.Plan{}
+	paths := make([]string, 0, len(writes))
 	for path := range writes {
 		if err := validateMCPRoute(req.Home, path); err != nil {
 			return err
 		}
-		if err := privatedir.MakeAll(filepath.Dir(path)); err != nil {
+		class := "profile-mcp"
+		if path == lockPath(req.Home, req.Profile) {
+			class = "profile-record"
+		}
+		if err := unit.ValidateReadScope(class, path); err != nil {
 			return err
 		}
-		if err := validateMCPRoute(req.Home, path); err != nil {
-			return err
-		}
-		if filepath.Dir(path) == filepath.Join(req.Home, "mcp-native-v1", "ownership") {
-			if err := privatedir.Validate(filepath.Dir(path)); err != nil {
-				return fmt.Errorf("%s: protected MCP ownership parent is untrusted: %w", mcpnative.Unreadable, err)
-			}
-		}
+		paths = append(paths, path)
 		targets.Targets = append(targets.Targets, staging.Target{LivePath: path, Kind: staging.KindBytes})
+	}
+	directories, err := op.engine.PublicationDirectories(paths...)
+	if err != nil {
+		return err
+	}
+	// Existing fixed ownership parents are protected through explicit durable
+	// metadata actions. No arbitrary native parent is granted protection custody.
+	for _, parent := range []string{filepath.Join(req.Home, "mcp-native-v1"), filepath.Join(req.Home, "mcp-native-v1", "ownership")} {
+		before, err := envunit.ObserveDirectory(parent)
+		if err != nil {
+			return err
+		}
+		if before.Kind == "directory" && before.Mode != 0700 {
+			directories = append(directories, transaction.DirectoryAction{LivePath: parent, Before: before, Mode: 0700})
+		}
 	}
 	admitted := []string{}
 	for path, digest := range inputs {
@@ -754,8 +773,8 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 	if err != nil {
 		return err
 	}
-	// Preserve planning-time ancestor pins while adding the directories this
-	// operation legitimately created for previously absent destinations.
+	// Preserve planning-time ancestor pins while describing the directories
+	// this publication may later create for absent destinations.
 	for path, earlier := range planning.Targets {
 		current, ok := snapshot.Targets[path]
 		if !ok {
@@ -795,7 +814,7 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		}
 		return nil
 	}
-	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-mcp-first-install", ReadInputs: frozen, BoundaryProof: &durable}
+	plan := transaction.Plan{TransactionID: unit.ID, ProjectIdentity: "managed-home-unit", Unit: unit, Directories: directories, ReadInputs: frozen, BoundaryProof: &durable}
 	plan.BoundaryCheck = func(_ int, path string) error {
 		if err := staging.RecheckOne(staging.Target{LivePath: path, Kind: staging.KindBytes}, snapshot, admitted); err != nil {
 			return err
@@ -803,20 +822,13 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		if err := validateMCPRoute(req.Home, path); err != nil {
 			return err
 		}
-		if err := privatedir.Validate(filepath.Join(req.Home, "mcp-native-v1", "ownership")); err != nil {
-			return fmt.Errorf("%s: protected MCP ownership parent changed: %w", mcpnative.Unreadable, err)
-		}
 		return recheck()
 	}
 	stage, err := privatedir.TempStaging(req.Home, ".mcp-stage-*")
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(stage) }()
-	paths := make([]string, 0, len(writes))
-	for path := range writes {
-		paths = append(paths, path)
-	}
+	defer finishPublicationCleanup(&resultErr, func() error { return os.RemoveAll(stage) })
 	sort.Strings(paths)
 	for _, path := range paths {
 		preimage, err := transaction.DigestPath(path)
@@ -838,7 +850,11 @@ func publishNativeMCP(op *operation, req ProfileMCPRequest, writes map[string][]
 		if closeErr != nil {
 			return closeErr
 		}
-		plan.Targets = append(plan.Targets, transaction.Target{PrivateFile: true, Class: "profile-mcp", Identifier: path, LivePath: path, StagedSource: file.Name(), PreimageDigest: preimage})
+		class := "profile-mcp"
+		if path == lockPath(req.Home, req.Profile) {
+			class = "profile-record"
+		}
+		plan.Targets = append(plan.Targets, transaction.Target{PrivateFile: true, Class: class, Identifier: path, LivePath: path, StagedSource: file.Name(), PreimageDigest: preimage})
 	}
 	if err = validate(); err != nil {
 		return err
@@ -960,4 +976,42 @@ func refuseNativeMCPEnrollment(home, profile, environment string) error {
 		}
 	}
 	return mcpAuthorityError()
+}
+
+// nativeMCPUnit binds exact existing authority without native discovery or
+// regeneration of marker/origin bytes. MCP cannot provision a missing home.
+func nativeMCPUnit(req ProfileMCPRequest) (*envunit.Unit, error) {
+	var unit *envunit.Unit
+	id := newTransactionID()
+	for _, adapter := range envregistry.Registry {
+		target := ManagedHomeDir(req.Home, req.Profile, adapter.ID)
+		marker, err := envmarker.Read(target)
+		if err != nil {
+			return nil, err
+		}
+		if marker == nil {
+			continue
+		}
+		resolve := ResolveRequest{Home: req.Home, Profile: req.Profile, EnvID: adapter.ID}
+		if err := resolve.observeOrigin(adapter.ID, marker); err != nil {
+			return nil, err
+		}
+		raw, err := os.ReadFile(filepath.Join(target, envmarker.Name)) // #nosec G304 -- exact managed marker path was boundary/record authority checked immediately above.
+		if err != nil {
+			return nil, err
+		}
+		next, err := resolve.homeUnit(id, &homePlan{adapter: adapter, homeDir: target}, marker, raw)
+		if err != nil {
+			return nil, err
+		}
+		if unit == nil {
+			unit = next
+		} else {
+			unit.Homes = append(unit.Homes, next.Homes...)
+		}
+	}
+	if unit == nil {
+		return nil, fmt.Errorf("%s: MCP publication requires an existing recorded managed home", mcpnative.AuthorityUnavailable)
+	}
+	return unit, nil
 }

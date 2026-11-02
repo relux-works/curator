@@ -1,8 +1,6 @@
 package install
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfiles"
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
@@ -26,6 +25,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/mcp"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // GlobalRoot returns the global scope directory under the machine home.
@@ -390,6 +390,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 	// The mixed plan stages external commands before local go-v1 commands, in
 	// the same command and receipt order as project installs. Both arms remain
 	// private until the serialized commit below.
+	externalPlan.durableNamespaces = true
 	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
 	if externalStageErr != nil {
 		result.failBuild(externalStageErr)
@@ -409,38 +410,16 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 			return result, nil
 		}
 	}
-	// No shared publication, including the profile continuation, may precede
-	// verified private staging. Revalidate before the profile can mutate state.
-	var publicationHome HomeLock
-	if opts.WithGlobalProfile != nil {
-		lock, err := commit.Locks.AcquireHome(opts.context())
-		if err != nil {
-			result.failf("acquire the manager-home lock: %v", err)
-			return result, nil
+	// Every mutating global caller uses the same durable profile/consumer
+	// owner, including programmatic callers that do not supply a publisher.
+	commit.PublishPlan = opts.PublishGlobalPlan
+	if commit.PublishPlan == nil {
+		commit.PublishPlan = func(lock HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
+			_, err := envprofile.PublishGlobalSkillPlanWithPlanner(home, envprofile.PolicyFromConfig(cfg), envprofile.MachineFromConfig(cfg), opts.GlobalAddition, nil, lock, stage, transaction.WithHooks(opts.Commit.Hooks))
+			return err
 		}
-		defer func() { _ = lock.Close() }()
-		if err := commit.Journal.Recover(lock); err != nil {
-			result.failf("%v", err)
-			return result, nil
-		}
-		if restart := observed.recheck(plan, deps.Cache); restart != nil {
-			return result, restart
-		}
-		publicationHome = lock
-		commit.Locks = globalHeldLocks{LockBroker: commit.Locks, home: lock}
 	}
 	publish := func() Result {
-		if opts.GlobalAddition != nil {
-			// The paired profile transaction has just published this exact
-			// prospective edit. Advance only that observation, from one read;
-			// arbitrary declaration changes must still refuse and compensate.
-			document, err := readDocument(manifest.PathIn(GlobalRoot(home)))
-			if err != nil || !bytes.Equal(document.payload, globalManifestPayload) {
-				result.failf("global declaration differs from the staged addition: %v", err)
-				return result
-			}
-			observed.observeDocument(globalManifestKey, manifest.PathIn(GlobalRoot(home)), document.generation)
-		}
 		outcome, commitErr := runCommit(opts.context(), commitRequest{
 			scope:    "global",
 			home:     home,
@@ -457,7 +436,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 				if legacy != nil {
 					runtimeKeys = legacy.RuntimeKeys
 				}
-				return stageGlobalTargets(globalTargetRequest{
+				targets, err := stageGlobalTargets(globalTargetRequest{
 					cfg: cfg, home: home, userHome: userHome, platform: platform,
 					nodes: nodes, agents: agents, effectiveLocale: effectiveLocale,
 					mcpFound: mcpFound, attestations: registryResult.Attestations,
@@ -466,6 +445,22 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 					external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
 					runtimeKeys: runtimeKeys, legacy: legacy,
 				})
+				if err != nil {
+					return scopeTargets{}, err
+				}
+				if opts.GlobalAddition != nil {
+					staged := filepath.Join(scoped.stageRoot, "prospective-Skillfile.json")
+					if err := os.WriteFile(staged, globalManifestPayload, 0600); err != nil {
+						return scopeTargets{}, err
+					}
+					live := manifest.PathIn(GlobalRoot(home))
+					targets.plan.Replace("55-global-declaration", live, live, staged)
+					targets.legacy.Entries = append(targets.legacy.Entries, envunit.LegacyTarget{Class: "55-global-declaration", Path: live})
+					if err := targets.attachBoundaries(targets.boundaries.Admitted); err != nil {
+						return scopeTargets{}, err
+					}
+				}
+				return targets, nil
 			},
 		})
 		result.Messages = append(result.Messages, outcome.messages...)
@@ -473,22 +468,10 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.BuildCacheRetained = outcome.retainedBuilds
 		if commitErr != nil {
 			result, restart = result.failCommit(externalTransactionFailure(commitErr, externalStaged))
-			if restart != nil && opts.WithGlobalProfile != nil {
-				result.failf("%v", restart)
-			}
 		}
 		return result
 	}
-	if opts.WithGlobalProfile != nil {
-		var profileErr error
-		result, profileErr = opts.WithGlobalProfile(publicationHome, publish)
-		if profileErr != nil {
-			restart = nil
-			result.failf("%v", profileErr)
-		}
-	} else {
-		result = publish()
-	}
+	result = publish()
 	return result, restart
 }
 
@@ -554,6 +537,9 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	targets.messages = append(targets.messages, runtime.messages...)
 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
 	targets.adoptions = request.external.adoptions(request.externalStoreRoot)
+	for i := range targets.adoptions {
+		targets.adoptions[i].verifyOnly = true
+	}
 	targets.referencedKeys = runtime.referencedKeys()
 
 	expectedSkills := map[string]bool{}
@@ -631,6 +617,9 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 		stageRoot, request.home, request.userHome, request.agents, contextNames, request.cfg.AdapterMode,
 		contextSources(targets.plan, request.skillsDir, contextNames), admitted,
 		func(adapterRoot, name string) (bool, error) {
+			if request.scoped.globalOwner != nil {
+				return request.scoped.globalOwner(adapterRoot, name, identities[name])
+			}
 			return envprofile.OwnsNativeSkill(request.home, adapterRoot, name, identities[name])
 		})
 	if err != nil {
@@ -639,6 +628,10 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 	targets.plan.Merge(mirror.Plan())
 	for _, message := range mirror.Messages {
 		targets.messages = append(targets.messages, "global: "+message)
+	}
+	targets.legacy = &envunit.LegacyPublication{UserHome: request.userHome, UserBin: forwarding.Path, ExternalStore: request.externalStoreRoot, Entries: []envunit.LegacyTarget{}}
+	for _, target := range targets.plan.Targets {
+		targets.legacy.Entries = append(targets.legacy.Entries, envunit.LegacyTarget{Class: target.Class, Path: target.LivePath})
 	}
 	if err := targets.attachBoundaries(admitted); err != nil {
 		return scopeTargets{}, err
@@ -656,27 +649,4 @@ func GlobalInit(home string) (string, error) {
 		return "", err
 	}
 	return manifest.EnsureEmpty(root)
-}
-
-// globalHeldLocks borrows a lock owned by the enclosing paired publication.
-// Project locks were already acquired before that home lock; inner recovery
-// and commit may assert it but cannot release it between the two publishers.
-type globalHeldLocks struct {
-	LockBroker
-	home HomeLock
-}
-
-func (locks globalHeldLocks) AcquireHome(_ context.Context) (HomeLock, error) {
-	return globalBorrowedHome{locks.home}, locks.home.AssertHeld()
-}
-
-type globalBorrowedHome struct{ HomeLock }
-
-func (globalBorrowedHome) Close() error { return nil }
-
-func (lock globalBorrowedHome) AssertCurrent() error {
-	if current, ok := lock.HomeLock.(interface{ AssertCurrent() error }); ok {
-		return current.AssertCurrent()
-	}
-	return fmt.Errorf("global operation requires current manager lock")
 }

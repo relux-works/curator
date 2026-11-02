@@ -15,11 +15,15 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/envauthority"
+	"github.com/relux-works/curator/internal/envorigin"
+	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/envunit"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -85,9 +89,10 @@ type CachePublisher interface {
 // zero value resolves the real manager locks, transaction engine, protected
 // cache publisher, and runtime collector.
 type CommitDeps struct {
-	Locks     LockBroker
-	Journal   TargetJournal
-	Publisher CachePublisher
+	PublishPlan func(HomeLock, func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error
+	Locks       LockBroker
+	Journal     TargetJournal
+	Publisher   CachePublisher
 	// Collect runs the post-commit maintenance sweep under the still-held home
 	// lock. A failure is a reported warning: the installation is already
 	// durable, and retaining an unreferenced entry is always safe.
@@ -498,7 +503,8 @@ type commitRequest struct {
 
 // scopeCommit is the home-locked context a scope stages its targets in.
 type scopeCommit struct {
-	stageRoot string
+	globalOwner envprofile.NativeSkillOwnership
+	stageRoot   string
 	// artifacts maps every planned build key to its protected cache entry.
 	artifacts map[buildmeta.CacheKey]buildcache.Result
 }
@@ -508,8 +514,10 @@ type scopeCommit struct {
 // journal cannot own, so nothing mutates between preparation and commit and an
 // ordinary failure always enters durable rollback.
 type scopeTargets struct {
-	plan     staging.Plan
-	messages []string
+	pinnedPreimages map[string]string
+	legacy          *envunit.LegacyPublication
+	plan            staging.Plan
+	messages        []string
 	// referencedKeys are the build keys the committed markers depend on, so GC
 	// retains them while this transaction is in flight.
 	referencedKeys []string
@@ -639,68 +647,167 @@ func runCommit(ctx context.Context, request commitRequest) (outcome commitOutcom
 	artifacts := builds.artifacts
 	outcome.messages = append(outcome.messages, builds.messages...)
 
-	targets, err := request.stageTargets(scopeCommit{stageRoot: stageRoot, artifacts: artifacts})
-	if err != nil {
-		return commitOutcome{}, err
-	}
-	outcome.messages = append(outcome.messages, targets.messages...)
-
-	if request.projectRoot != "" {
-		consumer, err := scopes.StageConsumer(stageRoot, request.home, request.projectRoot)
-		if err != nil {
-			return commitOutcome{}, err
-		}
-		targets.plan.Merge(consumer)
-	}
-	if err := targets.plan.Validate(); err != nil {
-		return commitOutcome{}, err
-	}
-	if targets.plan.Empty() {
-		outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
-		return outcome, nil
-	}
-	// Draft local-source boundary recheck (skillfile-sources revision 1
-	// section 2): immediately before the first publication write, and
-	// under the serialized transaction, re-verify destination separation
-	// and physical identity against the planning-time snapshot. A changed
-	// boundary fails here — before journaling, so there is nothing to
-	// roll back — with the spec section 5 diagnostic class.
-	if targets.boundaries != nil {
-		if err := targets.plan.Recheck(targets.boundaries.Snapshot, targets.boundaries.Admitted); err != nil {
-			return commitOutcome{}, err
-		}
-	}
-
-	// A target below a directory that does not exist yet needs that directory
-	// before the journal can place its sidecars. Those directories are not
-	// journaled targets, so an abandoned commit has to unwind them itself;
-	// otherwise a rolled-back installation would leave an empty runtime or
-	// skills tree behind and the restored state would not be the prior one.
-	journalPlan, created, planErr := journalPlan(request, targets)
-	journaled = journalPlan
+	var targets scopeTargets
+	var created []string
 	committed := false
 	defer func() {
 		if !committed {
 			removeCreatedDirectories(created)
 		}
 	}()
-	if planErr != nil {
-		return commitOutcome{}, planErr
+	buildJournal := func(owner envprofile.NativeSkillOwnership) (transaction.Plan, error) {
+		var err error
+		targets, err = request.stageTargets(scopeCommit{stageRoot: stageRoot, artifacts: artifacts, globalOwner: owner})
+		if err != nil {
+			return transaction.Plan{}, err
+		}
+		outcome.messages = append(outcome.messages, targets.messages...)
+
+		if request.projectRoot != "" {
+			consumer, err := scopes.StageConsumer(stageRoot, request.home, request.projectRoot)
+			if err != nil {
+				return transaction.Plan{}, err
+			}
+			targets.plan.Merge(consumer)
+		}
+		if request.commit.PublishPlan != nil {
+			if err := stageEnvApprovals(request, &targets, stageRoot); err != nil {
+				return transaction.Plan{}, err
+			}
+		}
+		if err := targets.plan.Validate(); err != nil {
+			return transaction.Plan{}, err
+		}
+		if targets.plan.Empty() {
+			outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
+			return transaction.Plan{}, nil
+		}
+		// Draft local-source boundary recheck (skillfile-sources revision 1
+		// section 2): immediately before the first publication write, and
+		// under the serialized transaction, re-verify destination separation
+		// and physical identity against the planning-time snapshot. A changed
+		// boundary fails here — before journaling, so there is nothing to
+		// roll back — with the spec section 5 diagnostic class.
+		if targets.boundaries != nil {
+			if err := targets.plan.Recheck(targets.boundaries.Snapshot, targets.boundaries.Admitted); err != nil {
+				return transaction.Plan{}, err
+			}
+		}
+
+		// A target below a directory that does not exist yet needs that directory
+		// before the journal can place its sidecars. Those directories are not
+		// journaled targets, so an abandoned commit has to unwind them itself;
+		// otherwise a rolled-back installation would leave an empty runtime or
+		// skills tree behind and the restored state would not be the prior one.
+		plan, added, planErr := journalPlan(request, targets)
+		created = append(created, added...)
+		journaled = plan
+		if planErr != nil {
+			return transaction.Plan{}, planErr
+		}
+		return plan, nil
 	}
-	// Preparation is immediately followed by the commit. Nothing may run in
-	// between: a prepared journal is a transaction recovery will finish, so an
-	// operation that returned failed must never leave one behind.
-	if _, err := request.commit.Journal.Prepare(lock, journalPlan); err != nil {
-		return commitOutcome{}, fmt.Errorf("prepare the install transaction: %w", err)
-	}
-	if err := request.commit.Journal.Commit(lock, journalPlan.TransactionID); err != nil {
-		return commitOutcome{}, fmt.Errorf("commit the install transaction: %w", err)
+	if request.commit.PublishPlan != nil {
+		if err := request.commit.PublishPlan(lock, buildJournal); err != nil {
+			return commitOutcome{}, fmt.Errorf("commit joined global publication: %w", err)
+		}
+	} else {
+		plan, err := buildJournal(nil)
+		if err != nil {
+			return commitOutcome{}, err
+		}
+		if len(plan.Targets) != 0 {
+			if _, err := request.commit.Journal.Prepare(lock, plan); err != nil {
+				return commitOutcome{}, fmt.Errorf("prepare the install transaction: %w", err)
+			}
+			if err := request.commit.Journal.Commit(lock, plan.TransactionID); err != nil {
+				return commitOutcome{}, fmt.Errorf("commit the install transaction: %w", err)
+			}
+		}
 	}
 	committed = true
-	outcome.warnings = append(outcome.warnings, recordPublishedEnvApprovals(request, targets)...)
+	if request.commit.PublishPlan == nil {
+		outcome.warnings = append(outcome.warnings, recordPublishedEnvApprovals(request, targets)...)
+	}
 	outcome.warnings = append(outcome.warnings, adoptExternalPublications(request, targets)...)
 	outcome.warnings = append(outcome.warnings, collectAfterCommit(request, lock)...)
 	return outcome, nil
+}
+
+// stageEnvApprovals enlists the exact manager-owned ledger with its env-file
+// bytes. There is no after-commit write or process-local rollback dependency.
+func stageEnvApprovals(request commitRequest, targets *scopeTargets, stageRoot string) error {
+	if targets.boundaries != nil {
+		if err := targets.plan.Recheck(targets.boundaries.Snapshot, targets.boundaries.Admitted); err != nil {
+			return err
+		}
+	}
+	var additions []hookapproval.Record
+	for _, target := range targets.plan.Targets {
+		if target.Class != staging.ClassEnvFile || target.Removal() {
+			continue
+		}
+		state, err := stateread.ReadRegularFile(target.StagedPath)
+		if err != nil {
+			return err
+		}
+		if state.Kind != stateread.KindPresent {
+			return fmt.Errorf("staged env file is absent")
+		}
+		path, err := hookapproval.Canonicalize(target.LivePath)
+		if err != nil {
+			return err
+		}
+		additions = append(additions, hookapproval.Record{Path: path, SHA256: hookapproval.Digest(state.Bytes), ApprovedBy: hookapproval.ApprovedByManager, ApprovedAt: time.Now().UTC()})
+	}
+	if len(additions) == 0 {
+		return nil
+	}
+	path := hookapproval.ApprovalsPath(request.home)
+	prior, present, err := envorigin.ReadPrivateAuthority(request.home, path, 4<<20)
+	if err != nil {
+		return err
+	}
+	expected := "absent"
+	if present {
+		state, err := stateread.Lstat(path)
+		if err != nil || state.Kind != stateread.KindPresent {
+			return fmt.Errorf("approval preimage disappeared: %v", err)
+		}
+		expected, err = transaction.DigestRegularPayload(prior, state.Info.Mode().Perm())
+		if err != nil {
+			return err
+		}
+	}
+	actual, err := transaction.DigestPath(path)
+	if err != nil {
+		return err
+	}
+	if actual != expected {
+		return fmt.Errorf("approval preimage changed during planning")
+	}
+	payload, err := hookapproval.PlanUpserts(prior, additions)
+	if err != nil {
+		return err
+	}
+	staged := filepath.Join(stageRoot, "hook-approvals.tsv")
+	if err := os.WriteFile(staged, payload, 0600); err != nil {
+		return err
+	}
+	if targets.legacy == nil {
+		return fmt.Errorf("paired approvals require closed global inventory")
+	}
+	targets.plan.Replace("56-hook-approvals", path, path, staged)
+	targets.legacy.Entries = append(targets.legacy.Entries, envunit.LegacyTarget{Class: "56-hook-approvals", Path: path})
+	if targets.pinnedPreimages == nil {
+		targets.pinnedPreimages = map[string]string{}
+	}
+	targets.pinnedPreimages[path] = expected
+	var admitted []string
+	if targets.boundaries != nil {
+		admitted = targets.boundaries.Admitted
+	}
+	return targets.attachBoundaries(admitted)
 }
 
 // recordPublishedEnvApprovals records approved_by manager digests for the env
@@ -935,6 +1042,7 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 	}
 	sorted := targets.Sorted()
 	plan := transaction.Plan{
+		Legacy:              targets.legacy,
 		TransactionID:       id,
 		ProjectIdentity:     identity,
 		ReferencedBuildKeys: uniqueSorted(targets.referencedKeys),
@@ -946,12 +1054,62 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 		BoundaryCheck: boundaryCheckFor(sorted, targets.boundaries),
 		BoundaryProof: boundaryProofFor(targets.boundaries),
 	}
+	var joinedScope *envunit.Unit
+	if request.commit.PublishPlan != nil {
+		joinedScope = &envunit.Unit{Manager: envunit.Manager{Path: request.home}, Action: envunit.GlobalExtend, Legacy: targets.legacy}
+		if err := joinedScope.VerifyLegacyRoots(); err != nil {
+			return transaction.Plan{}, created, err
+		}
+		for _, target := range sorted {
+			if err := joinedScope.ValidateReadScope(target.Class, target.LivePath); err != nil {
+				return transaction.Plan{}, created, err
+			}
+		}
+		engine, err := transaction.New(request.home)
+		if err != nil {
+			return transaction.Plan{}, created, err
+		}
+		var paths []string
+		for _, target := range sorted {
+			paths = append(paths, target.LivePath)
+		}
+		plan.Directories, err = engine.PublicationDirectories(paths...)
+		if err != nil {
+			return transaction.Plan{}, created, err
+		}
+		seen := map[string]bool{}
+		for _, dir := range plan.Directories {
+			seen[dir.LivePath] = true
+		}
+		for _, root := range targets.legacy.PublicationRoots() {
+			var leaves []string
+			for _, path := range paths {
+				rel, e := filepath.Rel(root, path)
+				if e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+					leaves = append(leaves, path)
+				}
+			}
+			if len(leaves) == 0 {
+				continue
+			}
+			dirs, e := engine.NativePublicationDirectories(root, leaves...)
+			if e != nil {
+				return transaction.Plan{}, created, e
+			}
+			for _, dir := range dirs {
+				if !seen[dir.LivePath] {
+					plan.Directories = append(plan.Directories, dir)
+					seen[dir.LivePath] = true
+				}
+			}
+		}
+	}
 	for _, target := range sorted {
 		kind, err := journalKind(target.Kind)
 		if err != nil {
 			return transaction.Plan{}, created, fmt.Errorf("stage %s/%s: %w", target.Class, target.Identifier, err)
 		}
-		if target.StagedPath != "" {
+		if target.StagedPath != "" && joinedScope == nil {
 			added, err := makeMissingDirectories(filepath.Dir(target.LivePath))
 			if err != nil {
 				return transaction.Plan{}, created, fmt.Errorf("prepare the parent of %s: %w", target.LivePath, err)
@@ -962,7 +1120,17 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 		if err != nil {
 			return transaction.Plan{}, created, fmt.Errorf("read the current state of %s: %w", target.LivePath, err)
 		}
+		if expected, pinned := targets.pinnedPreimages[target.LivePath]; pinned && preimage != expected {
+			return transaction.Plan{}, created, fmt.Errorf("publication preimage changed: %s", target.LivePath)
+		}
+		var fallback *transaction.LinkFallback
+		if target.CopyFallback != "" {
+			fallback = &transaction.LinkFallback{Source: target.CopyFallback, Class: target.Class}
+		}
 		plan.Targets = append(plan.Targets, transaction.Target{
+			LinkFallback:   fallback,
+			PrivateTree:    target.Class == "05-external-cache" || target.Class == "05-external-snapshot",
+			PrivateFile:    target.Class == "56-hook-approvals",
 			Class:          target.Class,
 			Identifier:     target.Identifier,
 			Kind:           kind,
@@ -971,7 +1139,61 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 			PreimageDigest: preimage,
 		})
 	}
+	if joinedScope != nil {
+		if err := request.observed.freezeDocuments(&plan); err != nil {
+			return transaction.Plan{}, created, err
+		}
+	}
 	return plan, created, nil
+}
+
+// The declaration parsed before private staging stays bound after the live
+// process and its callbacks disappear. A changing declaration is pinned by its
+// target preimage; independent documents are frozen inputs, never both.
+func (observed *observations) freezeDocuments(plan *transaction.Plan) error {
+	if observed == nil {
+		return nil
+	}
+	if plan.ReadInputs == nil {
+		plan.ReadInputs = map[string]string{}
+	}
+	for _, entry := range observed.entries {
+		if !entry.bytesBound {
+			continue
+		}
+		file, err := stateread.ReadRegularFile(entry.path)
+		if err != nil {
+			return err
+		}
+		generation, digest := documentAbsent, transaction.DigestAbsent
+		if file.Kind == stateread.KindPresent {
+			generation = digestDeclaration(file.Bytes)
+			info, err := os.Lstat(entry.path)
+			if err != nil || !info.Mode().IsRegular() {
+				return fmt.Errorf("declaration metadata changed during publication planning: %s", entry.path)
+			}
+			digest, err = transaction.DigestRegularPayload(file.Bytes, info.Mode())
+			if err != nil {
+				return err
+			}
+		}
+		if generation != entry.generation {
+			return fmt.Errorf("declaration changed during publication planning: %s", entry.path)
+		}
+		changing := false
+		for _, target := range plan.Targets {
+			if target.LivePath == entry.path {
+				if target.PreimageDigest != digest {
+					return fmt.Errorf("declaration target preimage changed during publication planning: %s", entry.path)
+				}
+				changing = true
+			}
+		}
+		if !changing {
+			plan.ReadInputs[entry.path] = digest
+		}
+	}
+	return nil
 }
 
 // journalKind maps a staged target kind onto the durable transaction kind. The

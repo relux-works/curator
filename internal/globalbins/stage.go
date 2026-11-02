@@ -13,9 +13,8 @@ import (
 //
 // Every published launcher, every stale removal, and the ownership ledger are
 // journaled transaction targets, so the mirror commits and rolls back with the
-// rest of the installation. Nothing here touches a live path except creating
-// the selected user bin directory itself, which is the user's own PATH entry
-// and never a managed target.
+// rest of the installation. Nothing here touches a live path. The caller must enlist any absent
+// selected user-bin parents with the actual publication journal.
 type Forwarding struct {
 	plan staging.Plan
 	// Messages carries the same operator-facing warnings Refresh reports.
@@ -60,17 +59,8 @@ func StageForwarding(
 		return forwarding, nil
 	}
 	target := selection.Path
-	// The selected directory is the user's own PATH entry, not managed state.
-	// Creating it is idempotent and is not journaled.
-	if err := os.MkdirAll(target, 0o755); err != nil {
-		if countExpected(expected) == 0 {
-			return Forwarding{}, nil
-		}
-		return Forwarding{Messages: []string{fmt.Sprintf(
-			"global: command shims were installed in %s, but %s could not be created: %v; set %s to a writable PATH directory or use curator shell-init --install",
-			canonicalBin, target, err, UserBinEnv,
-		)}}, nil
-	}
+	// The install journal owns absent live parents. Staging never creates
+	// a user PATH entry before the complete publication intent is durable.
 	forwarding.Path = target
 
 	managed, err := readLedger(target)

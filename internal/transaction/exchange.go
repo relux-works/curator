@@ -7,7 +7,7 @@ package transaction
 func (engine *Engine) commitExchange(journal *Journal, index int) error {
 	target := &journal.Targets[index]
 	if target.State == StateCommitted {
-		current, err := target.digest(target.LivePath)
+		current, err := target.Digest(target.LivePath)
 		if err != nil {
 			return err
 		}
@@ -17,7 +17,7 @@ func (engine *Engine) commitExchange(journal *Journal, index int) error {
 		return nil
 	}
 	if target.State == StatePending {
-		backup, err := target.digest(target.BackupPath)
+		backup, err := target.Digest(target.BackupPath)
 		if err != nil {
 			return err
 		}
@@ -31,7 +31,7 @@ func (engine *Engine) commitExchange(journal *Journal, index int) error {
 			if err := syncTree(target.LivePath); err != nil {
 				return err
 			}
-			if staged, err := target.digest(target.StagedPath); err != nil {
+			if staged, err := target.Digest(target.StagedPath); err != nil {
 				return err
 			} else if staged != target.DesiredDigest {
 				return corruptionf("exchange staging changed for %s/%s", target.Class, target.Identifier)
@@ -97,17 +97,17 @@ func (engine *Engine) commitExchange(journal *Journal, index int) error {
 // unexpected spare staging or rollback bytes before a live mutation.
 func exchangeLayout(target *TargetRecord) (string, string, error) {
 	for _, path := range []string{target.StagedPath, target.RollbackPath} {
-		if digest, err := target.digest(path); err != nil {
+		if digest, err := target.Digest(path); err != nil {
 			return "", "", err
 		} else if digest != DigestAbsent {
 			return "", "", corruptionf("exchange target %s/%s has unexpected sidecar bytes", target.Class, target.Identifier)
 		}
 	}
-	current, err := target.digest(target.LivePath)
+	current, err := target.Digest(target.LivePath)
 	if err != nil {
 		return "", "", err
 	}
-	backup, err := target.digest(target.BackupPath)
+	backup, err := target.Digest(target.BackupPath)
 	return current, backup, err
 }
 
@@ -116,11 +116,11 @@ func (engine *Engine) rollbackExchange(journal *Journal, index int) error {
 	if target.State == StateRolledBack {
 		return nil
 	}
-	current, err := target.digest(target.LivePath)
+	current, err := target.Digest(target.LivePath)
 	if err != nil {
 		return err
 	}
-	backup, err := target.digest(target.BackupPath)
+	backup, err := target.Digest(target.BackupPath)
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/audit"
+	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/closure"
@@ -1860,6 +1861,21 @@ func (c cli) runGlobalInstallMode(cfg *config.Config, args []string, fetch bool)
 	return c.runGlobalInstallModeWithProfile(cfg, args, fetch, nil)
 }
 
+// installExecutablePaths substitutes only the process snapshot transport in
+// isolated in-process fixtures. Nil preserves the production OS enumerator;
+// reference admission and the actual cache collector always execute.
+var installExecutablePaths func() ([]string, error)
+
+func collectInstallScopes(req scopes.MaintenanceRequest) (scopes.MaintenanceResult, error) {
+	store, err := buildcache.New(req.Home)
+	if err != nil {
+		return scopes.MaintenanceResult{}, err
+	}
+	store.ExecutablePaths = installExecutablePaths
+	req.Cache = store
+	return scopes.Collect(req)
+}
+
 func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, fetch bool, addition *envprofile.DirectSkill) int {
 	opts, positional, all, auditMode, err := c.installFlags(args)
 	if err != nil || len(positional) != 0 || all {
@@ -1897,28 +1913,12 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	if len(args) == 0 && !opts.DryRun && !fetch {
+	if !opts.DryRun {
+		opts.Commit.Collect = collectInstallScopes
 		opts.GlobalAddition = addition
-		opts.WithGlobalProfile = func(lock install.HomeLock, next func() install.Result) (install.Result, error) {
-			result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home())}
-			var legacyErr error
-			info, err := envprofile.GlobalSkillTransaction(cfg.Home(), envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), addition, c.profileNativeHomeResolver(), lock, func() error {
-				result = next()
-				if result.Status == "failed" {
-					legacyErr = fmt.Errorf("global legacy publication failed: %s", strings.Join(result.Errors, "; "))
-					return legacyErr
-				}
-				return nil
-			})
-			if err != nil {
-				result.Status = "failed"
-				if err != legacyErr {
-					return result, err
-				}
-			} else {
-				result.Messages = append(result.Messages, fmt.Sprintf("installed global skills from profile %s (lock %s)", info.Name, info.LockHash))
-			}
-			return result, nil
+		opts.PublishGlobalPlan = func(lock install.HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
+			_, err := envprofile.PublishGlobalSkillPlanWithPlanner(cfg.Home(), envprofile.PolicyFromConfig(cfg), machineFromConfig(cfg), addition, c.profileNativeHomeResolver(), lock, stage)
+			return err
 		}
 	}
 	result := install.Global(cfg, userHome, opts)

@@ -93,6 +93,7 @@ type plannedExternal struct {
 
 type externalPlan struct {
 	scope, projectIdentity string
+	durableNamespaces      bool // global owner enlists final parents in the joined journal
 	rows                   []plannedExternal
 	deps                   ExternalDeps
 	toolchain              buildrepo.ToolchainIdentity
@@ -286,8 +287,10 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 	if err := session.VerifyToolchain(ctx); err != nil {
 		return stagedExternal{}, err
 	}
-	if err := staged.prepareFinalNamespaces(plan.deps.StoreRoot); err != nil {
-		return stagedExternal{}, err
+	if !plan.durableNamespaces {
+		if err := staged.prepareFinalNamespaces(plan.deps.StoreRoot); err != nil {
+			return stagedExternal{}, err
+		}
 	}
 	return staged, nil
 }
@@ -326,10 +329,17 @@ type externalAdoption struct {
 	receiptSchemaVersion int
 	key                  string
 	snapshot             bool
+	verifyOnly           bool
 }
 
 func (adoption externalAdoption) adopt() error {
 	store := &buildrepo.DiskProtectedStore{Root: adoption.root}
+	if adoption.verifyOnly {
+		if adoption.snapshot {
+			return store.VerifySnapshot(adoption.key)
+		}
+		return store.VerifyArtifact(adoption.receiptSchemaVersion, adoption.key)
+	}
 	if adoption.snapshot {
 		return store.AdoptSnapshot(adoption.key)
 	}

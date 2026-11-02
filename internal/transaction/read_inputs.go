@@ -57,5 +57,10 @@ func validateReadInputs(journal *Journal) error {
 }
 
 func overlapsReadPath(a, b string) bool {
+	// Removal targets have no staged entry. An absent optional path has no
+	// namespace; treating it as a root would reject every absolute input.
+	if a == "" || b == "" {
+		return false
+	}
 	return a == b || strings.HasPrefix(a, b+string(filepath.Separator)) || strings.HasPrefix(b, a+string(filepath.Separator))
 }

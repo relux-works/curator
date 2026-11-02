@@ -10,8 +10,10 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // Private compilation holds the global project lock, leaves the home lock
@@ -61,12 +63,12 @@ func TestGlobalProfilePrivateStaging(t *testing.T) {
 			if mode == "cancel" {
 				builder.failOn["alpha"] = context.Canceled
 			}
-			result := Global(e.cfg, t.TempDir(), Options{Context: ctx, Build: deps, WithGlobalProfile: func(lock HomeLock, next func() Result) (Result, error) {
+			result := Global(e.cfg, t.TempDir(), Options{Context: ctx, Build: deps, PublishGlobalPlan: func(lock HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
 				if err := lock.AssertHeld(); err != nil {
 					t.Fatal(err)
 				}
 				published = true
-				return next(), nil
+				return publishStagingProfile(t, e, lock, stage)
 			}})
 			if mode == "success" {
 				if result.Status != "ok" || !published {
@@ -126,7 +128,7 @@ func TestGlobalProfileStagingAddition(t *testing.T) {
 			deps, _, cache, builder := newFakeDeps(t)
 			addition := &envprofile.DirectSkill{Name: "build-skill", Tag: "v1"}
 			result := Global(e.cfg, t.TempDir(), Options{Build: deps, GlobalAddition: addition,
-				WithGlobalProfile: func(_ HomeLock, next func() Result) (Result, error) {
+				PublishGlobalPlan: func(lock HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
 					if len(builder.calls) != 1 {
 						t.Fatal("prospective addition was not staged")
 					}
@@ -134,18 +136,19 @@ func TestGlobalProfileStagingAddition(t *testing.T) {
 					if err != nil || len(live.Skills) != 0 {
 						t.Fatalf("addition declaration published before private staging: %v", err)
 					}
-					if err := manifest.AddDecl(GlobalRoot(e.home), addition.Name, "tag", addition.Tag, "", ""); err != nil {
-						t.Fatal(err)
-					}
+
 					if diverged {
-						e.write(GlobalRoot(e.home), "Skillfile.json", `{"schema_version":1,"skills":[]}`)
+						e.write(GlobalRoot(e.home), "Skillfile.json", `{"schema_version":1,"skills":[],"agents":["codex_cli"]}`)
 					}
-					return next(), nil
+					return publishStagingProfile(t, e, lock, stage)
 				},
 			})
 			if diverged {
-				if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, " "), "differs from the staged addition") || len(cache.published) != 0 {
+				if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, " "), "declaration changed during publication planning") || len(cache.byCommand) != 0 || len(cache.reverted) != len(cache.published) {
 					t.Fatalf("divergent addition reached publication: %+v", result)
+				}
+				if _, err := os.Lstat(filepath.Join(GlobalRoot(e.home), "skills", addition.Name)); !os.IsNotExist(err) {
+					t.Fatalf("divergent declaration installed canonical skill: %v", err)
 				}
 			} else if result.Status != "ok" || len(cache.published) != 1 {
 				t.Fatalf("exact staged addition did not publish: %+v", result)
@@ -170,12 +173,12 @@ func TestGlobalProfileStagingRevalidatesDeclaration(t *testing.T) {
 			}
 			return nil
 		},
-		WithGlobalProfile: func(_ HomeLock, next func() Result) (Result, error) {
+		PublishGlobalPlan: func(lock HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
 			publications++
 			if stages != 2 {
 				t.Fatal("stale declaration reached profile publication before restart")
 			}
-			return next(), nil
+			return publishStagingProfile(t, e, lock, stage)
 		},
 	})
 	if result.Status != "ok" || stages != 2 || publications != 1 {
@@ -186,40 +189,47 @@ func TestGlobalProfileStagingRevalidatesDeclaration(t *testing.T) {
 	}
 }
 
-// A continuation's generation restart retries only after successful profile
-// compensation. A typed compensation failure terminates the first attempt and
-// remains visible in the result instead of being discarded by the retry loop.
-func TestGlobalProfileCompensationStopsRestart(t *testing.T) {
-	for _, fail := range []bool{false, true} {
-		t.Run(map[bool]string{false: "restored", true: "failed"}[fail], func(t *testing.T) {
-			e := newEnv(t)
-			e.buildSkill("build-skill", "alpha")
-			e.globalDeclare("build-skill")
-			deps, _, _, _ := newFakeDeps(t)
-			attempts := 0
-			result := Global(e.cfg, t.TempDir(), Options{Build: deps,
-				WithGlobalProfile: func(_ HomeLock, next func() Result) (Result, error) {
-					attempts++
-					if attempts == 1 {
-						e.write(GlobalRoot(e.home), "Skillfile.json", `{"schema_version":1,"skills":[]}`)
-					}
-					result := next()
-					if attempts == 1 && result.Status != "failed" {
-						t.Fatalf("generation restart was not exercised: %+v", result)
-					}
-					if fail {
-						return result, &envprofile.GlobalCompensationError{Cause: errors.New("planted surface conflict")}
-					}
-					return result, nil
-				},
-			})
-			if fail {
-				if attempts != 1 || result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "global profile compensation failed") {
-					t.Fatalf("compensation failure was retried or hidden: attempts=%d result=%+v", attempts, result)
-				}
-			} else if attempts != 2 || result.Status != "ok" {
-				t.Fatalf("successful compensation did not retry: attempts=%d result=%+v", attempts, result)
+// A joined publication refusal is final for that attempt. No arbitrary callback
+// may request an optimistic restart after profile state has already committed.
+// Actual rollback/substitution behavior is covered by joined owner tests; this
+// control checks propagation and single execution at the install boundary.
+func TestGlobalProfilePublicationRefusalStopsRestart(t *testing.T) {
+	e := newEnv(t)
+	e.buildSkill("build-skill", "alpha")
+	e.globalDeclare("build-skill")
+	deps, _, _, _ := newFakeDeps(t)
+	attempts := 0
+	result := Global(e.cfg, t.TempDir(), Options{Build: deps,
+		PublishGlobalPlan: func(lock HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
+			attempts++
+			if err := lock.AssertHeld(); err != nil {
+				t.Fatal(err)
 			}
-		})
+			return errors.New("joined publication fixture refusal")
+		},
+	})
+	if attempts != 1 || result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, ";"), "joined publication fixture refusal") {
+		t.Fatalf("publication refusal retried or hidden: attempts=%d result=%+v", attempts, result)
 	}
+	if _, err := os.Lstat(filepath.Join(GlobalRoot(e.home), "skills", "build-skill")); !os.IsNotExist(err) {
+		t.Fatalf("refusal installed canonical skill: %v", err)
+	}
+}
+
+// This delegates to the actual production profile planner and executor. Raw
+// native roots are owned empty fixture directories; no account lookup is used.
+// Local-only legacy skills have no profile Git member, so addition validation
+// is tested separately through the real Git-backed CLI owner controls.
+func publishStagingProfile(t *testing.T, e *env, lock HomeLock, stage func(envprofile.NativeSkillOwnership) (transaction.Plan, error)) error {
+	t.Helper()
+	native := t.TempDir()
+	resolve := func(id string) (string, error) {
+		path := filepath.Join(native, id)
+		if err := os.MkdirAll(path, 0700); err != nil {
+			return "", err
+		}
+		return path, nil
+	}
+	_, err := envprofile.PublishGlobalSkillPlanWithPlanner(e.home, envprofile.PolicyFromConfig(e.cfg), envregistry.DefaultMachineConfig(), nil, resolve, lock, stage)
+	return err
 }

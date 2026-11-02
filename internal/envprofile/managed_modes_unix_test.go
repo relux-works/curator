@@ -108,7 +108,10 @@ func TestManagedHomeRepairTightensDirectories(t *testing.T) {
 		t.Run(id, func(t *testing.T) {
 			fx := writeManagedFixture(t, "acme")
 			seedLiveNativeCredentials(t, fx)
-			fx.native[envregistry.Muse] = t.TempDir()
+			fx.native[envregistry.Muse] = filepath.Join(fx.xdg, "muse")
+			if err := os.MkdirAll(fx.native[envregistry.Muse], 0700); err != nil {
+				t.Fatal(err)
+			}
 			if err := os.WriteFile(filepath.Join(fx.native[envregistry.Muse], "auth.json"), []byte("synthetic-native\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +147,7 @@ func TestManagedHomeRepairTightensDirectories(t *testing.T) {
 			}
 			assertManagedMode(t, home, 0o755)
 			if _, err := Resolve(req); err != nil {
-				t.Fatal(err)
+				t.Fatalf("repair failed to restore private directories: %v", err)
 			}
 			for _, path := range paths {
 				assertManagedMode(t, path, 0o700)

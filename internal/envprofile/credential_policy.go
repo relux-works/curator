@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 )
@@ -49,11 +50,13 @@ type effectiveCredentialPolicy struct {
 // for one operation; a repair retry must not turn an observation failure into
 // an absence or a different backend.
 type credentialPolicyResolution struct {
-	profile     string
-	environment string
-	release     string
-	policy      *effectiveCredentialPolicy
-	err         error
+	profile        string
+	environment    string
+	release        string
+	originDigest   string
+	lifecycleEpoch string
+	policy         *effectiveCredentialPolicy
+	err            error
 }
 
 // credentialPolicyRelease respects the content verifier's observation boundary.
@@ -73,11 +76,15 @@ func (req *ResolveRequest) resolveCredentialPolicy(adapter envregistry.Adapter) 
 // resolveCredentialPolicyObserved uses supplied evidence, including unknown,
 // without discovering a tool. Cache entries never cross release observations.
 func (req *ResolveRequest) resolveCredentialPolicyObserved(adapter envregistry.Adapter, release string) (*effectiveCredentialPolicy, error) {
-	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release {
+	epoch, epochErr := envauthority.Epoch(req.Home)
+	if epochErr != nil {
+		return nil, epochErr
+	}
+	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release && cached.originDigest == req.originKey() && cached.lifecycleEpoch == epoch {
 		return cached.policy, cached.err
 	}
 	policy, err := req.computeCredentialPolicy(adapter, release)
-	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, policy: policy, err: err}
+	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, originDigest: req.originKey(), lifecycleEpoch: epoch, policy: policy, err: err}
 	return policy, err
 }
 
@@ -94,7 +101,7 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	}
 	var native string
 	if adapter.ID == envregistry.CodexCLI {
-		native, err = req.nativeHome(adapter.ID)
+		native, err = req.credentialNativeRoot(adapter.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +141,7 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 			return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
 		}
 		if native == "" && len(entries) > 0 {
-			native, err = req.nativeHome(adapter.ID)
+			native, err = req.credentialNativeRoot(adapter.ID)
 			if err != nil {
 				return nil, err
 			}

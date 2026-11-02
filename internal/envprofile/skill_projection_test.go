@@ -335,11 +335,11 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 				}
 				req.Repair = true
 				if _, err := Resolve(req); err != nil {
-					t.Fatalf("repair required takeover: %v", err)
+					t.Fatalf("repair failed to publish filtered projection: %v", err)
 				}
 				req.Repair = false
 				if _, err := Resolve(req); err != nil {
-					t.Fatal(err)
+					t.Fatalf("repair retained old copied skill: %v", err)
 				}
 				row, err = nativeSkillsState(fx.home, fx.profile, id, req.NativeHomeOf)
 				if err != nil || row == nil || row.State != "current" {
@@ -475,13 +475,15 @@ func TestProfileSkillProjectionMissingStore(t *testing.T) {
 	}
 }
 
-// A failure after the copied-tree transaction commits its target rolls back
+// Historical standalone entry oracle only; actual whole-home fallback is
+// exercised by TestProvisioningOriginFreshLinkFallback. A failure after the
+// copied-tree transaction commits its target rolls back
 // the entire old tree, including old excluded files; retry publishes exactly
 // the projected tree. The fault must fire on the real entry transaction.
 func TestSkillProjectionFallbackRollback(t *testing.T) {
 	home, source := gitFixtureHome(t), gitFixtureHome(t)
-	root := EnvRoot(home)
-	rel := "sample/codex_cli/skills/guide"
+	root := t.TempDir()
+	rel := "skills/guide"
 	old := t.TempDir()
 	writeGitFile(t, old, "SKILL.md", "old\n")
 	writeGitFile(t, old, ".research/notes.md", "old excluded\n")
@@ -502,7 +504,7 @@ func TestSkillProjectionFallbackRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = publishSkillFallback(op, root, rel, source)
+	err = legacyPublishSkillFallback(op, root, rel, source)
 	if closeErr := op.close(); closeErr != nil {
 		t.Fatal(closeErr)
 	}
@@ -521,7 +523,7 @@ func TestSkillProjectionFallbackRollback(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	if err := publishSkillFallback(op, root, rel, source); err != nil {
+	if err := legacyPublishSkillFallback(op, root, rel, source); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(projectionFiles(t, live), projectionFiles(t, source)) {

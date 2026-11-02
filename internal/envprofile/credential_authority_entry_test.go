@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
-// Every listed production entry refuses a schema-valid node home before any
+// Every listed production entry refuses node, legacy and unsafe-origin homes before any
 // observable recovery or mutation. A real prepared journal remains byte-identical
 // on refusal; entries marked as recovering complete that intent for per-home
 // controls. Other entries intentionally leave generic intent pending. The shared
@@ -68,10 +69,12 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 			req := fx.migrateRequest()
 			req.Profile, req.EnvID = fx.profile, envregistry.ClaudeCode
 			r, e := PlanMigration(req)
-			if e != nil {
-				t.Fatal(e)
+			// Still exercise Apply when common planning admission refuses. The
+			// caller-supplied hash cannot waive manager-wide authority.
+			req.Expect = strings.Repeat("a", 64)
+			if e == nil {
+				req.Expect = r.Hash
 			}
-			req.Expect = r.Hash
 			n := 0
 			req.transactionOptions = recoveryCounter(&n)
 			_, e = ApplyMigration(req)
@@ -127,14 +130,14 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			_, e = recoverMigrationJournal(fx.home, &operation{lock: lock, engine: engine}, nil, os.Symlink, os.Rename)
+			_, e = recoverMigrationJournal(fx.home, &operation{lock: lock, engine: engine}, nil)
 			return invocation{err: e}
 		}},
 		{"borrowed-global", false, func(t *testing.T, fx *managedFixture, _ string) invocation {
 			lock := authorityTestLock(t, fx.home)
 			defer func() { _ = lock.Close() }()
 			calls := 0
-			_, e := GlobalSkillTransaction(fx.home, Policy{}, envregistry.DefaultMachineConfig(), nil, fx.request(envregistry.ClaudeCode).NativeHomeOf, lock, func() error { calls++; return nil })
+			_, e := publishGlobalContinuationFixture(t, fx.home, fx.request(envregistry.ClaudeCode).NativeHomeOf, lock, &calls)
 			if e == nil && calls != 1 {
 				t.Error("per-home global continuation did not run")
 			}
@@ -189,16 +192,25 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 			_, e := Unmanage(UnmanageRequest{Home: fx.home, EnvID: envregistry.ClaudeCode, NativeHomeOf: fx.request(envregistry.ClaudeCode).NativeHomeOf})
 			return invocation{err: e}
 		}},
-		{"set-current", false, func(_ *testing.T, fx *managedFixture, _ string) invocation {
+		{"set-current", true, func(_ *testing.T, fx *managedFixture, _ string) invocation {
 			return invocation{err: SetCurrent(fx.home, "second")}
 		}},
-		{"set-scoped", false, func(_ *testing.T, fx *managedFixture, _ string) invocation {
+		{"set-scoped", true, func(_ *testing.T, fx *managedFixture, _ string) invocation {
 			return invocation{err: SetScoped(fx.home, "env:claude_code", "second", false)}
 		}},
 	}
 	for _, entry := range entries {
-		for _, node := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s/node=%v", entry.name, node), func(t *testing.T) {
+		for _, state := range []string{"node=true", "node=false", "legacy", "invalid-origin"} {
+			t.Run(entry.name+"/"+state, func(t *testing.T) {
+				node := state == "node=true"
+				refuse := state != "node=false"
+				code := envregistry.DiagCredentialInjectionUnavailable
+				if state == "legacy" {
+					code = envorigin.DiagRequired
+				}
+				if state == "invalid-origin" {
+					code = envorigin.DiagInvalid
+				}
 				fx, _, seed := claudeRepairFixture(t, envregistry.FormReferenced)
 				isolateAuthorityNativeHomes(t, fx)
 				if err := EnsureDefaultWithPolicy(fx.home, Policy{}); err != nil {
@@ -214,6 +226,29 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+				// The bulk owner has no account-injection transport. Provision its complete
+				// fixture set first through raw-evidence requests; bulk maintenance must use
+				// those records and must never consult the real account DB for a fixture pass.
+				if entry.name == "managed-sync" {
+					seedLiveNativeCredentials(t, fx)
+					for _, profile := range []string{fx.profile, DefaultProfile} {
+						copy := *fx
+						copy.profile = profile
+						for _, adapter := range envregistry.Registry {
+							if adapter.ID == envregistry.Muse {
+								continue
+							}
+							req := copy.request(adapter.ID)
+							req.Repair = true
+							if adapter.ID == envregistry.ClaudeCode {
+								req.Machine.Forms = map[string]string{adapter.ID: envregistry.FormReferenced}
+							}
+							if _, err := Resolve(req); err != nil {
+								t.Fatalf("synthetic bulk-owner setup %s/%s: %v", profile, adapter.ID, err)
+							}
+						}
+					}
+				}
 				// A stale context ensures Resolve --repair actually enters the operation.
 				if entry.name == "resolve-repair" {
 					if err := os.Remove(filepath.Join(filepath.Dir(seed), "CLAUDE.md")); err != nil {
@@ -223,13 +258,24 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 				target := filepath.Join(fx.home, "state", "authority-witness")
 				id := "authority-pending"
 				if entry.name == "migration-journal-recovery" {
-					if err := writeMigrationJournal(fx.home, &migrationJournal{Version: 1, Plan: strings.Repeat("a", 64), Complete: true}); err != nil {
+					if err := writeMigrationJournal(fx.home, &migrationJournal{Version: 1, Plan: strings.Repeat("a", 64), Complete: true, Ops: []migrationJournalOp{}, Markers: []migrationJournalMarker{}}); err != nil {
 						t.Fatal(err)
 					}
 				}
 				prepareAuthorityIntent(t, fx.home, id, target, []byte("recovered intent\n"))
 				if node {
 					writeNodeAuthorityMarker(t, fx)
+				}
+				originPath := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode), envorigin.Name)
+				if state == "legacy" {
+					if err := os.Remove(originPath); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if state == "invalid-origin" {
+					if err := os.Chmod(originPath, 0644); err != nil {
+						t.Fatal(err)
+					}
 				}
 				before := nativeSnapshot(t, fx.home)
 				nativeBefore := map[string]string{}
@@ -246,8 +292,8 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 				}
 				t.Cleanup(func() { newOperationEngine = newEngine })
 				result := entry.run(t, fx, id)
-				if node {
-					if result.err == nil || !strings.Contains(result.err.Error(), "credential_injection_unavailable:") {
+				if refuse {
+					if result.err == nil || !strings.Contains(result.err.Error(), code+":") {
 						t.Errorf("entry authority diagnostic: %v", result.err)
 					}
 					if sharedCalls != 0 || (result.counted && result.callbacks != 0) {
@@ -276,7 +322,7 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 					}
 				}
 				for env, path := range fx.native {
-					if node && nativeSnapshot(t, path) != nativeBefore[env] {
+					if refuse && nativeSnapshot(t, path) != nativeBefore[env] {
 						t.Error("entry authority refusal mutated native state")
 					}
 				}
@@ -293,6 +339,9 @@ func isolateAuthorityNativeHomes(t *testing.T, fx *managedFixture) {
 		path := fx.native[adapter.ID]
 		if adapter.ID == envregistry.OpenCode {
 			path = fx.xdg
+		}
+		if adapter.ID == envregistry.Pi {
+			path = filepath.Join(path, "agent")
 		}
 		if path == "" {
 			path = t.TempDir()

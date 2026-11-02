@@ -52,45 +52,6 @@ func (m *identityMigration) link(live, target string) error {
 	return nil
 }
 
-func (m *identityMigration) publish(op *operation) error {
-	plan := transaction.Plan{TransactionID: newTransactionID(), ProjectIdentity: "profile-hash-migration"}
-	paths := make([]string, 0, len(m.targets))
-	for path := range m.targets {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	for _, path := range paths {
-		digest, err := transaction.DigestTarget(transaction.KindEntry, path)
-		if err != nil {
-			return err
-		}
-		plan.Targets = append(plan.Targets, transaction.Target{Class: "profile-identity", Identifier: path, Kind: transaction.KindEntry, LivePath: path, StagedSource: m.targets[path], PreimageDigest: digest})
-	}
-	if _, err := op.engine.Prepare(op.lock, plan); err != nil {
-		return fmt.Errorf("prepare profile identity migration: %w", err)
-	}
-	if err := op.engine.Commit(op.lock, plan.TransactionID); err != nil {
-		return fmt.Errorf("publish profile identity migration: %w", err)
-	}
-	// Match ordinary profile-record publication: a copied entry inherits its
-	// live parent's DACL on Windows, regardless of its Unix permission bits.
-	for _, path := range paths {
-		if m.targets[path] == "" {
-			continue
-		}
-		info, err := os.Lstat(path)
-		if err != nil {
-			return err
-		}
-		if info.Mode().IsRegular() {
-			if err := privatedir.ProtectFile(path); err != nil {
-				return fmt.Errorf("protect migrated profile record %s: %w", path, err)
-			}
-		}
-	}
-	return nil
-}
-
 func markerHashVersion(marker *envmarker.Marker) hashing.Version {
 	if marker.Version == envmarker.VersionV3 || marker.Version == envmarker.VersionV7 {
 		return hashing.Version(marker.HashVersion) // #nosec G115 -- nonnegative int versions fit uint64; negative versions cannot alias v1 or v2
@@ -174,7 +135,7 @@ func identityMigrationInputs(req *MigrateRequest, profiles []string) (map[string
 // pinned snapshots, retaining unrelated metadata. Credential changes, when
 // supplied, join this same transaction rather than a separate marker rewrite.
 func prepareIdentityMigration(op *operation, req *ResolveRequest, profiles []string, report *MigrateReport) (_ *identityMigration, resultErr error) {
-	root, err := os.MkdirTemp("", "curator-identity-migration-*")
+	root, err := privatedir.TempStaging("", "curator-identity-migration-*")
 	if err != nil {
 		return nil, err
 	}
