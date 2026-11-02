@@ -186,7 +186,23 @@ curator project resolve  # resolve transitive dependencies for a project closure
 
 ```bash
 curator skill check  # validate a skill package directory against schemas
+curator skill validate-codex ./my-skill --json  # validate SKILL.md content
 ```
+
+`skill validate-codex` reads only the explicit directory's UTF-8 `SKILL.md`;
+it needs no machine configuration or package manifest and leaves inputs unchanged.
+It checks the required string name and description, supported frontmatter keys,
+name grammar and code-point limits, and unfinished TODO placeholders outside code
+fences. The name need not match the directory. This bounded check does not promise
+general YAML-validator equivalence or additional rules for empty strings,
+duplicate/non-string keys or optional-value types. `skill check` retains its
+existing package and policy checks.
+
+With `--json`, stdout contains one `codex-quick-validate-v1` object with
+`schema_version`, `contract`, `outcome` and `issues`. Valid inputs have an empty
+issues array; other results contain one issue code without input values or paths.
+Exit codes are 0 (valid), 1 (invalid content), 2 (invalid usage) and 3 (input I/O
+failure). Ordinary command help retains its normal text output.
 
 </details>
 
