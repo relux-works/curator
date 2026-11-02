@@ -139,7 +139,7 @@ func assertSanitized(t *testing.T, stderr string, forbidden ...string) {
 // TestDraftLiteralIgnoresGitSSHCommand is row (a): an ambient
 // GIT_SSH_COMMAND pointing at a script that would serve the evil
 // repository must not redirect the literal ssh:// clone. The lane fails
-// closed on the declared endpoint (no network to fixture.test) with the
+// closed on the declared endpoint with bounded SSH connection setup and the
 // evil script never invoked. Mutant "pass the ambient GIT_SSH_COMMAND
 // through" succeeds with the evil commit and is KILLED by the exit code,
 // the missing lock, and the invocation log.
@@ -190,7 +190,7 @@ func TestDraftLiteralIgnoresGitSSHCommand(t *testing.T) {
 	if strings.Contains(envSeen, evilSSH) {
 		t.Fatalf("git saw the ambient GIT_SSH_COMMAND:\n%s", envSeen)
 	}
-	if !strings.Contains(envSeen, "ssh -F ") || !strings.Contains(envSeen, "BatchMode=yes") {
+	if !strings.Contains(envSeen, "ssh -F ") || !strings.Contains(envSeen, "BatchMode=yes") || !strings.Contains(envSeen, "ConnectTimeout=15") {
 		t.Fatalf("git missed the pinned curator-owned command:\n%s", envSeen)
 	}
 	if probe, err := os.ReadFile(invokedLog); err == nil && len(probe) != 0 {
@@ -358,8 +358,8 @@ func writeFakeSSH(t *testing.T, fakeDir string) (argvLog string) {
 // (Host alias to an evil HostName plus a ProxyCommand) under a temp HOME
 // must not redirect the literal ssh:// clone. The lane runs the
 // curator-owned command (-F empty, ProxyCommand=none, host-key validation
-// never disabled) resolved through PATH, fails closed on the declared
-// endpoint, and never invokes the evil ProxyCommand. Mutants "drop -F"
+// never disabled, ConnectTimeout=15) resolved through PATH, fails closed on
+// the declared endpoint, and never invokes the evil ProxyCommand. Mutants "drop -F"
 // and "drop ProxyCommand=none" lose their argv markers and are KILLED;
 // "pass the ambient GIT_SSH_COMMAND through" bypasses the fake ssh and is
 // KILLED by its silence plus the evil invocation.
@@ -405,7 +405,7 @@ func TestDraftLiteralIgnoresUserSSHConfig(t *testing.T) {
 	if err != nil || len(argv) == 0 {
 		t.Fatalf("fake ssh was never invoked (argv log missing): %v", err)
 	}
-	for _, want := range []string{"<-F>", "<BatchMode=yes>", "<StrictHostKeyChecking=yes>", "<ProxyCommand=none>", "<ProxyJump=none>"} {
+	for _, want := range []string{"<-F>", "<BatchMode=yes>", "<ConnectTimeout=15>", "<StrictHostKeyChecking=yes>", "<ProxyCommand=none>", "<ProxyJump=none>"} {
 		if !strings.Contains(string(argv), want) {
 			t.Fatalf("ssh argv misses %s:\n%s", want, argv)
 		}

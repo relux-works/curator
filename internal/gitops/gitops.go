@@ -97,8 +97,11 @@ func isDraftAllowedEnv(name string) bool {
 // validation never disabled. Identities and known_hosts are deliberately
 // NOT pinned: the compiled-in defaults (~/.ssh/known_hosts, default
 // identity files) plus the agent stay in force.
+// Bound connection setup like the resolved transport; otherwise Apple's
+// Network.framework-backed ssh may wait indefinitely on an unreachable host.
 var draftSSHOptions = []string{
 	"BatchMode=yes",
+	"ConnectTimeout=15",
 	"StrictHostKeyChecking=yes",
 	"ProxyCommand=none",
 	"ProxyJump=none",
