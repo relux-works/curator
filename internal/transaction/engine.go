@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/relux-works/curator/internal/envauthority"
+	homeleasestate "github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/staging"
@@ -99,6 +100,9 @@ func (engine *Engine) Prepare(lock HomeLock, plan Plan) (*Journal, error) {
 
 	journal, _, err := engine.buildJournal(plan)
 	if err != nil {
+		return nil, err
+	}
+	if err := engine.guardHomeLeases(journal); err != nil {
 		return nil, err
 	}
 	if _, err := os.Lstat(engine.journalPath(journal.TransactionID)); err == nil {
@@ -311,6 +315,9 @@ func validateGenerationPath(path string) error {
 }
 
 func (engine *Engine) abortPreparation(journal *Journal, cause error) error {
+	if err := engine.guardHomeLeases(journal); err != nil {
+		return errors.Join(cause, err)
+	}
 	if journal.Phase == PhasePreparing {
 		if err := engine.discardPreparing(journal); err != nil {
 			return errors.Join(cause, err)
@@ -377,6 +384,16 @@ func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// Admission covers the complete recovery command before its first replay.
+	for _, id := range ids {
+		journal, err := engine.loadJournal(id)
+		if err != nil {
+			return false, err
+		}
+		if err := engine.guardHomeLeases(journal); err != nil {
+			return false, err
+		}
+	}
 	for _, id := range ids {
 		journal, err := engine.loadJournal(id)
 		if err != nil {
@@ -395,6 +412,9 @@ func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 }
 
 func (engine *Engine) resume(journal *Journal) error {
+	if err := engine.guardHomeLeases(journal); err != nil {
+		return err
+	}
 	switch journal.Phase {
 	case PhasePreparing:
 		return engine.discardPreparing(journal)
@@ -410,6 +430,9 @@ func (engine *Engine) resume(journal *Journal) error {
 }
 
 func (engine *Engine) commit(journal *Journal) error {
+	if err := engine.guardHomeLeases(journal); err != nil {
+		return err
+	}
 	if err := engine.checkCommit(journal); err != nil {
 		return engine.abortPreparation(journal, err)
 	}
@@ -421,6 +444,9 @@ func (engine *Engine) commit(journal *Journal) error {
 	}
 	for index := range journal.Targets {
 		if err := engine.commitTarget(journal, index); err != nil {
+			if guardErr := engine.guardHomeLeases(journal); guardErr != nil {
+				return errors.Join(err, guardErr)
+			}
 			journal.Phase = PhaseRollingBack
 			if saveErr := engine.saveJournal(journal); saveErr != nil {
 				return errors.Join(err, saveErr)
@@ -780,6 +806,9 @@ func verifyGenerationAt(target *TargetRecord, root string) error {
 }
 
 func (engine *Engine) rollback(journal *Journal) error {
+	if err := engine.guardHomeLeases(journal); err != nil {
+		return err
+	}
 	if journal.Phase != PhaseRollbackCleanup {
 		journal.Phase = PhaseRollingBack
 		if err := engine.saveJournal(journal); err != nil {
@@ -1180,6 +1209,35 @@ func (engine *Engine) checkCommit(journal *Journal) error {
 	}
 	snapshot := cloneJournal(journal)
 	return engine.commitCheck(engine.commitLock, *snapshot)
+}
+
+func (engine *Engine) guardHomeLeases(journal *Journal) error {
+	paths := make([]string, 0, len(journal.Targets)*4)
+	for _, target := range journal.Targets {
+		paths = append(paths, target.LivePath)
+		for _, path := range []string{target.BackupPath, target.StagedPath, target.RollbackPath} {
+			if path != "" {
+				paths = append(paths, path)
+			}
+		}
+	}
+	if journal.ProjectIdentity == "home-leases" {
+		targets := make([]homeleasestate.PublicationTarget, 0, len(journal.Targets))
+		for _, t := range journal.Targets {
+			targets = append(targets, homeleasestate.PublicationTarget{Live: t.LivePath, Class: t.Class, Identifier: t.Identifier, Kind: string(t.Kind), Private: t.PrivateFile, Desired: t.DesiredDigest, Preimage: t.PreimageDigest, Candidates: []string{t.StagedPath, t.LivePath, t.StagedSource}, Originals: []string{t.LivePath, t.BackupPath, t.RollbackPath}, AllPaths: []string{t.LivePath, t.StagedPath, t.StagedSource, t.BackupPath, t.RollbackPath}})
+		}
+		if err := homeleasestate.ValidatePublication(engine.home, string(journal.Phase), targets, func(path, want string) ([]byte, bool, error) {
+			got, err := DigestTarget(KindBytes, path)
+			if err != nil || got != want {
+				return nil, false, err
+			}
+			raw, err := homeleasestate.Read(engine.home, path)
+			return raw, err == nil, err
+		}); err != nil {
+			return err
+		}
+	}
+	return homeleasestate.GuardMutation(engine.home, engine.commitLock, journal.ProjectIdentity, paths)
 }
 
 // Ownership is independent of forward policy: a current owner may restore a

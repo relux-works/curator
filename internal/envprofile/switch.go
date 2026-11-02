@@ -167,7 +167,7 @@ func Use(home, name, environment, target string, clearScope bool) ([]EntryResult
 // UseWithPolicy switches under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
 func UseWithPolicy(home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseSelectionTargets(home, name, environment) })
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			// A scope-clear is one unlink under the held lock: crash
 			// before it retries the clear, crash after it has converged.
 			// It is not journaled as an absence target in this stage.
-			if err := SetScoped(home, scope, "", true); err != nil {
+			if err := setScopedDirect(op, home, scope, "", true); err != nil {
 				return results, err
 			}
 		} else if err := op.publish(map[string][]byte{filepath.Join(ScopedDir(home), scopeFileName(scope)): []byte(effective + "\n")}); err != nil {
@@ -392,11 +392,15 @@ func Sync(home string) ([]EntryResult, error) {
 // SyncWithPolicy syncs under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
 func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseSelectionTargets(home, "", "") })
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
+	return syncWithOperation(op, home, policy)
+}
+
+func syncWithOperation(op *operation, home string, policy Policy) ([]EntryResult, error) {
 	if err := preflightCurrentPathSources(home, policy); err != nil {
 		return nil, err
 	}
@@ -692,6 +696,9 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	native, err := resolveNativeHome(adapter, nativeHomeOf)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
+	}
+	if err := homeLeaseGuard(home, op.lock, []string{native}); err != nil {
+		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 	}
 	document, written, err := contextmaterialize.Monolithic(lock, hash, precedence, adapter.ID, packages)
 	if err != nil {

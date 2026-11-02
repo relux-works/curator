@@ -174,6 +174,13 @@ func identityMigrationInputs(req *MigrateRequest, profiles []string) (map[string
 // pinned snapshots, retaining unrelated metadata. Credential changes, when
 // supplied, join this same transaction rather than a separate marker rewrite.
 func prepareIdentityMigration(op *operation, req *ResolveRequest, profiles []string, report *MigrateReport) (_ *identityMigration, resultErr error) {
+	var leaseTargets []string
+	for _, profile := range profiles {
+		leaseTargets = append(leaseTargets, homeLeaseProfileTargets(req.Home, profile, "")...)
+	}
+	if err := homeLeaseGuard(req.Home, op.lock, leaseTargets); err != nil {
+		return nil, err
+	}
 	root, err := os.MkdirTemp("", "curator-identity-migration-*")
 	if err != nil {
 		return nil, err

@@ -1,7 +1,9 @@
 package envprofile
 
 import (
+	"fmt"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testhomeguard"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,13 +53,22 @@ func TestMain(m *testing.M) {
 	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
 		os.Exit(runMissingPinGit())
 	}
+	if code, parent := testhomeguard.Supervise(false); parent {
+		os.Exit(code)
+	}
 	dir, err := os.MkdirTemp("", "curator-test-noconfig-*")
 	if err == nil {
 		// Never created: the loader maps an absent file to an empty policy.
 		_ = os.Setenv("CURATOR_CONFIG", filepath.Join(dir, "config.json"))
 		_ = os.Setenv("CURATOR_SYSTEM_CONFIG", "")
 	}
+	previousHome, _ := os.UserHomeDir()
 	restoreGitEnv := testgitenv.Isolate()
+	if err := testhomeguard.CheckIsolation(previousHome); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		restoreGitEnv()
+		os.Exit(2)
+	}
 	code := m.Run()
 	restoreGitEnv()
 	os.Exit(code)

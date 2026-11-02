@@ -9,12 +9,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/homelease/persistence"
+	homeleasestate "github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
-	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
@@ -236,6 +236,13 @@ func (m *Manager) locked(ctx context.Context, fn func(*ledger, *managerlock.Home
 	return fn(l, lock, engine)
 }
 func (m *Manager) publish(l *ledger, lock *managerlock.HomeLock, engine *transaction.Engine, files map[string][]byte, removals []string) error {
+	targets := append([]string{}, removals...)
+	for path := range files {
+		targets = append(targets, path)
+	}
+	if err := homeleasestate.GuardMutation(m.home, lock, "project-leases", targets); err != nil {
+		return err
+	}
 	raw, err := canonical(l)
 	if err != nil {
 		return err
@@ -244,72 +251,20 @@ func (m *Manager) publish(l *ledger, lock *managerlock.HomeLock, engine *transac
 		return fmt.Errorf("project lease state exceeds record limit")
 	}
 	files[statePath(m.home)] = raw
-	if err = checkedRoute(m.home, statePath(m.home)); err != nil {
-		return err
-	}
-	if err = privatedir.MakeAll(filepath.Dir(statePath(m.home))); err != nil {
-		return err
-	}
-	plan := transaction.Plan{TransactionID: "project-lease-" + nonce(), ProjectIdentity: "project-leases"}
-	paths := make([]string, 0, len(files)+len(removals))
-	for p := range files {
-		paths = append(paths, p)
-	}
-	paths = append(paths, removals...)
-	sort.Strings(paths)
-	temps := []string{}
-	defer func() {
-		for _, p := range temps {
-			_ = os.Remove(p)
-		}
-	}()
-	for i, path := range paths {
-		if i > 0 && paths[i-1] == path {
-			return fmt.Errorf("duplicate project lease transaction target")
-		}
-		if err = checkedRoute(m.home, path); err != nil {
-			return err
-		}
-		if err = privatedir.MakeAll(filepath.Dir(path)); err != nil {
-			return err
-		}
-		pre, er := transaction.DigestTarget(transaction.KindBytes, path)
-		if er != nil {
-			return er
-		}
-		t := transaction.Target{Class: "project-lease", Identifier: path, LivePath: path, PreimageDigest: pre}
-		if payload, ok := files[path]; ok {
-			f, er := privatedir.CreateTemp(filepath.Dir(statePath(m.home)), "stage-*")
-			if er != nil {
-				return er
-			}
-			temps = append(temps, f.Name())
+	return persistence.Publish(persistence.Publication{
+		Home: m.home, StageDir: filepath.Dir(statePath(m.home)), TransactionID: "project-lease-" + nonce(),
+		Owner: "project-leases", Class: "project-lease", Files: files, Removals: removals, Route: checkedRoute,
+		Mode: func(path string) os.FileMode {
 			if strings.HasPrefix(path, filepath.Join(m.home, "environments", "project-views")+string(filepath.Separator)) {
 				for _, v := range l.Views {
-					if rel, e := filepath.Rel(filepath.Join(m.home, homeRelative(v.Composition)), path); e == nil {
+					if rel, err := filepath.Rel(filepath.Join(m.home, homeRelative(v.Composition)), path); err == nil {
 						if surface, ok := v.Surfaces[filepath.ToSlash(rel)]; ok {
-							if e = f.Chmod(os.FileMode(surface.Mode)); e != nil {
-								_ = f.Close()
-								return e
-							}
+							return os.FileMode(surface.Mode)
 						}
 					}
 				}
 			}
-			_, er = f.Write(payload)
-			er = errors.Join(er, f.Close())
-			if er != nil {
-				return er
-			}
-			t.StagedSource = f.Name()
-		}
-		plan.Targets = append(plan.Targets, t)
-	}
-	if err = lock.AssertCurrent(); err != nil {
-		return err
-	}
-	if _, err = engine.Prepare(lock, plan); err != nil {
-		return err
-	}
-	return engine.Commit(lock, plan.TransactionID)
+			return 0
+		},
+	}, lock, engine)
 }

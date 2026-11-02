@@ -160,10 +160,10 @@ func TestNativeCommandDiagnosticProcess(_ *testing.T) {
 	}
 	ready := os.NewFile(3, "diagnostic-ready")
 	if ready == nil {
-		os.Exit(94)
+		exitGuardedTests(94)
 	}
 	if _, err := ready.Write([]byte{1}); err != nil {
-		os.Exit(94)
+		exitGuardedTests(94)
 	}
 	_ = ready.Close()
 	if os.Getenv("CURATOR_NATIVE_DIAGNOSTIC_BLOCK") == "1" {

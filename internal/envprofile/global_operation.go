@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/stateread"
@@ -38,6 +39,9 @@ func GlobalSkillTransaction(home string, policy Policy, machine envregistry.Mach
 	if addition != nil && (addition.Name == "" || addition.Git == "" || (addition.Tag == "") == (addition.Revision == "")) {
 		return Info{}, fmt.Errorf("%s: global add requires a skill name, Git source, and exactly one of tag or revision", DiagRefConflict)
 	}
+	if err := homeLeaseGuard(home, lock, nil); err != nil {
+		return Info{}, err
+	}
 	engine, err := transaction.New(home)
 	if err != nil {
 		return Info{}, err
@@ -50,6 +54,10 @@ func GlobalSkillTransaction(home string, policy Policy, machine envregistry.Mach
 		}
 		// Only a profile-phase in-place unmanaged conflict qualifies for retaining
 		// the extended lock. A later legacy refusal never inherits this exception.
+		if err := homeLeaseGuardUndo(op); err != nil {
+			resultErr = errors.Join(resultErr, &GlobalCompensationError{Cause: err})
+			return
+		}
 		if err := op.undo.restore(); err != nil {
 			resultErr = errors.Join(resultErr, &GlobalCompensationError{Cause: err})
 			return
@@ -104,6 +112,13 @@ func GlobalSkillTransaction(home string, policy Policy, machine envregistry.Mach
 }
 
 type borrowedGlobalLock struct{ transaction.HomeLock }
+
+func (lock borrowedGlobalLock) Held() managerlock.Held {
+	if witness, ok := lock.HomeLock.(interface{ Held() managerlock.Held }); ok {
+		return witness.Held()
+	}
+	return managerlock.Held{}
+}
 
 func (borrowedGlobalLock) Close() error { return nil }
 func (lock borrowedGlobalLock) AssertCurrent() error {
