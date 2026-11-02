@@ -466,7 +466,8 @@ func TestIsolatedGitEnvWindowsCaseHonoursAllowed(t *testing.T) {
 
 // TestIsolatedGitEnvSSHCommand pins the curator-owned ssh command: -F with
 // a fresh empty config, BatchMode, host-key validation never disabled, and
-// ProxyCommand/Jump none. Dropping -F or ProxyCommand=none must fail.
+// ProxyCommand/Jump none, and a 15-second connection setup timeout. Dropping
+// -F, ProxyCommand=none or ConnectTimeout=15 must fail.
 func TestIsolatedGitEnvSSHCommand(t *testing.T) {
 	t.Setenv("GIT_SSH", "/tmp/evil-ssh")
 	t.Setenv("GIT_SSH_COMMAND", "/tmp/evil-ssh-command")
@@ -489,7 +490,7 @@ func TestIsolatedGitEnvSSHCommand(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"ssh -F ", "BatchMode=yes", "StrictHostKeyChecking=yes",
+		"ssh -F ", "BatchMode=yes", "ConnectTimeout=15", "StrictHostKeyChecking=yes",
 		"ProxyCommand=none", "ProxyJump=none", "PermitLocalCommand=no",
 		"ForwardAgent=no", "ClearAllForwardings=yes", "RequestTTY=no",
 		"CanonicalizeHostname=no", "UpdateHostKeys=no", "ConnectionAttempts=1",
