@@ -197,6 +197,8 @@ fences. The name need not match the directory. This bounded check does not promi
 general YAML-validator equivalence or additional rules for empty strings,
 duplicate/non-string keys or optional-value types. `skill check` retains its
 existing package and policy checks.
+Only exact `---` delimiter lines and LF/CRLF body line boundaries are covered;
+other delimiter spellings and line separators remain outside this version.
 
 With `--json`, stdout contains one `codex-quick-validate-v1` object with
 `schema_version`, `contract`, `outcome` and `issues`. Valid inputs have an empty
