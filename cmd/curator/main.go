@@ -79,6 +79,7 @@ Commands:
   list                     configured projects and declared skills
   project <subcommand>     add | resolve | refresh
   skill check <dir>        validate one skill package (--locale, --json)
+  skill validate-codex <dir> validate Codex SKILL.md content (--json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | adopt <command> [--dry-run] | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
   env <subcommand>         resolve | status | config | migrate | unmanage (see env resolve -h)
@@ -283,6 +284,16 @@ func (c cli) run(args []string) int {
 		return exitUsage
 	}
 	if rejectsTakeover(args) {
+		if len(args) > 1 && args[0] == "skill" && args[1] == "validate-codex" && !hasHelpFlag(args[2:]) {
+			for _, arg := range args[2:] {
+				if arg == "--" {
+					break
+				}
+				if arg == "--json" {
+					return c.cmdSkillValidateCodex(args[2:])
+				}
+			}
+		}
 		_, _ = fmt.Fprintln(c.stderr, "curator: --takeover applies only with --repair for env resolve; also available for profile install --use, profile use, profile sync, and profile update")
 		return exitUsage
 	}

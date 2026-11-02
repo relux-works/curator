@@ -45,9 +45,13 @@ var commandRegistry = []commandSpec{
 		if len(args) > 0 && args[0] == "check" {
 			return c.cmdSkillCheck(args[1:])
 		}
+		if len(args) > 0 && args[0] == "validate-codex" {
+			return c.cmdSkillValidateCodex(args[1:])
+		}
 		return c.runProvider(append([]string{"skill"}, args...))
 	}},
 	{"skill check", "<dir> [--locale <locale>] [--json]", "Validate one skill package.", "", nil},
+	{"skill validate-codex", "<dir> [--json]", "Validate Codex SKILL.md content without loading machine or package manifests.", "Exit codes: 0 valid, 1 invalid content, 2 invalid usage, 3 unreadable input.\nJSON returns codex-quick-validate-v1 with a stable outcome and at most one issue code.\n", nil},
 	{"global", "<init|add|remove|list|status|install|adopt|update|upgrade> [arguments]", "Manage machine-wide skill installations.", globalHelp, cli.cmdGlobal},
 	{"global init", "", "Create the global Skillfile.json and managed directories.", "", nil},
 	{"global add", "<name> [--git <url>] [--branch <ref>] [--tag <ref>] [--revision <ref>] [--source <dir>]", "Add a global skill declaration and install it.", "", nil},
