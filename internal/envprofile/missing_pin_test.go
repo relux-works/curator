@@ -269,9 +269,10 @@ func TestReinstallMissingDependencyPin(t *testing.T) {
 				}
 			}
 			pin := f.pin
-			if mode == "malformed" {
+			switch mode {
+			case "malformed":
 				pin = "not-a-pin"
-			} else if mode == "non-commit" {
+			case "non-commit":
 				pin = fixtureGitOutput(t, f.cache, "rev-parse", "HEAD:context/a.md")
 			}
 			if mode == "corrupt" {
