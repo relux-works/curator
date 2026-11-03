@@ -124,7 +124,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 		if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {
 			object["security_posture"] = config.SecurityPosturePermissive
 		}
-		if schema, _ := object["schema_version"].(float64); schema != float64(config.SchemaVersion7) {
+		if schema, _ := object["schema_version"].(float64); schema != float64(config.SchemaVersion7) && schema != float64(config.SchemaVersion8) {
 			object["schema_version"] = float64(config.SchemaVersion5)
 		}
 	} else if schema, _ := object["schema_version"].(float64); schema == float64(config.SchemaVersion) {

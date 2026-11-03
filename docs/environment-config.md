@@ -40,7 +40,7 @@ curator env config unset credential_store.example.codex
 
 Values are exactly `native`, `file`, or `keychain`; absent entries mean
 `native`. Set promotes older supported machine files to schema 5 and preserves an
-existing schema 7; unset leaves the current version in place. The persisted member is `environments.credential_store`,
+existing schema 7 or 8; unset leaves the current version in place. The persisted member is `environments.credential_store`,
 a profile map of canonical environment IDs (`claude_code`, `codex_cli`,
 `muse`, `pi`, `opencode`). CLI environment positions also accept `claude`
 and `codex`. Profile names are preserved, including internal dots: in
@@ -450,3 +450,37 @@ backend. `curator config launcher` exports the narrow typed projection, includin
 the selected source path. Consumers must independently enforce the selected
 launch policy. Older binaries reject schema 7 with a newer-tool requirement;
 there is no silent downgrade or fallback to an older envelope.
+
+### Host notification metadata (schema 8)
+
+Schema 8 preserves schema 7's existing fields and adds one optional
+`extensions.notification` selection. Its metadata export is the closed
+`curator.launcher-config/2` transport. Older configuration schemas keep exporting
+`curator.launcher-config/1` and cannot carry this selection.
+
+No notification member leaves notification disabled. The explicit disabled form
+is exactly `{"backend":"off"}`. A Host selection has exactly these four fields:
+
+```json
+{
+  "backend": "host",
+  "contract": "curator-host-notification/1",
+  "workflow_reference": "host-notification-inbox-v1",
+  "workflow_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+```
+
+The digest above is illustrative. An actual selection must identify its admitted
+immutable workflow bytes: a 1–128 byte reference containing ASCII letters,
+digits or `._:/@+-`, and a lowercase 64-character SHA-256 digest. Unknown,
+missing, duplicate, null, wrongly typed and mixed-variant fields refuse. Neither
+variant accepts endpoints, executable/argument selections, credentials or
+arbitrary environment fields.
+
+These are selection references, not authorization or proof of enrollment.
+Core only validates and exports them. The selected launcher and manager must
+independently validate their matching capability, admitted workflow, member and
+continuing attachment lifetime. A syntactically valid selection cannot enable a
+legacy fallback. Ordinary environment and credential-store edits preserve
+schema 8 and all existing selections. The machine-only source boundary applies
+equally to this selection; system policy cannot supply or lock it.
