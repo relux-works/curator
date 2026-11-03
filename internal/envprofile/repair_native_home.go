@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // A repair may seed from a native home only when its physical location is
@@ -15,6 +17,23 @@ func (req *ResolveRequest) validateRepairNativeHome(adapter envregistry.Adapter)
 	native, err := req.nativeHome(adapter.ID)
 	if err != nil {
 		return err
+	}
+	if runtime.GOOS == "windows" {
+		// Windows private-root creation requires an exact directory entry,
+		// rather than a root link. Preserve that admission before publication.
+		state, err := stateread.Lstat(native)
+		if err != nil {
+			return fmt.Errorf("%s: native home cannot be inspected: %w", envregistry.DiagCredentialConflict, err)
+		}
+		switch state.Kind {
+		case stateread.KindAbsent:
+		case stateread.KindPresent:
+			if state.Info == nil || !state.Info.IsDir() {
+				return fmt.Errorf("%s: native home must be a direct directory on Windows", envregistry.DiagCredentialConflict)
+			}
+		default:
+			return fmt.Errorf("%s: native home has unusable read state %q", envregistry.DiagCredentialConflict, state.Kind)
+		}
 	}
 	native, err = repairDirectoryLocation(native)
 	if err != nil {
@@ -46,6 +65,13 @@ func repairDirectoryLocation(path string) (string, error) {
 	for {
 		resolved, err := filepath.EvalSymlinks(path)
 		if err == nil {
+			state, statErr := stateread.Stat(resolved)
+			if statErr != nil {
+				return "", statErr
+			}
+			if state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.IsDir() {
+				return "", fmt.Errorf("directory location %s is not a readable directory", path)
+			}
 			for i := len(suffix) - 1; i >= 0; i-- {
 				resolved = filepath.Join(resolved, suffix[i])
 			}
@@ -54,12 +80,12 @@ func repairDirectoryLocation(path string) (string, error) {
 		if !os.IsNotExist(err) {
 			return "", err
 		}
-		info, statErr := os.Lstat(path)
-		if statErr == nil && info.Mode()&os.ModeSymlink != 0 {
-			return "", fmt.Errorf("symbolic link location %s is unresolved", path)
-		}
-		if statErr != nil && !os.IsNotExist(statErr) {
+		state, statErr := stateread.Lstat(path)
+		if statErr != nil {
 			return "", statErr
+		}
+		if state.Kind != stateread.KindAbsent {
+			return "", fmt.Errorf("directory location %s is unresolved or changed", path)
 		}
 		parent := filepath.Dir(path)
 		if parent == path {

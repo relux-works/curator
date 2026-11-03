@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -170,11 +171,12 @@ func TestRepairCredentialRefusalBeforePublicWrites(t *testing.T) {
 	}
 }
 
-// Physical inside aliases refuse; a real external alias, missing ordinary
-// external home and sibling sharing the root's text prefix remain legitimate.
+// Inside/broken aliases and non-directory ancestors refuse without public
+// writes. External aliases work on Unix; Windows preserves its direct private
+// root requirement. Ordinary missing homes and prefix siblings remain valid.
 func TestRepairNativeHomeLocationCompatibility(t *testing.T) {
 	requireLinkCapability(t)
-	for _, form := range []string{"inside-alias", "broken-inside-alias", "outside-alias", "outside-missing", "prefix-neighbor"} {
+	for _, form := range []string{"inside-alias", "broken-inside-alias", "outside-alias", "outside-missing", "prefix-neighbor", "outside-file", "file-ancestor", "broken-outside-ancestor"} {
 		t.Run(form, func(t *testing.T) {
 			fx := writeManagedFixture(t, "sample")
 			seedLiveNativeCredentials(t, fx)
@@ -193,12 +195,29 @@ func TestRepairNativeHomeLocationCompatibility(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "outside-alias":
+				refuse = runtime.GOOS == "windows"
 				native = filepath.Join(t.TempDir(), "native")
 				if err := os.Symlink(fx.native[envregistry.CodexCLI], native); err != nil {
 					t.Fatal(err)
 				}
 			case "outside-missing":
 				native = filepath.Join(t.TempDir(), "missing", "native")
+			case "outside-file", "file-ancestor":
+				refuse = true
+				native = filepath.Join(t.TempDir(), "file")
+				if err := os.WriteFile(native, []byte("synthetic non-directory\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if form == "file-ancestor" {
+					native = filepath.Join(native, "native")
+				}
+			case "broken-outside-ancestor":
+				refuse = true
+				parent := filepath.Join(t.TempDir(), "broken")
+				if err := os.Symlink(filepath.Join(t.TempDir(), "missing"), parent); err != nil {
+					t.Fatal(err)
+				}
+				native = filepath.Join(parent, "native")
 			case "prefix-neighbor":
 				native = EnvRoot(fx.home) + "-native"
 				if err := os.MkdirAll(native, 0o700); err != nil {
@@ -228,6 +247,57 @@ func TestRepairNativeHomeLocationCompatibility(t *testing.T) {
 					t.Fatalf("legitimate native location refused: %v", err)
 				}
 				readManagedMarker(t, fx, envregistry.CodexCLI)
+			}
+		})
+	}
+}
+
+// Physical resolution allows real directory aliases and ordinary missing
+// suffixes, independently of the platform's later native-root admission.
+// Existing files and unreadable ancestor shapes must never become absence.
+func TestRepairDirectoryLocationKinds(t *testing.T) {
+	requireLinkCapability(t)
+	root := t.TempDir()
+	directory := filepath.Join(root, "directory")
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(root, "alias")
+	if err := os.Symlink(directory, alias); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(root, "file")
+	if err := os.WriteFile(file, []byte("synthetic non-directory\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	broken := filepath.Join(root, "broken")
+	if err := os.Symlink(filepath.Join(root, "absent"), broken); err != nil {
+		t.Fatal(err)
+	}
+	physical, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, path, want string
+	}{
+		{"directory", directory, physical},
+		{"alias", alias, physical},
+		{"missing", filepath.Join(alias, "missing", "native"), filepath.Join(physical, "missing", "native")},
+		{"file", file, ""},
+		{"file-ancestor", filepath.Join(file, "native"), ""},
+		{"broken-ancestor", filepath.Join(broken, "native"), ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := repairDirectoryLocation(tc.path)
+			if tc.want == "" {
+				if err == nil || got != "" {
+					t.Fatalf("non-directory location must refuse, got %q, %v", got, err)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("directory location = %q, %v; want %q", got, err, tc.want)
 			}
 		})
 	}
