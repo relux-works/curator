@@ -863,8 +863,9 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if manager == nil {
 		manager = newGitManager(home).withPolicy(options.Policy)
 	}
-	// Only new installs acquire absent exact dependency pins. Reinstall,
-	// update and pinned Resolve/repair retain their existing fetch contracts.
+	// New installs acquire absent exact dependency pins. Explicit path
+	// reinstalls enable the same operation-local behavior below; update and
+	// pinned Resolve/repair retain their existing fetch contracts.
 	// This manager is operation-local and the Install operation lock is held.
 	manager.missingPins = make(map[string]bool)
 	// Machine overlays join the closure beside the root and resolve jointly
@@ -974,6 +975,10 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err := fetchLockedSources(manager, oldLock); err != nil {
 		return Info{}, false, false, err
 	}
+	// The fresh path snapshot may declare an exact dependency absent from a
+	// warm clone outside the old accepted closure. Reuse install's bounded
+	// acquisition before resolving that snapshot, under this operation lock.
+	manager.missingPins = make(map[string]bool)
 	overlays, err := resolveOverlays(home, manager, name, policy)
 	if err != nil {
 		return Info{}, false, false, err

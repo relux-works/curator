@@ -202,6 +202,195 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 	}
 }
 
+// The real same-name Install path refreshes a mutable root, while Update keeps
+// its accepted immutable snapshot. Only synthetic repositories/homes are used.
+// Each rejection checks its specific cause and preserves the accepted target,
+// unrelated cache, current selection and native surfaces; acquired objects are
+// allowed to remain outside that accepted closure after a later audit failure.
+func TestReinstallMissingDependencyPin(t *testing.T) {
+	for _, mode := range []string{"warm", "cached", "ssh-origin", "ssh-fetch-failure", "ssh-forbidden-rewrite", "prior-audit-failure", "audit-after-fetch", "still-absent", "probe-failure", "corrupt", "non-commit", "malformed", "forbidden-source", "denied"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newPinTransportFixture(t)
+			declaration, err := os.ReadFile(filepath.Join(f.root, "agent-context.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeManifestPackage(t, f.root, `{"schema_version":1,"name":"review-transport-root","version":"1.0.0"}`, nil)
+			original, _, _, err := Install(f.home, InstallOptions{Operand: f.root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := original.Lock.Find(contextlock.KindContext, "dep"); ok {
+				t.Fatal("fixture dependency is already in the accepted closure")
+			}
+			beforeTarget := hashTreeForTest(t, ProfileDir(f.home, original.Name))
+			manager := newGitManager(f.home)
+			if mode == "prior-audit-failure" {
+				// A prior refused install leaves this warm cache outside the
+				// accepted closure. Its cached pin needs no acquisition.
+				oldPin := fixtureGitOutput(t, f.cache, "rev-parse", "HEAD")
+				prior := strings.Replace(string(declaration), f.pin, oldPin, 1)
+				writeManifestPackage(t, f.root, prior, nil)
+				previous := canaryPasses
+				canaryPasses = func() bool { return false }
+				_, _, _, priorErr := Install(f.home, InstallOptions{Operand: f.root})
+				canaryPasses = previous
+				if priorErr == nil || !strings.Contains(priorErr.Error(), "audit canary failed") {
+					t.Fatalf("prior audit refusal: %v", priorErr)
+				}
+				if hashTreeForTest(t, ProfileDir(f.home, original.Name)) != beforeTarget {
+					t.Fatal("prior audit refusal changed accepted target")
+				}
+			}
+			if mode == "cached" {
+				if err := manager.fetch(f.source); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(f.cache, ".git", "FETCH_HEAD"), []byte("keep fetch metadata\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertPinTransportMissing(t, f.cache, f.pin)
+			}
+			wantOrigin := fixtureGitOutput(t, f.cache, "config", "--get", "remote.origin.url")
+			if mode == "ssh-origin" || mode == "ssh-fetch-failure" || mode == "ssh-forbidden-rewrite" {
+				// Same canonical source, different transport spelling: the
+				// cache keeps its SSH origin despite the HTTPS declaration.
+				wantOrigin = "git@example.com:review-transport"
+				f.selectRemote(t, wantOrigin, false)
+				if mode != "ssh-forbidden-rewrite" {
+					f.configureHelper(t, mode == "ssh-fetch-failure")
+					t.Setenv("GIT_SSH_COMMAND", "'"+strings.ReplaceAll(filepath.ToSlash(f.helper), "'", "'\\''")+"'")
+					t.Setenv("GIT_SSH_VARIANT", "ssh")
+				} else {
+					gitRun(t, f.cache, "config", "--file", f.ids.path, "url.fd::99.insteadOf", wantOrigin)
+					gitRun(t, f.cache, "config", "protocol.fd.allow", "always")
+					t.Setenv("GIT_ALLOW_PROTOCOL", gitops.AllowedProtocols+":fd")
+				}
+			}
+			pin := f.pin
+			if mode == "malformed" {
+				pin = "not-a-pin"
+			} else if mode == "non-commit" {
+				pin = fixtureGitOutput(t, f.cache, "rev-parse", "HEAD:context/a.md")
+			}
+			if mode == "corrupt" {
+				object := filepath.Join(f.cache, ".git", "objects", pin[:2], pin[2:])
+				if err := os.MkdirAll(filepath.Dir(object), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(object, []byte("corrupt fixture object\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			freshDeclaration := strings.Replace(string(declaration), f.pin, pin, 1)
+			if mode == "forbidden-source" {
+				freshDeclaration = strings.Replace(freshDeclaration, f.operand, "file:///forbidden-source", 1)
+			}
+			writeManifestPackage(t, f.root, freshDeclaration, nil)
+			trace := filepath.Join(t.TempDir(), "reinstall-git-trace")
+			t.Setenv("GIT_TRACE", trace)
+			updated, moved, err := UpdateWithPolicy(f.home, original.Name, Policy{})
+			if err != nil || moved || updated.LockHash != original.LockHash {
+				t.Fatalf("update adopted mutable declaration: moved=%v error=%v", moved, err)
+			}
+			updateTrace, err := os.ReadFile(trace)
+			if err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(updateTrace), "built-in: git fetch ") || strings.Contains(string(updateTrace), "built-in: git clone ") {
+				t.Fatal("immutable update acquired newly declared source")
+			}
+			if err := os.WriteFile(trace, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "still-absent" || mode == "probe-failure" {
+				installMissingPinGit(t, mode, trace)
+			}
+			policy := Policy{}
+			if mode == "denied" {
+				policy.AllowedSources = []string{"example.com/other"}
+			}
+			if mode == "audit-after-fetch" {
+				previous := canaryPasses
+				canaryPasses = func() bool { return false }
+				t.Cleanup(func() { canaryPasses = previous })
+			}
+			refs := fixtureGitOutput(t, f.cache, "show-ref")
+			info, activated, isUpdated, installErr := Install(f.home, InstallOptions{Operand: f.root, Policy: policy})
+			raw, err := os.ReadFile(trace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantFetches := 1
+			if mode == "cached" || mode == "malformed" || mode == "non-commit" || mode == "probe-failure" || mode == "corrupt" || mode == "forbidden-source" || mode == "denied" {
+				wantFetches = 0
+			}
+			// Count first: a bounded retry plant must fail for duplication,
+			// rather than for the observer's emergency second-attempt exit.
+			if n := strings.Count(string(raw), "built-in: git fetch "); n != wantFetches {
+				t.Fatalf("exact acquisition count %d, want %d; install error: %v", n, wantFetches, installErr)
+			}
+			if strings.Contains(string(raw), "built-in: git clone ") {
+				t.Fatal("warm reinstall cloned an unrelated or replacement source")
+			}
+			if wantFetches == 1 && mode != "still-absent" {
+				want := "built-in: git fetch --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin " + pin
+				if !strings.Contains(string(raw), want) {
+					t.Fatal("acquisition did not use the exact no-ref/no-submodule command")
+				}
+			}
+			success := mode == "warm" || mode == "cached" || mode == "ssh-origin" || mode == "prior-audit-failure"
+			if success {
+				if installErr != nil || activated || !isUpdated {
+					t.Fatalf("same-name reinstall: activated=%v updated=%v error=%v", activated, isUpdated, installErr)
+				}
+				member, ok := info.Lock.Find(contextlock.KindContext, "dep")
+				if !ok || member.Commit != pin || member.Source != f.source || info.LockHash == original.LockHash {
+					t.Fatalf("wrong acquired closure member: %+v", member)
+				}
+				payload, err := os.ReadFile(filepath.Join(contextstore.EntryDir(f.home, member.Kind, member.Name, member.PinKey()), "context", "a.md"))
+				if err != nil || string(payload) != pinTransportBytes {
+					t.Fatalf("pinned bytes = %q, error %v", payload, err)
+				}
+			} else {
+				reason := map[string]string{
+					"ssh-fetch-failure": "fetch exact pin", "forbidden-source": "file:// git sources carry no network identity and are not accepted", "corrupt": "inspect pinned object",
+					"ssh-forbidden-rewrite": "transport 'fd' not allowed", "audit-after-fetch": "audit canary failed",
+					"still-absent": "remains unavailable after acquisition", "probe-failure": "inspect pinned object",
+					"non-commit": "not an available commit", "malformed": "revision is not a full lowercase commit", "denied": "outside the machine's allowed sources",
+				}[mode]
+				if installErr == nil || !strings.Contains(installErr.Error(), reason) {
+					t.Fatalf("expected %q refusal, got %v", reason, installErr)
+				}
+				if hashTreeForTest(t, ProfileDir(f.home, original.Name)) != beforeTarget {
+					t.Fatal("refused reinstall changed accepted target/source/lock")
+				}
+				if mode == "audit-after-fetch" && fixtureGitOutput(t, f.cache, "cat-file", "-t", f.pin) != "commit" {
+					t.Fatal("audit refusal was not reached after successful acquisition")
+				}
+			}
+			if fixtureGitOutput(t, f.cache, "show-ref") != refs || fixtureGitOutput(t, f.cache, "config", "--get", "remote.origin.url") != wantOrigin {
+				t.Fatal("acquisition changed selected refs or rewrote origin")
+			}
+			if mode == "ssh-origin" {
+				marker, err := os.ReadFile(f.marker)
+				if err != nil || !strings.Contains(string(marker), "git-upload-pack") || !strings.Contains(string(marker), "example.com") {
+					t.Fatalf("SSH transport not exercised: %q %v", marker, err)
+				}
+			}
+			if mode == "ssh-forbidden-rewrite" || mode == "still-absent" || mode == "probe-failure" {
+				// The database-failure plant deliberately prevents a readback;
+				// the other refusals must still leave the exact pin absent.
+				if mode != "probe-failure" {
+					assertPinTransportMissing(t, f.cache, f.pin)
+				}
+			}
+			f.assertPreserved(t, true)
+		})
+	}
+}
+
 // A portable subprocess fault plant exercises the production Install path:
 // successful transport with no object, or a database read failure. Other Git
 // commands run the real executable, with the original isolated fixture config.

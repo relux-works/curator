@@ -50,8 +50,8 @@ type gitManager struct {
 	readOnlyAudit   bool
 	fetchRaw        map[string]string
 	allowedSources  []string
-	// Non-nil only during new-profile installation. Each missing exact pin
-	// gets at most one acquisition attempt within that operation.
+	// Non-nil only during new-profile installation or explicit path reinstall.
+	// Each missing exact pin gets at most one acquisition attempt per operation.
 	missingPins map[string]bool
 }
 
@@ -384,9 +384,17 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
 	probe := exec.Command("git", "-C", dir, "cat-file", "--batch-check") // #nosec G204 -- fixed command, manager cache
 	probe.Stdin = strings.NewReader(commit + "\n")
+	var diagnostics strings.Builder
+	probe.Stderr = &diagnostics
 	out, err := probe.Output()
 	if err != nil {
 		return fmt.Errorf("inspect pinned object: %w", err)
+	}
+	// A corrupt loose object can produce both a successful exit and the
+	// exact "missing" stdout response. Only a diagnostic-free probe permits
+	// either local admission or acquisition; corruption is not absence.
+	if diagnostics.Len() != 0 {
+		return fmt.Errorf("inspect pinned object: Git reported object database diagnostics")
 	}
 	fields := strings.Fields(string(out))
 	if len(fields) == 3 && fields[0] == commit && fields[1] == "commit" {
@@ -425,8 +433,8 @@ func (m *gitManager) VerifyCandidate(_, _, source, tag, commit string, allowed [
 	if err != nil {
 		return contextresolve.CandidateSignatures{}, err
 	}
-	// The resolver authorizes before reading Manifest. New installs must make
-	// the selected object available here too; acquisition grants no trust.
+	// The resolver authorizes before reading Manifest. Installs and explicit
+	// path reinstalls need the object here too; acquisition grants no trust.
 	if m.missingPins != nil {
 		if err := m.acquireMissingPin(dir, source, commit); err != nil {
 			return contextresolve.CandidateSignatures{}, err
