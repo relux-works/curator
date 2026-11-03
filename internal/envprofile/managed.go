@@ -1772,6 +1772,14 @@ func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
 	return true
 }
 
+type credentialLinkAction uint8
+
+const (
+	credentialLinkKeep credentialLinkAction = iota
+	credentialLinkCreate
+	credentialLinkReplaceEmpty
+)
+
 // ensureCredentialLink fix-first ensures one wanted credential link (§7.4,
 // §10.1): an absent link path is linked, a symlink still targeting the
 // declared native store is left alone, and an empty directory is replaced
@@ -1784,59 +1792,72 @@ func sameCredentialRecordSet(left, right []envmarker.Passthrough) bool {
 // directory, or a link whose state cannot be established refuses the
 // same way, removing nothing. Native bytes are never touched.
 func ensureCredentialLink(root, homeRel, path, target string, recorded bool, migrateCmd string) error {
-	rel := managedJoin(homeRel, path)
-	full, err := managedPath(root, rel, false)
+	action, err := inspectCredentialLink(root, homeRel, path, target, recorded, migrateCmd)
 	if err != nil {
 		return err
 	}
-	metadata, err := stateread.Lstat(full)
-	if err != nil {
-		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
-	}
-	if metadata.Kind == stateread.KindAbsent {
-		if err := atomicManagedLink(root, rel, target); err != nil {
-			return fmt.Errorf("passthrough %s: %v", path, err)
-		}
+	if action == credentialLinkKeep {
 		return nil
 	}
+	rel := managedJoin(homeRel, path)
+	if action == credentialLinkReplaceEmpty {
+		if err := removeManagedEntry(root, rel); err != nil {
+			return err
+		}
+	}
+	if err := atomicManagedLink(root, rel, target); err != nil {
+		return fmt.Errorf("passthrough %s: %v", path, err)
+	}
+	return nil
+}
+
+// inspectCredentialLink is shared by the refusal preflight and the final
+// mutation recheck. It neither creates, removes nor replaces an entry.
+func inspectCredentialLink(root, homeRel, path, target string, recorded bool, migrateCmd string) (credentialLinkAction, error) {
+	rel := managedJoin(homeRel, path)
+	full, err := managedPath(root, rel, false)
+	if err != nil {
+		return credentialLinkKeep, err
+	}
+	metadata, err := stateread.Lstat(full)
+	if err != nil {
+		return credentialLinkKeep, fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, err)
+	}
+	if metadata.Kind == stateread.KindAbsent {
+		return credentialLinkCreate, nil
+	}
 	if metadata.Kind != stateread.KindPresent || metadata.Info == nil {
-		return fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
+		return credentialLinkKeep, fmt.Errorf("%s: %s cannot be inspected: %v: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full, stateread.UnusableError(full, fmt.Errorf("unknown metadata state %q", metadata.Kind)))
 	}
 	info := metadata.Info
 	if info.Mode()&os.ModeSymlink != 0 {
 		link, err := stateread.Readlink(full)
 		if err != nil {
-			return fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+			return credentialLinkKeep, fmt.Errorf("%s: %s link target cannot be read: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
 		}
 		got := link.Target
 		if !filepath.IsAbs(got) {
 			got = filepath.Join(filepath.Dir(full), got)
 		}
 		if filepath.Clean(got) == filepath.Clean(target) {
-			return nil
+			return credentialLinkKeep, nil
 		}
 		if !recorded {
-			return fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it; remove the unrecorded link out of band and re-run", envregistry.DiagCredentialConflict, full, got, target)
+			return credentialLinkKeep, fmt.Errorf("%s: %s links to %s, expected %s: refusing to remove or re-point it; remove the unrecorded link out of band and re-run", envregistry.DiagCredentialConflict, full, got, target)
 		}
-		return fmt.Errorf("%s: %s links to %s, expected %s: migration needed: re-point the recorded link with `%s`; refusing to re-point it here", envregistry.DiagCredentialConflict, full, got, target, migrateCmd)
+		return credentialLinkKeep, fmt.Errorf("%s: %s links to %s, expected %s: migration needed: re-point the recorded link with `%s`; refusing to re-point it here", envregistry.DiagCredentialConflict, full, got, target, migrateCmd)
 	}
 	if info.IsDir() {
 		entries, err := os.ReadDir(full)
 		if err != nil {
-			return fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
+			return credentialLinkKeep, fmt.Errorf("%s: %s holds a directory that cannot be listed: refusing to touch it; restore access out of band and re-run", envregistry.DiagCredentialConflict, full)
 		}
 		if len(entries) != 0 {
-			return fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
+			return credentialLinkKeep, fmt.Errorf("%s: %s holds a non-empty directory, expected a link to %s: refusing to remove it; clear the directory out of band and re-run", envregistry.DiagCredentialConflict, full, target)
 		}
-		if err := removeManagedEntry(root, rel); err != nil {
-			return err
-		}
-		if err := atomicManagedLink(root, rel, target); err != nil {
-			return fmt.Errorf("passthrough %s: %v", path, err)
-		}
-		return nil
+		return credentialLinkReplaceEmpty, nil
 	}
-	return fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, target)
+	return credentialLinkKeep, fmt.Errorf("%s: %s holds a regular file, expected a link to %s: refusing to remove or replace it; decide which credential bytes win and move the loser aside out of band (the manager never moves credential bytes)", envregistry.DiagCredentialConflict, full, target)
 }
 
 // removeStaleCredentialLinks refuses recorded credential links the
@@ -2776,6 +2797,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if err := req.validateActivationCredentialSource(); err != nil {
 		return nil, err
 	}
+	if req.Repair {
+		if err := req.validateRepairNativeHome(adapter); err != nil {
+			return nil, err
+		}
+	}
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
@@ -3158,6 +3184,27 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		writePaths[path] = true
 	}
 	if err := preflightManagedWriteTargets(root, homeRel, writePaths); err != nil {
+		return nil, err
+	}
+	// Reuse every deterministic credential-link refusal before public plan
+	// writes. Finalization rechecks; racing I/O is not an atomic home transaction.
+	recordedLinks := map[string]bool{}
+	if verdict.marker != nil && verdict.marker.Passthrough != nil {
+		for _, entry := range *verdict.marker.Passthrough {
+			recordedLinks[entry.Path] = true
+		}
+	}
+	migrateCmd := fmt.Sprintf("curator env migrate --plan --profile %s --env %s, then curator env migrate --apply --expect <plan-hash> --profile %s --env %s", req.Profile, adapter.ID, req.Profile, adapter.ID)
+	for _, path := range sortedKeys(passthroughLinks) {
+		if _, err := inspectCredentialLink(root, homeRel, path, passthroughLinks[path], recordedLinks[path], migrateCmd); err != nil {
+			return nil, err
+		}
+	}
+	native, err := req.nativeHome(adapter.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := removeStaleCredentialLinks(adapter, plan.homeDir, native, verdict.marker, passthroughLinks, migrateCmd); err != nil {
 		return nil, err
 	}
 	if adapter.ID == envregistry.OpenCode {
