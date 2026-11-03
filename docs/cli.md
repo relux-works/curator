@@ -1200,6 +1200,12 @@ The closed transport is `curator.launcher-config/1`, with `config_schema`,
 `config_path` (the actual selected source) and `extensions`. Older supported
 schemas export an empty `extensions` object. Schema 7 may export typed `proxy`
 and `claude_auth` references; see [machine configuration](environment-config.md).
+Schema 8 exports `curator.launcher-config/2` and may additionally carry the closed
+`notification` selection. Absent or explicit `off` selection enables no
+notification backend. A `host` selection supplies only the supported contract
+and immutable workflow reference/digest; it does not prove runtime capability,
+workflow authorization, enrollment or attachment readiness. Consumers must
+validate the version and their actual selected capability before using it.
 The output contains references, never credential material. Do not use it as an
 authentication or proxy qualification result.
 

@@ -298,6 +298,11 @@ curator config build-ssh    # configure SSH credentials for external build repos
 curator config build-https  # configure HTTPS credentials for external build repos
 ```
 
+Machine configuration schema 8 adds optional Host notification workflow
+references to the metadata export. It preserves existing proxy and OAuth
+selections. Exporting the selection does not launch or enroll a session; see
+[selected launcher metadata](docs/environment-config.md#selected-launcher-metadata-schema-7).
+
 </details>
 
 ## Skillfile schema 2 project sources
