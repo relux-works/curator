@@ -878,13 +878,17 @@ if command -v go >/dev/null 2>&1 && go list ./... >/dev/null 2>&1; then
 		ok 'internal/interop is never deferred by a partial root'
 	fi
 
+	# A synthetic legacy table exercises exclusion support independently of
+	# today's shipped Linux execution support.
+	LEGACY_EXCLUSIONS="$WORK/legacy-exclusions.tsv"
+	printf 'internal/godriver\tTestProbeRejectsAnUncoveredPlatformBeforeTheWorker\tlinux\tlegacy fixture\n' >"$LEGACY_EXCLUSIONS"
 	assert 'a root excluding linux excludes godriver there' 0 \
-		env CI_GATE_GOOS=linux bash "$PLAN" "$SERVING" "$WORK/plan-linux"
+		env CI_PLATFORM_EXCLUSIONS="$LEGACY_EXCLUSIONS" CI_GATE_GOOS=linux bash "$PLAN" "$SERVING" "$WORK/plan-linux"
 	assert_contains 'godriver is excluded on linux' 'internal/godriver' "$WORK/plan-linux/plan-excluded.txt"
 	assert_contains 'the exclusion is asserted by a case' 'TestProbeRejectsAnUncoveredPlatformBeforeTheWorker' "$WORK/plan-linux/plan-assert.txt"
 
 	assert 'the same root does NOT exclude godriver on darwin' 0 \
-		env CI_GATE_GOOS=darwin bash "$PLAN" "$SERVING" "$WORK/plan-darwin"
+		env CI_PLATFORM_EXCLUSIONS="$LEGACY_EXCLUSIONS" CI_GATE_GOOS=darwin bash "$PLAN" "$SERVING" "$WORK/plan-darwin"
 	if [ -s "$WORK/plan-darwin/plan-excluded.txt" ]; then
 		bad 'darwin excludes nothing under a linux-only exclusion' "excluded: $(tr '\n' ' ' <"$WORK/plan-darwin/plan-excluded.txt")"
 	else
@@ -894,7 +898,7 @@ if command -v go >/dev/null 2>&1 && go list ./... >/dev/null 2>&1; then
 	# a root that predates the qualification vector falls back to the recorded default
 	rm -f "$PARTIAL/vectors/conformance-claim-v3-qualification.json"
 	assert 'a pre-vector root still excludes godriver on linux' 0 \
-		env CI_GATE_GOOS=linux bash "$PLAN" "$PARTIAL" "$WORK/plan-prevector"
+		env CI_PLATFORM_EXCLUSIONS="$LEGACY_EXCLUSIONS" CI_GATE_GOOS=linux bash "$PLAN" "$PARTIAL" "$WORK/plan-prevector"
 	assert_contains 'the fallback exclusion is recorded as such' 'default_excluded_on' "$WORK/plan-prevector/suite-plan.txt"
 
 	echo ''
@@ -907,7 +911,7 @@ if command -v go >/dev/null 2>&1 && go list ./... >/dev/null 2>&1; then
 	assert 'a ledger row naming a nonexistent package fails' 1 \
 		env CI_PLATFORM_CASES="$BADLEDGER" bash "$HERE/ledger-consistency.sh" "$WORK/lc-badpkg"
 	assert 'the shipped ledger is consistent with every build' 0 \
-		env CI_EXCLUDED_PKGS=internal/godriver CI_EXCLUDED_GOOS=linux bash "$HERE/ledger-consistency.sh" "$WORK/lc-shipped"
+		bash "$HERE/ledger-consistency.sh" "$WORK/lc-shipped"
 else
 	skip 'suite-plan and ledger-consistency cases' 'no usable `go list` on this runner; these gates need the module graph'
 fi

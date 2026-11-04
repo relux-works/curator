@@ -3,12 +3,14 @@
 package godriver
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -18,7 +20,7 @@ import (
 // Real kernel witnesses pair permitted execution with forbidden effects. These
 // run on Linux CI; compilation on another host is not runtime evidence.
 func TestLinuxNativeControls(t *testing.T) {
-	limits, err := normalizeBuildLimits(ResourceLimits{FileBytes: 1024 * 1024})
+	limits, err := normalizeBuildLimits(ResourceLimits{FileBytes: 1024 * 1024, ArtifactBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,6 +45,8 @@ func TestLinuxNativeControls(t *testing.T) {
 		for _, blocks := range []string{"1", "2048"} {
 			target := filepath.Join(t.TempDir(), "output")
 			cmd := exec.Command("/bin/sh", "-c", `exec dd if=/dev/zero of="$1" bs=1024 count="$2"`, "control", target, blocks)
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
 			launch(cmd)
 			err := cmd.Wait()
 			if blocks == "1" && err != nil {
@@ -55,6 +59,18 @@ func TestLinuxNativeControls(t *testing.T) {
 			if statErr != nil {
 				t.Fatal(statErr)
 			}
+			if blocks == "2048" {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) {
+					t.Fatalf("not a worker exit: %v", err)
+				}
+				status, ok := exit.Sys().(syscall.WaitStatus)
+				signaled := ok && status.Signaled() && status.Signal() == syscall.SIGXFSZ
+				if info.Size() != limits.FileBytes || (!signaled && !strings.Contains(stderr.String(), "File too large")) {
+					t.Fatalf("write did not reach intended file-size rejection: size=%d err=%v stderr=%s", info.Size(), err, stderr.String())
+				}
+			}
+
 			if info.Size() > limits.FileBytes {
 				t.Fatalf("file exceeds bound: %d", info.Size())
 			}
@@ -94,8 +110,8 @@ func TestLinuxNativeControls(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = unix.Kill(pid, unix.SIGKILL) }()
-		if err := unix.Kill(pid, 0); err != nil {
-			t.Fatalf("positive live descendant: %v", err)
+		if !processAlive(pid) {
+			t.Fatal("positive descendant is not alive before teardown")
 		}
 		terminateWorkerDomain(cmd)
 		deadline := time.Now().Add(5 * time.Second)

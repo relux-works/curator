@@ -131,6 +131,15 @@ func TestCapabilityEvidenceConsistencyRules(t *testing.T) {
 		name, platform, code string
 		mutate               func(*CapabilityEvidence)
 	}{
+
+		// Linux permits unavailable aggregate controls, but never claims them.
+		{name: "linux-unavailable-aggregate-controls-permit-portable", platform: PlatformLinux},
+		{name: "linux-unavailable-control-cannot-be-applied", platform: PlatformLinux, code: CodeCapabilityEvidenceInvalid,
+			mutate: func(record *CapabilityEvidence) { record.Controls[1].Status = StatusApplied }},
+		{name: "linux-unavailable-aggregate-bound-cannot-be-hardened", platform: PlatformLinux, code: CodeHardenedClaimForbidden,
+			mutate: func(record *CapabilityEvidence) {
+				record.Controls[1].Name = "hard-aggregate-descendant-resource-bounds"
+			}},
 		{name: "available-native-control-is-applied", platform: PlatformMacOS},
 		{name: "unavailable-native-control-does-not-reject", platform: PlatformMacOS},
 		{name: "unavailable-control-cannot-be-reported-as-applied", platform: PlatformMacOS, code: CodeCapabilityEvidenceInvalid,
