@@ -244,6 +244,8 @@ error: skill.manifest_invalid (agent-skill.json): commands.<name>.driver: must b
 
 Curator rejects invalid driver declarations before starting build execution or fetching repository sources.
 
+## Non-root Linux host setup
+
 A non-root Linux host must provision the pinned, qualified Go distribution in a
 user-owned toolchain directory outside repository and Curator runtime roots.
 Verify the distribution against the publisher's checksum before extraction.
