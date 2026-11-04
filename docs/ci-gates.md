@@ -45,14 +45,16 @@ The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../int
 
 The module's separate release-check suite remains pinned to curator-spec `v1.0.0-rc.8` at commit `f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the suite manifest SHA-256 `d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1` and release metadata SHA-256 `293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede`, including the empty published implementation, platform, and conformance claim sets. Run it locally with `make verify-spec-pin SPEC_PIN=f8c405aa3ad0a39d260c2ed93684e55c5a346359 CURATOR_CONFORMANCE_ROOT=/path/to/curator-spec/conformance/v1`.
 
-## The compiled-build platform carve-out
+## Compiled-build platform coverage
 
-The `rc5-native-control-inventory-v1` vector defines native control records exclusively for macOS and Windows. The `go-v1` driver refuses compiled builds on any other host before starting a worker process. This carve-out applies at two granularities:
+The `rc5-native-control-inventory-v2` candidate adds Linux to the macOS and Windows records. Both `go-v1` and `go-repository-v1` execute on these three platforms and refuse other platforms before worker launch. Coverage is checked at two granularities:
 
 - **Build execution**: `internal/godriver` runs on Linux, macOS, and Windows. The hosted Ubuntu driver lane enables real compiler witnesses with `CURATOR_REAL_GO_BUILD_TEST=1`; unsupported inventory platforms still refuse before worker launch.
 - **Individual case**: Commands in `cmd/curator` that require completed compilation use `requireNativeControlInventoryPlatform` to read `godriver.InventoryPlatform`. Skips log the inventory reason, classified under `platform-control` in [`skip-classes.tsv`](../.github/ci/skip-classes.tsv). `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every runner to verify the boundary state. Covered hosts execute and publish protected cache entries; uncovered hosts report `build_execution_control_unavailable`, publish nothing, and return non-zero exit codes for `curator status --check`.
 
-When the inventory gains a record for a platform, the guard stops skipping automatically. Only `must_run_on` in [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) requires updating.
+Linux enforces session/process-group teardown, `RLIMIT_FSIZE`, and inherited-descriptor restriction; aggregate memory and active-process limits remain unavailable (`no-private-aggregate-domain`). The hosted `Linux build controls (hosted)` job consumes the v2 candidate and requires real compiler success, compile failure and artifact tamper, plus native control witnesses. The other conformance lanes retain their independent published-suite pin. See [platform support and toolchain provisioning](authoring-cli-commands.md) for enforcement limits and non-root setup.
+
+The platform-case ledger requires the formerly excluded Linux cases to execute; Linux has no package-level inventory exclusion. Unsupported platform guards retain their pre-launch refusal contract.
 
 ## Suite consumption, not suite presence
 
