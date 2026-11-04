@@ -366,14 +366,14 @@ func TestLinuxRoutingKeepsForksHosted(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Required jobs cannot silently escape the behavioral routing checks.
-	for _, name := range []string{"test", "race"} {
+	for _, name := range []string{"test", "go-family-qualification", "race"} {
 		route, _ := wf.Jobs[name].RunsOn.(string)
 		if !strings.Contains(route, "LINUX_SELF_HOSTED") {
 			t.Fatalf("%s: missing required Linux routing", name)
 		}
 	}
 	// Linux compiler qualification is always hosted, even for trusted PRs.
-	if route, _ := wf.Jobs["go-family-qualification"].RunsOn.(string); route != "${{ matrix.os }}" {
+	if route, _ := wf.Jobs["linux-build-controls"].RunsOn.(string); route != "ubuntu-latest" {
 		t.Fatalf("driver qualification must remain hosted: %s", route)
 	}
 

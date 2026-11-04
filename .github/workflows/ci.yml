@@ -79,6 +79,69 @@ jobs:
   # Every admitted family gets its own real toolchain identity and driver
   # qualification. Linux applies the portable native controls; native
   # offline vendored builds replay twice with cold caches on macOS/Windows.
+  linux-build-controls:
+    name: Linux build controls (hosted)
+    # Linux entries run on the repository's self-hosted Linux runners when the
+    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
+    # same-repository pull requests. A pull request from a fork always stays on
+    # the hosted image, whatever the variable says. See
+    # docs/self-hosted-runner-setup.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: 559daf2875cf32751f9d1f824a4c1876e936bab2
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+          go-version: 1.25.5
+      - name: Verify family toolchain identity
+        shell: bash
+        env:
+          QUALIFIED_GO_VERSION: 1.25.5
+        run: |
+          set -euo pipefail
+          actual="$(go version)"
+          echo "$actual"
+          [[ "$actual" == "go version go$QUALIFIED_GO_VERSION "* ]]
+          [[ "$(go env GOTOOLCHAIN)" == local ]]
+          [[ -z "$(go env GOENV)" || "$(go env GOENV)" == off ]]
+      - name: Driver qualification and reproducibility
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CURATOR_REAL_GO_TEST: '1'
+          CURATOR_REAL_GO_BUILD_TEST: '1'
+          GOFLAGS: '-work'
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go test -count=1 -timeout=10m -json ./internal/godriver | tee driver-tests.json
+          python3 - <<'PYCODE'
+          import json
+          required = {"TestLinuxNativeControls", "TestLinuxNativeControls/file-bound", "TestLinuxNativeControls/descriptor", "TestLinuxNativeControls/descendant", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
+          passed = {row.get("Test") for line in open("driver-tests.json") if (row := json.loads(line)).get("Action") == "pass"}
+          assert required <= passed, required - passed
+          PYCODE
+      - name: Driver vet
+        run: go vet ./internal/godriver
+      - name: Build manager
+        run: go build ./cmd/curator
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
+
+
   go-family-qualification:
     name: Go ${{ matrix.go }} driver (${{ matrix.os }})
     # Linux entries run on the repository's self-hosted Linux runners when the
@@ -86,7 +149,7 @@ jobs:
     # same-repository pull requests. A pull request from a fork always stays on
     # the hosted image, whatever the variable says. See
     # docs/self-hosted-runner-setup.md.
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:

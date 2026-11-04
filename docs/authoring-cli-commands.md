@@ -255,3 +255,9 @@ The driver verifies and fingerprints the selected distribution and uses
 not download a missing toolchain. CI provisions the pinned Go release with
 `actions/setup-go` before executing real compiler success, failure, and tamper
 witnesses on hosted Ubuntu.
+
+Linux descriptor sealing enumerates `/proc/self/fd` and sets close-on-exec on
+nonstandard manager descriptors before launching the worker; it closes none in
+the parent. The launch rejects extra descriptor mappings and fails before the
+worker if descriptor sealing cannot be completed. The host must expose its own
+process descriptors through procfs.

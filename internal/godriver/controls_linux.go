@@ -3,9 +3,11 @@
 package godriver
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -152,6 +154,13 @@ func (domain *controlDomain) launch(command *exec.Cmd) error {
 	if err := seamFault(seamInstall); err != nil {
 		return diagnosticErr(CodeControlUnavailable, err, "cannot install the manager-owned native control domain")
 	}
+	if len(command.ExtraFiles) != 0 {
+		return diagnostic(CodeControlUnavailable, "worker launch cannot inherit extra descriptors")
+	}
+	if err := restrictManagerDescriptors(); err != nil {
+		return diagnosticErr(CodeControlUnavailable, err, "cannot restrict inherited descriptors before worker launch")
+	}
+
 	if command.SysProcAttr == nil {
 		command.SysProcAttr = &syscall.SysProcAttr{}
 	}
@@ -300,4 +309,33 @@ func terminateWorkerDomain(command *exec.Cmd) {
 		_ = unix.Kill(-pid, unix.SIGKILL)
 	}
 	_ = command.Process.Kill()
+}
+
+// Go-created descriptors are close-on-exec, but native libraries or callers may
+// open inheritable descriptors. Seal those too before fork; explicit standard
+// streams are remapped by exec.Cmd. No descriptor is closed in the parent.
+func restrictManagerDescriptors() error {
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		fd, err := strconv.Atoi(entry.Name())
+		if err != nil || fd < 3 {
+			continue
+		}
+		flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFD, 0)
+		if errors.Is(err, unix.EBADF) {
+			continue
+		} // ReadDir's own descriptor is closed.
+		if err != nil {
+			return err
+		}
+		if flags&unix.FD_CLOEXEC == 0 {
+			if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, flags|unix.FD_CLOEXEC); err != nil && !errors.Is(err, unix.EBADF) {
+				return err
+			}
+		}
+	}
+	return nil
 }
