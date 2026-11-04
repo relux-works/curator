@@ -317,6 +317,12 @@ func Load(path string, warn func(string)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	return loadObject(path, userData, warn)
+}
+
+// loadObject is the ordinary loader's shared overlay/parser path. A metadata
+// transaction can validate its in-memory candidate without publishing a file.
+func loadObject(path string, userData map[string]any, warn func(string)) (*Config, error) {
 	machineData := userData
 	userIsolation := userIsolationFromConfig(userData)
 	locked := map[string]bool{}

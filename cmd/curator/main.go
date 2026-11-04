@@ -2497,6 +2497,8 @@ const configUsage = `curator config: inspect and edit the machine configuration
 Usage:
   curator config show                  print the effective configuration
   curator config launcher              print selected launcher metadata as JSON
+  curator config claude-auth <plan|apply|restore>
+                                       safely edit OAuth metadata references
   curator config build-ssh <subcommand>
                                        operator SSH credentials for external
                                        build repositories (add | list | remove)
@@ -2548,6 +2550,8 @@ func (c cli) cmdConfig(args []string) int {
 	switch args[0] {
 	case "show":
 		return c.cmdConfigShow()
+	case "claude-auth":
+		return c.cmdConfigClaudeAuth(args[1:])
 	case "launcher":
 		if len(args) != 1 {
 			_, _ = fmt.Fprintln(c.stderr, "curator: config launcher takes no arguments")
