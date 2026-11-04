@@ -1249,8 +1249,10 @@ An applied result with `durable=false` has unconfirmed directory durability.
 
 Restore validates the named sibling backup's bytes, digest, regular type,
 owner and mode, and binds the current source to `CURRENT`. It validates
-ordinary loading/non-extension equivalence, rechecks source, policy and
-backup before replacement, and retains the backup. A changed source or
+ordinary loading/non-extension equivalence and equality of extensions other
+than `claude_auth`. A later proxy change refuses even when `CURRENT` is its
+freshly observed digest. Restore rechecks source, policy and backup before
+replacement, and retains the backup. A changed source or
 backup refuses; a successful rename reports `restored` with the same
 durability/readback semantics. The optional library-level expected-backup
 digest can additionally bind caller-held provenance.

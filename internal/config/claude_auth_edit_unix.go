@@ -20,7 +20,7 @@ func openClaudeAuthFile(path string) (*os.File, error) {
 
 func privateClaudeAuthInfo(info os.FileInfo) bool {
 	s, ok := info.Sys().(*syscall.Stat_t)
-	return ok && info.Mode().IsRegular() && info.Mode() == 0600 && s.Uid == uint32(os.Geteuid()) && s.Nlink == 1
+	return ok && info.Mode().IsRegular() && info.Mode() == 0600 && int(s.Uid) == os.Geteuid() && s.Nlink == 1
 }
 
 func claudeAuthFileIdentity(info os.FileInfo) string {

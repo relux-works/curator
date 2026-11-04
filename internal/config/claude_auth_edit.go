@@ -87,6 +87,7 @@ type claudeAuthEditOps struct {
 	beforeRecheck, afterBackup, beforeFinalRecheck func() error
 	rename                                         func(string, string) error
 	syncDirectory                                  func(string) error
+	syncBackupDirectory                            func(string) error
 }
 
 func claudeAuthSHA(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
@@ -155,7 +156,7 @@ func claudeAuthPolicyAt(path string) (string, error) {
 	if err != nil || !info.Mode().IsRegular() {
 		return "", ErrClaudeAuthEditRefused
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: independently selected system-policy metadata, never the OAuth credential reference.
 	if err != nil {
 		return "", ErrClaudeAuthEditRefused
 	}
@@ -190,6 +191,22 @@ func claudeAuthMachineSource(path string) (string, error) {
 // Both sides run the ordinary loader's exact overlay/parser path. Comparing
 // complete parsed configs covers settings omitted by the narrow EffectiveJSON.
 func claudeAuthEquivalent(path string, before, after map[string]any) bool {
+	// Raw non-auth extensions must remain equal even if an enforced overlay
+	// would hide the difference. Absent and empty extension sets are equivalent.
+	remaining := func(object map[string]any) map[string]any {
+		result := map[string]any{}
+		if extensions, ok := object["extensions"].(map[string]any); ok {
+			for key, value := range extensions {
+				if key != "claude_auth" {
+					result[key] = value
+				}
+			}
+		}
+		return result
+	}
+	if !reflect.DeepEqual(remaining(before), remaining(after)) {
+		return false
+	}
 	a, err := loadObject(path, before, nil)
 	if err != nil {
 		return false
@@ -257,6 +274,9 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 	extensions["claude_auth"] = selected
 	after["extensions"] = extensions
 	after["schema_version"] = float64(7)
+	// Defense in depth: for currently valid schema-2/7 sources this constructor
+	// changes only schema/auth, so no valid input currently reaches the refusal.
+	// Restore independently needs this check for later unrelated edits.
 	if !claudeAuthEquivalent(path, before, after) {
 		return nil, ErrClaudeAuthEditRefused
 	}
@@ -288,10 +308,10 @@ func syncClaudeAuthDirectory(path string) error {
 	return f.Sync()
 }
 
-func writeClaudeAuthExclusive(path string, raw []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+func writeClaudeAuthExclusive(path string, raw []byte, syncDirectory func(string) error) (published bool, err error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600) //nolint:gosec // G304: explicitly selected output uses O_EXCL/0600; an existing path cannot be overwritten.
 	if err != nil {
-		return ErrClaudeAuthEditIO
+		return false, ErrClaudeAuthEditIO
 	}
 	// Only an incomplete file created by this call is removed. A verified,
 	// durable recovery backup is never removed on later transaction failure.
@@ -306,26 +326,29 @@ func writeClaudeAuthExclusive(path string, raw []byte) error {
 		}
 	}()
 	if statErr != nil {
-		return ErrClaudeAuthEditIO
+		return false, ErrClaudeAuthEditIO
 	}
 	if _, err = f.Write(raw); err != nil {
-		return ErrClaudeAuthEditIO
+		return false, ErrClaudeAuthEditIO
 	}
 	if err = f.Sync(); err != nil {
-		return ErrClaudeAuthEditIO
+		return false, ErrClaudeAuthEditIO
 	}
 	if err = f.Close(); err != nil {
-		return ErrClaudeAuthEditIO
+		return false, ErrClaudeAuthEditIO
 	}
 	verified, err := readClaudeAuthFile(path)
 	if err != nil || !bytes.Equal(verified.raw, raw) {
-		return ErrClaudeAuthEditIO
+		return false, ErrClaudeAuthEditIO
 	}
 	complete = true
-	if syncClaudeAuthDirectory(path) != nil {
-		return ErrClaudeAuthEditIO
+	if syncDirectory == nil {
+		syncDirectory = syncClaudeAuthDirectory
 	}
-	return nil
+	if syncDirectory(path) != nil {
+		return true, ErrClaudeAuthEditIO
+	}
+	return true, nil
 }
 
 // WriteClaudeAuthCandidate creates only the explicitly named private output.
@@ -333,7 +356,8 @@ func WriteClaudeAuthCandidate(plan *ClaudeAuthEditPlan, path string) error {
 	if plan == nil || claudeAuthSHA(plan.candidate) != plan.CandidateSHA256 {
 		return ErrClaudeAuthEditRefused
 	}
-	return writeClaudeAuthExclusive(path, plan.candidate)
+	_, err := writeClaudeAuthExclusive(path, plan.candidate, nil)
+	return err
 }
 
 func recheckClaudeAuth(source *claudeAuthFile, policy string) error {
@@ -381,10 +405,10 @@ func applyClaudeAuth(ctx context.Context, req ClaudeAuthEditRequest, ops claudeA
 		return nil, err
 	}
 	result := &ClaudeAuthEditResult{Status: "not_applied_backup_retained", ConfigPath: plan.ConfigPath, SourceSHA256: plan.SourceSHA256, ResultSHA256: plan.CandidateSHA256, PolicySHA256: plan.PolicySHA256, BackupPath: plan.ConfigPath + ".bak-" + time.Now().UTC().Format(claudeAuthBackupTime), BackupSHA256: plan.SourceSHA256}
-	if err := writeClaudeAuthExclusive(result.BackupPath, plan.source.raw); err != nil {
-		// Directory sync may fail after complete backup publication; classify
-		// the actual recovery copy without falsely claiming it is durable.
-		if b, e := readClaudeAuthFile(result.BackupPath); e == nil && b.sha == plan.SourceSHA256 {
+	if published, err := writeClaudeAuthExclusive(result.BackupPath, plan.source.raw, ops.syncBackupDirectory); err != nil {
+		// Preserve the observed complete publication even if a later re-read
+		// is unavailable. This reports its path, not fresh verification/durability.
+		if published {
 			return result, err
 		}
 		return nil, err

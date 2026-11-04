@@ -309,6 +309,7 @@ curator config build-https  # configure HTTPS credentials for external build rep
 `config claude-auth` validates a schema-2 or schema-7 machine file, creates a
 private candidate, and applies inspected bytes with source, result and system
 policy digest guards. It retains an exact private backup for guarded restore.
+Restore refuses later unrelated extension changes, including proxy selection.
 It never resolves credentials. See the [command contract](docs/cli.md#curator-config-claude-auth)
 for phase outcomes and the exclusive-custody requirement.
 

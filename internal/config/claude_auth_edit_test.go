@@ -5,6 +5,7 @@ package config
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -51,6 +52,9 @@ func authEditBackups(t *testing.T, path string) []string {
 
 // Planning and applying a valid 2/7 carrier preserve unrelated settings and proxy;
 // the exact source backup permits a digest-guarded, byte-exact restore.
+// The Plan equivalence refusal is defense in depth: its current valid 2/7
+// constructor cannot produce a differing non-auth configuration. These tests
+// check preservation, not detection of deleting that unreachable Plan check.
 func TestClaudeAuthEditRoundTrip(t *testing.T) {
 	for _, text := range []string{
 		`{"schema_version":2,"skills_root":"x","projects":{}}`,
@@ -478,6 +482,107 @@ func TestClaudeAuthEditPrewriteState(t *testing.T) {
 			got, _ := os.ReadFile(path)
 			if !bytes.Equal(got, before) || len(authEditBackups(t, path)) != 0 {
 				t.Fatal("prewrite refusal changed state")
+			}
+		})
+	}
+}
+
+// Even with a freshly observed current digest, restore cannot discard a later
+// unrelated extension change. An auth-only change remains a valid recovery.
+func TestClaudeAuthRestorePreservesLaterExtensions(t *testing.T) {
+	for _, kind := range []string{"added-proxy", "changed-proxy", "removed-proxy", "auth-only"} {
+		t.Run(kind, func(t *testing.T) {
+			text := `{"schema_version":7,"skills_root":"x","projects":{}}`
+			if kind == "changed-proxy" || kind == "removed-proxy" {
+				text = `{"schema_version":7,"skills_root":"x","projects":{},"extensions":{"proxy":{"profile":"original"}}}`
+			}
+			path := authEditFixture(t, text)
+			applied, err := ApplyClaudeAuth(context.Background(), authEditRequest(t, path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			current, err := readClaudeAuthFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			object, err := claudeAuthObject(current.raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ext := object["extensions"].(map[string]any)
+			switch kind {
+			case "added-proxy", "changed-proxy":
+				ext["proxy"] = map[string]any{"profile": "later"}
+			case "removed-proxy":
+				delete(ext, "proxy")
+			case "auth-only":
+				ext["claude_auth"] = map[string]any{"type": "oauth", "store": map[string]any{"type": "keychain", "service": "later", "account": "fixture"}}
+			}
+			raw, err := json.Marshal(object)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			result, err := RestoreClaudeAuth(context.Background(), ClaudeAuthRestoreRequest{Path: path, BackupPath: applied.BackupPath, ExpectCurrentSHA256: claudeAuthSHA(raw)})
+			got, _ := os.ReadFile(path)
+			if kind == "auth-only" {
+				if err != nil || result == nil || result.Status != "restored" || string(got) != text {
+					t.Fatal("auth-only recovery refused", result, err)
+				}
+				return
+			}
+			if !errors.Is(err, ErrClaudeAuthEditRefused) || result != nil {
+				t.Fatalf("later unrelated extension not refused: result=%+v err=%v", result, err)
+			}
+			if !bytes.Equal(got, raw) {
+				t.Fatal("restore discarded later unrelated extension")
+			}
+			backups := authEditBackups(t, path)
+			saved, readErr := os.ReadFile(applied.BackupPath)
+			if len(backups) != 1 || readErr != nil || string(saved) != text {
+				t.Fatal("refused restore changed recovery set")
+			}
+		})
+	}
+}
+
+// A verified published backup remains reported after directory-sync failure,
+// including when its later metadata/readback is unavailable. No source rename
+// occurs and the existing recovery copy is retained with durability unknown.
+func TestClaudeAuthBackupSyncFailureReported(t *testing.T) {
+	for _, unreadable := range []bool{false, true} {
+		t.Run(map[bool]string{false: "sync-only", true: "sync-and-unreadable"}[unreadable], func(t *testing.T) {
+			text := `{"schema_version":2,"skills_root":"x","projects":{}}`
+			path := authEditFixture(t, text)
+			published := ""
+			ops := claudeAuthEditOps{syncBackupDirectory: func(backup string) error {
+				published = backup
+				if unreadable {
+					if err := os.Chmod(backup, 0000); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return errors.New("injected backup directory sync failure")
+			}}
+			result, err := applyClaudeAuth(context.Background(), authEditRequest(t, path), ops)
+			if !errors.Is(err, ErrClaudeAuthEditIO) || result == nil || result.BackupPath != published ||
+				result.Status != "not_applied_backup_retained" || result.BackupSHA256 != claudeAuthSHA([]byte(text)) || result.Durable || result.ReadbackVerified {
+				t.Fatalf("published backup not reported truthfully: result=%+v err=%v", result, err)
+			}
+			if unreadable {
+				if _, readErr := readClaudeAuthFile(published); !errors.Is(readErr, ErrClaudeAuthEditRefused) {
+					t.Fatal("readback-failure control not exercised", readErr)
+				}
+				if err := os.Chmod(published, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			current, _ := os.ReadFile(path)
+			saved, readErr := os.ReadFile(published)
+			if string(current) != text || readErr != nil || string(saved) != text || len(authEditBackups(t, path)) != 1 {
+				t.Fatal("backup sync failure changed source or lost exact recovery copy")
 			}
 		})
 	}
