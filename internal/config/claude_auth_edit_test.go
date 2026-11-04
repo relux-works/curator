@@ -587,3 +587,27 @@ func TestClaudeAuthBackupSyncFailureReported(t *testing.T) {
 		})
 	}
 }
+
+// Invalid external policy topology refuses with no token; the adjacent identity
+// test covers valid absence and a regular file. No real system input is read.
+func TestClaudeAuthPolicyReadRefusals(t *testing.T) {
+	for _, kind := range []string{"directory", "non-directory-parent"} {
+		t.Run(kind, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "policy.json")
+			if kind == "directory" {
+				if err := os.Mkdir(path, 0700); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.WriteFile(path, []byte("not a directory"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				path = filepath.Join(path, "policy.json")
+			}
+			token, err := claudeAuthPolicyAt(path)
+			if !errors.Is(err, ErrClaudeAuthEditRefused) || token != "" {
+				t.Fatalf("invalid policy topology returned token=%q, error=%v", token, err)
+			}
+		})
+	}
+}
