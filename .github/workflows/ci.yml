@@ -103,7 +103,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
-          ref: ${{ env.SPEC_PIN }}
+          ref: 559daf2875cf32751f9d1f824a4c1876e936bab2
           path: protocol-spec
       - uses: actions/setup-go@v5
         with:
