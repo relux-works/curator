@@ -535,7 +535,7 @@ func realVendoredBuildWitness(t *testing.T, witness string) (buildmeta.Artifact,
 	if witness == "artifact-tamper" {
 		original := chmod
 		chmod = func(path string, mode os.FileMode) error {
-			if filepath.Base(path) == "golden-tool" && filepath.Base(filepath.Dir(path)) == "bin" {
+			if (filepath.Base(path) == "golden-tool" || filepath.Base(path) == "golden-tool.exe") && filepath.Base(filepath.Dir(path)) == "bin" {
 				if err := os.WriteFile(path, []byte("tampered"), 0600); err != nil {
 					return err
 				}
