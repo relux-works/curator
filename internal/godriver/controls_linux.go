@@ -137,8 +137,8 @@ func prepareControlDomain(limits ResourceLimits, probes []ControlProbe) (*contro
 			domain.fileBound, domain.fileBytes = true, bytes
 		case ControlInheritedHandleRestriction:
 			// Installed at fork and exec: the manager passes exactly the three
-			// standard descriptors and no extra file, and the Go runtime opens
-			// every other descriptor close-on-exec.
+			// standard descriptors and no extra file. Launch seals other manager
+			// descriptors, including descriptors opened outside the Go runtime.
 		default:
 			return nil, diagnostic(CodeControlUnavailable, "no Linux mechanism for inventory control %q", name)
 		}

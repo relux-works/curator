@@ -78,7 +78,7 @@ func checkIsolation(data []byte) error {
 	count := 0
 	for name, job := range wf.Jobs {
 		route, _ := job.RunsOn.(string)
-		if !strings.Contains(route, "LINUX_SELF_HOSTED") && !strings.Contains(route, "relux-linux") {
+		if name != "linux-build-controls" && !strings.Contains(route, "LINUX_SELF_HOSTED") && !strings.Contains(route, "relux-linux") {
 			continue
 		}
 		count++

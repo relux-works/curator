@@ -92,6 +92,10 @@ func TestLinuxNativeControls(t *testing.T) {
 		if err := cmd.Wait(); err != nil {
 			t.Fatalf("private descriptor leaked: %v", err)
 		}
+		// The parent retains a usable descriptor after worker isolation.
+		if _, err := unix.Write(fd, []byte("parent retains custody")); err != nil {
+			t.Fatalf("parent descriptor was closed: %v", err)
+		}
 	})
 	t.Run("descendant", func(t *testing.T) {
 		// The shell exits first; its live child remains until group teardown.

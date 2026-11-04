@@ -81,11 +81,7 @@ jobs:
   # offline vendored builds replay twice with cold caches on macOS/Windows.
   linux-build-controls:
     name: Linux build controls (hosted)
-    # Linux entries run on the repository's self-hosted Linux runners when the
-    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
-    # same-repository pull requests. A pull request from a fork always stays on
-    # the hosted image, whatever the variable says. See
-    # docs/self-hosted-runner-setup.md.
+    # Required native controls and real compiler witnesses always run hosted.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
