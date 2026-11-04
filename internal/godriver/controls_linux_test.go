@@ -67,7 +67,7 @@ func TestLinuxNativeControls(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer unix.Close(fd)
+		defer func() { _ = unix.Close(fd) }()
 		if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, 0); err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestLinuxNativeControls(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer unix.Kill(pid, unix.SIGKILL)
+		defer func() { _ = unix.Kill(pid, unix.SIGKILL) }()
 		if err := unix.Kill(pid, 0); err != nil {
 			t.Fatalf("positive live descendant: %v", err)
 		}

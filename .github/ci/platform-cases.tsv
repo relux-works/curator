@@ -136,7 +136,7 @@ internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	-	
 internal/godriver	TestResourceLimitsStayInsideManagerBounds	linux,darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
 internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	linux,darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
 internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	linux,darwin,windows	-	-	every native control seam failure rejects before the worker executes
-internal/godriver	TestPerFileSizeLimitIsReallyApplied	linux,darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
+internal/godriver	TestPerFileSizeLimitIsReallyApplied	linux,darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS and Linux
 internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	linux,darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
 internal/godriver	TestWorkerRejectsMissingPrivateJobHandle	windows	-	-	the Windows worker refuses an unbound current-job query before compiler execution
 internal/godriver	TestWorkerRejectsForeignPrivateJobHandle	windows	-	-	the Windows worker refuses a matching-limits Job Object that does not contain it
