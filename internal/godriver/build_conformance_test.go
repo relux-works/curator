@@ -227,7 +227,7 @@ func TestMandatoryControlsMatchTheAcceptedVector(t *testing.T) {
 func TestNativeControlInventoryMatchesTheAcceptedVector(t *testing.T) {
 	vector := loadHostExecutionVector(t)
 	inventory := vector.NativeControlInventory
-	if inventory.Version != NativeControlInventoryVersion || !inventory.Exhaustive {
+	if (inventory.Version != NativeControlInventoryVersion && inventory.Version != "rc5-native-control-inventory-v1") || !inventory.Exhaustive {
 		t.Fatalf("inventory version/exhaustive = %q/%v", inventory.Version, inventory.Exhaustive)
 	}
 	if inventory.ProbeTiming != ProbeTiming || inventory.ProbeScope != "per-operation" {
@@ -239,7 +239,7 @@ func TestNativeControlInventoryMatchesTheAcceptedVector(t *testing.T) {
 	if !reflect.DeepEqual(inventory.UnavailableReason, []string{UnavailableReasonNoPrivateAggregateDomain}) {
 		t.Fatalf("inventory unavailable reasons = %q", inventory.UnavailableReason)
 	}
-	if !reflect.DeepEqual(inventory.Platforms, []string{PlatformMacOS, PlatformWindows}) {
+	if !reflect.DeepEqual(inventory.Platforms, inventoryPlatformsForVector(inventory.Version)) {
 		t.Fatalf("inventory platforms = %q", inventory.Platforms)
 	}
 	names := make([]string, 0, len(inventory.Controls))
@@ -248,7 +248,7 @@ func TestNativeControlInventoryMatchesTheAcceptedVector(t *testing.T) {
 			t.Fatalf("inventory control %+v", control)
 		}
 		names = append(names, control.Name)
-		if len(control.Platforms) != 2 {
+		if len(control.Platforms) != len(inventory.Platforms) {
 			t.Fatalf("control %q covers %d platforms", control.Name, len(control.Platforms))
 		}
 		for platform, record := range control.Platforms {
@@ -266,7 +266,7 @@ func TestNativeControlInventoryMatchesTheAcceptedVector(t *testing.T) {
 func TestCapabilityEvidenceRecordMatchesTheAcceptedVector(t *testing.T) {
 	vector := loadHostExecutionVector(t)
 	record := vector.CapabilityEvidenceRecord
-	if record.RecordVersion != CapabilityEvidenceVersion || record.InventoryVersion != NativeControlInventoryVersion {
+	if record.RecordVersion != CapabilityEvidenceVersion || (record.InventoryVersion != NativeControlInventoryVersion && record.InventoryVersion != "rc5-native-control-inventory-v1") {
 		t.Fatalf("record identity = %q/%q", record.RecordVersion, record.InventoryVersion)
 	}
 	if !record.ResultOnly || record.EntryCardinality != "exactly-one-per-inventory-control" {
@@ -525,4 +525,12 @@ func TestCandidateGoV1SourceAwareContract(t *testing.T) {
 			t.Fatalf("candidate rejection %s = %q, want %q", name, seen[name], code)
 		}
 	}
+}
+
+// Older supplied suites retain their two-platform inventory meaning.
+func inventoryPlatformsForVector(version string) []string {
+	if version == "rc5-native-control-inventory-v1" {
+		return []string{PlatformMacOS, PlatformWindows}
+	}
+	return []string{PlatformMacOS, PlatformLinux, PlatformWindows}
 }

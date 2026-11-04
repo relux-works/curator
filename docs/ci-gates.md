@@ -49,7 +49,7 @@ The module's separate release-check suite remains pinned to curator-spec `v1.0.0
 
 The `rc5-native-control-inventory-v1` vector defines native control records exclusively for macOS and Windows. The `go-v1` driver refuses compiled builds on any other host before starting a worker process. This carve-out applies at two granularities:
 
-- **Whole package**: `internal/godriver` is not executed where the root qualification vector marks the platform excluded (such as Linux, noted under `until_task: TASK-260728-1skseh`). `test-gate.sh` executes `TestProbeRejectsAnUncoveredPlatformBeforeTheWorker` on that runner to assert the exclusion boundary.
+- **Build execution**: `internal/godriver` runs on Linux, macOS, and Windows. The hosted Ubuntu driver lane enables real compiler witnesses with `CURATOR_REAL_GO_BUILD_TEST=1`; unsupported inventory platforms still refuse before worker launch.
 - **Individual case**: Commands in `cmd/curator` that require completed compilation use `requireNativeControlInventoryPlatform` to read `godriver.InventoryPlatform`. Skips log the inventory reason, classified under `platform-control` in [`skip-classes.tsv`](../.github/ci/skip-classes.tsv). `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every runner to verify the boundary state. Covered hosts execute and publish protected cache entries; uncovered hosts report `build_execution_control_unavailable`, publish nothing, and return non-zero exit codes for `curator status --check`.
 
 When the inventory gains a record for a platform, the guard stops skipping automatically. Only `must_run_on` in [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) requires updating.

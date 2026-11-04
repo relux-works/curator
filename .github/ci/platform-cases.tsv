@@ -133,18 +133,18 @@ internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	-	
 # ====================================================================
 # Resource policy -- rc5-native-control-inventory-v1
 # ====================================================================
-internal/godriver	TestResourceLimitsStayInsideManagerBounds	darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
-internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
-internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	darwin,windows	-	-	every native control seam failure rejects before the worker executes
-internal/godriver	TestPerFileSizeLimitIsReallyApplied	darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
-internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
+internal/godriver	TestResourceLimitsStayInsideManagerBounds	linux,darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
+internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	linux,darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
+internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	linux,darwin,windows	-	-	every native control seam failure rejects before the worker executes
+internal/godriver	TestPerFileSizeLimitIsReallyApplied	linux,darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
+internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	linux,darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
 internal/godriver	TestWorkerRejectsMissingPrivateJobHandle	windows	-	-	the Windows worker refuses an unbound current-job query before compiler execution
 internal/godriver	TestWorkerRejectsForeignPrivateJobHandle	windows	-	-	the Windows worker refuses a matching-limits Job Object that does not contain it
 
 # ====================================================================
 # Executable identity and executable behaviour
 # ====================================================================
-internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
+internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	linux,darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
 
 # The manager resolves its own executable to the canonical installed file
 # BEFORE the substitution battery above runs, so the launch shape an operator
@@ -161,13 +161,13 @@ internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,wi
 # Every such skip is recorded in `skips-observed.tsv` against
 # `host-capability`, and a skip for any other reason -- or any skip at all on
 # darwin, which creates both -- is fatal.
-internal/godriver	TestExecutableIdentityResolvesALauncherLink	darwin,windows	windows	host-capability	the manager resolves its own executable through a package-manager launcher link, and every launch shape yields the one installed identity
+internal/godriver	TestExecutableIdentityResolvesALauncherLink	linux,darwin,windows	windows	host-capability	the manager resolves its own executable through a package-manager launcher link, and every launch shape yields the one installed identity
 internal/godriver	TestExecutableIdentityResolvesALauncherLink/*	-	windows	host-capability	a launch-shape subtest may skip only where the Windows host forbids unprivileged symlink creation; the case itself must still pass
-internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink	darwin,windows	windows	host-capability	resolving the launch shape does not trust what it reaches: substitution of the installed file still fails closed
+internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink	linux,darwin,windows	windows	host-capability	resolving the launch shape does not trust what it reaches: substitution of the installed file still fails closed
 internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/*	-	windows	host-capability	a substitution subtest may skip only where the Windows host forbids unprivileged symlink creation; the case itself must still pass
-internal/godriver	TestExecutableIdentityResolvesARealSymlinkedProcessLaunch	darwin,windows	windows	host-capability	a process really started through a launcher link resolves the installed identity, so what os.Executable reports for this platform is observed rather than assumed
-internal/godriver	TestBuildAcceptsAManagerStartedThroughALauncherLink	darwin,windows	windows	host-capability	the whole identity handshake completes for a manager whose own path is a launcher link
-internal/godriver	TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink	darwin,windows	windows	host-capability	a worker process started from a launcher link proves the installed identity back over the protocol
+internal/godriver	TestExecutableIdentityResolvesARealSymlinkedProcessLaunch	linux,darwin,windows	windows	host-capability	a process really started through a launcher link resolves the installed identity, so what os.Executable reports for this platform is observed rather than assumed
+internal/godriver	TestBuildAcceptsAManagerStartedThroughALauncherLink	linux,darwin,windows	windows	host-capability	the whole identity handshake completes for a manager whose own path is a launcher link
+internal/godriver	TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink	linux,darwin,windows	windows	host-capability	a worker process started from a launcher link proves the installed identity back over the protocol
 internal/godriver	TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction	windows	windows	host-capability	a manager installed under a directory junction resolves instead of being refused as a non-canonical file -- the shape EvalSymlinks alone cannot follow
 internal/godriver	TestExecutableIdentityStillRejectsSubstitutionBehindAJunction	windows	windows	host-capability	a retargeted, dangling or hard-linked install behind a junction cannot move a recorded manager identity or pass as it
 internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
@@ -281,49 +281,26 @@ internal/interop/environments	TestNoLedgerRowForThisPackageToleratesASkip	linux,
 internal/interop/environments	TestNoRootReadHereEscapesTheDeclaredArtefactGuard	linux,darwin,windows	-	-	outside suite_test.go the identifier `root` is only bound, returned, passed to one of the accountable helpers or formatted into a failure message, so a read written the ordinary way goes through rootPath and is checked against the root-artifacts.tsv row as it is read; the scan tracks that identifier, so a case that re-reads the environment variable under another name is outside it and is caught only by failing red on the open()
 internal/interop/environments	TestTheRootIsAlwaysBoundToThatOneName	linux,darwin,windows	-	-	every binding of suiteRoot's result is named root, the identifier the guard scan above tracks; a second name would hide every read made through it
 internal/interop/environments	TestConformanceEveryPathTheVectorsNameIsDeclared	linux,darwin,windows	-	-	every string the four vectors carry that this root resolves as a path is covered by a declared artefact, and every declared artefact is either a required family or covers such a path, so the cross-referenced part of the declaration is derived from the vectors rather than restated
-internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
-internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
+internal/godriver	TestCandidateGoV1SourceAwareContract	linux,darwin,windows	linux,darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
+internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	linux,darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
 
 # ====================================================================
-# Compiled-build surface -- rc5-native-control-inventory-v1 carve-out
-#
-# A completed compiled command needs the go-v1 driver, which refuses before any
-# worker starts on a platform the inventory defines no record for.  These cases
-# therefore run on the two covered platforms and are carved out elsewhere by
-# `requireNativeControlInventoryPlatform`, whose reason names the inventory.
-#
-# The carve-out is asserted, not merely obeyed: the bidirectional case below
-# runs on EVERY runner and proves the boundary from whichever side that runner
-# is on -- a covered host installs and publishes exactly one protected entry, an
-# uncovered host is refused with `build_execution_control_unavailable`,
-# publishes nothing, and fails `status --check`.
-#
-# Linux is the open qualification item (rc.5 qualification vector, until_task
-# TASK-260728-1skseh).  When the inventory gains a linux record, the guard stops
-# skipping there on its own and only `must_run_on` below needs widening.
-# ====================================================================
+# Compiled-build surface runs on Linux, macOS, and Windows.
 cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
-cmd/curator	TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt	darwin,windows	linux	platform-control	the CLI build-dispatch path completes the portable go-v1 seed build before verified-provider dispatch; Linux skips because rc5-native-control-inventory-v1 defines no record for that host
-cmd/curator	TestCompiledProjectStatusAndUntrustedRecovery	darwin,windows	linux	platform-control	compiled currentness and untrusted-state repair over one real installation
-cmd/curator	TestCompiledProjectRepairsCorruptCompiledState	darwin,windows	linux	platform-control	corrupt compiled-cache repair over one real installation
-cmd/curator	TestCompiledProjectRestoresCacheWhenCommitFails	darwin,windows	linux	platform-control	commit rollback restoring the displaced cache over one real installation
-cmd/curator	TestStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	project status resolves and classifies a compiled command reached only through a dependency
-cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	darwin,windows	linux	platform-control	an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
-cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	darwin,windows	linux	platform-control	gc neither removes nor reports removing a cache entry a live marker references
-cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	darwin,windows	linux	platform-control	machine-wide status reports compiled currentness and fails `--check` for every non-current state
-cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	machine-wide status resolves a compiled command no declaration names
-cmd/curator	TestNativeBlackboxExternalBuildLifecycle	darwin,windows	linux	platform-control	the built binary installs a schema-7 external build repository command from a local substitution, runs its shim, reinstalls as a cache hit, and removes the shim and build root
+cmd/curator	TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt	linux,darwin,windows	-	-	real compiled command path runs on Linux with native execution controls
+cmd/curator	TestCompiledProjectStatusAndUntrustedRecovery	linux,darwin,windows	-	-	compiled currentness and untrusted-state repair over one real installation
+cmd/curator	TestCompiledProjectRepairsCorruptCompiledState	linux,darwin,windows	-	-	corrupt compiled-cache repair over one real installation
+cmd/curator	TestCompiledProjectRestoresCacheWhenCommitFails	linux,darwin,windows	-	-	commit rollback restoring the displaced cache over one real installation
+cmd/curator	TestStatusReportsATransitivelyResolvedCompiledCommand	linux,darwin,windows	-	-	project status resolves and classifies a compiled command reached only through a dependency
+cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	linux,darwin,windows	-	-	an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
+cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	linux,darwin,windows	-	-	gc neither removes nor reports removing a cache entry a live marker references
+cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	linux,darwin,windows	-	-	machine-wide status reports compiled currentness and fails `--check` for every non-current state
+cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	linux,darwin,windows	-	-	machine-wide status resolves a compiled command no declaration names
+cmd/curator	TestNativeBlackboxExternalBuildLifecycle	linux,darwin,windows	-	-	the built binary installs a schema-7 external build repository command from a local substitution, runs its shim, reinstalls as a cache hit, and removes the shim and build root
 
 # ====================================================================
-# Protocol platform exclusion -- asserted, never merely omitted.
-#
-# The rc.5 qualification vector marks linux `excluded` (until_task
-# TASK-260728-1skseh), so `internal/godriver` does not execute there.  This
-# case proves the exclusion is real fail-closed behaviour: an uncovered
-# platform is refused BEFORE the worker starts.  It is required on every
-# runner, including the one where the package is otherwise excluded.
-# ====================================================================
-internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (including linux) is rejected before the worker starts
+# Unsupported inventory platforms still refuse before launching a worker.
+internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (such as freebsd) is rejected before the worker starts
 
 # ====================================================================
 # Schema-8 suite consumption.
@@ -825,7 +802,7 @@ internal/buildcache	TestBuildInUseWindowsCase	windows	-	-	Windows image casing c
 internal/buildcache	TestWindowsNativeExecutablePath	windows	-	-	queries the current process image using the native Windows API
 internal/buildcache	TestDarwinSavedExecutablePath	darwin	-	-	saved executable path is independent of argv zero
 internal/buildcache	TestLinuxExecutablePaths	linux	-	-	proc exe enumeration distinguishes absent and unreadable images
-cmd/curator	TestGCRetainsLiveProcessBuild	darwin,windows	linux	platform-control	GC entry point retains an old executable used by a live child; Linux compilation lacks a native-control inventory record
+cmd/curator	TestGCRetainsLiveProcessBuild	linux,darwin,windows	-	-	real compiled command path runs on Linux with native execution controls
 
 # Atomic profile content-hash migration and v2 writer cutover.
 internal/envprofile	TestRC14MigrationRehashesLegacyIdentities	linux,darwin,windows	windows	host-capability	Resolve provisions genuine v1 identities; ApplyMigration rehashes lock, store and generated surfaces into v2
@@ -855,7 +832,7 @@ internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/Scripts/guide.md	li
 internal/envprofile	TestProfileInstallMarkdownCaseAliasesCLI/References/guide.md-declared	linux,darwin,windows	-	-	directory aliases are tested on both case-sensitive and case-folding filesystems
 
 # Global native ownership: deterministic private-build barrier and snapshot contract.
-cmd/curator	TestGlobalNativeOwnerPausedBuild	darwin	linux	platform-control	the stopped real worker holds an authenticated build permit while profile sync proceeds; Linux has no rc5-native-control-inventory-v1 record
+cmd/curator	TestGlobalNativeOwnerPausedBuild	linux,darwin	-	-	real compiled command path runs on Linux with native execution controls
 cmd/curator	TestGlobalNativeOwnerBuildInventory	linux,darwin,windows	-	-	a real global compiled install publishes on covered inventory hosts; uncovered hosts refuse without profile/native or canonical publication
 cmd/curator	TestNativeBuildPermitBarrier	linux,darwin	-	-	marked worker frames pause before the build permit; unmarked streams forward exactly and a failed barrier forwards no permit
 cmd/curator	TestNativeOwnerSnapshotContract	linux,darwin,windows	-	-	snapshot equality ignores opaque directory allocation size while detecting file bytes, file length and entry-kind changes
@@ -943,3 +920,4 @@ internal/envprofile	TestProjectMCPCredentialAuthority	linux,darwin,windows	-	-	a
 internal/envprofile	TestProfileMCPCredentialPublicationBoundary	linux,darwin,windows	-	-	node authority introduced before MCP publication prevents parent creation and payload writes while per-home publishes
 internal/envprofile	TestProjectMCPAuthorityBeforeState	linux,darwin,windows	-	-	MCP authority precedes empty acquisition and invalid or missing lock processing with explicit per-home diagnostic controls
 internal/envprofile	TestMCPCredentialAuthorityNarrowingControls	linux,darwin,windows	-	-	six bounded plants fail at intended MCP admission or prepublication assertions rather than setup or timeout
+internal/godriver	TestLinuxNativeControls	linux	-	-	real Linux kernel enforces file bounds, descriptor isolation, and descendant teardown

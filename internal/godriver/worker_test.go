@@ -457,7 +457,7 @@ func TestProbeRejectsAnUncoveredPlatformBeforeTheWorker(t *testing.T) {
 	if DiagnosticCode(err) != CodeControlUnavailable {
 		t.Fatalf("error = %v, want %s", err, CodeControlUnavailable)
 	}
-	_, _, err = probeNativeControlsFor("linux", limits)
+	_, _, err = probeNativeControlsFor("freebsd", limits)
 	if DiagnosticCode(err) != CodeControlUnavailable {
 		t.Fatalf("error = %v, want %s", err, CodeControlUnavailable)
 	}

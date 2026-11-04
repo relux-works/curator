@@ -1,4 +1,4 @@
-//go:build !darwin && !windows
+//go:build !darwin && !windows && !linux
 
 package godriver
 
@@ -23,25 +23,25 @@ func probeNativeControl(name string, _ ResourceLimits) (bool, error) {
 type controlDomain struct{}
 
 func prepareControlDomain(_ ResourceLimits, _ []ControlProbe) (*controlDomain, error) {
-	return nil, diagnostic(CodeControlUnavailable, "the portable execution policy is specified for macOS and Windows only")
+	return nil, diagnostic(CodeControlUnavailable, "the portable execution policy is specified for macOS, Linux, and Windows only")
 }
 
 func (domain *controlDomain) launch(_ *exec.Cmd) error {
-	return diagnostic(CodeControlUnavailable, "the portable execution policy is specified for macOS and Windows only")
+	return diagnostic(CodeControlUnavailable, "the portable execution policy is specified for macOS, Linux, and Windows only")
 }
 
 func (domain *controlDomain) installedControls() []string { return nil }
 
 func (domain *controlDomain) workerJobHandleValue() uint64 { return 0 }
 
-// destroy has no counterpart here on purpose. The macOS and Windows domains
+// destroy has no counterpart here on purpose. The macOS, Linux, and Windows domains
 // call their own destroy from inside their own launch; nothing in the shared
 // worker client does, so a stub on this build would be code no build can reach.
 
 func (domain *controlDomain) close() {}
 
 func observeNativeControls(_ ResourceLimits, _ []ControlProbe, _ []*os.File, _ uint64) ([]string, error) {
-	return nil, diagnostic(CodeCapabilityEvidenceInvalid, "the portable execution policy is specified for macOS and Windows only")
+	return nil, diagnostic(CodeCapabilityEvidenceInvalid, "the portable execution policy is specified for macOS, Linux, and Windows only")
 }
 
 func compilerSysProcAttr() *syscall.SysProcAttr { return &syscall.SysProcAttr{} }

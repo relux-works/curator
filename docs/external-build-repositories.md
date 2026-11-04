@@ -70,6 +70,6 @@ Every install runs the same pipeline, in order. A failure at any stage stops the
 3. **Cache.** Curator derives a cache key from the source, the toolchain, and the execution policy. A matching verified artifact is reused, and the install reports `outcome=cache-hit` without rebuilding.
 4. **Compiler.** On a cache miss, the Go toolchain builds the target from the immutable snapshot under the manager-owned execution policy. Curator records a receipt next to the artifact and publishes the shim in `.agents/bin/`.
 
-Compilation runs on macOS and Windows. On Linux and other hosts, Curator refuses the build before the worker starts with `build_execution_control_unavailable`; see Platform support in [Authoring CLI commands](authoring-cli-commands.md).
+Compilation runs on macOS, Linux, and Windows; see Platform support in [Authoring CLI commands](authoring-cli-commands.md) for enforced and unavailable Linux controls.
 
 Removing the skill and reinstalling removes its shim and the build root it no longer references. For status codes and repair, see [Compiled commands](compiled-commands.md) and [Troubleshooting](troubleshooting.md).

@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin || linux
 
 package godriver
 
@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -21,7 +22,7 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 		goTool = "go"
 	}
 	for _, plant := range []struct{ name, file, before, after, witness, message string }{
-		{"omit-group-kill", "controls_darwin.go", "_ = unix.Kill(-pid, unix.SIGKILL)", "_ = pid", "TestBuildTerminatesTheCompleteWorkerDomain", "outlived the worker domain teardown: survival marker"},
+		{"omit-group-kill", "controls_" + runtime.GOOS + ".go", "_ = unix.Kill(-pid, unix.SIGKILL)", "_ = pid", "TestBuildTerminatesTheCompleteWorkerDomain", "outlived the worker domain teardown: survival marker"},
 		{"restore-readiness-sleep", "testdata/stubgo/main.go", "_, readyErr := io.ReadFull(ready, acknowledgement[:])", "_, readyErr := 0, error(nil)\n time.Sleep(500*time.Millisecond)\n acknowledgement[0] = 1\n _ = io.ReadFull", "TestBuildWaitsForDelayedDescendantReadiness", "tool children did not publish their identities"},
 	} {
 		t.Run(plant.name, func(t *testing.T) {

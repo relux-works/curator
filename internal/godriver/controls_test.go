@@ -38,10 +38,10 @@ func TestNativeControlInventoryIsExhaustiveAndClosed(t *testing.T) {
 	if len(nativeControlInventory) != 5 {
 		t.Fatalf("inventory has %d controls, want exactly five", len(nativeControlInventory))
 	}
-	if len(nativeControlPlatforms) != 2 {
-		t.Fatalf("inventory covers %d platforms, want exactly macOS and Windows", len(nativeControlPlatforms))
+	if len(nativeControlPlatforms) != 3 {
+		t.Fatalf("inventory covers %d platforms, want exactly macOS, Linux, and Windows", len(nativeControlPlatforms))
 	}
-	for _, platform := range []string{PlatformMacOS, PlatformWindows} {
+	for _, platform := range []string{PlatformMacOS, PlatformLinux, PlatformWindows} {
 		records := nativeControlPlatforms[platform]
 		if len(records) != len(nativeControlInventory) {
 			t.Fatalf("%s has %d records, want one per inventory control", platform, len(records))
@@ -109,7 +109,7 @@ func TestDeferredHardenedGuaranteesNeverAppearAndNeverReject(t *testing.T) {
 				t.Fatalf("%q is a mandatory control", name)
 			}
 		}
-		for _, platform := range []string{PlatformMacOS, PlatformWindows} {
+		for _, platform := range []string{PlatformMacOS, PlatformLinux, PlatformWindows} {
 			for _, entry := range validEvidence(platform).Controls {
 				if entry.Name == name {
 					t.Fatalf("%s evidence names %q", platform, name)
@@ -119,7 +119,7 @@ func TestDeferredHardenedGuaranteesNeverAppearAndNeverReject(t *testing.T) {
 	}
 	// The absence of every deferred guarantee still yields a valid record for
 	// both platforms: no rejection code, no diagnostic, publication permitted.
-	for _, platform := range []string{PlatformMacOS, PlatformWindows} {
+	for _, platform := range []string{PlatformMacOS, PlatformLinux, PlatformWindows} {
 		if err := validateCapabilityEvidence(validEvidence(platform), platform, syntheticProbes(platform)); err != nil {
 			t.Fatalf("%s portable evidence rejected: %v", platform, err)
 		}

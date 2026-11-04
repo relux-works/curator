@@ -46,7 +46,7 @@ The driver enforces strict compilation constraints before and during execution:
 - **External linking prohibition**: Builds enforce internal linking (`-ldflags=-linkmode=internal -libgcc=none`). Linker modes requiring host external linkers are rejected with `external_link_forbidden`, and host linker fallbacks are rejected with `libgcc_fallback_forbidden`.
 - **Toolchain switching prohibition**: Directives requesting another toolchain version in `go.mod` are rejected with `toolchain_switch_forbidden`.
 - **Workspace prohibition**: The presence of `go.work` files inside the build root is rejected with `workspace_dependency_forbidden`.
-- **Platform support**: Compilation is supported on macOS (`darwin`) and Windows (`windows`). On Linux (`linux`) and other unsupported platforms, Curator refuses execution before worker launch with `build_execution_control_unavailable` because native execution control records are defined only for macOS and Windows.
+- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No hardened isolation guarantee is claimed.
 
 ## Script commands
 
@@ -243,3 +243,15 @@ error: skill.manifest_invalid (agent-skill.json): commands.<name>.driver: must b
 ```
 
 Curator rejects invalid driver declarations before starting build execution or fetching repository sources.
+
+A non-root Linux host must provision the pinned, qualified Go distribution in a
+user-owned toolchain directory outside repository and Curator runtime roots.
+Verify the distribution against the publisher's checksum before extraction.
+Set `CURATOR_GO` to its absolute `GOROOT/bin/go` path (or set `GOROOT` to the
+absolute distribution root). Selection order is `CURATOR_GO`, then `GOROOT`,
+then the manager's compiled-in runtime GOROOT; PATH lookup is not used.
+The driver verifies and fingerprints the selected distribution and uses
+`GOTOOLCHAIN=local`, `GOENV=off`, and offline vendor-only builds. Curator does
+not download a missing toolchain. CI provisions the pinned Go release with
+`actions/setup-go` before executing real compiler success, failure, and tamper
+witnesses on hosted Ubuntu.

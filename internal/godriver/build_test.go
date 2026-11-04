@@ -459,8 +459,8 @@ func testBuildTerminatesTheCompleteWorkerDomain(t *testing.T, readyDelayMS int) 
 // real kernel limit inherited by the compiler, not a declaration: a private
 // write above the bound fails inside the Go child.
 func TestPerFileSizeLimitIsReallyApplied(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1")
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("per-file-size-limit is available only on macOS and Linux in rc5-native-control-inventory-v2")
 	}
 	fixture := newSnapshotFixture(t)
 	fixture.start(stubScript{
@@ -487,12 +487,21 @@ func TestRealGoV1VendoredBuildIsBoundedAndNotLaunched(t *testing.T) {
 	if firstToolchain != secondToolchain {
 		t.Fatalf("independent sessions produced different toolchain identities: %+v != %+v", firstToolchain, secondToolchain)
 	}
+	// The same real-compiler lane must reject compilation failure and tampering.
+	for _, witness := range []string{"compile-failure", "artifact-tamper"} {
+		t.Run(witness, func(t *testing.T) { realVendoredBuildWitness(t, witness) })
+	}
+
 	t.Logf("reproducible artifact: %s (%d bytes); toolchain: %s, %s", firstArtifact.SHA256, firstArtifact.Size, firstToolchain.GoVersion, firstToolchain.ContentSHA256)
 }
 
 // Each replay owns a separate source snapshot, session, and initially empty
 // module/build cache. Both drive the production Establish -> Build boundary.
 func realVendoredBuild(t *testing.T) (buildmeta.Artifact, buildmeta.Toolchain) {
+	return realVendoredBuildWitness(t, "success")
+}
+
+func realVendoredBuildWitness(t *testing.T, witness string) (buildmeta.Artifact, buildmeta.Toolchain) {
 	t.Helper()
 	snapshot := filepath.Join(t.TempDir(), "snapshot")
 	fixtureRoot := "testdata/realbuild"
@@ -505,6 +514,10 @@ func realVendoredBuild(t *testing.T) (buildmeta.Artifact, buildmeta.Toolchain) {
 		t.Fatal(err)
 	}
 	snapshot = mustPhysical(t, snapshot)
+	if witness == "compile-failure" {
+		writeTestFile(t, filepath.Join(snapshot, sourceDirRel, "failure.go"), []byte("package main\nvar _ = undefinedBuildWitness\n"), 0600)
+	}
+
 	token, err := buildsource.Validate(snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -519,6 +532,19 @@ func realVendoredBuild(t *testing.T) (buildmeta.Artifact, buildmeta.Toolchain) {
 	}
 	defer func() { _ = session.Close() }()
 
+	if witness == "artifact-tamper" {
+		original := chmod
+		chmod = func(path string, mode os.FileMode) error {
+			if filepath.Base(path) == "golden-tool" && filepath.Base(filepath.Dir(path)) == "bin" {
+				if err := os.WriteFile(path, []byte("tampered"), 0600); err != nil {
+					return err
+				}
+			}
+			return original(path, mode)
+		}
+		defer func() { chmod = original }()
+	}
+
 	result, err := Build(context.Background(), BuildRequest{
 		Session: session, Source: token,
 		CommandObject: BuildCommand{"type": "build", "driver": "go-v1", "source_dir": sourceDirRel},
@@ -528,6 +554,17 @@ func realVendoredBuild(t *testing.T) (buildmeta.Artifact, buildmeta.Toolchain) {
 			FileBytes: defaultFileLimit, DiskBytes: defaultDiskLimit, MemoryBytes: defaultMemoryLimit, Processes: defaultProcessLimit,
 		},
 	})
+	if witness != "success" {
+		want := "go_build_failed"
+		if witness == "artifact-tamper" {
+			want = "artifact_mutated"
+		}
+		if DiagnosticCode(err) != want || result.Artifact.StagedPath != "" {
+			t.Fatalf("%s: result=%+v error=%v want %s without artifact", witness, result, err, want)
+		}
+		return buildmeta.Artifact{}, session.Toolchain()
+	}
+
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,7 +22,7 @@ const (
 // Protocol Core section 4.2.1.
 const (
 	ExecutionPolicy               = buildmeta.ExecutionPolicy
-	NativeControlInventoryVersion = "rc5-native-control-inventory-v1"
+	NativeControlInventoryVersion = "rc5-native-control-inventory-v2"
 	CapabilityEvidenceVersion     = "capability-evidence-v1"
 
 	// ProbeTiming is the only permitted probed_at value. Availability is probed
@@ -37,14 +37,15 @@ const (
 	StatusUnavailable = "unavailable"
 
 	// UnavailableReasonNoPrivateAggregateDomain is the only reason vocabulary
-	// entry defined by rc5-native-control-inventory-v1.
+	// entry defined by rc5-native-control-inventory-v2.
 	UnavailableReasonNoPrivateAggregateDomain = "no-private-aggregate-domain"
 
+	PlatformLinux   = "linux"
 	PlatformMacOS   = "macos"
 	PlatformWindows = "windows"
 )
 
-// The exhaustive rc5-native-control-inventory-v1 control names, in inventory
+// The exhaustive rc5-native-control-inventory-v2 control names, in inventory
 // order. Nothing outside this list may be applied or reported.
 const (
 	ControlDescendantDomainTermination = "descendant-domain-termination"
@@ -74,6 +75,13 @@ type inventoryRecord struct {
 // may only confirm or contradict an entry; it may not add or rename one.
 var nativeControlPlatforms = map[string]map[string]inventoryRecord{
 	PlatformMacOS: {
+		ControlDescendantDomainTermination: {Availability: AvailabilityAvailable, Mechanism: "process-group-and-session-teardown"},
+		ControlActiveProcessCountLimit:     {Availability: AvailabilityUnavailable, UnavailableReason: UnavailableReasonNoPrivateAggregateDomain},
+		ControlAggregateMemoryLimit:        {Availability: AvailabilityUnavailable, UnavailableReason: UnavailableReasonNoPrivateAggregateDomain},
+		ControlPerFileSizeLimit:            {Availability: AvailabilityAvailable, Mechanism: "rlimit-fsize"},
+		ControlInheritedHandleRestriction:  {Availability: AvailabilityAvailable, Mechanism: "close-on-exec-and-explicit-descriptor-release"},
+	},
+	PlatformLinux: {
 		ControlDescendantDomainTermination: {Availability: AvailabilityAvailable, Mechanism: "process-group-and-session-teardown"},
 		ControlActiveProcessCountLimit:     {Availability: AvailabilityUnavailable, UnavailableReason: UnavailableReasonNoPrivateAggregateDomain},
 		ControlAggregateMemoryLimit:        {Availability: AvailabilityUnavailable, UnavailableReason: UnavailableReasonNoPrivateAggregateDomain},
@@ -196,9 +204,11 @@ func DeferredHardenedGuarantees() []string {
 
 // InventoryPlatform maps a Go GOOS to the inventory platform identifier. An
 // unsupported host returns an empty string; the portable policy is defined for
-// exactly macOS and Windows.
+// exactly macOS, Linux, and Windows.
 func InventoryPlatform(goos string) string {
 	switch goos {
+	case "linux":
+		return PlatformLinux
 	case "darwin":
 		return PlatformMacOS
 	case "windows":
@@ -240,7 +250,7 @@ func probeNativeControls(limits ResourceLimits) (string, []ControlProbe, error) 
 func probeNativeControlsFor(platform string, limits ResourceLimits) (string, []ControlProbe, error) {
 	if platform == "" || nativeControlPlatforms[platform] == nil {
 		return "", nil, diagnostic(CodeControlUnavailable,
-			"rc5-native-control-inventory-v1 defines no record for host %s (platform %q); the portable execution policy is specified for macOS and Windows only",
+			"rc5-native-control-inventory-v2 defines no record for host %s (platform %q); the portable execution policy is specified for macOS, Linux, and Windows only",
 			runtime.GOOS, platform)
 	}
 	records := nativeControlPlatforms[platform]
@@ -348,7 +358,7 @@ func validateCapabilityEvidence(record CapabilityEvidence, platform string, prob
 	for _, entry := range record.Controls {
 		if !inInventory(entry.Name) {
 			return diagnostic(CodeCapabilityEvidenceInvalid,
-				"capability evidence reports control %q outside rc5-native-control-inventory-v1", entry.Name)
+				"capability evidence reports control %q outside rc5-native-control-inventory-v2", entry.Name)
 		}
 		if seen[entry.Name] {
 			return diagnostic(CodeCapabilityEvidenceInvalid, "capability evidence duplicates control %q", entry.Name)

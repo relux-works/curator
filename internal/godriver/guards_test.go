@@ -125,7 +125,7 @@ func TestProbeSetGuardMatchesTheInventoryExactly(t *testing.T) {
 	// Inside the worker every probe fault is an evidence fault. The
 	// mandatory-control rejection belongs exclusively to the parent's
 	// pre-worker boundary.
-	if code := DiagnosticCode(validateProbeSet("linux", probes)); code != CodeCapabilityEvidenceInvalid {
+	if code := DiagnosticCode(validateProbeSet("freebsd", probes)); code != CodeCapabilityEvidenceInvalid {
 		t.Fatalf("uncovered platform code = %q", code)
 	}
 	short := append([]ControlProbe(nil), probes[:len(probes)-1]...)

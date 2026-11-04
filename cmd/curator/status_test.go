@@ -454,12 +454,12 @@ func cacheFingerprint(t *testing.T, home string) string {
 }
 
 // requireNativeControlInventoryPlatform carves a case that installs a real
-// compiled command out of a host rc5-native-control-inventory-v1 defines no
+// compiled command out of a host rc5-native-control-inventory-v2 defines no
 // record for.
 //
 // A compiled command is produced by the go-v1 driver, and on such a host the
 // driver refuses before any worker starts: the portable execution policy is
-// specified for macOS and Windows only. A case that needs a completed
+// specified for macOS, Linux, and Windows only. A case that needs a completed
 // compilation has nothing to assert there, and asserting one anyway would claim
 // execution the protocol does not grant.
 //
@@ -476,8 +476,8 @@ func cacheFingerprint(t *testing.T, home string) string {
 func requireNativeControlInventoryPlatform(t *testing.T) {
 	t.Helper()
 	if godriver.InventoryPlatform(runtime.GOOS) == "" {
-		t.Skipf("rc5-native-control-inventory-v1 defines no record for host %s; "+
-			"the portable execution policy is specified for macOS and Windows only", runtime.GOOS)
+		t.Skipf("rc5-native-control-inventory-v2 defines no record for host %s; "+
+			"the portable execution policy is specified for macOS, Linux, and Windows only", runtime.GOOS)
 	}
 }
 
@@ -1658,7 +1658,7 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
 // directions, on every runner — including the one where the carved-out cases
 // above do not run.
 //
-// rc5-native-control-inventory-v1 defines control records for exactly macOS and
+// rc5-native-control-inventory-v2 defines control records for exactly macOS and
 // Windows. The claim under test is that a compiled install succeeds on exactly
 // those platforms and fails closed everywhere else, so:
 //
@@ -1679,7 +1679,7 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
 
 	if godriver.InventoryPlatform(runtime.GOOS) != "" {
 		if code != exitOK {
-			t.Fatalf("a compiled install failed on %s, which rc5-native-control-inventory-v1 covers: %d\nstdout:\n%s\nstderr:\n%s",
+			t.Fatalf("a compiled install failed on %s, which rc5-native-control-inventory-v2 covers: %d\nstdout:\n%s\nstderr:\n%s",
 				runtime.GOOS, code, stdout, stderr)
 		}
 		if entries := publishedCacheEntries(t, home); len(entries) != 1 {
@@ -1703,7 +1703,7 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
 	}
 
 	if code == exitOK {
-		t.Fatalf("a compiled install succeeded on %s, for which rc5-native-control-inventory-v1 defines no record\nstdout:\n%s\nstderr:\n%s",
+		t.Fatalf("a compiled install succeeded on %s, for which rc5-native-control-inventory-v2 defines no record\nstdout:\n%s\nstderr:\n%s",
 			runtime.GOOS, stdout, stderr)
 	}
 	if !strings.Contains(stderr, godriver.CodeControlUnavailable) {
