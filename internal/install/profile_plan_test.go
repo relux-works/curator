@@ -34,13 +34,18 @@ func init() {
 // absent from that inventory must refuse without reaching the staged receipt
 // callback or changing lock/routing preimages. Adding a supported inventory
 // platform automatically enables the same positive and negative build modes.
+// An injected uncovered platform always exercises the real pre-worker refusal,
+// even when every CI host has a native inventory. This test is sequential.
 func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
-	modes := []string{"success", "compiler-failure", "artifact-tamper"}
-	if godriver.InventoryPlatform(runtime.GOOS) == "" {
-		modes = []string{"unsupported-host"}
+	modes := []string{"unsupported-host"}
+	if godriver.InventoryPlatform(runtime.GOOS) != "" {
+		modes = append(modes, "success", "compiler-failure", "artifact-tamper")
 	}
 	for _, mode := range modes {
 		t.Run(mode, func(t *testing.T) {
+			if mode == "unsupported-host" {
+				defer godriver.OverrideUncoveredControlPlatformForTest()()
+			}
 			e := newEnv(t)
 			e.buildSkill("compiler", "profile-tool")
 			repo := filepath.Join(e.skillsRoot, "compiler")
@@ -100,7 +105,7 @@ func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
 			after, _ := os.ReadFile(lockPath)
 			switch mode {
 			case "unsupported-host":
-				if err == nil || !strings.Contains(err.Error(), "profile_skill_compile_failed") || !strings.Contains(err.Error(), "build_execution_control_unavailable") {
+				if err == nil || !strings.Contains(err.Error(), "profile_skill_compile_failed") || godriver.DiagnosticCode(err) != godriver.CodeControlUnavailable || !strings.Contains(err.Error(), "defines no record") {
 					t.Fatalf("intended unsupported-host refusal: %v", err)
 				}
 				if called || !bytes.Equal(old, after) {
