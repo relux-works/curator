@@ -402,7 +402,10 @@ func newSkillPlanGitManager(home string) *gitManager {
 // profile cache. Compare the complete stored projection (including ancestors)
 // so sibling injection cannot hide behind an unchanged selected package hash.
 func skillPlanStorePinHashes(home string, member contextlock.Member, entry string, version hashing.Version) (string, string, error) {
-	repo := newSkillPlanGitManager(home).repoDir(member.Source)
+	repo, err := newSkillPlanGitManager(home).checkedRepo(member.Source)
+	if err != nil {
+		return "", "", fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)
+	}
 	expected, format, err := gitops.PinnedDirectorySnapshotTree(repo, member.Commit, skillSnapshotDirectory(member.Kind, member.Directory))
 	if err != nil {
 		return "", "", fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)

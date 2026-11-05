@@ -19,8 +19,10 @@ import (
 // whole snapshot. Selected/ancestor links and missing selections refuse before
 // preparation or publication. Scoped v5 pins reject sibling and payload drift;
 // retained members keep verification through their existing legacy cache.
+// Foreign origins and cache links outside home refuse after an intact control;
+// file/gitlink selections and case/normalization collisions never publish.
 func TestSkillPlanDirectorySnapshots(t *testing.T) {
-	for _, mode := range []string{"selected", "retained", "discovery-link", "root", "root-link", "selected-link", "ancestor-link", "missing"} {
+	for _, mode := range []string{"selected", "retained", "discovery-link", "root", "root-link", "selected-link", "ancestor-link", "missing", "selection-file", "selection-submodule", "case-collision", "normalization-collision", "cache-foreign-origin", "cache-outside-home"} {
 		t.Run(mode, func(t *testing.T) {
 			home := gitFixtureHome(t)
 			ids := newGitIdentities(t)
@@ -38,6 +40,23 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 				prefix + "agent-skill.json": `{"schema_version":4,"capabilities":{},"commands":{}}`,
 				"outside.txt":               "sibling\n",
 			}, "v1")
+			// Index objects make collision/gitlink witnesses independent of the
+			// host filesystem's case folding, normalization and submodule checkout.
+			addObject := func(mode, name, content string) {
+				t.Helper()
+				object := content
+				if mode != "160000" {
+					cmd := exec.Command("git", "hash-object", "-w", "--stdin")
+					cmd.Dir = repo
+					cmd.Stdin = strings.NewReader(content)
+					out, err := cmd.CombinedOutput()
+					if err != nil {
+						t.Fatalf("fixture object: %v %s", err, out)
+					}
+					object = strings.TrimSpace(string(out))
+				}
+				gitRun(t, repo, "update-index", "--add", "--cacheinfo", mode+","+object+","+name)
+			}
 			link := ""
 			switch mode {
 			case "discovery-link", "root-link":
@@ -47,6 +66,19 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 			case "ancestor-link":
 				gitRun(t, repo, "rm", "-r", "skills")
 				link = "skills"
+			case "selection-file", "selection-submodule":
+				gitRun(t, repo, "rm", "-r", directory)
+				if mode == "selection-file" {
+					addObject("100644", directory, "file at selection\n")
+				} else {
+					addObject("160000", directory, fixtureGitOutput(t, repo, "rev-parse", "HEAD"))
+				}
+			case "case-collision":
+				addObject("100644", prefix+"Case", "first\n")
+				addObject("100644", prefix+"case", "second\n")
+			case "normalization-collision":
+				addObject("100644", prefix+"caf\u00e9", "first\n")
+				addObject("100644", prefix+"cafe\u0301", "second\n")
 			case "missing":
 				directory = "skills/missing"
 			}
@@ -106,10 +138,16 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 				}
 				return nil
 			})
-			refused := mode == "root-link" || mode == "selected-link" || mode == "ancestor-link" || mode == "missing"
-			if refused {
-				if err == nil || (!strings.Contains(err.Error(), "links in git snapshots") && !strings.Contains(err.Error(), "does not exist")) {
-					t.Fatalf("intended snapshot refusal: %v", err)
+			refusal := map[string]string{
+				"root-link": "links in git snapshots", "selected-link": "links in git snapshots",
+				"ancestor-link": "links in git snapshots", "missing": "does not exist",
+				"selection-file": "is not a Git tree", "selection-submodule": "is not a Git tree",
+				"case-collision":          "duplicate platform path in git snapshot",
+				"normalization-collision": "duplicate platform path in git snapshot",
+			}[mode]
+			if refusal != "" {
+				if err == nil || !strings.Contains(err.Error(), refusal) {
+					t.Fatalf("intended snapshot refusal %q: %v", refusal, err)
 				}
 				after, _ := os.ReadFile(lockPath(home, "profile"))
 				if calls != 0 || !bytes.Equal(old, after) {
@@ -142,6 +180,47 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 			if failure := validateNamedStorePins(home, result.Lock); failure != nil {
 				t.Fatalf("valid v5 pins: %v", failure)
 			}
+			if strings.HasPrefix(mode, "cache-") {
+				// Source binding is required even when every pinned tree byte is
+				// intact. The same lock/cache just passed the positive control.
+				cache := newSkillPlanGitManager(home).repoDir(member.Source)
+				want := "source cache origin differs from declaration"
+				if mode == "cache-foreign-origin" {
+					gitRun(t, cache, "remote", "set-url", "origin", "https://example.com/foreign")
+				} else {
+					outside := filepath.Join(t.TempDir(), "cache")
+					if err := os.Rename(cache, outside); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink(outside, cache); err != nil {
+						t.Fatal(err)
+					}
+					want = "source cache is unavailable"
+				}
+				before := snapshotPlanState(t, home)
+				failure := validateNamedStorePins(home, result.Lock)
+				if failure == nil || failure.Check != diagPinHash || !strings.Contains(failure.Error(), want) {
+					t.Fatalf("source-bound cache refusal %q: %v", want, failure)
+				}
+				if after := snapshotPlanState(t, home); before != after {
+					t.Fatal("cache refusal changed lock or store")
+				}
+				return
+			}
+			if mode == "retained" {
+				// A retained member still uses the legacy route, which must reject
+				// changed payload bytes and admit the restored pinned bytes.
+				retainedMember, _ := result.Lock.Find("skill", "retained")
+				payload := filepath.Join(memberEntryPath(home, retainedMember), "SKILL.md")
+				writeGitFile(t, filepath.Dir(payload), "SKILL.md", "tampered retained\n")
+				if failure := validateNamedStorePins(home, result.Lock); failure == nil || failure.Check != diagPinHash || failure.Member.Name != "retained" {
+					t.Fatalf("retained pin tamper admitted: %v", failure)
+				}
+				writeGitFile(t, filepath.Dir(payload), "SKILL.md", "# Retained\n")
+				if failure := validateNamedStorePins(home, result.Lock); failure != nil {
+					t.Fatal("restored retained pin refused", failure)
+				}
+			}
 			if directory != "." {
 				if _, err := os.Stat(contextstore.EntryDir(home, "skill", "memory", pin)); !os.IsNotExist(err) {
 					t.Fatalf("whole snapshot published: %v", err)
@@ -159,6 +238,16 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 			} else if raw, err := os.ReadFile(filepath.Join(entry, "outside.txt")); err != nil || string(raw) != "sibling\n" {
 				t.Fatal("root snapshot lost sibling", err)
 			}
+			if directory == "." {
+				// A whole-repository pin also rejects a newly injected sibling.
+				writeGitFile(t, entry, "injected.txt", "injected sibling\n")
+				if failure := validateNamedStorePins(home, result.Lock); failure == nil || failure.Check != diagPinHash {
+					t.Fatalf("root sibling pin drift admitted: %v", failure)
+				}
+				if err := os.Remove(filepath.Join(entry, "injected.txt")); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if failure := validateNamedStorePins(home, result.Lock); failure != nil {
 				t.Fatal("restored pin refused", failure)
 			}
@@ -171,4 +260,30 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Snapshot only the publication surfaces; cache mutation itself is the input.
+func snapshotPlanState(t *testing.T, home string) string {
+	t.Helper()
+	var state strings.Builder
+	for _, root := range []string{filepath.Join(home, "profiles"), contextstore.Root(home)} {
+		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			state.WriteString(path)
+			if !entry.IsDir() {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				state.Write(data)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return state.String()
 }

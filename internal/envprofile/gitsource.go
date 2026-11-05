@@ -159,15 +159,15 @@ func (m *gitManager) checkedRepo(canonical string) (string, error) {
 		return "", err
 	}
 	if metadata.Kind != stateread.KindPresent || !metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0 {
-		return "", fmt.Errorf("%s: MCP source cache is unavailable", DiagSourceInvalid)
+		return "", fmt.Errorf("%s: source cache is unavailable", DiagSourceInvalid)
 	}
 	output, err := exec.Command("git", "-C", dir, "config", "--local", "--get-all", "remote.origin.url").Output() // #nosec G204 -- fixed Git argv reads local metadata from the checked cache directory without a shell.
 	if err != nil {
-		return "", fmt.Errorf("%s: MCP source cache origin is unavailable", DiagSourceInvalid)
+		return "", fmt.Errorf("%s: source cache origin is unavailable", DiagSourceInvalid)
 	}
 	origin, err := identity.Parse(strings.TrimSpace(string(output)))
 	if err != nil || origin != canonical {
-		return "", fmt.Errorf("%s: MCP source cache origin differs from declaration", DiagSourceInvalid)
+		return "", fmt.Errorf("%s: source cache origin differs from declaration", DiagSourceInvalid)
 	}
 	return dir, nil
 }
