@@ -6,7 +6,7 @@ package main
 // install over an ordinary checkout. The repository is a local git checkout
 // selected through Skillfile.dev.json, so the run needs git and a Go
 // toolchain but no network. The build completes only on hosts
-// rc5-native-control-inventory-v1 covers (macOS, Windows); elsewhere the
+// rc5-native-control-inventory-v2 covers (macOS, Linux, Windows); elsewhere the
 // case skips with the inventory reason.
 
 import (

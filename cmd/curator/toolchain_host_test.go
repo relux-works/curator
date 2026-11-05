@@ -16,7 +16,7 @@ import (
 
 // TestHostGoToolchainIsSelectableOnAnInventoryPlatform pins the one precondition
 // every compiled-command case in this package depends on and none of them state:
-// on a platform rc5-native-control-inventory-v1 covers, the go-v1 boundary must
+// on a platform rc5-native-control-inventory-v2 covers, the go-v1 boundary must
 // be able to select the host's own Go installation from the trusted selection
 // variables alone.
 //

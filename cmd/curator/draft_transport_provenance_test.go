@@ -194,7 +194,7 @@ func TestProductionExternalDepsFalseDrivesMirrorFetchToSink(t *testing.T) {
 
 	code, stdout, stderr := capture(t, fixture.configPath, "install", "app")
 	// Acquisition (and its sink records) precedes the external build. On a
-	// host rc5-native-control-inventory-v1 defines no record for, the go-v1
+	// host rc5-native-control-inventory-v2 defines no record for, the go-v1
 	// driver refuses the build after the plan and staging fetches land; the
 	// sink assertions below run there independent of that build outcome, so
 	// both sink mutants fail on every lane that runs this test. Product code
@@ -206,7 +206,7 @@ func TestProductionExternalDepsFalseDrivesMirrorFetchToSink(t *testing.T) {
 		}
 	} else {
 		if code == exitOK {
-			t.Fatalf("real install succeeded on %s, for which rc5-native-control-inventory-v1 defines no record\nstdout:\n%s\nstderr:\n%s",
+			t.Fatalf("real install succeeded on %s, for which rc5-native-control-inventory-v2 defines no record\nstdout:\n%s\nstderr:\n%s",
 				runtime.GOOS, stdout, stderr)
 		}
 		for _, want := range []string{godriver.CodeControlUnavailable, godriver.NativeControlInventoryVersion, "no record for host " + runtime.GOOS} {

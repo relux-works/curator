@@ -244,7 +244,7 @@ func (session *workerSession) validateRequest() error {
 // validateProbeSet is the worker's defence in depth over the probe record it was
 // handed. The normative availability decision already happened in the parent
 // before this process was released to execute, so a probe record that
-// contradicts rc5-native-control-inventory-v1 here is an evidence fault and
+// contradicts rc5-native-control-inventory-v2 here is an evidence fault and
 // never a mandatory-control rejection.
 func validateProbeSet(platform string, probes []ControlProbe) error {
 	records := nativeControlPlatforms[platform]
@@ -266,12 +266,12 @@ func validateProbeSet(platform string, probes []ControlProbe) error {
 		case AvailabilityAvailable:
 			if record.Availability != AvailabilityAvailable {
 				return diagnostic(CodeCapabilityEvidenceInvalid,
-					"probe claims %q is available, but rc5-native-control-inventory-v1 marks it unavailable on %s", probe.Name, platform)
+					"probe claims %q is available, but rc5-native-control-inventory-v2 marks it unavailable on %s", probe.Name, platform)
 			}
 		case AvailabilityUnavailable:
 			if record.Availability == AvailabilityAvailable {
 				return diagnostic(CodeCapabilityEvidenceInvalid,
-					"rc5-native-control-inventory-v1 marks %q available on %s but the request reports it unavailable", probe.Name, platform)
+					"rc5-native-control-inventory-v2 marks %q available on %s but the request reports it unavailable", probe.Name, platform)
 			}
 		default:
 			return diagnostic(CodeCapabilityEvidenceInvalid, "probe %q reports availability %q", probe.Name, probe.Availability)
