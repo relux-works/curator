@@ -135,7 +135,12 @@ func TestDefaultTransportInstallScopes(t *testing.T) {
 
 func defaultCaptureTool(t *testing.T, repository, mode string) (buildrepo.GitTool, string) {
 	t.Helper()
-	root := t.TempDir()
+	// Credential admission resolves symlinks (including macOS /var). Capture
+	// expectations name that same selected file, rather than its path alias.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	write := func(name, content string) string {
 		p := filepath.Join(root, name)
 		if err := os.WriteFile(p, []byte(content), 0o700); err != nil {
