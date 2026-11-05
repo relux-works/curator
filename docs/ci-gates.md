@@ -88,11 +88,29 @@ The hosted lane also runs `TestCompiledInstallRefusesUncoveredHost` with
 `-tags=curator_test_platform`, exercising production install preflight and status
 without exposing an override in release binaries.
 
-The `Cold repository build` workflow runs on `ubuntu-latest` with Go 1.25.5,
-Node 22 and the isolation wrapper. It prepares a pinned public dependency
-fixture before invoking the offline driver, measures list/build with empty
-operation caches, then performs a full `go-repository-v1` install and resolves
-and runs its command on PATH. `curator_cold_repository` includes only the
-explicit measurement/install witnesses; it adds no release-binary input or
-platform override. Paired deadline/protocol tests and a descendant-survival
-barrier require a runaway build to stop with `process_timeout` and no artifact.
+The `Cold repository build` workflow uses Go 1.25.5, Node 22 and the isolation
+wrapper. It prepares a pinned public dependency fixture outside the offline
+driver, records establishment/fingerprint and all verification phases as well
+as cold list/build durations, and performs a full `go-repository-v1` install.
+The test prepends the project bin directory to PATH and invokes the exported
+command by name. This is test-configured PATH, not proof of a persistent change
+to the user's shell. The harness caps each command at two minutes; earlier
+19–41 second hosted runs prove this fixture succeeds, not the 15-minute limit.
+The over-budget negative independently qualifies stop and descendant teardown.
+
+The `hosted` entry always uses `ubuntu-latest`. The `target-linux` entry uses the
+existing configured Linux runner route only for same-repository PRs and when
+`LINUX_SELF_HOSTED=true`; otherwise its log says hosted and supplies no target
+host measurement. Target figures, not local PRI 4 macOS scheduling-band figures,
+are the budget evidence. Fingerprinting keeps its separate two-minute bound;
+its observed duration and establishment total are printed before the worker
+measurement. No a2a-source qualification is implied.
+
+Every filtered cold-workflow step checks a required set of exact PASS events
+with `.github/ci/required-tests.py`; zero matching tests, renamed tests and skips
+fail. The driver family lane likewise requires both inventory/evidence vector
+consumers and rejects an explicitly configured missing vector. Manager-kill,
+Ctrl-C, termination and deadline witnesses check all acknowledged descendants
+are gone. A release-entrypoint gate forbids `curator_test_platform` in release
+configuration, and default-build tests prove its environment selector inert.
+The test-only `curator_cold_repository` tag exposes no release-binary input.

@@ -201,3 +201,43 @@ func TestLinuxControlLaunchRefusals(t *testing.T) {
 		})
 	}
 }
+
+// Actual procfs admission and exact get/set fcntl errors fail closed; the valid
+// descriptor is retained in the manager with close-on-exec installed.
+func TestLinuxDescriptorProbeAndSyscallFailures(t *testing.T) {
+	if available, err := probeNativeControlWithDescriptorRoot(ControlInheritedHandleRestriction, ResourceLimits{}, "/proc/self/fd"); !available || err != nil {
+		t.Fatalf("actual procfs: %v %v", available, err)
+	}
+	if available, err := probeNativeControlWithDescriptorRoot(ControlInheritedHandleRestriction, ResourceLimits{}, filepath.Join(t.TempDir(), "absent")); available || !os.IsNotExist(err) {
+		t.Fatalf("missing procfs admitted: %v %v", available, err)
+	}
+	for _, operation := range []int{0, unix.F_GETFD, unix.F_SETFD} {
+		t.Run(strconv.Itoa(operation), func(t *testing.T) {
+			file, err := os.CreateTemp(t.TempDir(), "descriptor")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer file.Close()
+			if _, err := unix.FcntlInt(file.Fd(), unix.F_SETFD, 0); err != nil {
+				t.Fatal(err)
+			}
+			injected := false
+			fcntl := func(fd uintptr, op, arg int) (int, error) {
+				if fd == file.Fd() && op == operation && operation != 0 {
+					injected = true
+					return 0, unix.EPERM
+				}
+				return unix.FcntlInt(fd, op, arg)
+			}
+			err = restrictManagerDescriptorsWith("/proc/self/fd", fcntl)
+			if operation == 0 {
+				flags, flagErr := unix.FcntlInt(file.Fd(), unix.F_GETFD, 0)
+				if err != nil || flagErr != nil || flags&unix.FD_CLOEXEC == 0 {
+					t.Fatalf("positive seal: %v %v %d", err, flagErr, flags)
+				}
+			} else if !injected || !errors.Is(err, unix.EPERM) {
+				t.Fatalf("fcntl error admitted: injected=%v err=%v", injected, err)
+			}
+		})
+	}
+}

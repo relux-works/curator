@@ -100,6 +100,7 @@ type Config struct {
 	ProbeTimeout       time.Duration
 	OutputLimit        int64
 	FingerprintTimeout time.Duration
+	observePhase       func(string, time.Duration)
 }
 
 // ConfigFromEnvironment reads only the two trusted-selection variables. No
@@ -118,7 +119,8 @@ func ConfigFromEnvironment(privateBase string, forbiddenRoots ...string) Config 
 // frozen native target plus portable toolchain identity derived from it.
 type Session struct {
 	// observePhase is an internal measurement hook; it selects no build input.
-	observePhase func(string, time.Duration)
+	observePhase     func(string, time.Duration)
+	beforeAcceptance func(context.Context)
 
 	executable         string
 	goroot             string
@@ -176,6 +178,12 @@ func probe(ctx context.Context, config Config, host hostFacts) (Snapshot, error)
 }
 
 func establish(ctx context.Context, config Config, host hostFacts) (_ *Session, resultErr error) {
+	establishStarted := time.Now()
+	defer func() {
+		if config.observePhase != nil {
+			config.observePhase("establish-total", time.Since(establishStarted))
+		}
+	}()
 	if config.Executor == nil {
 		config.Executor = OSExecutor{}
 	}
@@ -215,6 +223,12 @@ func establish(ctx context.Context, config Config, host hostFacts) (_ *Session, 
 	}
 	bootstrap := bootstrapEnvironment(layout, host.goos)
 	run := func(arguments ...string) (Output, error) {
+		started := time.Now()
+		defer func() {
+			if config.observePhase != nil {
+				config.observePhase("establish-probe-"+arguments[0], time.Since(started))
+			}
+		}()
 		if err := verifySelectedRoot(goroot, rootInfo, executable); err != nil {
 			return Output{}, err
 		}
@@ -284,7 +298,11 @@ func establish(ctx context.Context, config Config, host hostFacts) (_ *Session, 
 		return nil, err
 	}
 	fingerprintCtx, cancelFingerprint := context.WithTimeout(ctx, config.FingerprintTimeout)
+	fingerprintStarted := time.Now()
 	digest, state, err := fingerprintToolchain(fingerprintCtx, goroot, version)
+	if config.observePhase != nil {
+		config.observePhase("establish-fingerprint", time.Since(fingerprintStarted))
+	}
 	cancelFingerprint()
 	if err != nil {
 		return nil, err
@@ -300,7 +318,7 @@ func establish(ctx context.Context, config Config, host hostFacts) (_ *Session, 
 			Algorithm: buildmeta.ToolchainAlgorithm, GoRelpath: buildmeta.ToolchainGoRelpath,
 			GoVersion: version, ContentSHA256: digest,
 		},
-		rootInfo: rootInfo, state: state, fingerprintTimeout: config.FingerprintTimeout,
+		rootInfo: rootInfo, state: state, fingerprintTimeout: config.FingerprintTimeout, observePhase: config.observePhase,
 	}, nil
 }
 
@@ -331,12 +349,15 @@ func (session *Session) Environment() []string { return append([]string(nil), se
 // VerifyToolchain revalidates the launcher and exact tree identity. Call it
 // after the last process that may consume this session.
 func (session *Session) VerifyToolchain(ctx context.Context) error {
+	if err := contextFailure(ctx); err != nil {
+		return err
+	}
 	if err := verifySelectedRoot(session.goroot, session.rootInfo, session.executable); err != nil {
 		return err
 	}
 	digest, state, err := fingerprintToolchain(ctx, session.goroot, session.toolchain.GoVersion)
 	if err != nil {
-		return diagnosticErr("toolchain_mutated", err, "cannot revalidate toolchain")
+		return errors.Join(contextFailure(ctx), diagnosticErr("toolchain_mutated", err, "cannot revalidate toolchain"))
 	}
 	if digest != session.toolchain.ContentSHA256 || !reflect.DeepEqual(state, session.state) {
 		return diagnostic("toolchain_mutated", "toolchain tree changed during operation")

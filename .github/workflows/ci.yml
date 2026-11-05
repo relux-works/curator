@@ -128,6 +128,11 @@ jobs:
           python3 - <<'PYCODE'
           import json
           required = {"TestLinuxControlLaunchRefusals", "TestLinuxNativeControls", "TestLinuxNativeControls/file-bound", "TestLinuxNativeControls/descriptor", "TestLinuxNativeControls/descendant", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
+          import sys
+          if sys.platform != "win32":
+              required |= {"TestBuildManagerLifecycle", "TestBuildDeadlineTearsDownDescendants", "TestBuildDescendantNarrowingControls/omit-acceptance-deadline"}
+          if sys.platform == "linux":
+              required |= {"TestBuildDescendantNarrowingControls/omit-deadline-domain-termination", "TestLinuxDescriptorProbeAndSyscallFailures"}
           passed = {row.get("Test") for line in open("driver-tests.json") if (row := json.loads(line)).get("Action") == "pass"}
           assert required <= passed, required - passed
           PYCODE
@@ -202,7 +207,7 @@ jobs:
           bash .github/ci/isolated-test.sh go test -count=1 -timeout=10m -json ./internal/godriver | tee driver-tests.json
           python3 - <<'PYCODE'
           import json
-          required = {"TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
+          required = {"TestNativeControlInventoryMatchesTheAcceptedVector", "TestCapabilityEvidenceRecordMatchesTheAcceptedVector", "TestExplicitNativeControlVectorCannotDisappear", "TestBuildRejectsArtifactDuringAcceptance", "TestBuildCallerContextDiagnostics", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
           passed = {row.get("Test") for line in open("driver-tests.json") if (row := json.loads(line)).get("Action") == "pass"}
           assert required <= passed, required - passed
           PYCODE

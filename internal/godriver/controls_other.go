@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-// rc5-native-control-inventory-v2 defines records for exactly macOS and
+// rc5-native-control-inventory-v2 defines records for macOS, Linux and
 // Windows. On any other host probeNativeControls rejects before the worker
 // starts, so these entry points exist only to keep the package buildable and
 // must never be reached.

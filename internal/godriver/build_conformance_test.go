@@ -3,8 +3,10 @@ package godriver
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildmeta"
@@ -158,17 +160,16 @@ type hostExecutionVector struct {
 func loadHostExecutionVector(t *testing.T) hostExecutionVector {
 	t.Helper()
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
-	if root == "" {
+	successor := os.Getenv("CURATOR_GO_CONTROL_CONFORMANCE_ROOT")
+	if root == "" && successor == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
 	}
 	path := filepath.Join(root, "vectors", "go-host-execution-policy.json")
-	if successor := os.Getenv("CURATOR_GO_CONTROL_CONFORMANCE_ROOT"); successor != "" {
+	if successor != "" {
 		path = filepath.Join(successor, "go-host-execution-policy.json")
 	}
 	payload, err := os.ReadFile(path) // #nosec G304 -- explicit conformance input
-	if os.IsNotExist(err) {
-		t.Skipf("%s is a pre-revision root and publishes no portable execution-policy vector", root)
-	}
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,4 +538,51 @@ func inventoryPlatformsForVector(version string) []string {
 		return []string{PlatformMacOS, PlatformWindows}
 	}
 	return []string{PlatformMacOS, PlatformLinux, PlatformWindows}
+}
+
+// Explicit conformance input cannot turn a missing authority into a green skip.
+// The negative uses the same production vector-consuming tests as the positive.
+func TestExplicitNativeControlVectorCannotDisappear(t *testing.T) {
+	// The missing-input refusal runs even without an optional external corpus.
+	// Configured lanes additionally execute their real pinned positive authority.
+	modes := []bool{true}
+	if os.Getenv("CURATOR_GO_CONTROL_CONFORMANCE_ROOT") != "" || os.Getenv("CURATOR_CONFORMANCE_ROOT") != "" {
+		modes = []bool{false, true}
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, missing := range modes {
+		command := exec.CommandContext(t.Context(), executable, "-test.v", "-test.run=^Test(NativeControlInventoryMatchesTheAcceptedVector|CapabilityEvidenceRecordMatchesTheAcceptedVector)$")
+		for _, item := range os.Environ() {
+			if !strings.HasPrefix(item, "CURATOR_GO_CONTROL_CONFORMANCE_ROOT=") {
+				command.Env = append(command.Env, item)
+			}
+		}
+		root := os.Getenv("CURATOR_GO_CONTROL_CONFORMANCE_ROOT")
+		if missing {
+			root = filepath.Join(t.TempDir(), "absent")
+		}
+		if root != "" {
+			command.Env = append(command.Env, "CURATOR_GO_CONTROL_CONFORMANCE_ROOT="+root)
+		}
+		output, err := command.CombinedOutput()
+		for _, name := range []string{"TestNativeControlInventoryMatchesTheAcceptedVector", "TestCapabilityEvidenceRecordMatchesTheAcceptedVector"} {
+			action := "PASS"
+			if missing {
+				action = "FAIL"
+			}
+			if !strings.Contains(string(output), "--- "+action+": "+name) {
+				t.Fatalf("missing=%v did not exercise %s: %v\n%s", missing, name, err, output)
+			}
+		}
+		if missing {
+			if err == nil || !strings.Contains(string(output), "go-host-execution-policy.json") {
+				t.Fatalf("missing input admitted: %v\n%s", err, output)
+			}
+		} else if err != nil {
+			t.Fatalf("valid input: %v\n%s", err, output)
+		}
+	}
 }

@@ -90,7 +90,9 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 	// identity checks, permit, and build. The worker shares that budget across
 	// children. This parent watchdog adds only bounded shutdown grace and kills
 	// the whole domain even if the worker or protocol stalls.
-	runCtx, cancel := context.WithTimeout(ctx, plan.Limits.Timeout+workerShutdownGrace)
+	runCtx, cancelBudget := context.WithTimeout(ctx, plan.Limits.Timeout)
+	watchCtx, cancelWatch := context.WithTimeout(ctx, plan.Limits.Timeout+workerShutdownGrace)
+	cancel := func() { cancelBudget(); cancelWatch() }
 	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel, runContext: runCtx}
 	defer func() {
 		if resultErr != nil {
@@ -106,7 +108,7 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 	}
 	client.domain = domain
 
-	command := exec.CommandContext(runCtx, plan.Executable.Path, WorkerMode) // #nosec G204 -- identity-verified re-execution of this manager
+	command := exec.CommandContext(watchCtx, plan.Executable.Path, WorkerMode) // #nosec G204 -- identity-verified re-execution of this manager
 	command.Dir = filepath.Dir(plan.Executable.Path)
 	command.Env = workerEnvironment()
 	command.SysProcAttr = workerSysProcAttr()
@@ -425,8 +427,17 @@ func workerEnvironment() []string {
 // deadlineFailure also guards artifact acceptance after successful child output:
 // a watchdog expiring during manager verification cannot turn into success.
 func (client *workerClient) deadlineFailure() error {
-	if client.runContext != nil && errors.Is(client.runContext.Err(), context.DeadlineExceeded) {
-		return diagnosticErr("process_timeout", context.DeadlineExceeded, "worker domain exceeded its whole-session deadline")
+	return contextFailure(client.runContext)
+}
+
+// Cancellation is caller intent, not a toolchain mutation or protocol defect.
+func contextFailure(ctx context.Context) error {
+	if ctx == nil || ctx.Err() == nil {
+		return nil
 	}
-	return nil
+	code := "process_canceled"
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		code = "process_timeout"
+	}
+	return diagnosticErr(code, ctx.Err(), "build operation context ended")
 }

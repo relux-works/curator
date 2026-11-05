@@ -923,3 +923,10 @@ internal/envprofile	TestMCPCredentialAuthorityNarrowingControls	linux,darwin,win
 internal/godriver	TestLinuxNativeControls	linux	-	-	real Linux kernel enforces file bounds, descriptor isolation, and descendant teardown
 
 internal/godriver	TestLinuxControlLaunchRefusals	linux	-	-	real pre-fork ExtraFiles and descriptor enumeration refusals leave no process or applied evidence
+internal/godriver	TestBuildManagerLifecycle	linux,darwin	-	-	manager death, interrupt and termination tear down the acknowledged compiler domain; live release detects survivors
+internal/godriver	TestBuildDeadlineTearsDownDescendants	linux,darwin	-	-	deadline tears down acknowledged descendants without survival markers
+internal/godriver	TestBuildRejectsArtifactDuringAcceptance	linux,darwin,windows	-	-	post-bracket deadline cannot accept an artifact, including a verification-error path
+internal/godriver	TestExplicitNativeControlVectorCannotDisappear	linux,darwin,windows	-	-	explicitly configured missing native-control authority fails rather than skips
+internal/godriver	TestProductionHostIgnoresPlatformTestSelector	linux,darwin,windows	-	-	default builds ignore the host override reserved for explicitly tagged test binaries
+internal/godriver	TestLinuxDescriptorProbeAndSyscallFailures	linux	-	-	missing procfs and injected fcntl errors refuse descriptor admission; valid descriptors remain sealed and open
+cmd/curator	TestNativeInstallSignalCancellation	linux,darwin	-	-	actual install entrypoint cancels its paused worker on interrupt/termination without publishing the compiled skill

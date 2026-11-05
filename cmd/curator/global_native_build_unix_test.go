@@ -192,7 +192,7 @@ func TestGlobalNativeOwnerPausedBuild(t *testing.T) {
 	}
 	resumed = true
 	// Completion is not a latency assertion: the production worker permits a
-	// two-minute real build, followed by toolchain verification/publication.
+	// full per-command budget, followed by toolchain verification/publication.
 	// Lock-order assertions happen at the paused barrier, before this wait.
 	released := time.Now()
 	child.waitWithin(t, nativeCommandWatchdog)
@@ -254,10 +254,10 @@ func waitNativeBuildWorker(t *testing.T, child *nativeCommand) int {
 	return 0
 }
 
-// The fixture completion watchdog must cover the production two-minute build
+// The fixture completion watchdog must cover the production per-command build
 // plus publication. Lock-order negatives remain at the unreleased barrier.
 func TestNativeCommandWatchdogBudget(t *testing.T) {
-	if nativeCommandWatchdog <= 2*time.Minute {
+	if nativeCommandWatchdog <= godriver.DefaultBuildTimeout() {
 		t.Fatal("native fixture watchdog does not cover production build and publication")
 	}
 }

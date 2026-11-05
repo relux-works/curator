@@ -86,7 +86,7 @@ func TestGlobalNativeOwnershipNarrowingControls(t *testing.T) {
 				}
 			}
 			if plant.name == "lock-before-real-private-build" && godriver.InventoryPlatform(runtime.GOOS) == "" {
-				t.Skipf("rc5-native-control-inventory-v1 defines no record for host %s", runtime.GOOS)
+				t.Skipf("rc5-native-control-inventory-v2 defines no record for host %s", runtime.GOOS)
 			}
 			original := filepath.Join(root, filepath.FromSlash(plant.file))
 			payload, err := os.ReadFile(original)

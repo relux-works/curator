@@ -67,6 +67,8 @@ type Options struct {
 	FetchedRepos map[string]bool
 	// Context bounds toolchain probing and compilation. Nil means background.
 	Context context.Context
+	// OnLockWait reports a contended operation lock once, without exposing paths.
+	OnLockWait func(string)
 	// Build injects the narrow toolchain, protected-cache, builder, clock, and
 	// generation-read boundaries. The zero value resolves the real ones.
 	Build BuildDeps
@@ -263,7 +265,9 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return failedResult(alias, projectRoot, err)
 	}
 	ctx := opts.context()
+	finishNotice := lockWaitNotice(opts.OnLockWait, "project")
 	locks, err := commit.Locks.AcquireProjects(ctx, projectRoot)
+	finishNotice()
 	if err != nil {
 		return failedResult(alias, projectRoot, fmt.Errorf("acquire the project operation lock: %w", err))
 	}
