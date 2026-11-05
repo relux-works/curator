@@ -992,7 +992,11 @@ func main() {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer policyFile.Close()
+			defer func() {
+				if err := policyFile.Close(); err != nil {
+					t.Errorf("close wrapper policy descriptor: %v", err)
+				}
+			}()
 			command.ExtraFiles = []*os.File{policyFile}
 			stateValue = "3"
 		}
