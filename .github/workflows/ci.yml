@@ -98,11 +98,11 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/buildrepo \
-              -run '^TestPipelinePreservesSanitizedAcquisitionReasons$'
+              -run '^TestPipelinePreserves(SanitizedAcquisitionReasons|DeterministicAcquisitionRefusals)$'
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \
-              -run '^TestProductionGitToolIgnoresInheritedSSHWrapper$'
+              -run '^Test(ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden)$'
       - name: Detect a dropped default-lane SSH policy
         shell: bash
         run: |

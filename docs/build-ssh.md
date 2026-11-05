@@ -505,8 +505,8 @@ Project, global, and profile installs bind the selected credentials to Curator's
 own SSH wrapper on the default lane. No transport-resolution switch or
 `GIT_SSH` setting is needed. Inherited `GIT_SSH` and `GIT_SSH_COMMAND` are
 ignored: Manager Profile §11.1 requires an environment constructed from empty,
-and §11.3 permits only the manager wrapper with its fixed SSH policy. An
-manager-discovered SSH executable still receives the explicit empty `-F`
+and §11.3 permits only the manager wrapper with its fixed SSH policy. The
+SSH executable discovered by the manager still receives the explicit empty `-F`
 configuration, selected host keys, and exactly one authentication tail above.
 
 Refusals retain the protocol codes and distinguish these sanitized reasons:

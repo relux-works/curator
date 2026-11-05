@@ -553,6 +553,8 @@ func draftCLILegacyRun(t *testing.T, root string, code int, stdout string, fetch
 	return out.String()
 }
 
+// Default-lane replay ignores the draft policy/provider table but always uses
+// the manager SSH wrapper; inherited GIT_SSH cannot select the wire transport.
 func TestDraftTransportLegacyGolden(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
@@ -590,8 +592,9 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 		t.Fatalf("legacy run differs from the committed golden:\n%s", golden)
 	}
 	for _, fetch := range fetches {
-		if strings.Contains(fetch, buildrepo.SSHWrapperName) {
-			t.Fatalf("legacy fetch used the manager wrapper:\n%s", fetch)
+		sshFetch := strings.Contains(fetch, "<"+draftCLISSH+">")
+		if strings.Contains(fetch, buildrepo.SSHWrapperName) != sshFetch || strings.Contains(fetch, fixture.staticSSH) {
+			t.Fatalf("default fetch did not isolate the manager SSH wrapper:\n%s", fetch)
 		}
 	}
 
@@ -862,38 +865,45 @@ func TestDraftTransportIdentityInvalidSurfacesThroughCLI(t *testing.T) {
 	}
 }
 
-// TestReviewProbeLegacyLaneIdentityInvalid pins the frozen lane
-// byte-identical: with the draft switch off, no machine policy, and no
-// GIT_SSH wrapper, the SSH lane's own identity refusal still collapses
-// to source-unavailable at install level (the §7 preservation is scoped
-// to the transport-plan refusal) and carries no appended guidance.
-func TestReviewProbeLegacyLaneIdentityInvalid(t *testing.T) {
+// With no inherited GIT_SSH and no draft policy, selected credentials still
+// reach the manager wrapper for install and status. Removing selection then
+// refuses before any new fetch, with the credential code rather than transport.
+func TestDefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH(t *testing.T) {
 	fixture := setupDraftCLI(t)
-	fakeDir, _ := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
+	fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
 	t.Setenv("PATH", fakeDir+string(os.PathListSeparator)+fixture.origPath)
 	t.Setenv("CURATOR_BUILD_SSH_IDENTITY", fixture.identity)
 	t.Setenv("CURATOR_BUILD_SSH_KNOWN_HOSTS", fixture.knownHosts)
-	for _, key := range []string{"GIT_SSH", "SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST", install.EnvDraftTransportResolution} {
+	for _, key := range []string{"GIT_SSH", "GIT_SSH_COMMAND", "SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST", install.EnvDraftTransportResolution} {
 		t.Setenv(key, "")
 		_ = os.Unsetenv(key)
 	}
 	_ = os.Remove(fixture.policyPath)
 	_ = os.Remove(fixture.providersPath)
 	for _, args := range [][]string{{"install", "app", "--dry-run"}, {"status", "app"}} {
+		before := len(draftCLIFetchLines(t, logPath))
 		code, stdout, stderr := capture(t, fixture.configPath, args...)
-		if code != exitFail {
-			t.Fatalf("%v: exit = %d, want %d\nstdout:\n%s\nstderr:\n%s", args, code, exitFail, stdout, stderr)
+		if code != exitOK {
+			t.Fatalf("%v: exit=%d\nstdout:\n%s\nstderr:\n%s", args, code, stdout, stderr)
 		}
-		const want = "error: skill-a.ssh-cmd: build_repository_source_unavailable: exact external source is unavailable"
-		if !strings.Contains(stderr, want) {
-			t.Fatalf("%v: stderr misses the frozen diagnostic %q:\n%s", args, want, stderr)
+		fetches := draftCLIFetchLines(t, logPath)[before:]
+		if len(fetches) != 2 {
+			t.Fatalf("%v: fetches=%v", args, fetches)
 		}
-		if strings.Contains(stderr, buildrepo.CodeIdentityInvalid) {
-			t.Fatalf("%v: frozen lane leaks %s:\n%s", args, buildrepo.CodeIdentityInvalid, stderr)
+		for _, fetch := range fetches {
+			if strings.Contains(fetch, buildrepo.SSHWrapperName) != strings.Contains(fetch, "<"+draftCLISSH+">") {
+				t.Fatalf("wrapper policy missing: %s", fetch)
+			}
 		}
-		if strings.Contains(stderr, "fix the endpoint entry in machine source-policy.json") {
-			t.Fatalf("%v: frozen lane carries port/alias guidance:\n%s", args, stderr)
-		}
+	}
+	before := len(draftCLIFetchLines(t, logPath))
+	t.Setenv("CURATOR_BUILD_SSH_IDENTITY", "")
+	code, stdout, stderr := capture(t, fixture.configPath, "install", "app", "--dry-run")
+	if code != exitFail || !strings.Contains(stdout+stderr, buildrepo.CodeSSHCredentialMissing) || strings.Contains(stdout+stderr, buildrepo.CodeSourceUnavailable) {
+		t.Fatalf("missing selection: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if after := len(draftCLIFetchLines(t, logPath)); after != before {
+		t.Fatalf("missing selection started %d fetches", after-before)
 	}
 }
 

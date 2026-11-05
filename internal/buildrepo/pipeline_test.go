@@ -700,24 +700,33 @@ func TestPipelinePreservesIdentityInvalidFromAcquisition(t *testing.T) {
 	}
 }
 
-// A missing manager wrapper is a deterministic policy refusal, preserved
-// without consulting an offline snapshot or invoking audit/compiler work.
-func TestPipelinePreservesMissingSSHWrapper(t *testing.T) {
-	_, declared, effective := pipelineFixture(t)
-	events := []string{}
-	laneErr := admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
-	request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
-		OfflineSnapshotKey: "sha256:" + strings.Repeat("0", 64),
-		Store:              recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
-		Go:                 recordingGo{events: &events},
-		Acquire:            func(context.Context) (*Snapshot, error) { return nil, laneErr },
-		Audit:              func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }}
-	_, err := RunPipeline(context.Background(), request)
-	if ErrorCode(err) != CodeIdentityInvalid || err.Error() != laneErr.Error() {
-		t.Fatalf("error = %v, want %v", err, laneErr)
-	}
-	if len(events) != 0 {
-		t.Fatalf("refusal started downstream work: %v", events)
+// Deterministic credential, wrapper and moved-tag refusals retain their
+// sanitized diagnostics without substituting an offline snapshot or starting
+// audit/compiler work. Successful acquisition controls are above in this file.
+func TestPipelinePreservesDeterministicAcquisitionRefusals(t *testing.T) {
+	for _, tc := range []struct{ code, message string }{
+		{CodeIdentityInvalid, "SSH requires the exact manager wrapper"},
+		{CodeSSHCredentialMissing, "SSH build repositories require an operator identity or agent"},
+		{CodeRefMoved, "declared tag does not terminate at the locked commit"},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			_, declared, effective := pipelineFixture(t)
+			events := []string{}
+			laneErr := admissionError(tc.code, "%s", tc.message)
+			request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
+				OfflineSnapshotKey: "sha256:" + strings.Repeat("0", 64),
+				Store:              recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
+				Go:                 recordingGo{events: &events},
+				Acquire:            func(context.Context) (*Snapshot, error) { return nil, laneErr },
+				Audit:              func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }}
+			_, err := RunPipeline(context.Background(), request)
+			if ErrorCode(err) != tc.code || err.Error() != laneErr.Error() {
+				t.Fatalf("error=%v want=%v", err, laneErr)
+			}
+			if len(events) != 0 {
+				t.Fatalf("refusal started downstream work: %v", events)
+			}
+		})
 	}
 }
 
