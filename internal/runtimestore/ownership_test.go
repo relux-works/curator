@@ -1,8 +1,10 @@
 package runtimestore
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,5 +38,49 @@ func TestLegacyShimOwnershipIsExact(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Frozen historical Windows bytes, independently copied from 669fe11c,
+// b52c0842 and cfffd7cd, remain adoptable only for the recorded target.
+// Extra executable text, a different target and forged multiline target text
+// are foreign; current positive controls above cover the modern renderer.
+func TestHistoricalWindowsShimOwnership(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "runtime % space", "tool.cmd")
+	escaped := strings.ReplaceAll(target, "%", "%%")
+	prefix := strings.ReplaceAll(filepath.Join(root, "deps %"), "%", "%%")
+	header := "@echo off\r\nsetlocal DisableDelayedExpansion\r\n"
+	tail := "call \"" + escaped + "\" %*\r\nexit /b %ERRORLEVEL%\r\n"
+	payloads := []string{
+		"@echo off\r\n\"" + target + "\" %*\r\n",
+		header + tail,
+		header + "set \"PATH=" + prefix + ";%PATH%\"\r\n" + tail,
+		header + "if defined PATH (\r\n  set \"PATH=" + prefix + ";%PATH%\"\r\n) else (\r\n  set \"PATH=" + prefix + "\"\r\n)\r\n" + tail,
+	}
+	path := filepath.Join(root, "shim.cmd")
+	for i, payload := range payloads {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			for _, tc := range []struct {
+				payload string
+				want    bool
+			}{
+				{payload, true}, {payload + "echo foreign\r\n", false}, {strings.ReplaceAll(payload, "tool.cmd", "other.cmd"), false},
+			} {
+				if err := os.WriteFile(path, []byte(tc.payload), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if got := MatchesLegacyShim(path, "windows", func(value string) bool { return value == target }); got != tc.want {
+					t.Fatalf("ownership=%v want=%v for %q", got, tc.want, tc.payload)
+				}
+			}
+		})
+	}
+	forged := "@echo off\r\n\"" + target + "\" %*\r\necho foreign\r\n\" %*\r\n"
+	if err := os.WriteFile(path, []byte(forged), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if MatchesLegacyShim(path, "windows", func(string) bool { return true }) {
+		t.Fatal("multiline executable payload adopted as a path")
 	}
 }

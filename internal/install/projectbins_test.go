@@ -100,17 +100,24 @@ func TestProjectBinPreservesForeignEntriesAndRemoval(t *testing.T) {
 }
 
 // A prior installed marker and an exact legacy script/.cmd or relative link
-// permit upgrade into a fingerprint ledger and later safe removal. Merely
+// permit upgrade into a fingerprint ledger and later safe removal. Windows
+// includes the original, lifecycle and single-pass-call historical bytes. Merely
 // similar script text fails the exact renderer check in the adjacent tests.
 func TestProjectBinLegacyUpgradeAndRemoval(t *testing.T) {
 	forms := []string{"script"}
 	if installPlatform() == "unix" {
 		forms = append(forms, "symlink")
+	} else {
+		forms = append(forms, "cmd-original", "cmd-lifecycle", "cmd-single-pass")
 	}
 	for _, form := range forms {
 		for _, upgrade := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/upgrade=%v", form, upgrade), func(t *testing.T) {
 				e := newEnv(t)
+				if installPlatform() == "windows" {
+					e.home = filepath.Join(e.home, "runtime % space")
+					e.cfg.Path = filepath.Join(e.home, "config.json")
+				}
 				e.skill("tool")
 				e.declare("tool")
 				if r := e.install(Options{}); r.Status != "ok" {
@@ -135,6 +142,24 @@ func TestProjectBinLegacyUpgradeAndRemoval(t *testing.T) {
 						t.Fatal(err)
 					}
 					if err := os.Symlink(rel, shim); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if strings.HasPrefix(form, "cmd-") {
+					target := ""
+					if !runtimestore.MatchesLegacyShim(shim, "windows", func(path string) bool { target = path; return true }) {
+						t.Fatal("installed cmd not recognized")
+					}
+					escaped := strings.ReplaceAll(target, "%", "%%")
+					content := "@echo off\r\n\"" + target + "\" %*\r\n"
+					if form == "cmd-lifecycle" {
+						prefix := strings.ReplaceAll(filepath.Join(e.home, "runtime deps"), "%", "%%")
+						content = "@echo off\r\nsetlocal DisableDelayedExpansion\r\nset \"PATH=" + prefix + ";%PATH%\"\r\ncall \"" + escaped + "\" %*\r\nexit /b %ERRORLEVEL%\r\n"
+					}
+					if form == "cmd-single-pass" {
+						content = strings.Replace(runtimestore.WindowsShimContent(target, nil), "call \""+strings.ReplaceAll(escaped, "%", "%%")+"\"", "call \""+escaped+"\"", 1)
+					}
+					if err := os.WriteFile(shim, []byte(content), 0o755); err != nil {
 						t.Fatal(err)
 					}
 				}

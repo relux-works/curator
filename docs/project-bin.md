@@ -23,7 +23,10 @@ For installations predating the ledger, ownership requires a previous installed
 skill marker naming the command and a recognized launcher to that marker's
 runtime or exact artifact cache entry. Unix script and Windows `.cmd` wrappers
 must match the complete generated template, including their PATH prefix;
-additional executable text is foreign. Legacy Unix symlinks must point to the
+additional executable text is foreign. Windows recognition also includes the
+original direct wrapper, the lifecycle PATH-prefix wrapper, and the earlier
+single-pass `call` escaping template. Each must match its complete historical
+bytes and the previously recorded target. Legacy Unix symlinks must point to the
 recorded managed runtime. Recognized legacy launchers update and remove through
 the same journal as current launchers. A filename, shebang, or arbitrary link to
 another file does not qualify. Legacy enforced binary launchers without a
