@@ -400,10 +400,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test_home="$(mktemp -d)"
+          test_home="$(cygpath -m "$(mktemp -d)")"
           trap 'chmod -R u+w "$test_home"; rm -rf "$test_home"' EXIT
           env -i PATH="$PATH" SystemRoot="$SYSTEMROOT" HOME="$test_home" \
             TEMP="$test_home" TMP="$test_home" USERPROFILE="$test_home" \
+            GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/install \
               -run '^TestProjectBinUnreadable(Ledger|Unrelated)$'
