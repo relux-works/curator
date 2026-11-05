@@ -29,7 +29,7 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 	}
 	if runtime.GOOS == "linux" {
 		plants = append(plants,
-			struct{ name, file, before, after, witness, message string }{"omit-deadline-domain-termination", "orphan_unix.go", "_ = unix.Kill(-os.Getpid(), unix.SIGKILL)", "_ = os.Getpid()", "TestBuildDeadlineTearsDownDescendants", "timed-out descendant published survival marker"},
+			struct{ name, file, before, after, witness, message string }{"omit-deadline-domain-termination", "orphan_unix.go", "_ = unix.Kill(-os.Getpid(), unix.SIGKILL)", "_ = unix.SIGKILL", "TestBuildDeadlineTearsDownDescendants", "timed-out descendant published survival marker"},
 			struct{ name, file, before, after, witness, message string }{"omit-descriptor-seal", "controls_linux.go", "restrictManagerDescriptors(domain.descriptorRoot)", "error(nil)", "TestLinuxNativeControls/descriptor", "private descriptor leaked"},
 			struct{ name, file, before, after, witness, message string }{"extra-file-admitted", "controls_linux.go", "len(command.ExtraFiles) != 0", "len(command.ExtraFiles) > 1", "TestLinuxControlLaunchRefusals/extra-files", "extra-files was admitted"},
 			struct{ name, file, before, after, witness, message string }{"sealing-error-admitted", "controls_linux.go", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil {", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil && false {", "TestLinuxControlLaunchRefusals/sealing-failure", "sealing-failure was admitted"},

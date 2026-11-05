@@ -132,7 +132,7 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 
 	run := func(args ...string) string {
 		t.Helper()
-		code, stdout, stderr := testcli.Run(t, project, env, "", bin, args...)
+		code, stdout, stderr := testcli.RunColdManager(t, project, env, bin, args...)
 		if code != 0 {
 			t.Fatalf("curator %v exit=%d\nstdout:\n%s\nstderr:\n%s", args, code, stdout, stderr)
 		}
