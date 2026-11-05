@@ -320,8 +320,17 @@ func (engine *Engine) Commit(lock HomeLock, transactionID string) error {
 // Recover processes every journal in unsigned transaction-id order. Recovery
 // is home-scoped and intentionally does not accept a current project filter.
 func (engine *Engine) Recover(lock HomeLock) error {
+	_, err := engine.RecoverWithOutcome(lock)
+	return err
+}
+
+// RecoverWithOutcome runs the same recovery loop and reports whether a nonempty
+// inventory was fully recovered. False with an error does not mean zero writes:
+// earlier journals may already have completed. No preflight or policy changes
+// are introduced; existing callers can continue using Recover.
+func (engine *Engine) RecoverWithOutcome(lock HomeLock) (bool, error) {
 	if err := requireHomeLock(lock); err != nil {
-		return err
+		return false, err
 	}
 	if engine.hooks.ObserveRecovery != nil {
 		engine.hooks.ObserveRecovery()
@@ -330,18 +339,18 @@ func (engine *Engine) Recover(lock HomeLock) error {
 	defer engine.mu.Unlock()
 	ids, err := engine.journalIDs()
 	if err != nil {
-		return err
+		return false, err
 	}
 	for _, id := range ids {
 		journal, err := engine.loadJournal(id)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if err := engine.resume(journal); err != nil {
-			return fmt.Errorf("recover transaction %s: %w", id, err)
+			return false, fmt.Errorf("recover transaction %s: %w", id, err)
 		}
 	}
-	return nil
+	return len(ids) != 0, nil
 }
 
 func (engine *Engine) resume(journal *Journal) error {

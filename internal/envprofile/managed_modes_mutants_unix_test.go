@@ -3,6 +3,7 @@
 package envprofile
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -44,8 +45,8 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 		},
 		{
 			"claude-trust-0644", "managed.go",
-			"root, path, payload, managedAuthoredFileMode)",
-			"root, path, payload, 0o644)",
+			"file.Chmod(managedAuthoredFileMode)",
+			"file.Chmod(0o644)",
 			"^TestManagedAuthoredFilesArePrivate$",
 			"TestManagedAuthoredFilesArePrivate", ".claude.json mode = 0644, want 0600",
 		},
@@ -89,7 +90,15 @@ func TestManagedModesNarrowingMutants(t *testing.T) {
 			}
 			command := exec.Command("go", "test", "-overlay", overlayPath, "-count=1", "-timeout=2m", "-v", "-run", mutant.run, "./internal/envprofile")
 			command.Dir = root
-			output, err := command.CombinedOutput()
+			var buffer bytes.Buffer
+			command.Stdout = &buffer
+			command.Stderr = &buffer
+			if err := command.Start(); err != nil {
+				t.Fatalf("cannot-start: %v", err)
+			}
+			t.Logf("owned child PID=%d", command.Process.Pid)
+			err = command.Wait()
+			output := buffer.Bytes()
 			exit, ok := err.(*exec.ExitError)
 			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: "+mutant.fails+" ") || !strings.Contains(string(output), mutant.reason) {
 				t.Fatalf("mutant survived or lacked the intended permission failure: %v\n%s", err, output)

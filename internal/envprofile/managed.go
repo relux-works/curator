@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -663,7 +664,8 @@ type seedBundle struct {
 	// xdg maps parent-relative names to operator absolute targets.
 	xdg map[string]string
 	// claudeInit marks the written (not copied) .claude.json seed.
-	claudeInit bool
+	claudeInit     bool
+	claudePrepared *claudeSeedPlan
 	// codexSeedRecord is captured only when a codex_cli home is first
 	// provisioned. Repair preserves the marker's existing record and seed.
 	codexSeedRecord *envmarker.CodexSeedRecord
@@ -828,15 +830,100 @@ func writeStoreDoc(root, path string, document []byte) error {
 	return atomicManagedFile(root, rel, document, managedStoreDocumentMode)
 }
 
-// claudeSeed merges the .claude.json provisioning seed: the exact object
-// {"hasCompletedOnboarding":true,"projects":{}} at provisioning, plus one
-// project entry per launch directory holding hasTrustDialogAccepted and —
-// under the referenced form — hasClaudeMdExternalIncludesApproved (§7.4).
-// Later tool writes are its own state: repair only adds the launch
-// directory's entry and never rewrites anything else.
-func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err error) {
+// claudeSeedPlan holds validated output; nil payload preserves the existing
+// configuration bytes, inode and mtime.
+type claudeSeedPlan struct {
+	seeded  []string
+	payload []byte
+	input   []byte
+	present bool
+}
+
+// Refresh a validated seed before repair publication. The tool does not share
+// our lock: raw input bytes and absence bind reuse, not the manager lock alone.
+// This is not atomic compare-and-swap against uncoordinated external writers.
+func refreshClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
+	fresh, err := prepareClaudeSeed(root, homeRel, launchDir, form)
+	if err != nil {
+		return nil, err
+	}
+	if sameClaudeSeedInput(prepared, fresh) {
+		return prepared, nil
+	}
+	return fresh, nil
+}
+
+func sameClaudeSeedInput(prepared, fresh *claudeSeedPlan) bool {
+	return prepared != nil && prepared.present == fresh.present && bytes.Equal(prepared.input, fresh.input)
+}
+
+// publishClaudeSeed stages only validated output, then compares the exact input
+// (including absence) immediately before rename. Three total checks are allowed;
+// a mismatch rebuilds from that fresh input, never from the stale payload.
+// The tool does not hold our lock: the final read-to-rename interval remains a
+// non-cooperative-writer race, not an atomic filesystem compare-and-swap.
+func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		var temp, full string
+		if prepared.payload != nil {
+			var err error
+			full, err = managedPath(root, managedJoin(homeRel, ".claude.json"), true)
+			if err != nil {
+				return nil, err
+			}
+			file, err := privatedir.CreateTemp(filepath.Dir(full), ".curator-write-*.tmp")
+			if err != nil {
+				return nil, err
+			}
+			temp = file.Name()
+			// Cleanup belongs to this attempt, including write/sync/close errors.
+			err = file.Chmod(managedAuthoredFileMode)
+			if err == nil {
+				_, err = file.Write(prepared.payload)
+			}
+			if err == nil {
+				err = file.Sync()
+			}
+			closeErr := file.Close()
+			if err == nil {
+				err = closeErr
+			}
+			if err != nil {
+				_ = os.Remove(temp)
+				return nil, err
+			}
+		}
+		fresh, err := readClaudeSeedInput(root, homeRel)
+		if err != nil {
+			if temp != "" {
+				_ = os.Remove(temp)
+			}
+			return nil, err
+		}
+		if !sameClaudeSeedInput(prepared, fresh) {
+			if temp != "" {
+				_ = os.Remove(temp)
+			}
+			prepared, err = prepareClaudeSeed(root, homeRel, launchDir, form)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if temp != "" {
+			err = replaceManagedEntry(temp, full)
+			_ = os.Remove(temp)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return prepared, nil
+	}
+	return nil, fmt.Errorf("%s: managed .claude.json changed during all 3 publication checks; seed not published", envregistry.DiagSeedUnreadable)
+}
+
+func readClaudeSeedInput(root, homeRel string) (*claudeSeedPlan, error) {
 	path := managedJoin(homeRel, ".claude.json")
-	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
 	payload, present, err := readManagedRegular(root, path)
 	if err != nil {
 		if strings.Contains(err.Error(), DiagWriteWouldFollowLink) {
@@ -844,6 +931,32 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 		}
 		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, err)
 	}
+	if !present {
+		if full, pathErr := managedPath(root, path, false); pathErr != nil {
+			return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, pathErr)
+		} else if state, statErr := stateread.Lstat(full); statErr != nil {
+			return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, statErr)
+		} else if state.Kind == stateread.KindPresent && !state.Info.Mode().IsRegular() {
+			return nil, fmt.Errorf("%s: managed .claude.json is not a regular file", envregistry.DiagSeedUnreadable)
+		}
+	}
+	return &claudeSeedPlan{input: payload, present: present}, nil
+}
+
+// prepareClaudeSeed merges the .claude.json provisioning seed: the exact
+// object {"hasCompletedOnboarding":true,"projects":{}} at provisioning,
+// plus the launch directory's trust and referenced-includes approval.
+// Tool-owned values and number lexemes survive the merge. Preparation reads
+// and serializes without writes; publication uses this exact prepared value.
+func prepareClaudeSeed(root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
+	var seeded []string
+	raw, err := readClaudeSeedInput(root, homeRel)
+	if err != nil {
+		return nil, err
+	}
+	input, present := raw.input, raw.present
+	payload := input
+	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
 	if present {
 		parsed, ok := decodeJSONObject(payload)
 		if !ok {
@@ -853,12 +966,6 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 		if _, ok := object["projects"].(map[string]any); !ok {
 			object["projects"] = map[string]any{}
 		}
-	} else if full, pathErr := managedPath(root, path, false); pathErr != nil {
-		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, pathErr)
-	} else if state, statErr := stateread.Lstat(full); statErr != nil {
-		return nil, fmt.Errorf("%s: managed .claude.json: %v", envregistry.DiagSeedUnreadable, statErr)
-	} else if state.Kind == stateread.KindPresent && !state.Info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s: managed .claude.json is not a regular file", envregistry.DiagSeedUnreadable)
 	}
 	projects := object["projects"].(map[string]any)
 	for name := range projects {
@@ -887,7 +994,7 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	}
 	sort.Strings(seeded)
 	if present && satisfied {
-		return seeded, nil
+		return &claudeSeedPlan{seeded: seeded, input: input, present: present}, nil
 	}
 	if present {
 		// Tool-owned state is ordinary JSON, not CCJ-1. UseNumber in the
@@ -900,19 +1007,21 @@ func claudeSeed(root, homeRel, launchDir, form string) (seeded []string, err err
 	if err != nil {
 		return nil, err
 	}
-	if err := atomicManagedFile(root, path, payload, managedAuthoredFileMode); err != nil {
-		return nil, err
-	}
-	return seeded, nil
+	return &claudeSeedPlan{seeded: seeded, payload: payload, input: input, present: present}, nil
 }
 
 // decodeJSONObject decodes one JSON object value without rounding numbers or
-// changing their textual representation in tool-owned state.
+// changing their textual representation in tool-owned state. Only JSON whitespace
+// may follow the object; a successful first Decode alone admits malformed tails.
 func decodeJSONObject(payload []byte) (map[string]any, bool) {
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	var object map[string]any
 	if err := decoder.Decode(&object); err != nil || object == nil {
+		return nil, false
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, false
 	}
 	return object, true
@@ -1202,6 +1311,15 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if err != nil {
 		return err
 	}
+	// Validate Claude state before directory protection, backups, context writes
+	// or link replacement. Staging/rename I/O errors after this boundary are
+	// not an all-or-nothing home transaction (see atomicManagedFile).
+	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
+		seeds.claudePrepared, err = refreshClaudeSeed(op.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
+		if err != nil {
+			return op.recoveryRefusal(err)
+		}
+	}
 	want := map[string]bool{}
 	for path := range plan.copies {
 		want[path] = true
@@ -1330,7 +1448,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	}
 	marker, err := finalizeMarker(req, plan, seeds, prior, provenance)
 	if err != nil {
-		return err
+		return op.recoveryRefusal(err)
 	}
 	payload, err := marker.Marshal()
 	if err != nil {
@@ -1436,11 +1554,11 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		seeded, err := claudeSeed(root, homeRel, req.LaunchDir, plan.form)
+		prepared, err := publishClaudeSeed(seeds.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
 		if err != nil {
 			return nil, err
 		}
-		marker.SeededProjects = seeded
+		marker.SeededProjects = prepared.seeded
 		recordedSeeds = append(recordedSeeds, ".claude.json")
 	}
 	sort.Strings(recordedSeeds)
@@ -2677,9 +2795,57 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	if req.beforeRepairLock != nil {
 		req.beforeRepairLock()
 	}
-	op, err := beginOperationValidated(req.Home, req.validatePreservedLock, req.transactionOptions...)
+	var prepared *claudeSeedPlan
+	validate := func() error {
+		if err := req.validatePreservedLock(); err != nil {
+			return err
+		}
+		if req.EnvID != envregistry.ClaudeCode {
+			return nil
+		}
+		adapter, err := envregistry.ByID(req.EnvID)
+		if err != nil {
+			return err
+		}
+		form, err := req.Machine.EffectiveForm(adapter)
+		if err != nil {
+			return err
+		}
+		// The manager home exists under the acquired lock, but environments/
+		// may be absent on first provisioning. Validate from the existing
+		// ancestor without creating directories just to read an absent seed.
+		root := req.Home
+		homeRel, err := managedRelative(root, ManagedHomeDir(req.Home, req.Profile, req.EnvID))
+		if err != nil {
+			return err
+		}
+		// This callback holds the repair lock and precedes journal recovery,
+		// store rebuilding and legacy identity migration. Later refreshes do
+		// not replace this early refusal gate.
+		prepared, err = prepareClaudeSeed(root, homeRel, req.LaunchDir, form)
+		return err
+	}
+	op, err := beginOperationValidated(req.Home, validate, req.transactionOptions...)
 	if err != nil {
 		return nil, err
+	}
+	op.claudePrepared = prepared
+	// Recovery can take time while the tool changes its input. Refresh before
+	// callers can migrate identities or rebuild the store, then again at the
+	// applyPlan write boundary. Completed recovery is not rolled back here.
+	if prepared != nil {
+		adapter, _ := envregistry.ByID(req.EnvID)
+		form, _ := req.Machine.EffectiveForm(adapter) // validated above
+		homeRel, relErr := managedRelative(req.Home, ManagedHomeDir(req.Home, req.Profile, req.EnvID))
+		if relErr != nil {
+			_ = op.close()
+			return nil, relErr
+		}
+		op.claudePrepared, err = refreshClaudeSeed(prepared, req.Home, homeRel, req.LaunchDir, form)
+		if err != nil {
+			_ = op.close()
+			return nil, op.recoveryRefusal(err)
+		}
 	}
 	// Recovery may itself have published a replacement lock.
 	if err := req.validatePreservedLock(); err != nil {
