@@ -29,6 +29,9 @@ const (
 )
 
 func TestMain(m *testing.M) {
+	if runWindowsPolicyHandleProbe() {
+		return
+	}
 	if os.Getenv(testBrokerGrandchild) == "1" {
 		code := 0
 		presence := "absent"
@@ -74,7 +77,7 @@ func TestMain(m *testing.M) {
 		os.Exit(code)
 	}
 	if IsSSHWrapperInvocation(os.Args[0]) {
-		os.Exit(RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
+		os.Exit(RunSSHWrapper(os.Args, os.Getenv, os.Stdin, os.Stdout, os.Stderr))
 	}
 	if isTestFakeSSH(os.Args[0]) {
 		os.Exit(testFakeSSHMain(os.Args))

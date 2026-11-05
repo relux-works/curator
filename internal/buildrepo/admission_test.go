@@ -541,7 +541,7 @@ func TestPackIndexConformanceAndExactSSHWrapper(t *testing.T) {
 		}
 	}
 	for _, mutation := range [][]string{{"ssh-wrapper", argv[1], argv[2]}, {argv[0], "other@example.test", argv[2]}, {argv[0], argv[1], argv[2], "extra"}} {
-		if _, err := ExactSSHCommand(policy, mutation); ErrorCode(err) != CodeIdentityInvalid {
+		if _, err := ExactSSHCommand(policy, mutation); ErrorCode(err) != CodeCredentialPolicyInvalid {
 			t.Errorf("unsafe SSH argv accepted: %#v", mutation)
 		}
 	}
@@ -575,13 +575,13 @@ func TestPackIndexConformanceAndExactSSHWrapper(t *testing.T) {
 
 	relativePin := pinned
 	relativePin.AgentSocket = "agent.sock"
-	if _, err := ExactSSHCommand(relativePin, argv); ErrorCode(err) != CodeIdentityInvalid {
+	if _, err := ExactSSHCommand(relativePin, argv); ErrorCode(err) != CodeCredentialPolicyInvalid {
 		t.Errorf("relative agent socket accepted in pinned-agent form")
 	}
 
 	empty := policy
 	empty.Identity = ""
-	if _, err := ExactSSHCommand(empty, argv); ErrorCode(err) != CodeIdentityInvalid {
+	if _, err := ExactSSHCommand(empty, argv); ErrorCode(err) != CodeCredentialPolicyInvalid {
 		t.Errorf("empty SSH selection accepted")
 	}
 }

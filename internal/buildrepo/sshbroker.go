@@ -1,16 +1,8 @@
 package buildrepo
 
-// Per-attempt SSH wrapper policies for bounded transport resolution.
-//
-// The strict lane admits one static SSH wrapper per tool, but a resolved
-// acquisition may attempt two endpoints with two different credential
-// selections. Each SSH attempt therefore binds its endpoint and its
-// selected credentials into a real wrapper policy through the existing
-// SSHPolicyFor builder and runs the fetch behind a private wrapper copy
-// pinned to that policy, mirroring the per-fetch HTTPS credential broker:
-// the manager executable is copied under a private basename the manager
-// binary dispatches, and the policy travels in a secret-free state file.
-// Paths name authentication material; no secret is copied or written.
+// Per-attempt SSH wrapper policies bind one endpoint, credential selection and
+// executable fingerprint. Unix passes the read-only policy descriptor through
+// Git; Windows uses the explicit operation-private record alternative.
 
 import (
 	"encoding/json"
@@ -29,7 +21,7 @@ const (
 	// public CLI.
 	SSHWrapperName = "curator-build-ssh-wrapper"
 	// EnvSSHWrapperState names the manager-owned, secret-free wrapper-state
-	// file for one fetch.
+	// descriptor (Unix) or protected private record (Windows) for one fetch.
 	EnvSSHWrapperState = "CURATOR_BUILD_SSH_WRAPPER_STATE"
 )
 
@@ -53,23 +45,31 @@ type SSHWrapperBase struct {
 // unresolvable paths, or no pinned host keys — refuses here, before any
 // fetch traffic, instead of authenticating against ambient SSH state.
 func bindSSHWrapperPolicy(tool GitTool, source Source) (SSHPolicy, error) {
-	for name, value := range map[string]string{
-		"SSH executable":        tool.SSHBase.SSH,
-		"SSH empty config":      tool.SSHBase.EmptyConfig,
-		"SSH empty known hosts": tool.SSHBase.EmptyKnownHosts,
+	if tool.SSHBase.SSH == "" {
+		return SSHPolicy{}, admissionError(CodeCredentialPolicyInvalid, "no ssh executable found")
+	}
+	for _, field := range []struct{ name, value string }{
+		{"SSH executable", tool.SSHBase.SSH},
+		{"SSH empty config", tool.SSHBase.EmptyConfig},
+		{"SSH empty known hosts", tool.SSHBase.EmptyKnownHosts},
 	} {
-		if !filepath.IsAbs(value) {
-			return SSHPolicy{}, admissionError(CodeIdentityInvalid, "SSH wrapper policy %s is not configured", name)
+		if !filepath.IsAbs(field.value) {
+			return SSHPolicy{}, admissionError(CodeCredentialPolicyInvalid, "SSH wrapper policy %s is not configured", field.name)
 		}
-		info, err := os.Lstat(value)
-		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-			return SSHPolicy{}, admissionError(CodeIdentityInvalid, "SSH wrapper policy %s is not an admitted absolute regular file", name)
+		info, err := os.Lstat(field.value)
+		if err != nil || !info.Mode().IsRegular() {
+			return SSHPolicy{}, admissionError(CodeCredentialPolicyInvalid, "SSH wrapper policy %s is not an admitted absolute regular file", field.name)
 		}
+	}
+	fingerprint, err := ExecutableFingerprint(tool.SSHBase.SSH)
+	if err != nil {
+		return SSHPolicy{}, admissionError(CodeCredentialPolicyInvalid, "SSH executable cannot be fingerprinted")
 	}
 	if tool.SSHBase.ConnectTimeout <= 0 {
-		return SSHPolicy{}, admissionError(CodeIdentityInvalid, "SSH wrapper policy has no connection timeout")
+		return SSHPolicy{}, admissionError(CodeCredentialPolicyInvalid, "SSH wrapper policy has no connection timeout")
 	}
 	return SSHPolicyFor(SSHPolicy{
+		SSHFingerprint:  fingerprint,
 		SSH:             tool.SSHBase.SSH,
 		EmptyConfig:     tool.SSHBase.EmptyConfig,
 		EmptyKnownHosts: tool.SSHBase.EmptyKnownHosts,
@@ -93,14 +93,18 @@ func IsSSHWrapperInvocation(argv0 string) bool {
 // wrapper's environment — the fetch environment, already clean — and its
 // exit code is reported back to Git.
 func RunSSHWrapper(args []string, getenv func(string) string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) != 2 || getenv == nil || stdin == nil || stdout == nil || stderr == nil {
+	if len(args) != 3 || getenv == nil || stdin == nil || stdout == nil || stderr == nil {
 		return 1
 	}
 	policy, ok := readSSHWrapperState(getenv(EnvSSHWrapperState))
 	if !ok {
 		return 1
 	}
-	command, err := ExactSSHCommand(policy, []string{policy.Wrapper, args[0], args[1]})
+	fingerprint, err := ExecutableFingerprint(policy.SSH)
+	if err != nil || fingerprint != policy.SSHFingerprint {
+		return 1
+	}
+	command, err := ExactSSHCommand(policy, args)
 	if err != nil {
 		return 1
 	}
@@ -120,7 +124,7 @@ func RunSSHWrapper(args []string, getenv func(string) string, stdin io.Reader, s
 // state file carries paths only, never secrets.
 func materializeSSHWrapper(root, executable string, policy SSHPolicy) (string, string, error) {
 	if !filepath.IsAbs(executable) {
-		return "", "", admissionError(CodeIdentityInvalid, "SSH wrapper source is not absolute")
+		return "", "", admissionError(CodeCredentialPolicyInvalid, "SSH wrapper source is not absolute")
 	}
 	managerRoot := filepath.Join(root, "manager-wrappers")
 	if err := os.Mkdir(managerRoot, 0o700); err != nil {
@@ -131,6 +135,9 @@ func materializeSSHWrapper(root, executable string, policy SSHPolicy) (string, s
 		name += ".exe"
 	}
 	wrapper := filepath.Join(managerRoot, name)
+	if err := protectSSHPolicyDirectory(managerRoot); err != nil {
+		return "", "", err
+	}
 	if err := copyBrokerExecutable(executable, wrapper); err != nil {
 		return "", "", err
 	}
@@ -151,15 +158,8 @@ func materializeSSHWrapper(root, executable string, policy SSHPolicy) (string, s
 // unreadable, or unadmitted state fails silently: the wrapper answers
 // nothing without a complete policy.
 func readSSHWrapperState(path string) (SSHPolicy, bool) {
-	if !filepath.IsAbs(path) {
-		return SSHPolicy{}, false
-	}
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 8192 {
-		return SSHPolicy{}, false
-	}
-	payload, err := os.ReadFile(path) // #nosec G304 -- absolute manager-owned path supplied only to the fetch child.
-	if err != nil {
+	payload, err := sshPolicyPayload(path)
+	if err != nil || len(payload) > 8192 {
 		return SSHPolicy{}, false
 	}
 	var policy SSHPolicy

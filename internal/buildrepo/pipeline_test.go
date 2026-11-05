@@ -677,7 +677,7 @@ func TestPipelineFailuresStopBeforeCacheAndCompiler(t *testing.T) {
 func TestPipelinePreservesIdentityInvalidFromAcquisition(t *testing.T) {
 	_, declared, effective := pipelineFixture(t)
 	events := []string{}
-	planErr := admissionError(CodeIdentityInvalid, "transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar")
+	planErr := transportPlanError("transport plan endpoint 1 carries an explicit port or host alias outside the strict external-build lane grammar")
 	request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
 		OfflineSnapshotKey: "sha256:" + strings.Repeat("0", 64),
 		Store:              recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
@@ -705,7 +705,7 @@ func TestPipelinePreservesIdentityInvalidFromAcquisition(t *testing.T) {
 // audit/compiler work. Successful acquisition controls are above in this file.
 func TestPipelinePreservesDeterministicAcquisitionRefusals(t *testing.T) {
 	for _, tc := range []struct{ code, message string }{
-		{CodeIdentityInvalid, "SSH requires the exact manager wrapper"},
+		{CodeCredentialPolicyInvalid, "SSH requires the exact manager wrapper"},
 		{CodeSSHCredentialMissing, "SSH build repositories require an operator identity or agent"},
 		{CodeRefMoved, "declared tag does not terminate at the locked commit"},
 	} {

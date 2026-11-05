@@ -92,11 +92,7 @@ to the destination rather than enumerating every key the agent holds, and
 authenticates a passphrase-protected key without a prompt. It is also the
 default entry of the interactive precheck menu.
 
-The identity-only and agent-only tails are `Spec profiles/manager.md §11.3` as
-published on `curator-spec` main. The pinned-agent tail is admitted by the
-`spec/pinned-agent-authentication-tail` revision of that section, which is not
-yet merged on `curator-spec` main; Curator implements all three. Read the
-current section text before treating any of this as settled protocol.
+All three authentication tails are defined by Manager Profile §11.3.
 
 In every shape the operator names each element explicitly. No ambient agent
 socket, default identity, user or system SSH configuration, prompt, TTY,
@@ -299,7 +295,7 @@ tilde-expanded by Curator. A shell expands `~` in `--build-ssh-identity
 refused:
 
 ```
-build_repository_identity_invalid: SSH identity path must be absolute
+build_repository_credential_policy_invalid: SSH identity path must be absolute
 ```
 
 Use an absolute path in the environment.
@@ -513,8 +509,10 @@ Refusals retain the protocol codes and distinguish these sanitized reasons:
 
 | Code | Reason |
 | --- | --- |
-| `build_repository_ssh_credential_missing` | No operator identity/agent selection, or no selected host keys; no fetch starts. |
-| `build_repository_identity_invalid` | The manager wrapper or its SSH policy inputs are unavailable; no fetch starts. |
+| `build_repository_ssh_credential_missing` | No operator identity/agent selection; no fetch starts. |
+| `build_repository_credential_policy_invalid` | Missing host keys, missing key/known-hosts file, unavailable SSH executable or invalid wrapper policy; no fetch starts. |
+| `build_repository_credential_policy_invalid` | `authentication_failed`: the selected key was not accepted. |
+| `build_repository_credential_policy_invalid` | `host_key_verification_failed`: the host key is unknown or mismatched. |
 | `build_repository_source_unavailable` | `transport_failed`: fetch failed without a proved missing ref. Raw remote output is never printed. |
 | `build_repository_source_unavailable` | `locked_ref_unavailable`: the server reports a missing locked object/ref. This is not a transport failure. |
 | `build_repository_ref_moved` | A declared tag terminates at a different commit from the lock. |
@@ -532,3 +530,48 @@ matrix and `python3 .github/ci/default-build-transport-control.py`. The control
 temporarily drops the default-lane policy binding, requires the selected-key
 install witness to fail for that reason, restores the source, and requires the
 same positive control to pass. It uses capture SSH, never a real SSH client.
+
+## Trusted executables and OpenSSH compatibility
+
+`CURATOR_BUILD_SSH_EXECUTABLE` and `CURATOR_BUILD_GIT_EXECUTABLE` are optional
+operator-configured absolute paths. An invalid configured path refuses rather
+than falling through. Without them, Unix searches `/usr/bin`, `/bin`,
+`/usr/local/bin`, `/opt/homebrew/bin`, in that order. Windows searches
+`C:\Windows\System32\OpenSSH\ssh.exe` for SSH and
+`C:\Program Files\Git\cmd\git.exe`, then `C:\Program Files\Git\bin\git.exe`
+for Git. Inherited `PATH` never selects these executables. Resolved project
+bins, manager bins, and managed command roots are refused, even when explicitly
+configured. Executable bytes are fingerprinted with SHA-256 and rechecked
+before use. No admitted SSH yields the single `no ssh executable found` message.
+
+The qualified real-client floor is OpenSSH 8.9. `EscapeChar=none` disables all
+escape processing ([manual](https://man.openbsd.org/ssh_config.5#EscapeChar)).
+The redundant `EnableEscapeCommandline=no` option was introduced in
+[OpenSSH 9.2](https://www.openssh.org/txt/release-9.2); omitting it permits 8.9
+without enabling an escape channel. Identity-only mode needs an **unencrypted
+private key** because batch mode cannot answer passphrase prompts. A prepared
+operator `known_hosts` file is required; Curator never learns host keys on trust.
+
+Unix passes the read-only policy descriptor through Git to the binary wrapper.
+Git for Windows filters inherited helper handles, so Windows uses a bounded
+private policy record whose directory has a protected current-user-only DACL.
+Both paths compare argc, the exact absolute argv[0], host and remote command,
+then revalidate the SSH executable fingerprint. The record contains policy and
+paths, never key bytes. The native Windows handle control establishes the
+transport boundary; it runs no SSH.
+
+The `OpenSSH 8.9 real fetch` hosted job uses `ubuntu-22.04`, verifies the actual
+client version in its log, starts a fixture sshd with explicit server config,
+and exercises the product wrapper's explicit `-F` client config: key fetch,
+wrong key and unknown host. Real SSH runs only in this hosted job. The default
+project/global matrix uses POSIX capture scripts and therefore cannot execute
+on Windows. CLI fake-Git shell witnesses have the same POSIX boundary; Windows
+still executes portable missing-credential admission, executable-selection,
+fingerprint and native wrapper/handle controls. Those controls do not establish
+a real Windows SSH fetch or agent interoperability.
+
+Profile install uses the shared acquisition implementation; this change has no
+separate profile-install credential fixture. Project/global integration evidence
+must not be presented as independent profile-path coverage. Linux **build and
+publication** success requires #219 and #220; the fetch controls qualify source
+acquisition only and keep existing Linux build refusals unchanged.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -211,23 +212,21 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 		if request.Operation == OperationSyntax {
 			return PipelineResult{State: "unverified-offline", Code: CodeUnverifiedOffline}, nil
 		}
-		// A deterministic transport-plan refusal cannot be repaired by an
-		// offline snapshot. Its static diagnostic is safe to preserve.
-		if ErrorCode(acquireErr) == CodeIdentityInvalid && strings.Contains(acquireErr.Error(), TransportPlanRefusalPrefix) {
-			return result, acquireErr
-		}
-		// Credential/policy refusals and proved pin mismatches cannot be
-		// repaired by an offline snapshot. Preserve only static diagnostics.
-		switch ErrorCode(acquireErr) {
-		case CodeSSHCredentialMissing, CodeRefMoved:
-			return result, acquireErr
-		case CodeIdentityInvalid:
-			if strings.Contains(acquireErr.Error(), "SSH ") {
+		// Structured codes and typed reasons preserve only admitted diagnostics.
+		var refusal *AdmissionError
+		if errors.As(acquireErr, &refusal) {
+			switch refusal.Code {
+			case CodeCredentialPolicyInvalid, CodeSSHCredentialMissing, CodeRefMoved:
 				return result, acquireErr
+			case CodeIdentityInvalid:
+				if refusal.Reason == ReasonTransportPlanInvalid {
+					return result, acquireErr
+				}
+			case CodeSourceUnavailable:
+				if refusal.Reason == ReasonLockedRefUnavailable {
+					return result, acquireErr
+				}
 			}
-		}
-		if ErrorCode(acquireErr) == CodeSourceUnavailable && strings.HasSuffix(acquireErr.Error(), "(locked_ref_unavailable)") {
-			return result, acquireErr
 		}
 		// An untagged exact protected snapshot may support offline reinstall,
 		// but a declared tag requires a same-operation exact-tag assertion.

@@ -76,6 +76,72 @@ env:
   PNPM_PIN: "10.33.0"
 
 jobs:
+  openssh89-fetch:
+    name: OpenSSH 8.9 real fetch (hosted Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Install trusted Git and image OpenSSH
+        run: |
+          sudo add-apt-repository -y ppa:git-core/ppa
+          sudo apt-get update
+          sudo apt-get install -y git openssh-client openssh-server
+          /usr/bin/ssh -V 2>&1 | tee openssh-version.txt
+          grep -E '^OpenSSH_8[.]9p' openssh-version.txt
+      - name: Real product fetch with key and policy refusals
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$(mktemp -d "$HOME/curator-ssh-control.XXXXXX")"
+          server_pid=""
+          cleanup() {
+            if [ -n "$server_pid" ]; then sudo kill "$server_pid" || true; fi
+            sudo rm -rf "$fixture"
+          }
+          trap cleanup EXIT
+          chmod 755 "$fixture"
+          /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/host-key"
+          /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/identity"
+          /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/wrong-identity"
+          cp "$fixture/identity.pub" "$fixture/authorized-keys"
+          printf '127.0.0.1 %s\n' "$(cut -d ' ' -f 1,2 "$fixture/host-key.pub")" > "$fixture/known-hosts"
+          touch "$fixture/empty-config" "$fixture/empty-hosts"
+          cat > "$fixture/sshd-config" <<EOF
+          Port 22
+          ListenAddress 127.0.0.1
+          HostKey $fixture/host-key
+          PidFile $fixture/sshd.pid
+          AuthorizedKeysFile $fixture/authorized-keys
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PubkeyAuthentication yes
+          PermitRootLogin no
+          StrictModes yes
+          UsePAM no
+          AllowUsers $(id -un)
+          EOF
+          sudo systemctl stop ssh
+          sudo mkdir -p /run/sshd
+          sudo /usr/sbin/sshd -f "$fixture/sshd-config" -E "$fixture/server.log"
+          server_pid="$(sudo cat "$fixture/sshd.pid")"
+          git init --bare "$fixture/repository.git"
+          git init "$fixture/source"
+          printf 'witness\n' > "$fixture/source/control.txt"
+          git -C "$fixture/source" add control.txt
+          git -C "$fixture/source" -c user.name=Fixture -c user.email=fixture@example.invalid commit -m fixture
+          git -C "$fixture/source" push "$fixture/repository.git" HEAD:refs/heads/main
+          commit="$(git -C "$fixture/source" rev-parse HEAD)"
+          test_home="$(mktemp -d)"
+          env -i PATH="$PATH" HOME="$test_home" GOTOOLCHAIN=local GOENV=off \
+            go build -o "$fixture/control" ./.github/ci/openssh89
+          env -i PATH="$PATH" HOME="$test_home" \
+            "$fixture/control" "$fixture" "$commit" "$(id -un)"
+          rm -rf "$test_home"
   default-build-transport:
     name: Default build transport (hosted Linux)
     runs-on: ubuntu-latest
@@ -94,15 +160,15 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/install \
-              -run '^TestDefaultTransportInstallScopes$'
+              -run '^Test(DefaultTransportInstallScopes|R1ProjectBinSSHSelected|DefaultTransportMissingCredentialsPortable)$'
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/buildrepo \
-              -run '^TestPipelinePreserves(SanitizedAcquisitionReasons|DeterministicAcquisitionRefusals)$'
+              -run '^Test(PipelinePreserves(SanitizedAcquisitionReasons|DeterministicAcquisitionRefusals)|TrustedExecutableSelection|TrustedGitFingerprintChange|NoSSHExecutableDiagnostic)$'
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \
-              -run '^Test(ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden)$'
+              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden)$'
       - name: Detect a dropped default-lane SSH policy
         shell: bash
         run: |

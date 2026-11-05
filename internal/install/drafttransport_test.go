@@ -325,7 +325,7 @@ func TestDraftSSHWrapperBase(t *testing.T) {
 	}
 
 	t.Run("missing ssh refuses later with a zero base", func(t *testing.T) {
-		t.Setenv("PATH", t.TempDir())
+		t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", filepath.Join(t.TempDir(), "absent-ssh"))
 		base, cleanup, err := draftSSHWrapperBase()
 		defer cleanup()
 		if err != nil {

@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -237,15 +236,8 @@ func draftPlanNeedsSSH(plan buildrepo.TransportPlan) bool {
 // before any traffic. Only empty-file creation failures are errors.
 func draftSSHWrapperBase() (buildrepo.SSHWrapperBase, func(), error) {
 	none := func() {}
-	ssh, err := exec.LookPath("ssh")
+	ssh, err := buildrepo.SelectTrustedExecutable("ssh", os.Getenv("CURATOR_BUILD_SSH_EXECUTABLE"), buildrepo.OperatorManagedExecutableRoots()...)
 	if err != nil {
-		return buildrepo.SSHWrapperBase{}, none, nil
-	}
-	ssh, err = filepath.EvalSymlinks(ssh)
-	if err != nil {
-		return buildrepo.SSHWrapperBase{}, none, nil
-	}
-	if info, err := os.Lstat(ssh); err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
 		return buildrepo.SSHWrapperBase{}, none, nil
 	}
 	dir, err := os.MkdirTemp("", "curator-draft-ssh-")

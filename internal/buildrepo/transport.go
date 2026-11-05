@@ -498,7 +498,7 @@ func parseTransportPlan(plan TransportPlan) ([]Source, error) {
 		// rewriting: refuse before any network I/O rather than strip
 		// the port or fetch the unsubstituted URL (§7).
 		if attempt.HasExplicitPort || attempt.Alias != "" {
-			return nil, admissionError(CodeIdentityInvalid, "transport plan endpoint %d carries an explicit port or host alias outside the strict external-build lane grammar", index+1)
+			return nil, transportPlanError("transport plan endpoint %d carries an explicit port or host alias outside the strict external-build lane grammar", index+1)
 		}
 		if seen[attempt.URL] {
 			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoints must be distinct URLs")

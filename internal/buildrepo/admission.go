@@ -28,6 +28,7 @@ import (
 
 // Stable admission error codes from the rc.5 manager profile.
 const (
+	CodeCredentialPolicyInvalid      = "build_repository_credential_policy_invalid"
 	CodeIdentityInvalid              = "build_repository_identity_invalid"
 	CodeSourceUnavailable            = "build_repository_source_unavailable"
 	CodeRefMoved                     = "build_repository_ref_moved"
@@ -45,8 +46,9 @@ const (
 // AdmissionError preserves the stable protocol code without exposing remote
 // diagnostics or object contents.
 type AdmissionError struct {
-	Code string
-	err  error
+	Code   string
+	Reason AcquisitionReason
+	err    error
 }
 
 func (e *AdmissionError) Error() string { return e.Code + ": " + e.err.Error() }
@@ -92,6 +94,7 @@ func DefaultLimits() Limits {
 // must be absolute, ordinary paths; AllowedVersions pins tested release
 // prefixes such as "git version 2.50.".
 type GitTool struct {
+	Fingerprint     string
 	Executable      string
 	ExecPath        string
 	AllowedVersions []string
@@ -115,6 +118,7 @@ type GitTool struct {
 
 // SSHPolicy contains the manager-owned inputs for the fixed SSH wrapper.
 type SSHPolicy struct {
+	SSHFingerprint  string
 	Wrapper         string
 	SSH             string
 	ExpectedHost    string
@@ -132,15 +136,15 @@ type SSHPolicy struct {
 func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 	expectedCommand := "git-upload-pack '" + policy.RepositoryPath + "'"
 	if len(argv) != 3 || argv[0] != policy.Wrapper || argv[1] != policy.ExpectedHost || argv[2] != expectedCommand {
-		return nil, admissionError(CodeIdentityInvalid, "SSH wrapper invocation does not match protected policy")
+		return nil, admissionError(CodeCredentialPolicyInvalid, "SSH wrapper invocation does not match protected policy")
 	}
 	for _, value := range []string{policy.Wrapper, policy.SSH, policy.EmptyConfig, policy.KnownHosts, policy.EmptyKnownHosts} {
 		if !filepath.IsAbs(value) {
-			return nil, admissionError(CodeIdentityInvalid, "SSH policy path is not absolute")
+			return nil, admissionError(CodeCredentialPolicyInvalid, "SSH policy path is not absolute")
 		}
 	}
 	if policy.ConnectTimeout <= 0 || !sshPathRE.MatchString(policy.RepositoryPath) {
-		return nil, admissionError(CodeIdentityInvalid, "SSH policy is invalid")
+		return nil, admissionError(CodeCredentialPolicyInvalid, "SSH policy is invalid")
 	}
 	result := []string{policy.SSH, "-F", policy.EmptyConfig, "-T",
 		"-o", "BatchMode=yes", "-o", "NumberOfPasswordPrompts=0", "-o", "PasswordAuthentication=no",
@@ -151,17 +155,17 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 		"-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes",
 		"-o", "PermitLocalCommand=no", "-o", "ProxyCommand=none", "-o", "ProxyJump=none",
 		"-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no",
-		"-o", "RequestTTY=no", "-o", "EscapeChar=none", "-o", "EnableEscapeCommandline=no",
+		"-o", "RequestTTY=no", "-o", "EscapeChar=none",
 		"-o", "CanonicalizeHostname=no", "-o", "ConnectionAttempts=1", "-o", "ConnectTimeout=" + strconv.Itoa(policy.ConnectTimeout)}
 	switch {
 	case policy.Identity != "" && policy.AgentSocket == "":
 		if !filepath.IsAbs(policy.Identity) {
-			return nil, admissionError(CodeIdentityInvalid, "SSH identity path is not absolute")
+			return nil, admissionError(CodeCredentialPolicyInvalid, "SSH identity path is not absolute")
 		}
 		result = append(result, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none", "-i", policy.Identity)
 	case policy.AgentSocket != "" && policy.Identity == "":
 		if !filepath.IsAbs(policy.AgentSocket) {
-			return nil, admissionError(CodeIdentityInvalid, "SSH agent path is not absolute")
+			return nil, admissionError(CodeCredentialPolicyInvalid, "SSH agent path is not absolute")
 		}
 		result = append(result, "-o", "IdentitiesOnly=no", "-o", "IdentityFile=none", "-o", "IdentityAgent="+policy.AgentSocket)
 	case policy.Identity != "" && policy.AgentSocket != "":
@@ -171,14 +175,14 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 		// disclosed public key, and passphrase-protected keys authenticate
 		// without a prompt.
 		if !filepath.IsAbs(policy.Identity) {
-			return nil, admissionError(CodeIdentityInvalid, "SSH identity path is not absolute")
+			return nil, admissionError(CodeCredentialPolicyInvalid, "SSH identity path is not absolute")
 		}
 		if !filepath.IsAbs(policy.AgentSocket) {
-			return nil, admissionError(CodeIdentityInvalid, "SSH agent path is not absolute")
+			return nil, admissionError(CodeCredentialPolicyInvalid, "SSH agent path is not absolute")
 		}
 		result = append(result, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent="+policy.AgentSocket, "-i", policy.Identity)
 	default:
-		return nil, admissionError(CodeIdentityInvalid, "SSH authentication policy must select an identity, an agent, or both")
+		return nil, admissionError(CodeCredentialPolicyInvalid, "SSH authentication policy must select an identity, an agent, or both")
 	}
 	return append(result, policy.ExpectedHost, expectedCommand), nil
 }
@@ -186,6 +190,12 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 // ValidateGitTool performs trusted discovery/version pinning before any
 // package or substitution path is read.
 func ValidateGitTool(ctx context.Context, tool GitTool) error {
+	if tool.Fingerprint != "" {
+		current, err := ExecutableFingerprint(tool.Executable)
+		if err != nil || current != tool.Fingerprint {
+			return admissionError(CodeCredentialPolicyInvalid, "Git executable fingerprint changed")
+		}
+	}
 	for name, value := range map[string]string{"git": tool.Executable, "git exec path": tool.ExecPath} {
 		if !filepath.IsAbs(value) {
 			return admissionError(CodeIdentityInvalid, "%s path must be absolute", name)
@@ -302,7 +312,7 @@ func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
 			"SSH build repositories require an operator identity or agent")
 	}
 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
-		return admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
+		return admissionError(CodeCredentialPolicyInvalid, "SSH requires the exact manager wrapper")
 	}
 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
 		return admissionError(CodeIdentityInvalid, "invalid immutable lock")
@@ -345,11 +355,18 @@ func (e *fetchError) Error() string { return "exact source fetch failed" }
 func laneDiagnostic(err error) error {
 	var fetch *fetchError
 	if errors.As(err, &fetch) {
-		reason := "transport_failed"
-		if !fetch.truncated && ClassifyFetchOutput(fetch.stderr) == FailureRef {
-			reason = "locked_ref_unavailable"
+		reason, code := ReasonTransportFailed, CodeSourceUnavailable
+		if !fetch.truncated {
+			switch ClassifyFetchOutput(fetch.stderr) {
+			case FailureRef:
+				reason = ReasonLockedRefUnavailable
+			case FailureAuth:
+				reason, code = ReasonAuthenticationFailed, CodeCredentialPolicyInvalid
+			case FailureHostKey:
+				reason, code = ReasonHostKeyFailed, CodeCredentialPolicyInvalid
+			}
 		}
-		return admissionError(CodeSourceUnavailable, "exact source fetch failed (%s)", reason)
+		return &AdmissionError{Code: code, Reason: reason, err: fmt.Errorf("exact source fetch failed (%s)", reason)}
 	}
 	return err
 }
@@ -357,7 +374,7 @@ func laneDiagnostic(err error) error {
 func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Limits) (*Snapshot, error) {
 	// No internal caller may fall back to a static or ambient SSH wrapper.
 	if request.Source.Transport == "ssh" && request.sshPolicy == nil {
-		return nil, admissionError(CodeIdentityInvalid, "SSH requires a bound manager wrapper policy")
+		return nil, admissionError(CodeCredentialPolicyInvalid, "SSH requires a bound manager wrapper policy")
 	}
 
 	root, err := os.MkdirTemp("", "curator-buildrepo-")
@@ -400,6 +417,7 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 	askPass := request.Tool.AskPass
 	fetchEnv := env
 	fetchSecret := ""
+	var sshState string
 	if request.Source.Transport == "https" && request.Tool.HTTPSCredentials.Selected() {
 		host := strings.SplitN(request.Source.Identity, "/", 2)[0]
 		if request.Tool.HTTPSCredentials.Host != host {
@@ -421,13 +439,15 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 			return nil, admissionError(CodeSourceUnavailable, "cannot materialize SSH wrapper")
 		}
 		fetchEnv = setEnvironmentValue(fetchEnv, "GIT_SSH", wrapper)
-		fetchEnv = append(fetchEnv, EnvSSHWrapperState+"="+state)
+		sshState = state
 	}
 	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, askPass, request.Source.Transport, request.Source.Git, refspec)
 	var stderr string
 	var truncated bool
 	var fetchErr error
-	if fetchSecret != "" {
+	if sshState != "" {
+		stderr, truncated, fetchErr = runGitCaptureSSH(ctx, request.Tool.Executable, paths.work, fetchEnv, sshState, fetchArgs...)
+	} else if fetchSecret != "" {
 		stderr, truncated, fetchErr = runGitCaptureWithHTTPSSecret(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchSecret, fetchArgs...)
 	} else {
 		stderr, truncated, fetchErr = runGitCapture(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...)
@@ -1256,4 +1276,31 @@ func isLFSPointer(data []byte) bool {
 		}
 	}
 	return state == 3
+}
+
+// AcquisitionReason is static protocol classification, never stderr matching.
+type AcquisitionReason string
+
+const (
+	ReasonTransportFailed      AcquisitionReason = "transport_failed"
+	ReasonLockedRefUnavailable AcquisitionReason = "locked_ref_unavailable"
+	ReasonAuthenticationFailed AcquisitionReason = "authentication_failed"
+	ReasonHostKeyFailed        AcquisitionReason = "host_key_verification_failed"
+)
+
+const ReasonTransportPlanInvalid AcquisitionReason = "transport_plan_invalid"
+
+func transportPlanError(format string, args ...any) error {
+	return &AdmissionError{Code: CodeIdentityInvalid, Reason: ReasonTransportPlanInvalid, err: fmt.Errorf(format, args...)}
+}
+
+func runGitCapturePolicy(ctx context.Context, executable, dir string, env []string, policy *os.File, args ...string) (string, bool, error) {
+	cmd := newBoundedGitCommand(ctx, executable, args...)
+	cmd.Dir, cmd.Env, cmd.Stdin = dir, env, bytes.NewReader(nil)
+	cmd.ExtraFiles = []*os.File{policy}
+	var stderr bytes.Buffer
+	capture := &boundedWriter{writer: &stderr, remaining: 64 << 10}
+	cmd.Stdout, cmd.Stderr = io.Discard, capture
+	err := cmd.Run()
+	return stderr.String(), capture.truncated, err
 }

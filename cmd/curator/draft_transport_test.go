@@ -197,7 +197,7 @@ func draftCLISkillRepo(t *testing.T, skillsRoot, httpsLock, sshLock string) {
 func (f *draftCLIFixture) installDraftFakeGit(t *testing.T, arms map[string]draftCLIArm, creds map[string]string) (fakeDir, logPath string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 	realGit, err := exec.LookPath("git")
 	if err != nil {
@@ -462,7 +462,8 @@ func (f *draftCLIFixture) runDraftCLI(t *testing.T, fakeDir, logPath string, swi
 	saved := map[string]*string{}
 	set := map[string]string{
 		"PATH":                          fakeDir + string(os.PathListSeparator) + f.origPath,
-		"GIT_SSH":                       f.staticSSH,
+		"CURATOR_BUILD_GIT_EXECUTABLE":  filepath.Join(fakeDir, "git"),
+		"CURATOR_BUILD_SSH_EXECUTABLE":  f.staticSSH,
 		"CURATOR_BUILD_SSH_IDENTITY":    f.identity,
 		"CURATOR_BUILD_SSH_KNOWN_HOSTS": f.knownHosts,
 	}
@@ -557,7 +558,7 @@ func draftCLILegacyRun(t *testing.T, root string, code int, stdout string, fetch
 // the manager SSH wrapper; inherited GIT_SSH cannot select the wire transport.
 func TestDraftTransportLegacyGolden(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 	fixture := setupDraftCLI(t)
 	policy := draftCLIPolicy(map[string][]string{
@@ -620,7 +621,7 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 
 func TestDraftTransportResolvedMatrix(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 
 	t.Run("fallback on availability then success", func(t *testing.T) {
@@ -702,7 +703,7 @@ func TestDraftTransportResolvedMatrix(t *testing.T) {
 // broker traffic.
 func TestDraftTransportProviderAdmission(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 
 	t.Run("unknown https provider refuses before any fetch", func(t *testing.T) {
@@ -818,7 +819,7 @@ func TestDraftTransportProviderAdmission(t *testing.T) {
 // remediation, with zero fetch attempts.
 func TestDraftTransportIdentityInvalidSurfacesThroughCLI(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 	fixture := setupDraftCLI(t)
 	fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
@@ -872,9 +873,11 @@ func TestDefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH(t *testing.T) {
 	fixture := setupDraftCLI(t)
 	fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
 	t.Setenv("PATH", fakeDir+string(os.PathListSeparator)+fixture.origPath)
+	t.Setenv("CURATOR_BUILD_GIT_EXECUTABLE", filepath.Join(fakeDir, "git"))
+	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", fixture.staticSSH)
 	t.Setenv("CURATOR_BUILD_SSH_IDENTITY", fixture.identity)
 	t.Setenv("CURATOR_BUILD_SSH_KNOWN_HOSTS", fixture.knownHosts)
-	for _, key := range []string{"GIT_SSH", "GIT_SSH_COMMAND", "SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST", install.EnvDraftTransportResolution} {
+	for _, key := range []string{"SSH_AUTH_SOCK", "CURATOR_BUILD_SSH_AGENT", "CURATOR_BUILD_HTTPS_TOKEN", "CURATOR_BUILD_HTTPS_HOST", install.EnvDraftTransportResolution} {
 		t.Setenv(key, "")
 		_ = os.Unsetenv(key)
 	}

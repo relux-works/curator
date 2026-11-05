@@ -56,22 +56,22 @@ func ValidateOperatorSSHCredentials(credentials OperatorSSHCredentials) (Operato
 			continue
 		}
 		if !filepath.IsAbs(*field.value) {
-			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s path must be absolute", field.label)
+			return OperatorSSHCredentials{}, admissionError(CodeCredentialPolicyInvalid, "%s path must be absolute", field.label)
 		}
 		target, err := filepath.EvalSymlinks(*field.value)
 		if err != nil {
-			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s is unavailable", field.label)
+			return OperatorSSHCredentials{}, admissionError(CodeCredentialPolicyInvalid, "%s is unavailable", field.label)
 		}
 		info, err := os.Lstat(target)
 		if err != nil {
-			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s is unavailable", field.label)
+			return OperatorSSHCredentials{}, admissionError(CodeCredentialPolicyInvalid, "%s is unavailable", field.label)
 		}
 		admitted, kind := info.Mode().IsRegular(), "regular file"
 		if field.socket {
 			admitted, kind = info.Mode()&os.ModeSocket != 0, "socket"
 		}
 		if !admitted {
-			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s is not an admitted %s", field.label, kind)
+			return OperatorSSHCredentials{}, admissionError(CodeCredentialPolicyInvalid, "%s is not an admitted %s", field.label, kind)
 		}
 		*field.value = target
 	}
@@ -124,7 +124,7 @@ func SSHPolicyFor(base SSHPolicy, source Source, credentials OperatorSSHCredenti
 		policy.KnownHosts = admitted.KnownHosts
 	}
 	if policy.KnownHosts == "" {
-		return SSHPolicy{}, admissionError(CodeSSHCredentialMissing,
+		return SSHPolicy{}, admissionError(CodeCredentialPolicyInvalid,
 			"SSH build repositories pin StrictHostKeyChecking and require operator host keys")
 	}
 	return policy, nil

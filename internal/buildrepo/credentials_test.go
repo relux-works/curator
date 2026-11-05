@@ -177,8 +177,8 @@ func TestSSHPolicyRefusesUnselectedAndUnverifiableRepositories(t *testing.T) {
 	}
 	// Known hosts alone authenticate nothing, and their absence leaves
 	// StrictHostKeyChecking=yes with nothing to check against.
-	if _, err := SSHPolicyFor(managerPolicy(t), source, OperatorSSHCredentials{Identity: identity}); ErrorCode(err) != CodeSSHCredentialMissing {
-		t.Fatalf("hostless policy error = %v, want %s", err, CodeSSHCredentialMissing)
+	if _, err := SSHPolicyFor(managerPolicy(t), source, OperatorSSHCredentials{Identity: identity}); ErrorCode(err) != CodeCredentialPolicyInvalid {
+		t.Fatalf("hostless policy error = %v, want %s", err, CodeCredentialPolicyInvalid)
 	}
 }
 
@@ -196,8 +196,8 @@ func TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind(t *testing
 		"agent is a file":       {AgentSocket: identity},
 		"known hosts directory": {Identity: identity, KnownHosts: directory},
 	} {
-		if _, err := ValidateOperatorSSHCredentials(credentials); ErrorCode(err) != CodeIdentityInvalid {
-			t.Errorf("%s: error = %v, want %s", name, err, CodeIdentityInvalid)
+		if _, err := ValidateOperatorSSHCredentials(credentials); ErrorCode(err) != CodeCredentialPolicyInvalid {
+			t.Errorf("%s: error = %v, want %s", name, err, CodeCredentialPolicyInvalid)
 		}
 	}
 	// A link onto the material is resolved, not refused: a live agent socket

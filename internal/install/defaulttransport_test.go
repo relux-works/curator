@@ -21,10 +21,10 @@ import (
 // native compiler containment or cryptographic SSH authentication.
 func TestDefaultTransportInstallScopes(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
+		t.Skip("test transport wrapper is POSIX-only; this POSIX capture fixture cannot execute on Windows; portable admission and native wrapper witnesses run separately")
 	}
 	for _, scope := range []string{"project", "global"} {
-		for _, mode := range []string{"selected", "pinned-agent", "missing", "wrong-pin", "transport", "missing-wrapper", "https"} {
+		for _, mode := range []string{"selected", "pinned-agent", "missing", "wrong-pin", "transport", "missing-wrapper", "no-host-keys", "missing-key-file", "missing-hosts-file", "no-ssh", "ref-moved", "https"} {
 			t.Run(scope+"/"+mode, func(t *testing.T) {
 				e := newEnv(t)
 				writeLegacyBuildSkill(t, e, 7, []string{"go-repository-v1"})
@@ -52,7 +52,13 @@ func TestDefaultTransportInstallScopes(t *testing.T) {
 				if err := json.Unmarshal(payload, &manifest); err != nil {
 					t.Fatal(err)
 				}
-				manifest["build_repositories"] = map[string]any{"golden-tools": map[string]any{"git": url, "locked_commit": map[string]any{"object_format": "sha1", "hex": pin}}}
+				repository := map[string]any{"git": url, "locked_commit": map[string]any{"object_format": "sha1", "hex": pin}}
+				if mode == "ref-moved" {
+					e.git(sourceRoot, "tag", "v1")
+					repository["tag"] = "v1"
+					repository["locked_commit"] = map[string]any{"object_format": "sha1", "hex": strings.Repeat("f", 40)}
+				}
+				manifest["build_repositories"] = map[string]any{"golden-tools": repository}
 				payload, err = json.Marshal(manifest)
 				if err != nil {
 					t.Fatal(err)
@@ -69,6 +75,7 @@ func TestDefaultTransportInstallScopes(t *testing.T) {
 				}
 				deps, _ := lifecycleBuildDeps(t)
 				options := Options{Platform: installPlatform(), Build: deps, External: external}
+				before := snapshotState(t, e)
 				var result Result
 				shim := filepath.Join(e.project, ".agents", "bin", shimName("golden-tool"))
 				if scope == "global" {
@@ -83,7 +90,8 @@ func TestDefaultTransportInstallScopes(t *testing.T) {
 				switch mode {
 				case "selected", "pinned-agent", "https":
 					if result.Status != "ok" {
-						t.Fatalf("install: %s", text)
+						fixtureStderr, _ := os.ReadFile(logPath + ".git-stderr")
+						t.Fatalf("install: %s; fixture stderr=%s", text, fixtureStderr)
 					}
 					if _, err := os.Lstat(shim); err != nil {
 						t.Fatal(err)
@@ -109,7 +117,22 @@ func TestDefaultTransportInstallScopes(t *testing.T) {
 						code, reason = buildrepo.CodeSSHCredentialMissing, ""
 					}
 					if mode == "missing-wrapper" {
-						code, reason = buildrepo.CodeIdentityInvalid, "exact manager wrapper"
+						code, reason = buildrepo.CodeCredentialPolicyInvalid, "exact manager wrapper"
+					}
+					if mode == "no-host-keys" {
+						code, reason = buildrepo.CodeCredentialPolicyInvalid, "require operator host keys"
+					}
+					if mode == "missing-key-file" {
+						code, reason = buildrepo.CodeCredentialPolicyInvalid, "SSH identity is unavailable"
+					}
+					if mode == "missing-hosts-file" {
+						code, reason = buildrepo.CodeCredentialPolicyInvalid, "SSH known hosts is unavailable"
+					}
+					if mode == "no-ssh" {
+						code, reason = buildrepo.CodeCredentialPolicyInvalid, "no ssh executable found"
+					}
+					if mode == "ref-moved" {
+						code, reason = buildrepo.CodeRefMoved, ""
 					}
 					if mode == "wrong-pin" {
 						reason = "locked_ref_unavailable"
@@ -121,10 +144,13 @@ func TestDefaultTransportInstallScopes(t *testing.T) {
 					if mode == "wrong-pin" && strings.Contains(text, "transport_failed") {
 						t.Fatal(text)
 					}
+					if err := stateUnchanged(t, before, snapshotState(t, e), "credential refusal"); err != nil {
+						t.Fatal(err)
+					}
 					if _, err := os.Lstat(shim); !os.IsNotExist(err) {
 						t.Fatalf("refusal published shim: %v", err)
 					}
-					if (mode == "missing" || mode == "missing-wrapper") && len(log) != 0 {
+					if (mode == "missing" || mode == "missing-wrapper" || mode == "no-host-keys" || mode == "missing-key-file" || mode == "missing-hosts-file" || mode == "no-ssh") && len(log) != 0 {
 						t.Fatalf("refusal reached transport: %s", log)
 					}
 				}
@@ -164,6 +190,8 @@ func defaultCaptureTool(t *testing.T, repository, mode string) (buildrepo.GitToo
 	// empty -F config. It never launches OpenSSH or reaches an external host.
 	ssh := write("capture-ssh", fmt.Sprintf(`#!/bin/sh
 { for arg in "$@"; do printf '<%%s>' "$arg"; done; printf '\n'; } >> %s
+[ ! -e "$HOME/.ssh/config" ] || { printf 'ambient config reached fixture' > %s; printf 'ambient config reached fixture' >&2; exit 97; }
+[ -z "${SSH_AUTH_SOCK+x}" ] || { printf 'ambient agent reached fixture' > %s; printf 'ambient agent reached fixture' >&2; exit 96; }
 [ "$1" = '-F' ] && [ "$2" = %s ] || exit 91
 selected=0
 while [ "$#" -gt 2 ]; do
@@ -177,7 +205,7 @@ done
 status=$?
 /bin/cat %s >&2
 exit "$status"
-`, shellQuote(log), shellQuote(empty), shellQuote(identity), func() string {
+`, shellQuote(log), shellQuote(log+".git-stderr"), shellQuote(log+".git-stderr"), shellQuote(empty), shellQuote(identity), func() string {
 		if mode == "transport" {
 			return "printf 'ssh: connect to host fixture.test port 22: Connection refused\\n' >&2; exit 128"
 		}
@@ -225,10 +253,18 @@ exit "$status"
 	if mode == "https" {
 		tool, _ = draftGitTool(t, map[string]draftGitArm{draftHTTPSPrimary: {succeed: true, fileRepo: repository}})
 	}
+	switch mode {
+	case "no-host-keys":
+		tool.SSHCredentials.KnownHosts = ""
+	case "missing-key-file":
+		tool.SSHCredentials.Identity += "-missing"
+	case "missing-hosts-file":
+		tool.SSHCredentials.KnownHosts += "-missing"
+	case "no-ssh":
+		tool.SSHBase = buildrepo.SSHWrapperBase{}
+	}
 	// Plant ambient hooks that would fail or leak into argv if inherited. Paths
 	// are wholly fixture-owned; no real SSH executable or real home is touched.
-	t.Setenv("GIT_SSH", write("ambient-wrapper", "#!/bin/sh\nexit 95\n"))
-	t.Setenv("GIT_SSH_COMMAND", "/fixture/ambient-ssh")
 	t.Setenv("SSH_AUTH_SOCK", filepath.Join(root, "ambient-agent"))
 	ehome := t.TempDir()
 	if err := os.Mkdir(filepath.Join(ehome, ".ssh"), 0o700); err != nil {

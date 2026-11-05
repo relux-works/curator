@@ -144,7 +144,7 @@ func main() {
 		os.Exit(buildrepo.RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
 	}
 	if buildrepo.IsSSHWrapperInvocation(os.Args[0]) {
-		os.Exit(buildrepo.RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
+		os.Exit(buildrepo.RunSSHWrapper(os.Args, os.Getenv, os.Stdin, os.Stdout, os.Stderr))
 	}
 	// The fixed hidden go-v1 build worker is an implementation boundary, not a
 	// user-visible command surface. It is dispatched before any other parsing,
@@ -2073,16 +2073,13 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 }
 
 func productionGitTool() buildrepo.GitTool {
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		return buildrepo.GitTool{}
-	}
-	gitPath, err = filepath.EvalSymlinks(gitPath)
+	gitPath, err := buildrepo.SelectTrustedExecutable("git", os.Getenv("CURATOR_BUILD_GIT_EXECUTABLE"), buildrepo.OperatorManagedExecutableRoots()...)
 	if err != nil {
 		return buildrepo.GitTool{}
 	}
 	run := func(args ...string) string {
 		command := exec.Command(gitPath, args...) // #nosec G204 -- resolved operator tool, fixed discovery arguments.
+		command.Env = buildrepo.DiscoveryEnvironment(os.Environ())
 		output, runErr := command.Output()
 		if runErr != nil || len(output) > 4096 {
 			return ""
@@ -2098,7 +2095,11 @@ func productionGitTool() buildrepo.GitTool {
 	if err != nil {
 		return buildrepo.GitTool{}
 	}
-	tool := buildrepo.GitTool{Executable: gitPath, ExecPath: execPath, AllowedVersions: []string{version}}
+	fingerprint, err := buildrepo.ExecutableFingerprint(gitPath)
+	if err != nil {
+		return buildrepo.GitTool{}
+	}
+	tool := buildrepo.GitTool{Executable: gitPath, Fingerprint: fingerprint, ExecPath: execPath, AllowedVersions: []string{version}}
 	if executable, executableErr := os.Executable(); executableErr == nil {
 		tool.AskPass = admittedOperatorFile(executable)
 		tool.SSHWrapper = tool.AskPass

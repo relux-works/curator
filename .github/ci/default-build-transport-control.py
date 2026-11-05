@@ -29,17 +29,26 @@ def witness():
     return child.returncode, text
 
 
+plants = [
+    ("binding", anchor, b"\t\t_ = policy // detection plant\n", "SSH requires a bound manager wrapper policy"),
+    ("ambient-agent", b"\treturn env\n}\n\nfunc runGit(",
+     b'\tenv = append(env, "SSH_AUTH_SOCK="+os.Getenv("SSH_AUTH_SOCK")) // detection plant\n\treturn env\n}\n\nfunc runGit(', "ambient agent reached fixture"),
+    ("ambient-config", b'"HOME="+p.home', b'"HOME="+os.Getenv("HOME")', "ambient config reached fixture"),
+]
 try:
-    source.write_bytes(original.replace(anchor, b"\t\t_ = policy // detection plant\n"))
-    code, output = witness()
-    # A crash, skipped case, setup failure or unrelated failure is not detection.
-    if (code != 1 or "--- FAIL: TestDefaultTransportInstallScopes/project/selected" not in output
-            or "SSH requires a bound manager wrapper policy" not in output):
-        raise SystemExit("default-lane policy plant was not detected by its install witness")
+    for name, old, new, reason in plants:
+        if original.count(old) != 1:
+            raise SystemExit(name + " mutation anchor is not unique")
+        source.write_bytes(original.replace(old, new))
+        code, output = witness()
+        if (code != 1 or "--- FAIL: TestDefaultTransportInstallScopes/project/selected" not in output
+                or reason not in output):
+            raise SystemExit(name + " plant was not detected for the intended reason")
+        print(name + " plant detected for: " + reason, flush=True)
 finally:
     source.write_bytes(original)
 
 code, output = witness()
 if code != 0 or "--- PASS: TestDefaultTransportInstallScopes/project/selected" not in output:
     raise SystemExit("restored default-lane positive control did not pass")
-print("default-lane policy plant detected; original source restored; positive control passed")
+print("all default-lane plants detected; original source restored; positive control passed")

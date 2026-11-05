@@ -152,15 +152,15 @@ func TestBindSSHWrapperPolicy(t *testing.T) {
 		tool GitTool
 		code string
 	}{
-		{"zero base", GitTool{SSHCredentials: valid.SSHCredentials}, CodeIdentityInvalid},
-		{"relative ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: "ssh", EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeIdentityInvalid},
-		{"dangling ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: filepath.Join(t.TempDir(), "absent"), EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeIdentityInvalid},
-		{"directory ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: t.TempDir(), EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeIdentityInvalid},
-		{"zero timeout", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: ssh, EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts}}, CodeIdentityInvalid},
+		{"zero base", GitTool{SSHCredentials: valid.SSHCredentials}, CodeCredentialPolicyInvalid},
+		{"relative ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: "ssh", EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeCredentialPolicyInvalid},
+		{"dangling ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: filepath.Join(t.TempDir(), "absent"), EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeCredentialPolicyInvalid},
+		{"directory ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: t.TempDir(), EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeCredentialPolicyInvalid},
+		{"zero timeout", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: ssh, EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts}}, CodeCredentialPolicyInvalid},
 		{"unselected credentials", GitTool{SSHBase: valid.SSHBase}, CodeSSHCredentialMissing},
 		{"known hosts alone select nothing", GitTool{SSHCredentials: OperatorSSHCredentials{KnownHosts: knownHosts}, SSHBase: valid.SSHBase}, CodeSSHCredentialMissing},
-		{"identity without pinned host keys", GitTool{SSHCredentials: OperatorSSHCredentials{Identity: identity}, SSHBase: valid.SSHBase}, CodeSSHCredentialMissing},
-		{"dangling identity", GitTool{SSHCredentials: OperatorSSHCredentials{Identity: filepath.Join(t.TempDir(), "absent"), KnownHosts: knownHosts}, SSHBase: valid.SSHBase}, CodeIdentityInvalid},
+		{"identity without pinned host keys", GitTool{SSHCredentials: OperatorSSHCredentials{Identity: identity}, SSHBase: valid.SSHBase}, CodeCredentialPolicyInvalid},
+		{"dangling identity", GitTool{SSHCredentials: OperatorSSHCredentials{Identity: filepath.Join(t.TempDir(), "absent"), KnownHosts: knownHosts}, SSHBase: valid.SSHBase}, CodeCredentialPolicyInvalid},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if _, err := bindSSHWrapperPolicy(testCase.tool, source); ErrorCode(err) != testCase.code {
@@ -195,7 +195,7 @@ func TestMaterializeSSHWrapperRoundTrip(t *testing.T) {
 	if !IsSSHWrapperInvocation(wrapper) {
 		t.Fatalf("materialized wrapper %q does not dispatch", wrapper)
 	}
-	loaded, ok := readSSHWrapperState(state)
+	loaded, ok := readSSHWrapperState(testPolicyDescriptor(t, state))
 	if !ok {
 		t.Fatal("materialized state does not read back")
 	}
@@ -212,7 +212,7 @@ func TestMaterializeSSHWrapperRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(payload, &keys); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"Wrapper": true, "SSH": true, "ExpectedHost": true, "RepositoryPath": true,
+	want := map[string]bool{"Wrapper": true, "SSH": true, "SSHFingerprint": true, "ExpectedHost": true, "RepositoryPath": true,
 		"EmptyConfig": true, "KnownHosts": true, "EmptyKnownHosts": true, "Identity": true,
 		"AgentSocket": true, "ConnectTimeout": true}
 	if len(keys) != len(want) {
@@ -223,8 +223,8 @@ func TestMaterializeSSHWrapperRoundTrip(t *testing.T) {
 			t.Fatalf("state carries %q", key)
 		}
 	}
-	if _, _, err := materializeSSHWrapper(t.TempDir(), "relative/curator", policy); ErrorCode(err) != CodeIdentityInvalid {
-		t.Fatalf("relative wrapper source error = %v, want %s", err, CodeIdentityInvalid)
+	if _, _, err := materializeSSHWrapper(t.TempDir(), "relative/curator", policy); ErrorCode(err) != CodeCredentialPolicyInvalid {
+		t.Fatalf("relative wrapper source error = %v, want %s", err, CodeCredentialPolicyInvalid)
 	}
 }
 
@@ -261,13 +261,13 @@ func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, state, err := materializeSSHWrapper(t.TempDir(), executable, policy)
+	wrapper, state, err := materializeSSHWrapper(t.TempDir(), executable, policy)
 	if err != nil {
 		t.Fatal(err)
 	}
 	getenv := func(name string) string {
 		if name == EnvSSHWrapperState {
-			return state
+			return testPolicyDescriptor(t, state)
 		}
 		return ""
 	}
@@ -275,7 +275,7 @@ func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
 
 	t.Run("pinned argv reaches ssh", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
-		if code := RunSSHWrapper(tuple, getenv, strings.NewReader("stdin-probe"), &stdout, &stderr); code != 0 {
+		if code := RunSSHWrapper(append([]string{wrapper}, tuple...), getenv, strings.NewReader("stdin-probe"), &stdout, &stderr); code != 0 {
 			t.Fatalf("code = %d, stderr = %q", code, stderr.String())
 		}
 		argv := strings.Split(strings.TrimSpace(stdout.String()), "\n")
@@ -297,18 +297,19 @@ func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
 	t.Run("exit code maps through", func(t *testing.T) {
 		failing := policy
 		failing.SSH = testFakeSSH(t, "-fail3")
-		_, failingState, err := materializeSSHWrapper(t.TempDir(), executable, failing)
+		failing.SSHFingerprint, _ = ExecutableFingerprint(failing.SSH)
+		failingWrapper, failingState, err := materializeSSHWrapper(t.TempDir(), executable, failing)
 		if err != nil {
 			t.Fatal(err)
 		}
 		failingGetenv := func(name string) string {
 			if name == EnvSSHWrapperState {
-				return failingState
+				return testPolicyDescriptor(t, failingState)
 			}
 			return ""
 		}
 		var stdout, stderr bytes.Buffer
-		if code := RunSSHWrapper(tuple, failingGetenv, strings.NewReader(""), &stdout, &stderr); code != 3 {
+		if code := RunSSHWrapper(append([]string{failingWrapper}, tuple...), failingGetenv, strings.NewReader(""), &stdout, &stderr); code != 3 {
 			t.Fatalf("code = %d, want 3", code)
 		}
 	})
@@ -326,7 +327,7 @@ func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			if code := RunSSHWrapper(testCase.args, getenv, strings.NewReader(""), &stdout, &stderr); code != 1 {
+			if code := RunSSHWrapper(append([]string{wrapper}, testCase.args...), getenv, strings.NewReader(""), &stdout, &stderr); code != 1 {
 				t.Fatalf("code = %d, want 1", code)
 			}
 			if stdout.Len() != 0 {
@@ -335,6 +336,13 @@ func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
 		})
 	}
 
+	// Exact argv[0] is part of the tuple, even for an alias with the same basename.
+	for _, alternate := range []string{filepath.Base(wrapper), filepath.Join(t.TempDir(), filepath.Base(wrapper))} {
+		var stdout, stderr bytes.Buffer
+		if code := RunSSHWrapper(append([]string{alternate}, tuple...), getenv, strings.NewReader(""), &stdout, &stderr); code != 1 || stdout.Len() != 0 {
+			t.Fatalf("alternate argv[0] accepted: %q code=%d output=%s", alternate, code, stdout.String())
+		}
+	}
 	for _, testCase := range []struct {
 		name  string
 		state func() string
@@ -375,12 +383,16 @@ func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			broken := func(name string) string {
 				if name == EnvSSHWrapperState {
-					return testCase.state()
+					path := testCase.state()
+					if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+						return testPolicyDescriptor(t, path)
+					}
+					return path
 				}
 				return ""
 			}
 			var stdout, stderr bytes.Buffer
-			if code := RunSSHWrapper(tuple, broken, strings.NewReader(""), &stdout, &stderr); code != 1 {
+			if code := RunSSHWrapper(append([]string{wrapper}, tuple...), broken, strings.NewReader(""), &stdout, &stderr); code != 1 {
 				t.Fatalf("code = %d, want 1", code)
 			}
 		})
@@ -419,6 +431,72 @@ func TestIsSSHWrapperInvocation(t *testing.T) {
 	for _, argv0 := range []string{HTTPSBrokerName, "ssh", "curator", SSHWrapperName + ".bak", "x" + SSHWrapperName} {
 		if IsSSHWrapperInvocation(argv0) {
 			t.Fatalf("%q dispatches as the SSH wrapper", argv0)
+		}
+	}
+}
+
+// Unit controls open the same read-only record descriptor as the fetch launcher.
+func testPolicyDescriptor(t *testing.T, path string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return path
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "invalid"
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	return strconv.Itoa(int(file.Fd()))
+}
+
+// A valid executable/tuple reaches capture SSH; changing only its pinned
+// fingerprint refuses silently, even though that executable could still run.
+// This distinguishes fingerprint enforcement from an unrelated exec failure.
+func TestSSHWrapperRejectsFingerprintMismatch(t *testing.T) {
+	ssh := testFakeSSH(t, "")
+	identity, hosts := testSSHMaterial(t)
+	source, err := ParseSource("git@example.test:skills/tool.git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := bindSSHWrapperPolicy(GitTool{SSHCredentials: OperatorSSHCredentials{Identity: identity, KnownHosts: hosts}, SSHBase: testSSHBase(t, ssh)}, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, valid := range []bool{true, false} {
+		selected := policy
+		if !valid {
+			selected.SSHFingerprint = strings.Repeat("0", 64)
+		}
+		wrapper, state, err := materializeSSHWrapper(t.TempDir(), manager, selected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before, err := os.ReadFile(state)
+		if err != nil {
+			t.Fatal(err)
+		}
+		getenv := func(key string) string {
+			if key == EnvSSHWrapperState {
+				return testPolicyDescriptor(t, state)
+			}
+			return ""
+		}
+		var out, errout bytes.Buffer
+		code := RunSSHWrapper([]string{wrapper, "git@example.test", "git-upload-pack 'skills/tool.git'"}, getenv, strings.NewReader(""), &out, &errout)
+		if valid {
+			if code != 0 || out.Len() == 0 {
+				t.Fatalf("valid: code=%d out=%s stderr=%s", code, out.String(), errout.String())
+			}
+		} else if code != 1 || out.Len() != 0 || errout.Len() != 0 {
+			t.Fatalf("fingerprint refusal: code=%d out=%s stderr=%s", code, out.String(), errout.String())
+		}
+		if after, err := os.ReadFile(state); err != nil || !bytes.Equal(before, after) {
+			t.Fatal("policy changed")
 		}
 	}
 }

@@ -84,7 +84,7 @@ func (e *env) schema8ScriptSkill(name string, enforced bool, interpreter ...stri
 // system temp dir on every package run.
 func TestMain(m *testing.M) {
 	if buildrepo.IsSSHWrapperInvocation(os.Args[0]) {
-		os.Exit(buildrepo.RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
+		os.Exit(buildrepo.RunSSHWrapper(os.Args, os.Getenv, os.Stdin, os.Stdout, os.Stderr))
 	}
 	// BUG-261027-5t7pqj: inherited adapter roots must never escape the test HOME.
 	testHome, err := os.MkdirTemp("", "curator-package-home-*")

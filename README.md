@@ -678,3 +678,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workf
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
+controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
+real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`
+from the OpenSSH 8.9 CI fixture; never run it on an operator host. Ordinary
+capture controls run with `go test ./internal/install -run
+'^TestDefaultTransportInstallScopes$'`; their logs go to the CI job output.

@@ -611,7 +611,12 @@ func verifyAcquisitionFetchCallSite(t *testing.T, invocation acquisitionGitShimI
 			name += ".exe"
 		}
 		wantEnvironment["GIT_SSH"] = filepath.Join(root, "manager-wrappers", name)
-		wantEnvironment["CURATOR_BUILD_SSH_WRAPPER_STATE"] = filepath.Join(root, "manager-wrappers", "ssh-wrapper-state.json")
+		// Unix uses the normative already-open read-only descriptor; this replaces
+		// the former path expectation rather than admitting extra environment.
+		wantEnvironment[EnvSSHWrapperState] = "3"
+		if runtime.GOOS == "windows" {
+			wantEnvironment[EnvSSHWrapperState] = filepath.Join(root, "manager-wrappers", "ssh-wrapper-state.json")
+		}
 	}
 	if !reflect.DeepEqual(gotEnvironment, wantEnvironment) {
 		return fmt.Errorf("production fetch environment = %#v, vector requires %#v", gotEnvironment, wantEnvironment)
