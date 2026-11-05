@@ -46,7 +46,7 @@ The driver enforces strict compilation constraints before and during execution:
 - **External linking prohibition**: Builds enforce internal linking (`-ldflags=-linkmode=internal -libgcc=none`). Linker modes requiring host external linkers are rejected with `external_link_forbidden`, and host linker fallbacks are rejected with `libgcc_fallback_forbidden`.
 - **Toolchain switching prohibition**: Directives requesting another toolchain version in `go.mod` are rejected with `toolchain_switch_forbidden`.
 - **Workspace prohibition**: The presence of `go.work` files inside the build root is rejected with `workspace_dependency_forbidden`.
-- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No parent-death signal is installed: if the manager is killed, its teardown cannot run; the orphan is bounded by the worker's own per-child deadlines and exits when its protocol pipe breaks. No hardened isolation guarantee is claimed.
+- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No parent-death signal is installed: if the manager is killed, its teardown cannot run; the orphan is bounded by the worker's own whole-session deadlines and exits when its protocol pipe breaks. No hardened isolation guarantee is claimed.
 
 ## Script commands
 
@@ -268,3 +268,23 @@ Descriptor sealing permanently sets `FD_CLOEXEC` on every manager descriptor
 numbered 3 or higher. It closes none in the parent, but inherited pass-through
 descriptors such as jobserver pipes or activation sockets will not reach later
 children of that manager process. This side effect is intentional.
+
+### Cold-build wall-clock budget
+
+The Go drivers allow **15 minutes for one complete worker session**, including
+`go list`, the manager's graph and identity checks, and `go build`. The build
+phase receives only the remaining time. The parent has a further five seconds
+of bounded shutdown grace and tears down the descendant domain on expiry.
+A parent deadline reports `process_timeout`; malformed live worker messages
+still report `build_execution_worker_protocol_invalid`. Package data cannot
+select or extend this budget. The driver still uses an empty private build
+cache and never downloads a toolchain or dependencies.
+
+This is a manager execution bound. It is absent from the closed go-v1 logical
+build input, receipt, cache key and capability-evidence record; changing it
+does not relabel or invalidate an already installed artifact. Protocol Core
+requires a bounded whole-session deadline and specifies no numeric duration.
+The 15-minute bound is qualified with cold repository measurements and a real
+repository-driver install/PATH witness in `Cold repository install (hosted)`.
+Measurements are observations of those hosts, not a speed guarantee for every
+machine. A shorter caller context still takes precedence.

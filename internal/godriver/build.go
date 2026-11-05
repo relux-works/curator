@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultBuildTimeout  = 2 * time.Minute
+	defaultBuildTimeout  = 15 * time.Minute
 	defaultBuildOutput   = int64(8 * 1024 * 1024)
 	defaultArtifactLimit = int64(128 * 1024 * 1024)
 	defaultFileLimit     = int64(512 * 1024 * 1024)
@@ -247,7 +247,12 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 		return output, runErr
 	}
 
-	listOutput, err := bracket(client.list())
+	phaseStarted := time.Now()
+	listRaw, listErr := client.list()
+	if request.Session.observePhase != nil {
+		request.Session.observePhase("list", time.Since(phaseStarted))
+	}
+	listOutput, err := bracket(listRaw, listErr)
 	if err != nil {
 		return Result{}, classifyListFailure(err, listOutput.Stderr)
 	}
@@ -258,7 +263,12 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 		return Result{}, err
 	}
 
-	buildOutput, err := bracket(client.build())
+	phaseStarted = time.Now()
+	buildRaw, buildErr := client.build()
+	if request.Session.observePhase != nil {
+		request.Session.observePhase("build", time.Since(phaseStarted))
+	}
+	buildOutput, err := bracket(buildRaw, buildErr)
 	if err != nil {
 		return Result{}, classifyBuildFailure(err, buildOutput.Stderr)
 	}

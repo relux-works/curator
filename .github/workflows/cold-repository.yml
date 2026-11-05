@@ -1,0 +1,44 @@
+name: Cold repository build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cold-repository-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cold-repository:
+    name: Cold repository install (hosted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Dependency acquisition is fixture preparation, outside the offline
+      # driver. The driver itself still has no network or download path.
+      - name: Prepare pinned public dependency fixture
+        working-directory: internal/godriver/testdata/coldrepository
+        run: bash ../../../../.github/ci/isolated-test.sh go mod vendor
+      - name: Measure cold list and build through the real worker
+        env:
+          CURATOR_COLD_REPOSITORY: ${{ github.workspace }}/internal/godriver/testdata/coldrepository
+        run: bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -v -timeout=25m ./internal/godriver -run '^TestColdRepositoryMeasurement$'
+      - name: Full repository-driver install and PATH witness
+        env:
+          CURATOR_COLD_REPOSITORY: ${{ github.workspace }}/internal/godriver/testdata/coldrepository
+        run: bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -v -timeout=25m ./cmd/curator -run '^TestColdRepositoryInstallOnPATH$'
+      - name: Deadline and protocol paired witnesses
+        run: bash .github/ci/isolated-test.sh go test -count=1 -v -timeout=10m ./internal/godriver -run '^Test(WorkerChannelFailureDistinguishesParentDeadline|RealWorkerParentDeadline|WorkerSharesWholeSessionBudget|BuildDeadlineTearsDownDescendants)$'

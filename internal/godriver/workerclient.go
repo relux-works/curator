@@ -55,9 +55,10 @@ type workerClient struct {
 	secret   string
 	evidence CapabilityEvidence
 
-	cancel   context.CancelFunc
-	finished bool
-	drained  bool
+	runContext context.Context
+	cancel     context.CancelFunc
+	finished   bool
+	drained    bool
 }
 
 // launchWorker performs steps 3 to 6 of the worker session: it re-verifies the
@@ -85,12 +86,12 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 		return nil, err
 	}
 
-	// The worker bounds each Go child at Limits.Timeout. The parent bounds the
-	// complete worker domain at the same value plus one bounded join grace and
-	// terminates the whole domain when it expires, so the operation cannot
-	// outlive its wall-clock budget even if the worker itself hangs.
+	// One manager-selected budget covers the complete session: list, graph and
+	// identity checks, permit, and build. The worker shares that budget across
+	// children. This parent watchdog adds only bounded shutdown grace and kills
+	// the whole domain even if the worker or protocol stalls.
 	runCtx, cancel := context.WithTimeout(ctx, plan.Limits.Timeout+workerShutdownGrace)
-	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel}
+	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel, runContext: runCtx}
 	defer func() {
 		if resultErr != nil {
 			client.teardown()
@@ -129,7 +130,7 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 	// process creation and releases the worker only when every one of them is in
 	// place. A failure destroys the worker before it executes a session.
 	if err := domain.launch(command); err != nil {
-		return nil, client.destroyBeforeExecution(err)
+		return nil, client.protocolFailure(client.destroyBeforeExecution(err), "cannot launch the worker before its deadline")
 	}
 
 	// Only now, with the domain complete, may an applied status exist.
@@ -314,9 +315,6 @@ func (client *workerClient) result(kind string, started int) (Output, error) {
 
 func (client *workerClient) send(message workerMessage) error {
 	if err := writeMessage(client.stdin, message); err != nil {
-		if code := DiagnosticCode(err); code != "" {
-			return err
-		}
 		return client.protocolFailure(err, "cannot send the %s message", message.Kind)
 	}
 	return nil
@@ -345,6 +343,14 @@ func (client *workerClient) receive(kind string) (workerMessage, error) {
 // protocolFailure prefers the worker's own stable diagnostic when the session
 // channel closed because the worker rejected the session.
 func (client *workerClient) protocolFailure(cause error, format string, args ...any) error {
+	// EOF/EPIPE after CommandContext killed the domain is a deadline, not a
+	// malformed session. Preserve genuine framing/nonce failures while live.
+	if client.runContext != nil && errors.Is(client.runContext.Err(), context.DeadlineExceeded) {
+		return diagnosticErr("process_timeout", context.DeadlineExceeded, "worker domain exceeded its whole-session deadline")
+	}
+	if DiagnosticCode(cause) != "" {
+		return cause
+	}
 	if detail := string(client.stderr.Bytes()); detail != "" {
 		return diagnosticErr(CodeWorkerProtocolInvalid, cause, format+": %s", append(args, detail)...)
 	}
