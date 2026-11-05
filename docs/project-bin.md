@@ -15,7 +15,9 @@ fingerprint of each published shim and enforced-launcher sidecar. It is committe
 in the installation transaction, so rollback restores the prior ledger and
 launchers together. A fingerprint includes the entry kind; a symlink is checked
 as a link, without reading its destination. A malformed ledger refuses with
-`project_bin_ownership_invalid`; it never authorizes an overwrite.
+`project_bin_ownership_invalid`; it never authorizes an overwrite. Unreadable
+ownership inventories or legacy markers refuse with `manager_state_unreadable`,
+so a failed read cannot authorize legacy adoption as though state were absent.
 
 For installations predating the ledger, ownership requires a previous installed
 skill marker naming the command and a recognized launcher to that marker's

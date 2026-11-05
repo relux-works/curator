@@ -33,7 +33,7 @@ func MatchesLegacyShim(path, platform string, authorized func(string) bool) bool
 	if !info.Mode().IsRegular() || info.Size() > 65536 {
 		return false
 	}
-	payload, err := os.ReadFile(path)
+	payload, err := os.ReadFile(path) // #nosec G304 -- read-only ownership probe; bounded regular bytes are compared, never executed.
 	if err != nil {
 		return false
 	}

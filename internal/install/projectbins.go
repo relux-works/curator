@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/staging"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 const projectBinLedgerName = ".curator-bin-ownership.json"
@@ -49,12 +51,14 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 	}
 	var ledger projectBinLedger
 	legacy := false
-	info, err := os.Lstat(state.ledgerPath)
-	if os.IsNotExist(err) {
-		legacy = true
-	} else if err != nil {
+	metadata, err := stateread.Lstat(state.ledgerPath)
+	if err != nil {
 		return state, err
+	}
+	if metadata.Kind == stateread.KindAbsent {
+		legacy = true
 	} else {
+		info := metadata.Info
 		if !info.Mode().IsRegular() || info.Size() > 1<<20 {
 			return state, fmt.Errorf("project_bin_ownership_invalid: %s", state.ledgerPath)
 		}
@@ -71,18 +75,21 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 			return state, fmt.Errorf("project_bin_ownership_invalid: %s", state.ledgerPath)
 		}
 	}
-	if info, err := os.Lstat(binDir); err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
-		return state, fmt.Errorf("project_bin_ownership_invalid: %s", binDir)
-	} else if err != nil && !os.IsNotExist(err) {
-		return state, err
-	}
-	entries, err := os.ReadDir(binDir)
-	if os.IsNotExist(err) {
-		return state, nil
-	}
+	metadata, err = stateread.Lstat(binDir)
 	if err != nil {
 		return state, err
 	}
+	if metadata.Kind == stateread.KindPresent && (!metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0) {
+		return state, fmt.Errorf("project_bin_ownership_invalid: %s", binDir)
+	}
+	listing, err := stateread.ReadDir(binDir)
+	if err != nil {
+		return state, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return state, nil
+	}
+	entries := listing.Entries
 	var previous map[string][]*marker.Marker
 	if legacy {
 		previous, err = previousProjectCommands(home, binDir)
@@ -125,19 +132,26 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 func previousProjectCommands(home, binDir string) (map[string][]*marker.Marker, error) {
 	commands := map[string][]*marker.Marker{}
 	for _, store := range []string{filepath.Join(filepath.Dir(binDir), "skills"), scopes.HybridSkillsRoot(home)} {
-		entries, err := os.ReadDir(store)
-		if os.IsNotExist(err) {
-			continue
-		}
+		listing, err := stateread.ReadDir(store)
 		if err != nil {
 			return nil, err
 		}
-		for _, entry := range entries {
+		if listing.Kind == stateread.KindAbsent {
+			continue
+		}
+		for _, entry := range listing.Entries {
 			if !entry.IsDir() || !identifiers.Valid(entry.Name()) {
 				continue
 			}
 			recorded, _, err := marker.ReadState(filepath.Join(store, entry.Name()))
-			if err != nil || recorded == nil || recorded.Name != entry.Name() {
+			if err != nil {
+				var invalid *marker.InvalidError
+				if !errors.As(err, &invalid) {
+					return nil, err
+				}
+				continue
+			}
+			if recorded == nil || recorded.Name != entry.Name() {
 				continue
 			}
 			for _, name := range recorded.Commands {
@@ -189,13 +203,14 @@ func legacyTargetOwned(target, home, externalRoot, command string, recorded *mar
 }
 
 func shimFingerprint(path string) (string, error) {
-	info, err := os.Lstat(path)
-	if os.IsNotExist(err) {
-		return "", nil
-	}
+	metadata, err := stateread.Lstat(path)
 	if err != nil {
 		return "", err
 	}
+	if metadata.Kind == stateread.KindAbsent {
+		return "", nil
+	}
+	info := metadata.Info
 	if info.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(path)
 		if err != nil {
@@ -207,11 +222,11 @@ func shimFingerprint(path string) (string, error) {
 	if !info.Mode().IsRegular() {
 		return "", nil
 	}
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 -- read-only ownership probe of an enumerated bin entry; type and opened identity are checked.
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	opened, err := file.Stat()
 	if err != nil {
 		return "", err
@@ -253,7 +268,11 @@ func (state projectBinOwnership) stageLedger(stageRoot string, plan *staging.Pla
 		return err
 	}
 	payload = append(payload, '\n')
-	if old, err := os.ReadFile(state.ledgerPath); err == nil && bytes.Equal(old, payload) {
+	old, err := stateread.ReadFile(state.ledgerPath)
+	if err != nil {
+		return err
+	}
+	if old.Kind == stateread.KindPresent && bytes.Equal(old.Bytes, payload) {
 		return nil
 	}
 	staged := filepath.Join(stageRoot, "project-bin-ledger.json")

@@ -216,3 +216,47 @@ func TestProjectBinOwnershipSwapBeforeJournal(t *testing.T) {
 		t.Fatal("foreign replacement changed")
 	}
 }
+
+// Missing inventories and entries are valid empty controls. A non-directory
+// ancestor or unreadable marker cannot become absence or authorize adoption;
+// the probes leave the obstructing bytes and marker directory untouched.
+func TestProjectBinOwnershipReadFailuresRemainUnreadable(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	bin := filepath.Join(root, "project", ".agents", "bin")
+	if _, err := inspectProjectBin(home, bin, installPlatform(), "", nil); err != nil {
+		t.Fatalf("absent inventory: %v", err)
+	}
+	if fingerprint, err := shimFingerprint(filepath.Join(bin, "missing")); err != nil || fingerprint != "" {
+		t.Fatalf("absent entry = %q, %v", fingerprint, err)
+	}
+	obstructed := filepath.Join(root, "obstructed")
+	const payload = "foreign ancestor\n"
+	if err := os.WriteFile(obstructed, []byte(payload), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	requireUnreadable := func(err error) {
+		t.Helper()
+		if err == nil || !strings.Contains(err.Error(), "manager_state_unreadable") {
+			t.Fatalf("want unreadable state, got %v", err)
+		}
+	}
+	_, err := inspectProjectBin(home, filepath.Join(obstructed, ".agents", "bin"), installPlatform(), "", nil)
+	requireUnreadable(err)
+	_, err = shimFingerprint(filepath.Join(obstructed, "command"))
+	requireUnreadable(err)
+	_, err = previousProjectCommands(home, filepath.Join(obstructed, "bin"))
+	requireUnreadable(err)
+	if got, err := os.ReadFile(obstructed); err != nil || string(got) != payload {
+		t.Fatalf("ancestor changed: %q, %v", got, err)
+	}
+	markerDir := filepath.Join(filepath.Dir(bin), "skills", "tool", ".csk-install.json")
+	if err := os.MkdirAll(markerDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err = previousProjectCommands(home, bin)
+	requireUnreadable(err)
+	if info, err := os.Stat(markerDir); err != nil || !info.IsDir() {
+		t.Fatalf("marker directory changed: %v, %v", info, err)
+	}
+}
