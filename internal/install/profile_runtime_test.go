@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/globalbins"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/runtimestore"
@@ -66,7 +67,7 @@ func profileDomain(t *testing.T, e *env) *profileRuntimeAdmission {
 	return &profileRuntimeAdmission{domain: skillruntime.Domain{Home: e.home, UserHome: user, UserBin: bin, FixedPATH: bin + string(os.PathListSeparator) + os.Getenv("PATH")}}
 }
 
-func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, build, broken bool) (string, envprofile.Policy) {
+func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, build, broken bool, variants ...string) (string, envprofile.Policy) {
 	t.Helper()
 	if build {
 		e.buildSkill(skill, command)
@@ -98,11 +99,45 @@ func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, 
 	if broken {
 		e.write(repo, "src/cmd/"+command+"/main.go", "package main\nfunc main() { broken syntax }\n")
 	}
+
+	directory := ""
+	discovery := len(variants) > 0 && variants[0] == "scoped-discovery-link"
+	if len(variants) > 0 && strings.HasPrefix(variants[0], "scoped-") {
+		directory = "skills/" + skill
+		entries, err := os.ReadDir(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		selected := filepath.Join(repo, filepath.FromSlash(directory))
+		if err := os.MkdirAll(selected, 0755); err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			if entry.Name() == ".git" {
+				continue
+			}
+			if err := os.Rename(filepath.Join(repo, entry.Name()), filepath.Join(selected, entry.Name())); err != nil {
+				t.Fatal(err)
+			}
+		}
+		e.write(repo, "outside.txt", "sibling excluded from selected runtime\n")
+	}
 	key := filepath.Join(t.TempDir(), "signer")
 	if out, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
 		t.Fatalf("fixture signer: %v %s", err, out)
 	}
 	e.git(repo, "add", ".")
+	if discovery {
+		cmd := exec.Command("git", "hash-object", "-w", "--stdin")
+		cmd.Dir = repo
+		cmd.Stdin = strings.NewReader("../../" + directory)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("discovery link object: %v %s", err, out)
+		}
+		e.git(repo, "update-index", "--add", "--cacheinfo", "120000,"+strings.TrimSpace(string(out))+",.claude/skills/"+skill)
+	}
+
 	e.git(repo, "-c", "gpg.format=ssh", "-c", "gpg.ssh.program=ssh-keygen", "-c", "user.signingkey="+key, "commit", "--amend", "-S", "--no-edit")
 	pin, err := gitops.Resolve(repo, "revision", "HEAD")
 	if err != nil {
@@ -131,7 +166,13 @@ func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, 
 	t.Setenv("GIT_CONFIG_GLOBAL", gitConfig)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root := t.TempDir()
-	e.write(root, "agent-context.json", fmt.Sprintf(`{"schema_version":1,"name":%q,"version":"1.0.0","requires":{"skills":{%q:{"git":%q,"revision":%q}}}}`, profile, skill, "https://example.com/"+skill, pin.Commit))
+	selector := ""
+	schema := 1
+	if directory != "" {
+		schema = 2
+		selector = fmt.Sprintf(`,"directory":%q`, directory)
+	}
+	e.write(root, "agent-context.json", fmt.Sprintf(`{"schema_version":%d,"name":%q,"version":"1.0.0","requires":{"skills":{%q:{"git":%q,"revision":%q%s}}}}`, schema, profile, skill, "https://example.com/"+skill, pin.Commit, selector))
 	e.write(root, "context/main.md", "# Profile\n")
 	_, state, err := contextstore.EnsureState(e.home, "context", profile, root)
 	if err != nil {
@@ -148,11 +189,15 @@ func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, 
 // hops reach a private final process. Inactive profiles publish no shims and
 // report B1. Stale pins, unmanaged roots, companion refusals and failed native
 // compilation leave lock/current/root/declaration preimages unchanged.
-// POSIX executes the final child; Windows proves staging only. This is an
+// Scoped directory variants also publish and repeat from v5, then refuse
+// injected store siblings while preserving lock/routing. The root variant is
+// the whole-repository positive control. POSIX executes the final child; Windows proves staging only. This is an
 // install witness, not final-agent PATH or real supervisor proof.
 func TestProfileRuntimePublication(t *testing.T) {
-	modes := []string{"current-script", "inactive-script", "stale-lock", "unmanaged", "reserved", "inventory-refusal", "base-path-refusal", "missing-supervisor"}
-	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+	// Use the same driver inventory as TestProfileSkillPlanRealCompileBeforeLock;
+	// adding a supported host must enable these build modes in both tests.
+	modes := []string{"current-script", "scoped-script", "scoped-discovery-link", "inactive-script", "stale-lock", "unmanaged", "reserved", "inventory-refusal", "base-path-refusal", "missing-supervisor"}
+	if godriver.InventoryPlatform(runtime.GOOS) != "" {
 		modes = append(modes, "current-build", "compiler-failure")
 	}
 	for _, mode := range modes {
@@ -163,7 +208,7 @@ func TestProfileRuntimePublication(t *testing.T) {
 				command = "CuRaToR-secret.EXE.CmD"
 			}
 			build := mode == "current-build" || mode == "compiler-failure"
-			hash, policy := signedRuntimeProfile(t, e, "profile", "slice-skill", command, build, mode == "compiler-failure")
+			hash, policy := signedRuntimeProfile(t, e, "profile", "slice-skill", command, build, mode == "compiler-failure", mode)
 			current := "profile"
 			if mode == "inactive-script" {
 				current = "other"
@@ -195,7 +240,7 @@ func TestProfileRuntimePublication(t *testing.T) {
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			positive := mode == "current-script" || mode == "inactive-script" || mode == "current-build"
+			positive := strings.HasPrefix(mode, "scoped-") || mode == "current-script" || mode == "inactive-script" || mode == "current-build"
 			if positive {
 				if err != nil {
 					t.Fatal(err)
@@ -252,10 +297,52 @@ func TestProfileRuntimePublication(t *testing.T) {
 							t.Fatalf("wrong reached script: %q", out)
 						}
 					}
+
+					// Scoped v5 publication and its pinned repeat must use the directory
+					// namespace, omit siblings and preserve the selected command payload.
+					if strings.HasPrefix(mode, "scoped-") {
+						member, ok := result.Lock.Find("skill", "slice-skill")
+						if !ok || member.Directory != "skills/slice-skill" {
+							t.Fatal("runtime lost scoped v5 member")
+						}
+						entry := contextstore.GitEntryDir(e.home, "skill", member.Name, member.Commit, member.Directory)
+						if _, err := os.Stat(entry); err != nil {
+							t.Fatal(err)
+						}
+						if _, err := os.Stat(contextstore.EntryDir(e.home, "skill", member.Name, member.Commit)); !os.IsNotExist(err) {
+							t.Fatalf("runtime published whole snapshot: %v", err)
+						}
+						if _, err := os.Stat(filepath.Join(entry, "outside.txt")); !os.IsNotExist(err) {
+							t.Fatalf("runtime stored sibling: %v", err)
+						}
+					}
 					// Repeat from the exact v5 pin, with no new publication authority.
 					if _, err := PrepareProfileSkillRuntime(e.cfg, "profile", result.LockHash, policy, Options{}, supervisor, checks); err != nil {
 						t.Fatalf("pinned repeat: %v", err)
 					}
+					if strings.HasPrefix(mode, "scoped-") {
+						member, _ := result.Lock.Find("skill", "slice-skill")
+						entry := contextstore.GitEntryDir(e.home, "skill", member.Name, member.Commit, member.Directory)
+						e.write(entry, "outside.txt", "injected sibling")
+						lockBefore, err := os.ReadFile(path)
+						if err != nil {
+							t.Fatal(err)
+						}
+						routingPath := filepath.Join(skillruntime.DomainDir(e.home), "routing.json")
+						routingBefore, err := os.ReadFile(routingPath)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if _, err := PrepareProfileSkillRuntime(e.cfg, "profile", result.LockHash, policy, Options{}, supervisor, checks); err == nil || !strings.Contains(err.Error(), "profile_skill_plan_invalid") {
+							t.Fatalf("scoped runtime sibling tamper refusal: %v", err)
+						}
+						lockAfter, _ := os.ReadFile(path)
+						routingAfter, _ := os.ReadFile(routingPath)
+						if !bytes.Equal(lockBefore, lockAfter) || !bytes.Equal(routingBefore, routingAfter) {
+							t.Fatal("scoped refusal changed published records")
+						}
+					}
+
 				}
 			} else {
 				want := map[string]string{"stale-lock": "profile_skill_plan_binding_invalid", "unmanaged": "environment_surface_unmanaged_conflict", "reserved": "environment_reserved_command_name", "inventory-refusal": "environment_reserved_command_name", "base-path-refusal": "profile_skill_command_conflict", "missing-supervisor": "profile_skill_routing_unproven", "compiler-failure": "profile_skill_compile_failed"}[mode]
