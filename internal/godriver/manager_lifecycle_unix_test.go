@@ -45,7 +45,11 @@ func TestBuildManagerLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer output.Close()
+			defer func() {
+				if err := output.Close(); err != nil {
+					t.Errorf("close test file: %v", err)
+				}
+			}()
 			command.Stdout, command.Stderr = output, output
 			if err := command.Start(); err != nil {
 				t.Fatal(err)

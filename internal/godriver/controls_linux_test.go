@@ -217,7 +217,11 @@ func TestLinuxDescriptorProbeAndSyscallFailures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					t.Errorf("close test file: %v", err)
+				}
+			}()
 			if _, err := unix.FcntlInt(file.Fd(), unix.F_SETFD, 0); err != nil {
 				t.Fatal(err)
 			}
