@@ -132,7 +132,14 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 	// process creation and releases the worker only when every one of them is in
 	// place. A failure destroys the worker before it executes a session.
 	if err := domain.launch(command); err != nil {
-		return nil, client.protocolFailure(client.destroyBeforeExecution(err), "cannot launch the worker before its deadline")
+		// Cleanup cancels our watchdog; it is not caller cancellation. Capture the
+		// launch verdict before cleanup so a control refusal keeps its stable code.
+		deadlineErr := client.deadlineFailure()
+		cause := client.destroyBeforeExecution(err)
+		if deadlineErr != nil {
+			return nil, deadlineErr
+		}
+		return nil, cause
 	}
 
 	// Only now, with the domain complete, may an applied status exist.
