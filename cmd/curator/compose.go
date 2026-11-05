@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 
@@ -190,17 +191,14 @@ func (c cli) cmdComposeList(cfg *config.Config, profile string, args []string) i
 	if !cfg.Env.OverlaysAllowed && len(cfg.Env.Overlays[profile]) > 0 {
 		_, _ = fmt.Fprintln(c.stderr, "warning: overlays_allowed is false: the listed declarations are inert; resolution joins the root alone")
 	}
-	decls := cfg.Env.Overlays[profile]
-	names := make([]string, 0, len(decls))
-	byKey := map[string]config.OverlayDeclaration{}
-	for _, decl := range decls {
-		key := decl.Source + "\x00" + decl.Range + "\x00" + decl.Tag + "\x00" + decl.Revision
-		names = append(names, key)
-		byKey[key] = decl
+	// Sort a copy to keep configuration order intact. Equal source/ref keys
+	// still represent separate declarations, with their own directory/weight.
+	decls := slices.Clone(cfg.Env.Overlays[profile])
+	key := func(decl config.OverlayDeclaration) string {
+		return decl.Source + "\x00" + decl.Range + "\x00" + decl.Tag + "\x00" + decl.Revision
 	}
-	sort.Strings(names)
-	for _, key := range names {
-		decl := byKey[key]
+	sort.SliceStable(decls, func(i, j int) bool { return key(decls[i]) < key(decls[j]) })
+	for _, decl := range decls {
 		form := ""
 		switch {
 		case decl.Range != "":
