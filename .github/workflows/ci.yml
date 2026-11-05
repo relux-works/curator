@@ -206,7 +206,7 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/buildrepo \
-              -run '^Test(PipelinePreserves(SanitizedAcquisitionReasons|DeterministicAcquisitionRefusals)|TrustedExecutableSelection|TrustedGitFingerprintChange|NoSSHExecutableDiagnostic)$'
+              -run '^Test(PipelinePreserves(SanitizedAcquisitionReasons|DeterministicAcquisitionRefusals)|TrustedExecutableSelection|TrustedGitFingerprintChange|NoSSHExecutableDiagnostic|ClassifyAdmissionCode|ResolvedTransport(FailClosedClassesStopAfterOneFetch|SSHWithoutKnownHostsRefusesBeforeTraffic|SSHAttemptBindsPerAttemptCredentials))$'
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \

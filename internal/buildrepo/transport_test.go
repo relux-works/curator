@@ -158,6 +158,8 @@ func TestClassifyFetchOutput(t *testing.T) {
 	}
 }
 
+// Deterministic codes retain their class; a broad credential-policy refusal
+// does not positively establish fallback-eligible authentication failure.
 func TestClassifyAdmissionCode(t *testing.T) {
 	for code, want := range map[string]FailureClass{
 		CodeRefMoved:                               FailureRef,
@@ -167,6 +169,7 @@ func TestClassifyAdmissionCode(t *testing.T) {
 		CodeIdentityInvalid:                        FailureIdentity,
 		CodeLocalLayoutUnsafe:                      FailureIdentity,
 		CodeSSHCredentialMissing:                   FailureAuth,
+		CodeCredentialPolicyInvalid:                FailureUnknown,
 		CodeAuditBlocked:                           FailureAudit,
 		CodeDescriptorInvalid:                      FailureIntegrity,
 		CodeTransportResolutionUnsupportedPlatform: FailureUnknown,
@@ -825,6 +828,8 @@ func TestResolvedTransportFallsBackOnAvailabilityThenVerifies(t *testing.T) {
 	}
 }
 
+// Fail-closed transport classes send no alternate traffic or snapshot; 11.10
+// gives host verification its credential-policy code and static reason.
 func TestResolvedTransportFailClosedClassesStopAfterOneFetch(t *testing.T) {
 	requirePOSIXTransport(t)
 	fixture := makeGitFixture(t, "sha1", false)
@@ -851,15 +856,21 @@ func TestResolvedTransportFailClosedClassesStopAfterOneFetch(t *testing.T) {
 				Fallback: TransportFallbackAvailabilityAuth,
 			}
 			var records []AttemptRecord
-			_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, func(record AttemptRecord) {
+			snapshot, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, func(record AttemptRecord) {
 				records = append(records, record)
 			})
 			if err == nil {
 				t.Fatal("fail-closed failure succeeded")
 			}
-			// Fail-closed classes retain the lane's specific diagnostic.
-			if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
-				t.Fatalf("error = %q, want the lane diagnostic", err)
+			want := CodeSourceUnavailable + ": exact source fetch failed (transport_failed)"
+			if testCase.class == FailureHostKey {
+				want = CodeCredentialPolicyInvalid + ": exact source fetch failed (host_key_verification_failed)"
+			}
+			if err.Error() != want {
+				t.Fatalf("error = %q, want %q", err, want)
+			}
+			if snapshot != nil {
+				t.Fatalf("refused acquisition returned a snapshot: %+v", snapshot)
 			}
 			if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
 				t.Fatalf("fetch count = %d, want 1 (no alternate traffic)", len(fetches))
@@ -1530,77 +1541,83 @@ func TestResolvedTransportTruncatedStderrFailsClosed(t *testing.T) {
 	}
 }
 
+// Pinned host keys admit both credential sources; absent host keys refuse with
+// the 11.10 policy diagnostic before traffic or a snapshot, even with a ready
+// alternate. Section 2 forbids fallback without a positive auth classification.
 func TestResolvedTransportSSHWithoutKnownHostsRefusesBeforeTraffic(t *testing.T) {
 	requirePOSIXTransport(t)
 	fixture := makeGitFixture(t, "sha1", false)
-	identity := filepath.Join(t.TempDir(), "id_example")
-	if err := os.WriteFile(identity, []byte("key"), 0o600); err != nil {
-		t.Fatal(err)
+	identity, knownHosts := transportSSHMaterial(t)
+	for _, testCase := range []struct {
+		name     string
+		provider bool
+		hostKeys bool
+	}{
+		{"provider-with-host-keys", true, true},
+		{"provider", true, false},
+		{"base-credentials-with-host-keys", false, true},
+		{"base-credentials", false, false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
+				transportSSH:   {succeed: true, fileRepo: fixture.bare},
+				transportHTTPS: {succeed: true, fileRepo: fixture.bare},
+			})
+			credentials := OperatorSSHCredentials{Identity: identity}
+			if testCase.hostKeys {
+				credentials.KnownHosts = knownHosts
+			}
+			base := transportBase(t, tool, fixture)
+			base.Tool.SSHBase = transportSSHBase(t)
+			base.Source, _ = ParseSource(transportSSH)
+			attempt := TransportAttempt{URL: transportSSH}
+			var providers AuthProvider
+			if testCase.provider {
+				providers = CredentialProviders{Set: ProviderSet{
+					"ssh-provider": {SSH: &ProviderSSH{Identity: credentials.Identity, KnownHosts: credentials.KnownHosts}},
+				}}
+				attempt.Authentication = "ssh-provider"
+			} else {
+				base.Tool.SSHCredentials = credentials
+			}
+			plan := TransportPlan{
+				Identity: base.Source.Identity,
+				Attempts: []TransportAttempt{attempt, {URL: transportHTTPS}},
+				Fallback: TransportFallbackAvailabilityAuth,
+			}
+			var records []AttemptRecord
+			snapshot, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
+				records = append(records, record)
+			})
+			if testCase.hostKeys {
+				if err != nil || snapshot == nil || snapshot.Commit != fixture.commit {
+					t.Fatalf("pinned-host acquisition: snapshot=%+v, error=%v", snapshot, err)
+				}
+				if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
+					t.Fatalf("fetch count = %d, want 1", len(fetches))
+				}
+				if len(records) != 1 || records[0].Class != "" || !records[0].NetworkAttempted || !records[0].Succeeded {
+					t.Fatalf("records = %+v, want one successful attempted record", records)
+				}
+				return
+			}
+			want := CodeCredentialPolicyInvalid + ": SSH build repositories pin StrictHostKeyChecking and require operator host keys"
+			if err == nil || err.Error() != want {
+				t.Fatalf("error = %v, want %q", err, want)
+			}
+			if snapshot != nil {
+				t.Fatalf("refused acquisition returned a snapshot: %+v", snapshot)
+			}
+			if fetches := transportFetchLines(t, logPath); len(fetches) != 0 {
+				t.Fatalf("fetch count = %d, want 0", len(fetches))
+			}
+			// The policy code also covers host verification and tool binding;
+			// it cannot establish an auth-only failure or authorize fallback.
+			if len(records) != 1 || records[0].Class != FailureUnknown || records[0].NetworkAttempted || records[0].Succeeded {
+				t.Fatalf("records = %+v, want one traffic-free fail-closed record", records)
+			}
+		})
 	}
-	t.Run("provider", func(t *testing.T) {
-		tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
-			transportSSH: {succeed: true, fileRepo: fixture.bare},
-		})
-		providers := CredentialProviders{Set: ProviderSet{
-			"ssh-nohosts": {SSH: &ProviderSSH{Identity: identity}},
-		}}
-		base := transportBase(t, tool, fixture)
-		base.Tool.SSHBase = transportSSHBase(t)
-		base.Source, _ = ParseSource(transportSSH)
-		plan := TransportPlan{
-			Identity: base.Source.Identity,
-			Attempts: []TransportAttempt{{URL: transportSSH, Authentication: "ssh-nohosts"}},
-			Fallback: TransportFallbackNone,
-		}
-		var records []AttemptRecord
-		_, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
-			records = append(records, record)
-		})
-		// An identity without pinned host keys cannot form a wrapper
-		// policy: the attempt records an unavailable auth method with
-		// no traffic and the policy plan exhausts.
-		if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
-			t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
-		}
-		if !strings.Contains(err.Error(), "no fetch attempted") {
-			t.Fatalf("exhaustion names traffic it never sent: %v", err)
-		}
-		if fetches := transportFetchLines(t, logPath); len(fetches) != 0 {
-			t.Fatalf("fetch count = %d, want 0", len(fetches))
-		}
-		if len(records) != 1 || records[0].Class != FailureAuth || records[0].NetworkAttempted {
-			t.Fatalf("records = %+v, want one traffic-free auth record", records)
-		}
-	})
-	t.Run("base-credentials", func(t *testing.T) {
-		tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
-			transportSSH: {succeed: true, fileRepo: fixture.bare},
-		})
-		base := transportBase(t, tool, fixture)
-		base.Tool.SSHBase = transportSSHBase(t)
-		base.Tool.SSHCredentials = OperatorSSHCredentials{Identity: identity}
-		base.Source, _ = ParseSource(transportSSH)
-		plan := TransportPlan{
-			Identity: base.Source.Identity,
-			Attempts: []TransportAttempt{{URL: transportSSH}},
-			Fallback: TransportFallbackNone,
-		}
-		var records []AttemptRecord
-		_, err := AcquireNetworkResolved(context.Background(), base, plan, nil, func(record AttemptRecord) {
-			records = append(records, record)
-		})
-		// A legacy-shape plan keeps the lane's own diagnostic: the
-		// SSH refusal surfaces unchanged, with no fetch traffic.
-		if ErrorCode(err) != CodeSSHCredentialMissing {
-			t.Fatalf("error = %v, want %s", err, CodeSSHCredentialMissing)
-		}
-		if fetches := transportFetchLines(t, logPath); len(fetches) != 0 {
-			t.Fatalf("fetch count = %d, want 0", len(fetches))
-		}
-		if len(records) != 1 || records[0].Class != FailureAuth || records[0].NetworkAttempted {
-			t.Fatalf("records = %+v, want one traffic-free auth record", records)
-		}
-	})
 }
 
 func TestResolvedTransportCancelledContextFetchesNothing(t *testing.T) {
@@ -1658,6 +1675,8 @@ esac
 	return script, logPath
 }
 
+// Each attempted SSH endpoint receives only its provider material; a host-key
+// failure uses the 11.10 policy diagnostic and returns no snapshot.
 func TestResolvedTransportSSHAttemptBindsPerAttemptCredentials(t *testing.T) {
 	requirePOSIXTransport(t)
 	fixture := makeGitFixture(t, "sha1", false)
@@ -1718,14 +1737,18 @@ func TestResolvedTransportSSHAttemptBindsPerAttemptCredentials(t *testing.T) {
 		Fallback: TransportFallbackAvailabilityAuth,
 	}
 	var records []AttemptRecord
-	_, err = AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, providers, func(record AttemptRecord) {
+	snapshot, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, providers, func(record AttemptRecord) {
 		records = append(records, record)
 	})
 	// The first SSH attempt fails refused and the plan advances; the
-	// second fails host-key verification and closes with the lane's own
-	// diagnostic. Real git drove a real per-attempt wrapper on both.
-	if err == nil || err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
-		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
+	// second host-key failure closes with the normative policy diagnostic.
+	// Real Git drives fake SSH through a real per-attempt manager wrapper.
+	want := CodeCredentialPolicyInvalid + ": exact source fetch failed (host_key_verification_failed)"
+	if err == nil || err.Error() != want {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+	if snapshot != nil {
+		t.Fatalf("refused acquisition returned a snapshot: %+v", snapshot)
 	}
 	if len(records) != 2 || records[0].Class != FailureAvailability || !records[0].NetworkAttempted ||
 		records[1].Class != FailureHostKey || !records[1].NetworkAttempted {
