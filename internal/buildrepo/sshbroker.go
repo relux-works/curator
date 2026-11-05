@@ -39,6 +39,12 @@ type SSHWrapperBase struct {
 	ConnectTimeout  int
 }
 
+// MissingManagerSSHWrapper reports unavailable manager policy without exposing
+// executable paths or OS errors. Manager 11.10 classifies this as blocked policy.
+func MissingManagerSSHWrapper() error {
+	return admissionError(CodeCredentialPolicyInvalid, "SSH transport requires an admitted manager executable")
+}
+
 // bindSSHWrapperPolicy completes the real per-attempt wrapper policy for
 // one SSH source from the manager base and the attempt's bound credential
 // selection. A selection that cannot form a policy — unknown endpoint,

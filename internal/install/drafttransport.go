@@ -263,14 +263,18 @@ func draftSSHWrapperBase() (buildrepo.SSHWrapperBase, func(), error) {
 func draftManagerExecutable() (string, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires the manager executable: %v", err)
+		return "", buildrepo.MissingManagerSSHWrapper()
 	}
+	return draftManagerExecutableFrom(executable)
+}
+
+func draftManagerExecutableFrom(executable string) (string, error) {
 	resolved, err := filepath.EvalSymlinks(executable)
 	if err != nil || !filepath.IsAbs(resolved) {
-		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires an absolute manager executable")
+		return "", buildrepo.MissingManagerSSHWrapper()
 	}
 	if info, err := os.Lstat(resolved); err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires an admitted manager executable")
+		return "", buildrepo.MissingManagerSSHWrapper()
 	}
 	return resolved, nil
 }

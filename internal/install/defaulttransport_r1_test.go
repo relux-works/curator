@@ -63,3 +63,26 @@ func TestDefaultTransportMissingCredentialsPortable(t *testing.T) {
 		t.Fatalf("default-lane missing credential: %v", err)
 	}
 }
+
+// A missing, relative or non-file manager wrapper is blocked credential policy,
+// not source grammar. A valid absolute regular file is admitted without running
+// it; refusal preserves the file and exposes no fixture path.
+func TestDraftManagerExecutableAdmission(t *testing.T) {
+	root := t.TempDir()
+	valid := filepath.Join(root, "manager")
+	if err := os.WriteFile(valid, []byte("manager fixture"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := draftManagerExecutableFrom(valid); err != nil || got != valid {
+		t.Fatalf("positive: %q %v", got, err)
+	}
+	for _, path := range []string{"relative-manager", valid + "-absent", root} {
+		got, err := draftManagerExecutableFrom(path)
+		if got != "" || buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || strings.Contains(err.Error(), root) {
+			t.Fatalf("policy refusal: %q %v", got, err)
+		}
+	}
+	if got, err := os.ReadFile(valid); err != nil || string(got) != "manager fixture" {
+		t.Fatalf("preimage changed: %q %v", got, err)
+	}
+}
