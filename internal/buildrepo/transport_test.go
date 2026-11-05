@@ -1328,19 +1328,19 @@ func TestResolvedTransportKeepsStrictLanePerAttempt(t *testing.T) {
 func TestAcquireNetworkFetchFailureKeepsLaneDiagnostic(t *testing.T) {
 	requirePOSIXTransport(t)
 	fixture := makeGitFixture(t, "sha1", false)
-	for _, stderr := range []string{
-		transportDNSStderr,
-		"fatal: unable to access 'https://fixture.test/repository.git/': SSL certificate problem: unable to get local issuer certificate",
-		"Host key verification failed.",
+	// Manager 11.10 requires a credential-policy refusal for host verification;
+	// transport failures retain their source code. Neither exposes raw stderr.
+	for _, c := range []struct{ stderr, code, reason string }{
+		{transportDNSStderr, CodeSourceUnavailable, "transport_failed"},
+		{"fatal: unable to access 'https://fixture.test/repository.git/': SSL certificate problem: unable to get local issuer certificate", CodeSourceUnavailable, "transport_failed"},
+		{"Host key verification failed.", CodeCredentialPolicyInvalid, "host_key_verification_failed"},
 	} {
-		tool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(stderr)})
+		tool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(c.stderr)})
 		_, err := AcquireNetwork(context.Background(), transportBase(t, tool, fixture))
 		if err == nil {
 			t.Fatal("failing fetch succeeded")
 		}
-		// The fetchError refactor must not change the legacy lane:
-		// fetch stderr never surfaces, whatever it says.
-		if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
+		if err.Error() != c.code+": exact source fetch failed ("+c.reason+")" {
 			t.Fatalf("error = %q", err)
 		}
 	}

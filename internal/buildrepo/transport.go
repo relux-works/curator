@@ -215,6 +215,9 @@ var transportLineSignals = []struct {
 	{regexp.MustCompile(`(?i)^fatal: unable to access '[^']+': OpenSSL SSL_connect: Connection timed out$`), FailureTLS, false},
 	// SSH host-key failures (fail closed).
 	{regexp.MustCompile(`(?i)^Host key verification failed\.$`), FailureHostKey, false},
+	// OpenSSH 8.9 sshconnect.c emits this before the fixed failure trailer
+	// when StrictHostKeyChecking=yes encounters a previously unknown host.
+	{regexp.MustCompile(`^No (RSA|DSA|ECDSA|ED25519) host key is known for ` + transportHost + ` and you have requested strict checking\.$`), FailureHostKey, false},
 	{regexp.MustCompile(`(?i)^WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!$`), FailureHostKey, false},
 
 	// Missing or moved refs (fail closed).

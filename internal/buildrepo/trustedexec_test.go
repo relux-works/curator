@@ -112,3 +112,31 @@ func TestCredentialFailureTypedReasons(t *testing.T) {
 		t.Fatalf("message text routed the error: %v", err)
 	}
 }
+
+// OpenSSH 8.9's complete unknown-host diagnostic is a static host-key refusal,
+// never a fallback grant. Unrecognized neighboring text still fails closed as
+// unknown; a recognized authentication sentence retains its separate class.
+func TestOpenSSH89UnknownHostDiagnostic(t *testing.T) {
+	const unknownHost = "No ED25519 host key is known for 127.0.0.1 and you have requested strict checking.\nHost key verification failed.\n"
+	for _, c := range []struct {
+		text  string
+		class FailureClass
+	}{
+		{unknownHost, FailureHostKey},
+		{unknownHost + "unrecognized detail\n", FailureUnknown},
+		{"No invented host key is known for 127.0.0.1 and you have requested strict checking.\nHost key verification failed.\n", FailureUnknown},
+		{"Permission denied (publickey).\n", FailureAuth},
+	} {
+		if got := ClassifyFetchOutput(c.text); got != c.class {
+			t.Fatalf("class = %v, want %v", got, c.class)
+		}
+		if c.class != FailureAuth && AllowSecondAttempt(TransportFallbackAvailabilityAuth, c.class) {
+			t.Fatalf("host/unknown failure permitted fallback: %v", c.class)
+		}
+	}
+	err := laneDiagnostic(&fetchError{stderr: unknownHost})
+	var typed *AdmissionError
+	if !errors.As(err, &typed) || typed.Code != CodeCredentialPolicyInvalid || typed.Reason != ReasonHostKeyFailed || strings.Contains(err.Error(), "127.0.0.1") {
+		t.Fatalf("sanitized host-key reason: %v", err)
+	}
+}
