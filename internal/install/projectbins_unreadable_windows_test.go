@@ -38,6 +38,24 @@ func denyProjectLedgerRead(t *testing.T, path string) {
 		}
 	}
 	t.Logf("exclusive native handle: size=%d; second native open: %v", uint64(held.FileSizeHigh)<<32|uint64(held.FileSizeLow), secondErr)
+	backup, backupErr := windows.CreateFile(name, windows.GENERIC_READ, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
+	if backupErr == nil {
+		if err := windows.CloseHandle(backup); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reader, readerErr := os.Open(path)
+	if readerErr == nil {
+		var readInfo windows.ByHandleFileInformation
+		if err := windows.GetFileInformationByHandle(windows.Handle(reader.Fd()), &readInfo); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("Go reader same file identity: %v", held.VolumeSerialNumber == readInfo.VolumeSerialNumber && held.FileIndexHigh == readInfo.FileIndexHigh && held.FileIndexLow == readInfo.FileIndexLow)
+		if err := reader.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Logf("native backup open: %v; Go open: %v", backupErr, readerErr)
 	if _, err := os.ReadFile(path); !errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
 		t.Fatalf("unreadable-ledger fixture did not deny a real read: %v", err)
 	}
