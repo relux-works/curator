@@ -835,19 +835,11 @@ func TestFingerprintDigestPhaseResolvesEveryFileFromTheRoot(t *testing.T) {
 	}
 	replaceFile := func(t *testing.T, name, payload string) {
 		t.Helper()
-		// Hold the removed inode alive: Linux may otherwise immediately reuse
-		// it, turning this substitution fixture into an in-place identity.
-		original, err := os.Open(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			if err := original.Close(); err != nil {
-				t.Error(err)
-			}
-		})
-
-		if err := os.Remove(name); err != nil {
+		// Keep the original object at another path so the replacement has a
+		// distinct identity even on filesystems that immediately reuse inodes.
+		// Renaming a closed file avoids Windows' restriction on deleting an
+		// object that is still held open.
+		if err := os.Rename(name, filepath.Join(t.TempDir(), "original")); err != nil {
 			t.Fatal(err)
 		}
 		writeTestFile(t, name, []byte(payload), 0o644)
