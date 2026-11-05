@@ -2101,8 +2101,8 @@ func productionGitTool() buildrepo.GitTool {
 	tool := buildrepo.GitTool{Executable: gitPath, ExecPath: execPath, AllowedVersions: []string{version}}
 	if executable, executableErr := os.Executable(); executableErr == nil {
 		tool.AskPass = admittedOperatorFile(executable)
+		tool.SSHWrapper = tool.AskPass
 	}
-	tool.SSHWrapper = admittedOperatorFile(os.Getenv("GIT_SSH"))
 	return tool
 }
 

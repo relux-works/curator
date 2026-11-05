@@ -858,7 +858,7 @@ func TestResolvedTransportFailClosedClassesStopAfterOneFetch(t *testing.T) {
 				t.Fatal("fail-closed failure succeeded")
 			}
 			// Fail-closed classes retain the lane's specific diagnostic.
-			if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+			if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 				t.Fatalf("error = %q, want the lane diagnostic", err)
 			}
 			if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
@@ -1340,7 +1340,7 @@ func TestAcquireNetworkFetchFailureKeepsLaneDiagnostic(t *testing.T) {
 		}
 		// The fetchError refactor must not change the legacy lane:
 		// fetch stderr never surfaces, whatever it says.
-		if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+		if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 			t.Fatalf("error = %q", err)
 		}
 	}
@@ -1443,7 +1443,7 @@ func TestResolvedTransportAmbiguousFailureMustNotFallbackWhenAlternateReady(t *t
 			if err == nil {
 				t.Fatal("ambiguous failure fell back to a ready alternate and succeeded")
 			}
-			if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+			if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 				t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
 			}
 			if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
@@ -1514,7 +1514,7 @@ func TestResolvedTransportTruncatedStderrFailsClosed(t *testing.T) {
 	if err == nil {
 		t.Fatal("truncated evidence fell back to a ready alternate and succeeded")
 	}
-	if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+	if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
 	}
 	if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
@@ -1724,7 +1724,7 @@ func TestResolvedTransportSSHAttemptBindsPerAttemptCredentials(t *testing.T) {
 	// The first SSH attempt fails refused and the plan advances; the
 	// second fails host-key verification and closes with the lane's own
 	// diagnostic. Real git drove a real per-attempt wrapper on both.
-	if err == nil || err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+	if err == nil || err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
 	}
 	if len(records) != 2 || records[0].Class != FailureAvailability || !records[0].NetworkAttempted ||
@@ -1810,7 +1810,7 @@ func TestResolvedTransportUnknownTailMustNotFallbackWhenAlternateReady(t *testin
 	if err == nil {
 		t.Fatal("unknown-tailed failure fell back to a ready alternate and succeeded")
 	}
-	if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+	if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
 	}
 	if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
@@ -2043,7 +2043,7 @@ func TestResolvedTransportClosedGrammarTable(t *testing.T) {
 				if err == nil {
 					t.Fatal("mutated shape fell back to a ready alternate and succeeded")
 				}
-				if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
+				if err.Error() != CodeSourceUnavailable+": exact source fetch failed (transport_failed)" {
 					t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
 				}
 				if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {

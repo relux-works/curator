@@ -76,6 +76,42 @@ env:
   PNPM_PIN: "10.33.0"
 
 jobs:
+  default-build-transport:
+    name: Default build transport (hosted Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Default-lane credential isolation and refusal controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./internal/install \
+              -run '^TestDefaultTransportInstallScopes$'
+          env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./internal/buildrepo \
+              -run '^TestPipelinePreservesSanitizedAcquisitionReasons$'
+          env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./cmd/curator \
+              -run '^TestProductionGitToolIgnoresInheritedSSHWrapper$'
+      - name: Detect a dropped default-lane SSH policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
+            GOTOOLCHAIN=local GOENV=off \
+            python3 .github/ci/default-build-transport-control.py
   # Every admitted family gets its own real toolchain identity and driver
   # qualification. Linux applies the portable native controls; native
   # offline vendored builds replay twice with cold caches on macOS/Windows.

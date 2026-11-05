@@ -211,15 +211,22 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 		if request.Operation == OperationSyntax {
 			return PipelineResult{State: "unverified-offline", Code: CodeUnverifiedOffline}, nil
 		}
-		// A deterministic §7 transport-plan refusal is not an
-		// availability failure: the planned endpoint is outside the
-		// strict-lane grammar, so no offline snapshot can substitute
-		// for it. Return the lane's own diagnostic unchanged instead
-		// of masking it as source-unavailable. Scoped to the §7
-		// refusal's own static diagnostic (resolved lane only); every
-		// other identity refusal keeps the legacy collapse below, so
-		// the frozen lane is byte-identical.
+		// A deterministic transport-plan refusal cannot be repaired by an
+		// offline snapshot. Its static diagnostic is safe to preserve.
 		if ErrorCode(acquireErr) == CodeIdentityInvalid && strings.Contains(acquireErr.Error(), TransportPlanRefusalPrefix) {
+			return result, acquireErr
+		}
+		// Credential/policy refusals and proved pin mismatches cannot be
+		// repaired by an offline snapshot. Preserve only static diagnostics.
+		switch ErrorCode(acquireErr) {
+		case CodeSSHCredentialMissing, CodeRefMoved:
+			return result, acquireErr
+		case CodeIdentityInvalid:
+			if strings.Contains(acquireErr.Error(), "SSH ") {
+				return result, acquireErr
+			}
+		}
+		if ErrorCode(acquireErr) == CodeSourceUnavailable && strings.HasSuffix(acquireErr.Error(), "(locked_ref_unavailable)") {
 			return result, acquireErr
 		}
 		// An untagged exact protected snapshot may support offline reinstall,
@@ -228,6 +235,9 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 			snapshot, acquireErr = request.Store.LoadSnapshot(request.OfflineSnapshotKey, mutate)
 		}
 		if acquireErr != nil || snapshot == nil {
+			if ErrorCode(acquireErr) == CodeSourceUnavailable {
+				return result, acquireErr
+			}
 			return result, admissionError(CodeSourceUnavailable, "exact external source is unavailable")
 		}
 	}

@@ -694,7 +694,7 @@ func TestAcquireDraftNetworkSelection(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy ssh keeps the static wrapper", func(t *testing.T) {
+	t.Run("default ssh uses the manager wrapper", func(t *testing.T) {
 		tool, logPath := draftGitTool(t, map[string]draftGitArm{
 			draftSSHPrimary: {succeed: true, fileRepo: bare},
 		})
@@ -715,11 +715,9 @@ func TestAcquireDraftNetworkSelection(t *testing.T) {
 		if len(fetches) != 1 {
 			t.Fatalf("%d fetches, want 1:\n%s", len(fetches), strings.Join(fetches, "\n"))
 		}
-		if strings.Contains(fetches[0], buildrepo.SSHWrapperName) {
-			t.Fatalf("legacy ssh fetch used the manager wrapper:\n%s", fetches[0])
-		}
-		if !strings.Contains(fetches[0], tool.SSHWrapper) {
-			t.Fatalf("legacy ssh fetch lost the static wrapper:\n%s", fetches[0])
+		// The default lane binds the selected credentials just like resolution.
+		if !strings.Contains(fetches[0], buildrepo.SSHWrapperName) {
+			t.Fatalf("default ssh fetch bypassed the manager wrapper:\n%s", fetches[0])
 		}
 	})
 

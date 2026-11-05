@@ -109,7 +109,7 @@ type GitTool struct {
 	// policies. Bounded transport resolution completes it per SSH attempt
 	// with the endpoint source and the attempt's credential selection; a
 	// zero base binds no policy and every resolved SSH attempt refuses.
-	// Direct acquisition ignores it and keeps the static wrapper.
+	// Direct acquisition binds the same policy as resolved acquisition.
 	SSHBase SSHWrapperBase
 }
 
@@ -262,6 +262,13 @@ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, err
 	if err := admitNetworkRequest(ctx, request); err != nil {
 		return nil, err
 	}
+	if request.Source.Transport == "ssh" {
+		policy, err := bindSSHWrapperPolicy(request.Tool, request.Source)
+		if err != nil {
+			return nil, err
+		}
+		request.sshPolicy = &policy
+	}
 	limits := normalizedLimits(request.Limits)
 	ctx, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
@@ -289,15 +296,13 @@ func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
 	if request.Source.Transport == "https" && request.Tool.AskPass == "" {
 		return admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
 	}
-	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
-		return admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
-	}
-	// The admission boundary refuses an unselected SSH repository even when a
-	// caller forgot to resolve credentials, so no fetch can quietly fall back
-	// to whatever the operator's ambient SSH state happens to offer.
+	// Selection is checked before wrapper admission and before any Git probe.
 	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
 		return admissionError(CodeSSHCredentialMissing,
 			"SSH build repositories require an operator identity or agent")
+	}
+	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
+		return admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
 	}
 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
 		return admissionError(CodeIdentityInvalid, "invalid immutable lock")
@@ -340,12 +345,21 @@ func (e *fetchError) Error() string { return "exact source fetch failed" }
 func laneDiagnostic(err error) error {
 	var fetch *fetchError
 	if errors.As(err, &fetch) {
-		return admissionError(CodeSourceUnavailable, "exact source fetch failed")
+		reason := "transport_failed"
+		if !fetch.truncated && ClassifyFetchOutput(fetch.stderr) == FailureRef {
+			reason = "locked_ref_unavailable"
+		}
+		return admissionError(CodeSourceUnavailable, "exact source fetch failed (%s)", reason)
 	}
 	return err
 }
 
 func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Limits) (*Snapshot, error) {
+	// No internal caller may fall back to a static or ambient SSH wrapper.
+	if request.Source.Transport == "ssh" && request.sshPolicy == nil {
+		return nil, admissionError(CodeIdentityInvalid, "SSH requires a bound manager wrapper policy")
+	}
+
 	root, err := os.MkdirTemp("", "curator-buildrepo-")
 	if err != nil {
 		return nil, admissionError(CodeSourceUnavailable, "cannot create private state")

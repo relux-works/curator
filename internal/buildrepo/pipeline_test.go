@@ -700,11 +700,9 @@ func TestPipelinePreservesIdentityInvalidFromAcquisition(t *testing.T) {
 	}
 }
 
-// TestPipelineCollapsesNonTransportPlanIdentityInvalid pins the scope of
-// the §7 preservation: any other identity refusal (here the frozen
-// lane's SSH wrapper diagnostic) keeps the legacy collapse to
-// source-unavailable, through the legacy offline-snapshot branch.
-func TestPipelineCollapsesNonTransportPlanIdentityInvalid(t *testing.T) {
+// A missing manager wrapper is a deterministic policy refusal, preserved
+// without consulting an offline snapshot or invoking audit/compiler work.
+func TestPipelinePreservesMissingSSHWrapper(t *testing.T) {
 	_, declared, effective := pipelineFixture(t)
 	events := []string{}
 	laneErr := admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
@@ -715,14 +713,11 @@ func TestPipelineCollapsesNonTransportPlanIdentityInvalid(t *testing.T) {
 		Acquire:            func(context.Context) (*Snapshot, error) { return nil, laneErr },
 		Audit:              func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }}
 	_, err := RunPipeline(context.Background(), request)
-	if ErrorCode(err) != CodeSourceUnavailable {
-		t.Fatalf("error = %v, want the legacy collapse to %s", err, CodeSourceUnavailable)
+	if ErrorCode(err) != CodeIdentityInvalid || err.Error() != laneErr.Error() {
+		t.Fatalf("error = %v, want %v", err, laneErr)
 	}
-	if err.Error() != CodeSourceUnavailable+": exact external source is unavailable" {
-		t.Fatalf("error = %q, want the byte-identical legacy diagnostic", err.Error())
-	}
-	if !contains(events, "snapshot-load") {
-		t.Fatalf("events = %v, want the legacy offline-snapshot branch past a non-§7 refusal", events)
+	if len(events) != 0 {
+		t.Fatalf("refusal started downstream work: %v", events)
 	}
 }
 
@@ -857,5 +852,29 @@ func assertBefore(t *testing.T, values []string, left, right string) {
 	}
 	if li < 0 || ri < 0 || li >= ri {
 		t.Fatalf("want %s before %s: %v", left, right, values)
+	}
+}
+
+// Acquisition refuses with static pin/transport reasons without exposing the
+// server's diagnostic, and the pipeline preserves those reasons for operators.
+func TestPipelinePreservesSanitizedAcquisitionReasons(t *testing.T) {
+	for _, tc := range []struct{ stderr, reason string }{
+		{"fatal: remote error: upload-pack: not our ref " + strings.Repeat("f", 40) + "\n", "locked_ref_unavailable"},
+		{"fatal: git upload-pack: not our ref " + strings.Repeat("f", 40) + "\n", "locked_ref_unavailable"},
+		{"error: Server does not allow request for unadvertised object " + strings.Repeat("f", 40) + "\n", "locked_ref_unavailable"},
+		{"ssh: connect to host fixture.test port 22: Connection refused\n", "transport_failed"},
+		{"secret-untrusted-server-output\n", "transport_failed"},
+	} {
+		t.Run(tc.reason+tc.stderr[:5], func(t *testing.T) {
+			_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Acquire: func(context.Context) (*Snapshot, error) { return nil, laneDiagnostic(&fetchError{stderr: tc.stderr}) }})
+			if ErrorCode(err) != CodeSourceUnavailable || !strings.Contains(err.Error(), "("+tc.reason+")") || strings.Contains(err.Error(), tc.stderr) {
+				t.Fatalf("error: %v", err)
+			}
+		})
+	}
+	// Truncation cannot authorize a pin diagnosis even when its prefix matches.
+	err := laneDiagnostic(&fetchError{stderr: "fatal: remote error: upload-pack: not our ref " + strings.Repeat("f", 40), truncated: true})
+	if !strings.Contains(err.Error(), "(transport_failed)") {
+		t.Fatal(err)
 	}
 }

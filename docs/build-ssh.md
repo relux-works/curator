@@ -498,3 +498,37 @@ loops over targets, so a repository covered by an answer given for target 1 is
 asked about again for target 2. Answering twice is harmless, since the same
 scope is simply replaced, but the "one scope covers every sibling" property
 holds within a target and not across them.
+
+## Default-lane wrapper and failure reasons
+
+Project, global, and profile installs bind the selected credentials to Curator's
+own SSH wrapper on the default lane. No transport-resolution switch or
+`GIT_SSH` setting is needed. Inherited `GIT_SSH` and `GIT_SSH_COMMAND` are
+ignored: Manager Profile §11.1 requires an environment constructed from empty,
+and §11.3 permits only the manager wrapper with its fixed SSH policy. An
+manager-discovered SSH executable still receives the explicit empty `-F`
+configuration, selected host keys, and exactly one authentication tail above.
+
+Refusals retain the protocol codes and distinguish these sanitized reasons:
+
+| Code | Reason |
+| --- | --- |
+| `build_repository_ssh_credential_missing` | No operator identity/agent selection, or no selected host keys; no fetch starts. |
+| `build_repository_identity_invalid` | The manager wrapper or its SSH policy inputs are unavailable; no fetch starts. |
+| `build_repository_source_unavailable` | `transport_failed`: fetch failed without a proved missing ref. Raw remote output is never printed. |
+| `build_repository_source_unavailable` | `locked_ref_unavailable`: the server reports a missing locked object/ref. This is not a transport failure. |
+| `build_repository_ref_moved` | A declared tag terminates at a different commit from the lock. |
+
+Unknown or truncated fetch output remains a transport failure with no inferred
+pin diagnosis. These reasons do not change the stable mappings in Manager
+Profile §11.2 and §11.10.
+
+HTTPS selections work on the same install scopes for `https://` declarations,
+including anonymous fetch when no credential is selected. A `build_https`
+selection never converts an `ssh://` declaration into HTTPS.
+
+The hosted Linux `Default build transport` job runs the project/global fixture
+matrix and `python3 .github/ci/default-build-transport-control.py`. The control
+temporarily drops the default-lane policy binding, requires the selected-key
+install witness to fail for that reason, restores the source, and requires the
+same positive control to pass. It uses capture SSH, never a real SSH client.

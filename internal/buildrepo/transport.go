@@ -219,6 +219,8 @@ var transportLineSignals = []struct {
 
 	// Missing or moved refs (fail closed).
 	{regexp.MustCompile(`(?i)^fatal: couldn't find remote ref [A-Za-z0-9_./-]+\.?$`), FailureRef, false},
+	{regexp.MustCompile(`^fatal: (remote error: upload-pack: not our ref|git upload-pack: not our ref) [0-9a-f]{40}([0-9a-f]{24})?$`), FailureRef, false},
+	{regexp.MustCompile(`^error: Server does not allow request for unadvertised object [0-9a-f]{40}([0-9a-f]{24})?$`), FailureRef, false},
 	// Ambiguous HTTP 404 shapes (fail closed: a 404 can hide an auth
 	// rejection, so it never authorizes an alternate).
 	{regexp.MustCompile(`(?i)^fatal: unable to access '[^']+': The requested URL returned error: 404$`), FailureHTTP404, false},

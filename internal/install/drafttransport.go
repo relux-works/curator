@@ -5,7 +5,7 @@ package install
 // The external-repository lane declares URLs only. Behind the draft/opt-in
 // switch, one fetch with a present machine policy runs the resolved executor
 // over the policy's endpoint plan; with the switch off, or with no policy
-// file, the legacy lane runs unchanged. The logical `repository` spelling is
+// file, the default lane applies the same manager SSH wrapper policy. The logical `repository` spelling is
 // admitted only in new Skillfile source objects (§3) and no caller here mints
 // it, so resolution always starts from the declared URL.
 
@@ -24,7 +24,7 @@ import (
 
 // EnvDraftTransportResolution names the draft/opt-in switch for bounded
 // transport resolution. Exactly "1" enables the resolved lane; every other
-// value, including unset and empty, keeps the legacy lane. The switch is
+// value, including unset and empty, keeps the default lane. The switch is
 // operator-owned: package data can neither set it nor observe it.
 const EnvDraftTransportResolution = "CURATOR_DRAFT_TRANSPORT_RESOLUTION"
 
@@ -109,8 +109,8 @@ func appendTransportProvenance(path string, record buildrepo.AttemptRecord) {
 
 // acquireDraftNetwork routes one external-repository fetch behind the draft
 // switch. git/transport/identity carry the effective fetch endpoint: the
-// declared URL, or the network substitution's. The legacy call keeps the
-// exact legacy request shape. The resolved call passes the policy's endpoint
+// declared URL, or the network substitution's. The default call binds the
+// manager SSH policy directly. The resolved call passes the policy's endpoint
 // plan; attempts without a policy provider keep the tool's bound lane
 // credentials, while named providers resolve only through the operator's
 // provider table and trusted broker — never through the repository's own
@@ -118,7 +118,7 @@ func appendTransportProvenance(path string, record buildrepo.AttemptRecord) {
 func (deps ExternalDeps) acquireDraftNetwork(ctx context.Context, tool buildrepo.GitTool, git, transport, identity string, lock buildrepo.LockedCommit, tag, refKind, refValue string) (*buildrepo.Snapshot, error) {
 	base := buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: lock, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: tool, Limits: deps.Limits}
 	if !deps.DraftTransportResolution {
-		return buildrepo.AcquireNetwork(ctx, base)
+		return acquireDefaultNetwork(ctx, base)
 	}
 	path := deps.DraftPolicyPath
 	if path == "" {
@@ -129,7 +129,7 @@ func (deps ExternalDeps) acquireDraftNetwork(ctx context.Context, tool buildrepo
 		return nil, err
 	}
 	if policy == nil {
-		return buildrepo.AcquireNetwork(ctx, base)
+		return acquireDefaultNetwork(ctx, base)
 	}
 	resolution, err := config.ResolveRepositoryEndpoints(policy, git, "")
 	if err != nil {
@@ -281,4 +281,21 @@ func draftManagerExecutable() (string, error) {
 		return "", fmt.Errorf("build_repository_identity_invalid: SSH transport resolution requires an admitted manager executable")
 	}
 	return resolved, nil
+}
+
+// acquireDefaultNetwork equips every install scope with the same manager
+// wrapper policy as resolved transport. An injected base is used by isolated
+// transport fixtures; production discovers the SSH executable and empty files.
+func acquireDefaultNetwork(ctx context.Context, base buildrepo.NetworkRequest) (*buildrepo.Snapshot, error) {
+	if base.Source.Transport == "ssh" && base.Tool.SSHBase == (buildrepo.SSHWrapperBase{}) {
+		sshBase, cleanup, err := draftSSHWrapperBase()
+		if err != nil {
+			// A zero base reaches the shared binder's typed, static policy
+			// refusal. Never expose a temporary path or fall back to SSH.
+			sshBase = buildrepo.SSHWrapperBase{}
+		}
+		defer cleanup()
+		base.Tool.SSHBase = sshBase
+	}
+	return buildrepo.AcquireNetwork(ctx, base)
 }
