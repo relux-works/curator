@@ -244,6 +244,17 @@ func TestProjectBinCollisionKinds(t *testing.T) {
 			if _, err := os.Lstat(filepath.Join(e.project, ".agents", projectBinLedgerName)); !os.IsNotExist(err) {
 				t.Fatalf("ledger published: %v", err)
 			}
+			if kind == "directory" {
+				if err := os.Remove(filepath.Join(path, "keep")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if result := e.install(Options{}); result.Status != "ok" {
+				t.Fatalf("absent-path positive control: %+v", result)
+			}
 		})
 	}
 }

@@ -1,38 +1,32 @@
 package install
 
 import (
-	"golang.org/x/sys/windows"
+	"errors"
+	"os"
 	"testing"
+
+	"golang.org/x/sys/windows"
 )
 
+// An exclusive native handle makes an ordinary state read fail with a real
+// sharing violation. This tests unreadable state without assuming that the
+// hosted account cannot bypass a deny-read DACL. Cleanup restores readability.
 func denyProjectLedgerRead(t *testing.T, path string) {
 	t.Helper()
-	old, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	name, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	original, _, err := old.DACL()
+	handle, err := windows.CreateFile(name, windows.GENERIC_READ, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, original, nil); err != nil {
+		if err := windows.CloseHandle(handle); err != nil {
 			t.Error(err)
 		}
 	})
-	user, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		t.Fatal(err)
-	}
-	descriptor, err := windows.SecurityDescriptorFromString("D:P(D;;0x1;;;" + user.User.Sid.String() + ")(A;;FA;;;" + user.User.Sid.String() + ")")
-	if err != nil {
-		t.Fatal(err)
-	}
-	acl, _, err := descriptor.DACL()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, acl, nil); err != nil {
-		t.Fatal(err)
+	if _, err := os.ReadFile(path); !errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
+		t.Fatalf("unreadable-ledger fixture did not deny a real read: %v", err)
 	}
 }
