@@ -449,6 +449,9 @@ func newAcquisitionGitShim(t *testing.T) acquisitionGitShim {
 	tool.AskPass = executable
 	tool.SSHWrapper = executable
 	tool.SSHCredentials = OperatorSSHCredentials{Identity: realGit, KnownHosts: realGit}
+	// The Git shim rewrites fixture fetches locally; SSH still requires an
+	// admitted manager policy base, without ever invoking a real SSH client.
+	tool.SSHBase = transportSSHBase(t)
 	return acquisitionGitShim{Executable: executable, RealGit: realGit, Tool: tool}
 }
 
@@ -559,7 +562,8 @@ func testExternalRepositoryAcquisitionCases(t *testing.T, vector externalReposit
 
 // verifyAcquisitionFetchCallSite checks the invocation recorded at the shim's
 // entry, before it rewrites the test transport. Expected flags and environment
-// come from the vector, never from the production builders under test.
+// come from the vector plus the section 11.3 operation-bound SSH wrapper,
+// never from the production builders under test.
 func verifyAcquisitionFetchCallSite(t *testing.T, invocation acquisitionGitShimInvocation, vector externalRepositoryAcquisitionVector, request NetworkRequest, refspec string) error {
 	t.Helper()
 	var repo, hooks string
@@ -599,6 +603,16 @@ func verifyAcquisitionFetchCallSite(t *testing.T, invocation acquisitionGitShimI
 		return fmt.Errorf("production fetch environment: %w", err)
 	}
 	wantEnvironment := expectedAcquisitionEnvironment(t, vector.CleanEnvironment, paths, request.Tool, request.Source.Transport)
+	if request.Source.Transport == "ssh" {
+		// The selected key is bound to this operation's private wrapper and
+		// state; neither a static tool wrapper nor ambient SSH state may pass.
+		name := "curator-build-ssh-wrapper"
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		wantEnvironment["GIT_SSH"] = filepath.Join(root, "manager-wrappers", name)
+		wantEnvironment["CURATOR_BUILD_SSH_WRAPPER_STATE"] = filepath.Join(root, "manager-wrappers", "ssh-wrapper-state.json")
+	}
 	if !reflect.DeepEqual(gotEnvironment, wantEnvironment) {
 		return fmt.Errorf("production fetch environment = %#v, vector requires %#v", gotEnvironment, wantEnvironment)
 	}
