@@ -69,7 +69,7 @@ func SelectTrustedExecutable(name, configured string, forbiddenRoots ...string) 
 
 // ExecutableFingerprint pins executable bytes for revalidation before use.
 func ExecutableFingerprint(path string) (string, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 -- operator-selected executable bytes are the required fingerprint input, never a package-supplied file.
 	if err != nil {
 		return "", err
 	}

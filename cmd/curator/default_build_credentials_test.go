@@ -4,17 +4,21 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/relux-works/curator/internal/buildrepo"
 )
 
-// An inherited GIT_SSH never selects the production wrapper; Curator's own
-// executable supplies both manager helpers. No SSH process is started here.
+// Discovery strips inherited SSH selectors (a pure environment witness), and
+// production binds both helpers to Curator. No SSH selector is set on this host.
 func TestProductionGitToolIgnoresInheritedSSHWrapper(t *testing.T) {
 	inherited := filepath.Join(t.TempDir(), "foreign-wrapper")
 	if err := os.WriteFile(inherited, []byte("foreign"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	// GIT_SSH is deliberately not set in the host process; the production
-	// selector has no environment lookup for it.
+	clean := buildrepo.DiscoveryEnvironment([]string{"GIT_SSH=" + inherited, "GIT_SSH_COMMAND=" + inherited, "SSH_AUTH_SOCK=foreign", "HOME=fixture"})
+	if len(clean) != 1 || clean[0] != "HOME=fixture" {
+		t.Fatalf("discovery retained a credential selector or lost ordinary environment: %v", clean)
+	}
 	tool := productionGitTool()
 	manager, err := os.Executable()
 	if err != nil {

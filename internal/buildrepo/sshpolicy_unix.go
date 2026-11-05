@@ -14,7 +14,7 @@ import (
 // Git inherits descriptor 3 and passes it to the exact binary wrapper. The
 // original is read-only; Git's standard streams keep their protocol roles.
 func runGitCaptureSSH(ctx context.Context, executable, dir string, env []string, state string, args ...string) (string, bool, error) {
-	policy, err := os.Open(state)
+	policy, err := os.Open(state) // #nosec G304 -- state is the manager-created operation-private policy record, passed read-only to Git.
 	if err != nil {
 		return "", false, err
 	}

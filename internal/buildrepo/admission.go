@@ -1281,6 +1281,7 @@ func isLFSPointer(data []byte) bool {
 // AcquisitionReason is static protocol classification, never stderr matching.
 type AcquisitionReason string
 
+// Acquisition failure reasons are fixed labels safe to expose to operators.
 const (
 	ReasonTransportFailed      AcquisitionReason = "transport_failed"
 	ReasonLockedRefUnavailable AcquisitionReason = "locked_ref_unavailable"
@@ -1288,6 +1289,7 @@ const (
 	ReasonHostKeyFailed        AcquisitionReason = "host_key_verification_failed"
 )
 
+// ReasonTransportPlanInvalid identifies a refused transport plan before acquisition.
 const ReasonTransportPlanInvalid AcquisitionReason = "transport_plan_invalid"
 
 func transportPlanError(format string, args ...any) error {

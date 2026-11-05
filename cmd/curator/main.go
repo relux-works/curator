@@ -2078,7 +2078,7 @@ func productionGitTool() buildrepo.GitTool {
 		return buildrepo.GitTool{}
 	}
 	run := func(args ...string) string {
-		command := exec.Command(gitPath, args...) // #nosec G204 -- resolved operator tool, fixed discovery arguments.
+		command := exec.Command(gitPath, args...) // #nosec G204 G702 -- SelectTrustedExecutable rejects relative and managed paths; fixed discovery arguments, no shell.
 		command.Env = buildrepo.DiscoveryEnvironment(os.Environ())
 		output, runErr := command.Output()
 		if runErr != nil || len(output) > 4096 {

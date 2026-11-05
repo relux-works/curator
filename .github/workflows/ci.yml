@@ -124,7 +124,9 @@ jobs:
           PubkeyAuthentication yes
           PermitRootLogin no
           StrictModes yes
-          UsePAM no
+          # Hosted runner accounts are password-locked; retain the image's PAM
+          # account/session handling while admitting public-key auth only.
+          UsePAM yes
           AllowUsers $(id -un)
           EOF
           sudo systemctl stop ssh
