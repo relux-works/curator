@@ -1,0 +1,60 @@
+func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		var temp, full string
+		if prepared.payload != nil {
+			var err error
+			full, err = managedPath(root, managedJoin(homeRel, ".claude.json"), true)
+			if err != nil {
+				return nil, err
+			}
+			file, err := privatedir.CreateTemp(filepath.Dir(full), ".curator-write-*.tmp")
+			if err != nil {
+				return nil, err
+			}
+			temp = file.Name()
+			// Cleanup belongs to this attempt, including write/sync/close errors.
+			err = file.Chmod(managedAuthoredFileMode)
+			if err == nil {
+				_, err = file.Write(prepared.payload)
+			}
+			if err == nil {
+				err = file.Sync()
+			}
+			closeErr := file.Close()
+			if err == nil {
+				err = closeErr
+			}
+			if err != nil {
+				_ = os.Remove(temp)
+				return nil, err
+			}
+		}
+		fresh, err := readClaudeSeedInput(root, homeRel)
+		if err != nil {
+			if temp != "" {
+				_ = os.Remove(temp)
+			}
+			return nil, err
+		}
+		if !sameClaudeSeedInput(prepared, fresh) {
+			if temp != "" {
+				_ = os.Remove(temp)
+			}
+			prepared, err = prepareClaudeSeed(root, homeRel, launchDir, form)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if temp != "" {
+			err = replaceManagedEntry(temp, full)
+			_ = os.Remove(temp)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return prepared, nil
+	}
+	return nil, fmt.Errorf("%s: managed .claude.json changed during all 3 publication checks; seed not published", envregistry.DiagSeedUnreadable)
+}
+

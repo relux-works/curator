@@ -867,11 +867,13 @@ func sameClaudeSeedInput(prepared, fresh *claudeSeedPlan) bool {
 // publishClaudeSeed stages only validated output, then compares the exact input
 // (including absence) immediately before rename. Three total checks are allowed;
 // a mismatch rebuilds from that fresh input, never from the stale payload.
-// The tool does not hold our lock: the final read-to-rename interval remains a
-// non-cooperative-writer race, not an atomic filesystem compare-and-swap.
+// Rename preparation precedes the final comparison; only the native rename
+// call follows it. Uncoordinated writes in that native rename syscall interval
+// can still be lost: eliminating that race requires filesystem compare-and-swap.
 func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form string) (*claudeSeedPlan, error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		var temp, full string
+		var rename func() error
 		if prepared.payload != nil {
 			var err error
 			full, err = managedPath(root, managedJoin(homeRel, ".claude.json"), true)
@@ -894,6 +896,9 @@ func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form 
 			closeErr := file.Close()
 			if err == nil {
 				err = closeErr
+			}
+			if err == nil {
+				rename, err = prepareClaudeSeedRename(temp, full)
 			}
 			if err != nil {
 				_ = os.Remove(temp)
@@ -918,7 +923,7 @@ func publishClaudeSeed(prepared *claudeSeedPlan, root, homeRel, launchDir, form 
 			continue
 		}
 		if temp != "" {
-			err = replaceManagedEntry(temp, full)
+			err = rename()
 			_ = os.Remove(temp)
 			if err != nil {
 				return nil, err
