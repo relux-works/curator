@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           test_home="$(mktemp -d)"
-          trap 'rm -rf "$test_home"' EXIT
+          trap 'chmod -R u+w "$test_home"; rm -rf "$test_home"' EXIT
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/install \
@@ -108,7 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           test_home="$(mktemp -d)"
-          trap 'rm -rf "$test_home"' EXIT
+          trap 'chmod -R u+w "$test_home"; rm -rf "$test_home"' EXIT
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             python3 .github/ci/default-build-transport-control.py
