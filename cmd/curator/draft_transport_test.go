@@ -910,6 +910,10 @@ func TestDefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH(t *testing.T) {
 	}
 }
 
+// The production entry point accepts a complete policy and preserves the fake
+// client's exit status on every platform. Invalid policy or tuple fields refuse
+// silently without invoking that client. Git inheritance and Windows policy
+// directory protection have separate native controls in internal/buildrepo.
 func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
 	build := exec.Command(testtoolchain.Go(t), "build", "-o", binary, ".")
@@ -940,22 +944,33 @@ func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
 	identity := writeFile("id_example", []byte("key"))
 	sshLog := filepath.Join(t.TempDir(), "ssh-argv.log")
 
-	fakeSSH := ""
-	if runtime.GOOS != "windows" {
-		fakeSSH = filepath.Join(t.TempDir(), "ssh")
-		script := "#!/bin/sh\nfor arg in \"$@\"; do printf '<%s>' \"$arg\"; done >> " + draftCLIShellQuote(sshLog) + "\nprintf '\\n' >> " + draftCLIShellQuote(sshLog) + "\nexit 3\n"
-		if err := os.WriteFile(fakeSSH, []byte(script), 0o700); err != nil {
-			t.Fatal(err)
-		}
-	} else {
-		fakeSSH = filepath.Join(t.TempDir(), "ssh.exe")
-		if err := os.WriteFile(fakeSSH, []byte("MZ"), 0o700); err != nil {
-			t.Fatal(err)
-		}
+	fakeSSH := filepath.Join(t.TempDir(), "ssh"+productionBinarySuffix())
+	fakeSource := filepath.Join(t.TempDir(), "ssh-client.go")
+	program := fmt.Sprintf(`package main
+import ("fmt"; "os")
+func main() {
+ f, err := os.OpenFile(%q, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+ if err != nil { os.Exit(99) }
+ for _, arg := range os.Args[1:] { fmt.Fprint(f, "<", arg, ">") }
+ fmt.Fprintln(f)
+ if err := f.Close(); err != nil { os.Exit(99) }
+ os.Exit(3)
+}
+`, sshLog)
+	if err := os.WriteFile(fakeSource, []byte(program), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fakeBuild := exec.Command(testtoolchain.Go(t), "build", "-o", fakeSSH, fakeSource)
+	if output, err := fakeBuild.CombinedOutput(); err != nil {
+		t.Fatalf("build native fake SSH client: %v\n%s", err, output)
+	}
+	fingerprint, err := buildrepo.ExecutableFingerprint(fakeSSH)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	policy := map[string]any{
-		"Wrapper": wrapper, "SSH": fakeSSH,
+		"Wrapper": wrapper, "SSH": fakeSSH, "SSHFingerprint": fingerprint,
 		"ExpectedHost": "git@fixture.test", "RepositoryPath": "/repository.git",
 		"EmptyConfig": emptyConfig, "KnownHosts": knownHosts, "EmptyKnownHosts": emptyKnownHosts,
 		"Identity": identity, "ConnectTimeout": 15,
@@ -966,9 +981,21 @@ func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
 	}
 	statePath := writeFile("ssh-wrapper-state.json", append(state, '\n'))
 
-	run := func(args []string, stateValue string) (int, string) {
+	run := func(args []string, stateValue string, argv0 ...string) (int, string) {
 		t.Helper()
 		command := exec.Command(wrapper, args...)
+		if len(argv0) != 0 {
+			command.Args[0] = argv0[0]
+		}
+		if runtime.GOOS != "windows" && stateValue != "" {
+			policyFile, err := os.Open(stateValue)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer policyFile.Close()
+			command.ExtraFiles = []*os.File{policyFile}
+			stateValue = "3"
+		}
 		command.Env = []string{"PATH=" + os.Getenv("PATH"), buildrepo.EnvSSHWrapperState + "=" + stateValue}
 		output, err := command.CombinedOutput()
 		if err == nil {
@@ -981,22 +1008,34 @@ func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
 		return -1, ""
 	}
 
-	if runtime.GOOS != "windows" {
-		t.Run("passthrough", func(t *testing.T) {
-			code, output := run([]string{"git@fixture.test", "git-upload-pack '/repository.git'"}, statePath)
-			if code != 3 {
-				t.Fatalf("wrapper exit = %d, want the ssh exit 3\n%s", code, output)
+	t.Run("passthrough", func(t *testing.T) {
+		code, output := run([]string{"git@fixture.test", "git-upload-pack '/repository.git'"}, statePath)
+		if code != 3 {
+			t.Fatalf("wrapper exit = %d, want the ssh exit 3\n%s", code, output)
+		}
+		logged, err := os.ReadFile(sshLog)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"<-F>", "<" + emptyConfig + ">", "<BatchMode=yes>", "<git@fixture.test>", "<git-upload-pack '/repository.git'>"} {
+			if !strings.Contains(string(logged), want) {
+				t.Fatalf("ssh argv lacks %s:\n%s", want, logged)
 			}
-			logged, err := os.ReadFile(sshLog)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, want := range []string{"<-F>", "<" + emptyConfig + ">", "<BatchMode=yes>", "<git@fixture.test>", "<git-upload-pack '/repository.git'>"} {
-				if !strings.Contains(string(logged), want) {
-					t.Fatalf("ssh argv lacks %s:\n%s", want, logged)
-				}
-			}
-		})
+		}
+	})
+	refuses := func(t *testing.T, args []string, stateValue string, argv0 ...string) {
+		t.Helper()
+		before, err := os.ReadFile(sshLog)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code, output := run(args, stateValue, argv0...); code != 1 || output != "" {
+			t.Fatalf("refusal = (%d, %q), want silent exit 1", code, output)
+		}
+		after, err := os.ReadFile(sshLog)
+		if err != nil || string(after) != string(before) {
+			t.Fatalf("refused invocation reached the fake client: %v", err)
+		}
 	}
 
 	for _, testCase := range []struct {
@@ -1005,23 +1044,37 @@ func TestProductionBinaryDispatchesSSHWrapper(t *testing.T) {
 	}{
 		{"missing state refuses", []string{"git@fixture.test", "git-upload-pack '/repository.git'"}},
 		{"wrong tuple refuses", []string{"other@fixture.test", "git-upload-pack '/repository.git'"}},
+		{"wrong command refuses", []string{"git@fixture.test", "git-upload-pack '/neighbour.git'"}},
 		{"single arg refuses before CLI parsing", []string{"--version"}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			stateValue := ""
-			if testCase.name == "wrong tuple refuses" {
-				stateValue = statePath
+			stateValue := statePath
+			if testCase.name == "missing state refuses" {
+				stateValue = ""
 			}
-			if code, output := run(testCase.args, stateValue); code != 1 || output != "" {
-				t.Fatalf("refusal = (%d, %q), want silent exit 1", code, output)
-			}
+			refuses(t, testCase.args, stateValue)
 		})
 	}
+	t.Run("wrong argv zero refuses", func(t *testing.T) {
+		otherWrapper := filepath.Join(t.TempDir(), wrapperName)
+		refuses(t, []string{"git@fixture.test", "git-upload-pack '/repository.git'"}, statePath, otherWrapper)
+	})
 
 	t.Run("malformed state refuses", func(t *testing.T) {
 		bad := writeFile("bad-state.json", []byte("{broken"))
-		if code, output := run([]string{"git@fixture.test", "git-upload-pack '/repository.git'"}, bad); code != 1 || output != "" {
-			t.Fatalf("refusal = (%d, %q), want silent exit 1", code, output)
+		refuses(t, []string{"git@fixture.test", "git-upload-pack '/repository.git'"}, bad)
+	})
+	t.Run("wrong fingerprint refuses", func(t *testing.T) {
+		policy["SSHFingerprint"] = strings.Repeat("0", 64)
+		bad, err := json.Marshal(policy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		refuses(t, []string{"git@fixture.test", "git-upload-pack '/repository.git'"}, writeFile("wrong-fingerprint.json", bad))
+	})
+	t.Run("original policy still passes", func(t *testing.T) {
+		if code, output := run([]string{"git@fixture.test", "git-upload-pack '/repository.git'"}, statePath); code != 3 || output != "" {
+			t.Fatalf("original policy = (%d, %q), want fake-client exit 3", code, output)
 		}
 	})
 }

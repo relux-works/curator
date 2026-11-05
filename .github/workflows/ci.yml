@@ -182,7 +182,7 @@ jobs:
             GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \
-              -run '^TestProductionGitTool(RejectsProjectPATH|IgnoresInheritedSSHWrapper)$'
+              -run '^Test(ProductionGitTool(RejectsProjectPATH|IgnoresInheritedSSHWrapper)|ProductionBinaryDispatchesSSHWrapper)$'
 
   default-build-transport:
     name: Default build transport (hosted Linux)
@@ -210,7 +210,7 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \
-              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden|ProductionExternalDepsFalseDrivesMirrorFetchToSink)$'
+              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden|ProductionExternalDepsFalseDrivesMirrorFetchToSink|ProductionBinaryDispatchesSSHWrapper)$'
       - name: Detect a dropped default-lane SSH policy
         shell: bash
         run: |

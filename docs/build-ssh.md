@@ -567,8 +567,11 @@ wrong key and unknown host. Real SSH runs only in this hosted job. The default
 project/global matrix uses POSIX capture scripts and therefore cannot execute
 on Windows. CLI fake-Git shell witnesses have the same POSIX boundary; Windows
 still executes portable missing-credential admission, executable-selection,
-fingerprint and native wrapper/handle controls. Those controls do not establish
-a real Windows SSH fetch or agent interoperability.
+fingerprint and native wrapper/handle controls. The production entry-point
+dispatch witness uses a native fake SSH client on every platform: a complete
+policy preserves its exit status, while invalid tuple or fingerprint inputs
+refuse without invoking it. These controls do not establish a real Windows
+SSH fetch or agent interoperability.
 
 Profile install uses the shared acquisition implementation; this change has no
 separate profile-install credential fixture. Project/global integration evidence
