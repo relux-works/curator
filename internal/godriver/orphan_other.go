@@ -4,7 +4,9 @@ package godriver
 
 import "os"
 
-// Windows closes the worker's query-only job handle on exit. After manager
-// death this releases the last handle and kill-on-close tears down the job;
-// with the manager alive its existing parent-side teardown closes the domain.
-func stopOrphanedWorkerDomain() { os.Exit(exitWorkerFailure) }
+// Windows closes the query handle during admission, before acknowledgement.
+// The manager then holds the last Job Object handle; its death alone triggers
+// kill-on-close. Worker-owned termination is not claimed on this platform.
+func stopOrphanedWorkerDomain()       { os.Exit(exitWorkerFailure) }
+func protectWorkerPipeWrites() func() { return func() {} }
+func finishWorkerDomain()             {}

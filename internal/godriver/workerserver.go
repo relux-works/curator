@@ -24,14 +24,18 @@ import (
 // every installation belong to the manager parent and are complete before the
 // worker executes. A control the worker cannot confirm is an evidence fault.
 //
-// It returns the process exit code; 0 means the session completed as specified.
+// Successful protocol completion can end in self-SIGKILL on Unix: process
+// status alone does not establish artifact acceptance or session failure.
 func RunWorker(input io.Reader, output io.Writer) int {
+	stopPipeSignals := protectWorkerPipeWrites()
+	defer stopPipeSignals()
 	session := &workerSession{input: input, output: output}
 	if err := session.run(); err != nil {
 		session.fail(err)
 		stopOrphanedWorkerDomain()
 		return exitWorkerTeardownFailed
 	}
+	finishWorkerDomain()
 	return 0
 }
 

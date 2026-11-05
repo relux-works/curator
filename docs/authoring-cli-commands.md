@@ -343,16 +343,13 @@ other than EOF. Successful group SIGKILL has a bounded five-second delivery
 window; a failed kill, missing private group, or expired delivery window exits
 with worker status 4. Status 4 means teardown is **unconfirmed**, and an absent
 response with that status is reported as
-`build_execution_worker_teardown_failed`, never as a protocol violation.
-Windows retains its Job Object ownership model: the worker holds query access,
-not termination access. With the manager alive, the manager tears down the job;
-after manager death, closing the last job handle on worker exit activates
-kill-on-close. This change does not claim worker-owned Windows termination.
-
-The macOS Race exit-3 cause remains unproven. Both candidate exit paths are
-closed without attributing that hosted failure to either one. The separate
-profile-plan native success witness also reported a missing build-result frame;
-its handoff/log contain no worker exit status or descendant evidence, so the
-same mechanism is possible but unestablished. No change to that profile-plan
-branch is implied. Local PRI 4 background-band timings are not evidence about
-target Linux performance.
+`build_execution_worker_teardown_failed` when no primary deadline or framed
+failure takes precedence. Status 4 is not currently preserved as a secondary
+diagnostic alongside those primary failures or during final successful teardown.
+Windows closes the worker query handle during admission, before acknowledgement.
+The manager then holds the last Job Object handle; manager death alone activates
+kill-on-close. Live-manager termination is tested on Windows; manager death is
+not witnessed there. This does not claim worker-owned Windows termination.
+Unix worker output uses a SIGPIPE handler so a closed manager pipe cannot
+terminate it before cleanup. Successful protocol completion also tears down the
+private group, covering tools that outlive the Go launcher.

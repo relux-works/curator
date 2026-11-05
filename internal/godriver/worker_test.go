@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
 )
 
@@ -453,9 +456,7 @@ func TestWorkerRunsTheCompleteHappySession(t *testing.T) {
 		t.Fatalf("worker did not stage the manager-derived artifact: %v", err)
 	}
 	worker.send(workerMessage{Kind: kindShutdown, Nonce: scenario.nonce})
-	if err := worker.command.Wait(); err != nil {
-		t.Fatalf("worker exited with %v", err)
-	}
+	requireWorkerShutdown(t, worker.command.Wait())
 }
 
 func TestProbeRejectsAnUncoveredPlatformBeforeTheWorker(t *testing.T) {
@@ -540,10 +541,22 @@ func TestWorkerReturnsABoundedResultWhenTheGoChildCannotStart(t *testing.T) {
 		t.Fatal("a refused build produced an artifact")
 	}
 	worker.send(workerMessage{Kind: kindShutdown, Nonce: scenario.nonce})
-	if err := worker.command.Wait(); err != nil {
-		t.Fatalf("worker exited with %v, want a clean shutdown after a refused child", err)
-	}
+	requireWorkerShutdown(t, worker.command.Wait())
 	if calls := scenario.fixture.sourceAwareCalls(); len(calls) != 0 {
 		t.Fatalf("calls = %+v, no Go child may have run", calls)
+	}
+}
+
+// Protocol completion keeps the native status contract: Unix self-SIGKILL,
+// Windows exit zero. An arbitrary worker failure must not satisfy completion.
+func requireWorkerShutdown(t *testing.T, err error) {
+	t.Helper()
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) || exit.Sys().(syscall.WaitStatus).Signal() != syscall.SIGKILL {
+			t.Fatalf("worker shutdown: %v, want SIGKILL", err)
+		}
+	} else if err != nil {
+		t.Fatalf("worker shutdown: %v, want exit zero", err)
 	}
 }

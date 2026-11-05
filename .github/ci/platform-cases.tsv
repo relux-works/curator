@@ -931,3 +931,23 @@ internal/godriver	TestProductionHostIgnoresPlatformTestSelector	linux,darwin,win
 internal/godriver	TestLinuxDescriptorProbeAndSyscallFailures	linux	-	-	missing procfs and injected fcntl errors refuse descriptor admission; valid descriptors remain sealed and open
 cmd/curator	TestNativeInstallSignalCancellation	linux,darwin	-	-	actual install entrypoint cancels its paused worker on interrupt/termination without publishing the compiled skill
 internal/godriver	TestWorkerEOFWhileShutdownQueued	linux,darwin	-	-	Queued shutdown preserves EOF teardown of the live worker domain
+internal/godriver	TestWorkerCheckedKill	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerFailureKillsDescendants	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerTeardownStatusDiagnostic	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerClosedManagerPipes	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerIndependentDeadline	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerSuccessfulShutdownKillsDescendants	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/collapsed-status	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/ignored-kill-error	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/no-signal-wait	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/no-failure-teardown	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/EOF-only-reader	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/fatal-SIGPIPE	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/no-worker-deadline	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerExitNarrowingControls/no-success-teardown	linux,darwin	-	-	Worker domain closure after failure, shutdown or deadline
+internal/godriver	TestWorkerClosedManagerPipes/header	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
+internal/godriver	TestWorkerClosedManagerPipes/held-stdout	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
+internal/godriver	TestWorkerClosedManagerPipes/plain-EOF	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
+internal/godriver	TestWorkerClosedManagerPipes/session-failure	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
+internal/godriver	TestWorkerClosedManagerPipes/read-error	linux,darwin	-	-	Closed manager pipe row retains descendant evidence

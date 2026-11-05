@@ -5,6 +5,8 @@ package godriver
 import (
 	"golang.org/x/sys/unix"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -26,3 +28,14 @@ func stopOrphanedWorkerDomain() {
 	orphanSignalWait()
 	os.Exit(exitWorkerTeardownFailed)
 }
+
+// A handler makes fd 1/2 EPIPE return to the caller instead of terminating the
+// worker before teardown. Unlike SIG_IGN, this disposition is reset on exec.
+func protectWorkerPipeWrites() func() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGPIPE)
+	return func() { signal.Stop(c) }
+}
+
+// Even a successful launcher may leave tools alive after publishing its result.
+func finishWorkerDomain() { stopOrphanedWorkerDomain() }

@@ -21,7 +21,7 @@ import (
 // environment have no such switch. The seams execute in their own subprocess.
 func init() {
 	mode := os.Getenv("CURATOR_TEST_EXIT_SEAM")
-	if mode == "session-failure" {
+	if mode == "session-failure" || mode == "worker-deadline" {
 		workerRunFault = func(argv []string) error {
 			if argv[0] != "build" {
 				return nil
@@ -98,7 +98,7 @@ func TestWorkerCheckedKill(t *testing.T) {
 		})
 	}
 }
-func TestWorkerKillHelper(t *testing.T) {
+func TestWorkerKillHelper(_ *testing.T) {
 	if os.Getenv("CURATOR_TEST_EXIT_SEAM") != "" {
 		stopOrphanedWorkerDomain()
 	}
