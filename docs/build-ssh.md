@@ -576,7 +576,8 @@ SSH fetch or agent interoperability.
 Profile install uses the shared acquisition implementation; this change has no
 separate profile-install credential fixture. Project/global integration evidence
 must not be presented as independent profile-path coverage. Linux **build and
-publication** support depends on #219 and #220, whose accepted native controls
-are now included in the main branch used by this change. The fetch controls
-qualify source acquisition only; the separate native-control jobs qualify Linux
-build execution.
+publication** support depends on #219 and #220. The main branch used by this
+change includes #219's native execution controls; #220's bounded build-session
+and manager-loss controls remain a pending dependency. The fetch controls
+qualify source acquisition only; separate native-control jobs cover the
+execution controls present in main.
