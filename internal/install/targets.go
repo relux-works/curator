@@ -180,7 +180,8 @@ func contextSources(plan staging.Plan, store string, names []string) map[string]
 // runtimeStaging is the staged executable state of one scope: commit-keyed
 // script runtime trees plus the canonical launchers that reach them.
 type runtimeStaging struct {
-	plan staging.Plan
+	plan                staging.Plan
+	projectBinPreimages map[string]string
 	// commands is the complete set of command names the scope publishes.
 	commands map[string]bool
 	// enforced names the published commands served by native enforced
@@ -381,13 +382,43 @@ func stageRuntimeAndShims(
 		}
 	}
 
-	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform)
+	var ownership projectBinOwnership
+	if role == runtimestore.ProjectShim {
+		desired := map[string]bool{}
+		for _, spec := range specs {
+			desired[spec.Destination.Path()] = true
+		}
+		for _, spec := range enforcedSpecs {
+			desired[spec.Destination.Path()] = true
+			desired[spec.Destination.SidecarPath()] = true
+		}
+		var err error
+		ownership, err = inspectProjectBin(home, binDir, platform, externalRoot, desired)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
+		result.projectBinPreimages = ownership.preimages
+		result.messages = append(result.messages, ownership.messages...)
+	}
+	owns := func(path string) bool {
+		return role != runtimestore.ProjectShim || ownership.owned[projectBinKey(path, platform)]
+	}
+	currentlyManaged, err := runtimestore.ManagedShimsIn(binDir, role, platform, func(shim runtimestore.ManagedShim) bool { return owns(shim.Path()) })
 	if err != nil {
 		return runtimeStaging{}, err
 	}
 	currentlyEnforced, err := runtimestore.ManagedEnforcedShimsIn(binDir, role, platform)
 	if err != nil {
 		return runtimeStaging{}, err
+	}
+	if role == runtimestore.ProjectShim {
+		filtered := currentlyEnforced[:0]
+		for _, shim := range currentlyEnforced {
+			if owns(shim.Path()) && owns(shim.SidecarPath()) {
+				filtered = append(filtered, shim)
+			}
+		}
+		currentlyEnforced = filtered
 	}
 	// Sidecar-paired launchers and the sidecars themselves belong to the
 	// enforced transition, so the ordinary transition must not also claim
@@ -425,13 +456,21 @@ func stageRuntimeAndShims(
 		replaced[desired.LivePath] = true
 	}
 	for _, desired := range transition.Desired {
-		result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+		if role == runtimestore.ProjectShim && isShimLink(desired.LivePath) {
+			result.plan.ReplaceEntry(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+		} else {
+			result.plan.Replace(staging.ClassCanonicalShim, desired.Command, desired.LivePath, desired.StagedPath)
+		}
 	}
 	for _, removal := range transition.Removals {
 		if replaced[removal.LivePath] {
 			continue
 		}
-		result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+		if role == runtimestore.ProjectShim && isShimLink(removal.LivePath) {
+			result.plan.RemoveEntry("shim/"+removal.Command, removal.LivePath)
+		} else {
+			result.plan.Remove("shim/"+removal.Command, removal.LivePath)
+		}
 	}
 	for _, desired := range enforcedTransition.Desired {
 		identifier := enforcedPlanIdentifier(desired.Command, desired.LivePath)
@@ -443,6 +482,12 @@ func stageRuntimeAndShims(
 		}
 		result.plan.Remove(enforcedPlanIdentifier(removal.Command, removal.LivePath), removal.LivePath)
 	}
+	if role == runtimestore.ProjectShim {
+		if err := ownership.stageLedger(stageRoot, &result.plan); err != nil {
+			return runtimeStaging{}, err
+		}
+	}
+
 	return result, nil
 }
 

@@ -678,6 +678,9 @@ Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-pro
 
 Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
 
+Project command collision and legacy-shim ownership rules are documented in
+[Project command ownership](docs/project-bin.md).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workflow, discrete signed commits, and spec-first rules.

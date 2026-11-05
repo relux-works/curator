@@ -1041,6 +1041,7 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	if err != nil {
 		return scopeTargets{}, err
 	}
+	targets.projectBinPreimages = runtime.projectBinPreimages
 	targets.plan.Merge(runtime.plan)
 	targets.messages = append(targets.messages, runtime.messages...)
 	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))

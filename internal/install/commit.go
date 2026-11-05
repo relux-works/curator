@@ -514,8 +514,9 @@ type scopeCommit struct {
 // journal cannot own, so nothing mutates between preparation and commit and an
 // ordinary failure always enters durable rollback.
 type scopeTargets struct {
-	plan     staging.Plan
-	messages []string
+	projectBinPreimages map[string]string
+	plan                staging.Plan
+	messages            []string
 	// referencedKeys are the build keys the committed markers depend on, so GC
 	// retains them while this transaction is in flight.
 	referencedKeys []string
@@ -967,6 +968,17 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 		preimage, err := transaction.DigestTarget(kind, target.LivePath)
 		if err != nil {
 			return transaction.Plan{}, created, fmt.Errorf("read the current state of %s: %w", target.LivePath, err)
+		}
+		// Validate ownership after capturing the durable preimage, so a swap
+		// during capture refuses here; later swaps fail the engine digest check.
+		if expected, known := targets.projectBinPreimages[target.LivePath]; known {
+			actual, err := shimFingerprint(target.LivePath)
+			if err != nil {
+				return transaction.Plan{}, created, err
+			}
+			if actual != expected {
+				return transaction.Plan{}, created, fmt.Errorf("%s: %s", projectBinConflict, target.LivePath)
+			}
 		}
 		plan.Targets = append(plan.Targets, transaction.Target{
 			Class:          target.Class,

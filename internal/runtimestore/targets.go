@@ -241,8 +241,9 @@ func (shim ManagedShim) Path() string { return shim.path }
 // ManagedShimsIn enumerates the launchers a manager-owned canonical bin
 // directory currently holds, so a transition can derive its removals without
 // the caller inventing removal paths. Entries whose name is not a portable
-// command identifier are ignored rather than claimed.
-func ManagedShimsIn(binDir string, role ShimRole, platform string) ([]ManagedShim, error) {
+// command identifier are ignored rather than claimed. The caller must prove
+// live ownership; a nil verifier never claims an entry.
+func ManagedShimsIn(binDir string, role ShimRole, platform string, owns func(ManagedShim) bool) ([]ManagedShim, error) {
 	entries, err := os.ReadDir(binDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -269,7 +270,9 @@ func ManagedShimsIn(binDir string, role ShimRole, platform string) ([]ManagedShi
 		if err != nil {
 			continue
 		}
-		shims = append(shims, shim)
+		if owns != nil && owns(shim) {
+			shims = append(shims, shim)
+		}
 	}
 	sort.Slice(shims, func(i, j int) bool { return shimSortKey(shims[i]) < shimSortKey(shims[j]) })
 	return shims, nil
