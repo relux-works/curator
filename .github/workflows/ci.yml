@@ -150,6 +150,40 @@ jobs:
             go build -o "$fixture/control" ./.github/ci/openssh89
           env -i PATH="$PATH" HOME="$test_home" \
             "$fixture/control" "$fixture" "$commit" "$(id -un)"
+  credential-windows-controls:
+    name: Credential policy native Windows controls
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Portable selection and native descriptor-policy controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_home="$(cygpath -m "$(mktemp -d)")"
+          trap 'chmod -R u+w "$test_home"; rm -rf "$test_home"' EXIT
+          env -i PATH="$PATH" SystemRoot="$SYSTEMROOT" HOME="$test_home" \
+            TEMP="$test_home" TMP="$test_home" USERPROFILE="$test_home" \
+            GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./internal/install \
+              -run '^Test(R1ProjectBinSSHSelected|DefaultTransportMissingCredentialsPortable|DraftManagerExecutableAdmission)$'
+          env -i PATH="$PATH" SystemRoot="$SYSTEMROOT" HOME="$test_home" \
+            TEMP="$test_home" TMP="$test_home" USERPROFILE="$test_home" \
+            GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./internal/buildrepo \
+              -run '^Test(TrustedExecutableSelection|WindowsGitDoesNotForwardPolicyHandle|WindowsSSHPolicyDirectoryIsPrivate|NoSSHExecutableDiagnostic|TrustedGitFingerprintChange)$'
+          env -i PATH="$PATH" SystemRoot="$SYSTEMROOT" HOME="$test_home" \
+            TEMP="$test_home" TMP="$test_home" USERPROFILE="$test_home" \
+            GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./cmd/curator \
+              -run '^TestProductionGitTool(RejectsProjectPATH|IgnoresInheritedSSHWrapper)$'
+
   default-build-transport:
     name: Default build transport (hosted Linux)
     runs-on: ubuntu-latest

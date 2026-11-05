@@ -11,7 +11,8 @@ import (
 
 // Operator-selected absolute tools are admitted outside managed roots; a
 // project/manager command, relative path and missing executable are refused.
-// This witness never starts any selected executable and runs on Windows too.
+// File identity covers native path aliases. This witness never starts any
+// selected executable and runs on Windows too.
 func TestTrustedExecutableSelection(t *testing.T) {
 	for _, name := range []string{"ssh", "git"} {
 		t.Run(name, func(t *testing.T) {
@@ -20,8 +21,14 @@ func TestTrustedExecutableSelection(t *testing.T) {
 			if err := os.WriteFile(tool, []byte("fixture"), 0700); err != nil {
 				t.Fatal(err)
 			}
-			if got, err := SelectTrustedExecutable(name, tool); err != nil || got != tool {
-				t.Fatalf("positive: %q %v", got, err)
+			got, err := SelectTrustedExecutable(name, tool)
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected, selectedErr := os.Stat(got)
+			original, originalErr := os.Stat(tool)
+			if selectedErr != nil || originalErr != nil || !os.SameFile(selected, original) {
+				t.Fatalf("positive selected a different file: %q %v %v", got, selectedErr, originalErr)
 			}
 			if _, err := SelectTrustedExecutable(name, tool, root); err == nil || !strings.Contains(err.Error(), "managed command root") {
 				t.Fatalf("manager bin: %v", err)

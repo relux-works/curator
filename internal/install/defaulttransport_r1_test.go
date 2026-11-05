@@ -13,7 +13,8 @@ import (
 // A package-provided ssh first on inherited PATH cannot become the selected
 // executable. Explicitly selecting that project command also refuses; an
 // operator-selected fixture outside managed roots is the positive control.
-// Only selection is exercised: no real SSH client is ever started.
+// File identity covers native short/long path aliases. Only selection is
+// exercised: no real SSH client is ever started.
 func TestR1ProjectBinSSHSelected(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), ".agents", "bin")
 	if err := os.MkdirAll(bin, 0755); err != nil {
@@ -27,7 +28,7 @@ func TestR1ProjectBinSSHSelected(t *testing.T) {
 	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", "")
 	inherited, release, selectErr := draftSSHWrapperBase()
 	release()
-	if selectErr != nil || inherited.SSH == foreign {
+	if selectErr != nil || sameTransportFixtureFile(t, inherited.SSH, foreign) {
 		t.Fatalf("PATH selected project ssh: %+v %v", inherited, selectErr)
 	}
 	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", foreign)
@@ -43,7 +44,7 @@ func TestR1ProjectBinSSHSelected(t *testing.T) {
 	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", trusted)
 	base, cleanup, err = draftSSHWrapperBase()
 	defer cleanup()
-	if err != nil || base.SSH != trusted {
+	if err != nil || !sameTransportFixtureFile(t, base.SSH, trusted) {
 		t.Fatalf("trusted control: %+v %v", base, err)
 	}
 	if got, _ := os.ReadFile(foreign); string(got) != "foreign package program" {
@@ -73,7 +74,7 @@ func TestDraftManagerExecutableAdmission(t *testing.T) {
 	if err := os.WriteFile(valid, []byte("manager fixture"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := draftManagerExecutableFrom(valid); err != nil || got != valid {
+	if got, err := draftManagerExecutableFrom(valid); err != nil || !sameTransportFixtureFile(t, got, valid) {
 		t.Fatalf("positive: %q %v", got, err)
 	}
 	for _, path := range []string{"relative-manager", valid + "-absent", root} {
@@ -85,4 +86,14 @@ func TestDraftManagerExecutableAdmission(t *testing.T) {
 	if got, err := os.ReadFile(valid); err != nil || string(got) != "manager fixture" {
 		t.Fatalf("preimage changed: %q %v", got, err)
 	}
+}
+
+func sameTransportFixtureFile(t *testing.T, selected, expected string) bool {
+	t.Helper()
+	want, err := os.Stat(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.Stat(selected)
+	return err == nil && os.SameFile(got, want)
 }
