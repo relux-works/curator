@@ -223,6 +223,7 @@ curator profile update [<name>|--all]  # re-resolve; blocking findings keep the 
 curator profile remove <name> [--purge]  # refuse while current in any scope
 curator profile sync    # re-materialize current profiles across adapters
 curator env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]
+curator env adopt <env-id> --profile <name> --operator-home <path> --native-root <path> --selector-state absent|present-empty|present-value [--selector-value <original-value>]
 curator env status [--check] [--json]  # profile x environment x surface matrix
 curator env unmanage [--restore-backups] [--env <env-id>]
 curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
@@ -235,11 +236,21 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 </details>
 
 When a caller already uses a managed environment, Curator excludes that managed
-root and its filesystem aliases as native seed or credential origins. For
-`env resolve`, it selects the operator HOME default and reports that fallback. This is a current native
-selection, not recovery of a previous selector. Existing credential links must
-still match the selected native path; repair preserves conflicting links and
-refuses them. No marker upgrade is required for this default-native repair.
+root and its filesystem aliases as native origins. Newly provisioned homes
+capture their credential origin in the private
+`.agent-provisioning-origin.json` sidecar, separate from published home markers.
+Resolve and repair use the recorded origin even when today's selector differs;
+retargeted credential links refuse instead of acquiring new authority.
+Native-skill selection retains its separate routing contract.
+
+Legacy homes without that record require explicit `env adopt` input for the
+original operator anchor, native root and selector state/value. No value is
+inferred from today's HOME or credential link. `absent` forbids a selector value;
+`present-empty` requires `--selector-value ''`; `present-value` requires the
+original nonempty value. Repeating identical adoption is read-only, and adopt
+cannot replace an existing origin. The proposed standalone contract is under
+[source review](https://github.com/relux-works/curator-spec/pull/182); complete
+home transaction and crash-recovery qualification remain outstanding in PR179.
 
 > **Important:** a managed home either shares your native login or logs in by itself. Claude Code on macOS always logs in by itself, so every profile you use with it needs one login in its home before the first launch or spawn; otherwise the launch stops with "Not logged in". See [Logging in to managed homes](docs/environment-config.md#logging-in-to-managed-homes).
 >

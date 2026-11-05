@@ -26,8 +26,25 @@ func (engine *Engine) PendingRecoveryFor(lock HomeLock, projectIdentity string) 
 }
 
 func (engine *Engine) pendingRecovery(lock HomeLock, projectIdentity string) (bool, error) {
-	if err := requireHomeLock(lock); err != nil {
+	journals, err := engine.PendingJournals(lock)
+	if err != nil {
 		return false, err
+	}
+	for _, journal := range journals {
+		if projectIdentity == "" || journal.ProjectIdentity == projectIdentity {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// PendingJournals returns detached, validated durable intent without resuming
+// or cleaning it. Callers must still validate target contents and their own
+// authority: a journal's presence alone never admits a publication. The complete
+// inventory is checked before any records are returned, including other owners.
+func (engine *Engine) PendingJournals(lock HomeLock) ([]Journal, error) {
+	if err := requireHomeLock(lock); err != nil {
+		return nil, err
 	}
 	engine.mu.Lock()
 	defer engine.mu.Unlock()
@@ -35,32 +52,30 @@ func (engine *Engine) pendingRecovery(lock HomeLock, projectIdentity string) (bo
 	for _, path := range []string{filepath.Dir(filepath.Dir(engine.journalRoot)), filepath.Dir(engine.journalRoot), engine.journalRoot} {
 		state, err := stateread.Lstat(path)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		if state.Kind == stateread.KindAbsent {
-			return false, nil
+			return nil, nil
 		}
 		if !state.Info.IsDir() {
-			return false, stateread.UnusableError(path, journalf("transaction inventory is not a directory"))
+			return nil, stateread.UnusableError(path, journalf("transaction inventory is not a directory"))
 		}
 	}
 	ids, err := engine.journalIDs()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	pending := false
+	var journals []Journal
 	for _, id := range ids {
 		journal, err := engine.loadJournal(id)
 		if err != nil {
 			var pathErr *os.PathError
 			if errors.As(err, &pathErr) {
-				return false, stateread.UnusableError(pathErr.Path, err)
+				return nil, stateread.UnusableError(pathErr.Path, err)
 			}
-			return false, err
+			return nil, err
 		}
-		if projectIdentity == "" || journal.ProjectIdentity == projectIdentity {
-			pending = true
-		}
+		journals = append(journals, *cloneJournal(journal))
 	}
-	return pending, nil
+	return journals, nil
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
@@ -144,9 +145,11 @@ type ResolveRequest struct {
 	nativeHomeFallback   bool
 	// credentialRelease scopes policy derivation to caller-supplied evidence.
 	// Nil permits vendor observation; content verification supplies unknown.
-	credentialRelease *string
-	credentialPolicy  *credentialPolicyResolution
-	preserveLockHash  string
+	credentialRelease  *string
+	credentialPolicy   *credentialPolicyResolution
+	provisioningOrigin *envorigin.Record
+	adoptingOrigin     bool
+	preserveLockHash   string
 	// beforeRepairLock is a race-injection seam; production leaves it nil.
 	beforeRepairLock func()
 }
@@ -344,6 +347,9 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, adapter envregistry.Adapter, prior *envmarker.Marker, release string) (*homePlan, error) {
 	if prior == nil && adapter.CodexSeedRevision == envregistry.CodexSeedRevisionC && lock.ContentHashVersion() != hashing.VersionV2 {
 		return nil, fmt.Errorf("%s: Codex seed C requires hash_version 2", envregistry.DiagSeedUnreadable)
+	}
+	if err := req.prepareProvisioningOrigin(adapter, hash, prior); err != nil {
+		return nil, err
 	}
 	previous := req.credentialRelease
 	req.credentialRelease = &release
@@ -763,7 +769,7 @@ func stripCodexSeedTrust(payload []byte) ([]byte, []string, error) {
 // that would never read it.
 func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bool) (*seedBundle, error) {
 	bundle := &seedBundle{files: map[string]seedFile{}, xdg: map[string]string{}}
-	native, err := req.nativeHome(adapter.ID)
+	native, err := req.credentialNativeHome(adapter.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -1532,7 +1538,11 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	if prior != nil && prior.Version == envmarker.VersionV1 && legacyMarkerProjectionMatches(prior, marker) {
 		return nil
 	}
-	return op.publish(map[string][]byte{markerPath: payload})
+	originPayload, err := req.provisioningOrigin.Marshal()
+	if err != nil {
+		return err
+	}
+	return op.publish(map[string][]byte{markerPath: payload, filepath.Join(plan.homeDir, envorigin.Name): originPayload})
 }
 
 // isSeedPath reports whether a recorded path is seed-owned tool state the
@@ -1596,7 +1606,7 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 	if err != nil {
 		return nil, err
 	}
-	native, err := req.nativeHome(plan.adapter.ID)
+	native, err := req.credentialNativeHome(plan.adapter.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -1970,6 +1980,7 @@ type verification struct {
 	reasons               []string
 	warnings              []string
 	passthroughReadFailed bool
+	credentialConflict    bool
 	markerReadFailed      bool
 	credentialSourceError error
 	markerState           stateread.Kind
@@ -2044,6 +2055,11 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 	verdict.markerState = stateread.KindPresent
 	verdict.marker = marker
 	if err := requirePerHomeCredentialSource(marker); err != nil {
+		verdict.credentialSourceError = err
+		verdict.reasons = append(verdict.reasons, err.Error())
+		return verdict
+	}
+	if err := req.prepareProvisioningOrigin(adapter, hash, marker); err != nil {
 		verdict.credentialSourceError = err
 		verdict.reasons = append(verdict.reasons, err.Error())
 		return verdict
@@ -2412,6 +2428,7 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 		}
 		if info.Mode()&os.ModeSymlink == 0 {
 			if !info.IsDir() {
+				v.credentialConflict = true
 				v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link path holds a regular file, expected a link to %s (%s)", path, target, envregistry.DiagCredentialConflict))
 				continue
 			}
@@ -2437,7 +2454,11 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 			continue
 		}
 		got := link.Target
-		if got != target {
+		if !filepath.IsAbs(got) {
+			got = filepath.Join(filepath.Dir(full), got)
+		}
+		if filepath.Clean(got) != filepath.Clean(target) {
+			v.credentialConflict = true
 			v.reasons = append(v.reasons, fmt.Sprintf("passthrough entry %s is detached: link targets %s, expected %s (%s)", path, got, target, envregistry.DiagCredentialConflict))
 			continue
 		}
@@ -2790,13 +2811,42 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if err := req.validateActivationCredentialSource(); err != nil {
 		return nil, err
 	}
+	originMarker, originErr := req.readOriginMarker(adapter)
+	if originErr != nil {
+		return nil, originErr
+	}
+	var pendingOrigin bool
+	if req.Repair && !req.DryRun && originMarker == nil {
+		pendingOrigin, err = req.observePendingOrigin(adapter, hash)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !pendingOrigin {
+		if originErr := req.prepareProvisioningOrigin(adapter, hash, originMarker); originErr != nil {
+			if req.Repair && !req.DryRun && strings.HasPrefix(originErr.Error(), envorigin.DiagRequired+":") {
+				pendingOrigin, err = req.observePendingOrigin(adapter, hash)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if !pendingOrigin {
+				return nil, originErr
+			}
+		}
+	}
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
 	}
+	if pendingOrigin {
+		if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
+			return nil, err
+		}
+	}
 	// Preserve native stale-home reporting through verification. Explicit
 	// selectors must refuse at the activation boundary before provisioning.
-	if selection != envregistry.CredentialStoreNative {
+	if selection != envregistry.CredentialStoreNative && !pendingOrigin {
 		if _, err := req.resolveCredentialPolicyObserved(adapter, "unknown"); err != nil {
 			return nil, err
 		}
@@ -2869,6 +2919,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		}
 		return nil, failure
 	}
+	if pendingOrigin {
+		// Only a fresh locked validation of the same durable intent may admit
+		// recovery. It is never consumed as a read-only launch authority.
+		return repairUnderLock(&req, adapter, source)
+	}
 	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
 		return repairUnderLock(&req, adapter, source)
 	}
@@ -2890,6 +2945,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	}
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+	}
+	if verdict.credentialConflict {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagCredentialConflict, strings.Join(verdict.reasons, "; "))
 	}
 	if verdict.passthroughReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
@@ -2939,7 +2997,30 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 		req.beforeRepairLock()
 	}
 	var prepared *claudeSeedPlan
-	validate := func() error {
+	validate := func(held *operation) error {
+		req.provisioningOrigin = nil
+		req.credentialPolicy = nil
+		originAdapter, err := envregistry.ByID(req.EnvID)
+		if err != nil {
+			return err
+		}
+		prior, err := req.readOriginMarker(originAdapter)
+		if err != nil {
+			return err
+		}
+		_, hash, err := readLock(req.Home, req.Profile)
+		if err != nil {
+			return err
+		}
+		pending, err := req.preparePendingOrigin(held, originAdapter, hash)
+		if err != nil {
+			return err
+		}
+		if !pending {
+			if err := req.prepareProvisioningOrigin(originAdapter, hash, prior); err != nil {
+				return err
+			}
+		}
 		// Recheck authority under the mutation lock before journal recovery.
 		if err := req.validateActivationCredentialSource(); err != nil {
 			return err
@@ -3002,12 +3083,34 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 	}
 	op, err := req.borrowedOperation, error(nil)
 	if op == nil {
-		op, err = beginOperationValidated(req.Home, validate, req.transactionOptions...)
+		op, err = beginOperationWithValidation(req.Home, validate, req.transactionOptions...)
 	} else {
-		err = validate()
+		err = validate(op)
 	}
 	if err != nil {
 		return nil, err
+	}
+	// Never retain an authority or credential-policy cache across recovery.
+	// Recovery may have completed the previously absent origin and marker.
+	req.provisioningOrigin = nil
+	req.credentialPolicy = nil
+	originAdapter, originErr := envregistry.ByID(req.EnvID)
+	if originErr == nil {
+		var prior *envmarker.Marker
+		prior, originErr = req.readOriginMarker(originAdapter)
+		if originErr == nil {
+			var hash string
+			_, hash, originErr = readLock(req.Home, req.Profile)
+			if originErr == nil {
+				originErr = req.prepareProvisioningOrigin(originAdapter, hash, prior)
+			}
+		}
+	}
+	if originErr != nil {
+		if req.borrowedOperation == nil {
+			_ = op.close()
+		}
+		return nil, op.recoveryRefusal(originErr)
 	}
 	// Recovery may replace the marker as well as the lock. Refuse before
 	// callers publish any further repair using the recovered authority.
@@ -3093,6 +3196,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	}
 	if verdict.markerReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envmarker.DiagMarkerUnreadable, strings.Join(verdict.reasons, "; "))
+	}
+	if verdict.credentialConflict {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagCredentialConflict, strings.Join(verdict.reasons, "; "))
 	}
 	if verdict.passthroughReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))

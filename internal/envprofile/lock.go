@@ -97,6 +97,18 @@ func beginOperation(home string, options ...transaction.Option) (*operation, err
 // beginOperationValidated checks read-only inputs under the lock before journal
 // recovery can write. All mutations also validate manager-wide authority.
 func beginOperationValidated(home string, validate func() error, options ...transaction.Option) (*operation, error) {
+	return beginOperationWithValidation(home, func(_ *operation) error {
+		if validate != nil {
+			return validate()
+		}
+		return nil
+	}, options...)
+}
+
+// The operation passed to validate holds the lock but has not entered recovery.
+// This permits read-only admission of durable intent without making its mere
+// presence authority to write.
+func beginOperationWithValidation(home string, validate func(*operation) error, options ...transaction.Option) (*operation, error) {
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err
@@ -116,16 +128,17 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 		_ = lock.Close()
 		return nil, err
 	}
-	if validate != nil {
-		if err := validate(); err != nil {
-			_ = lock.Close()
-			return nil, err
-		}
-	}
 	engine, err := newOperationEngine(home, options...)
 	if err != nil {
 		_ = lock.Close()
 		return nil, err
+	}
+	op := &operation{lock: lock, engine: engine}
+	if validate != nil {
+		if err := validate(op); err != nil {
+			_ = op.close()
+			return nil, err
+		}
 	}
 	recovered, err := projectlease.RecoverUnderLock(home, lock, engine)
 	if err != nil {
@@ -135,7 +148,7 @@ func beginOperationValidated(home string, validate func() error, options ...tran
 		}
 		return nil, fmt.Errorf("recover incomplete profile transactions: %w", err)
 	}
-	op := &operation{lock: lock, engine: engine, recovered: recovered}
+	op.recovered = recovered
 	// Previously durable intent may itself replace the authority marker.
 	if err := envauthority.Validate(home); err != nil {
 		_ = op.close()

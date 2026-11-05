@@ -1,6 +1,8 @@
 package envprofile
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -52,6 +54,8 @@ type credentialPolicyResolution struct {
 	profile     string
 	environment string
 	release     string
+	origin      string
+	inputs      string
 	policy      *effectiveCredentialPolicy
 	err         error
 }
@@ -73,11 +77,34 @@ func (req *ResolveRequest) resolveCredentialPolicy(adapter envregistry.Adapter) 
 // resolveCredentialPolicyObserved uses supplied evidence, including unknown,
 // without discovering a tool. Cache entries never cross release observations.
 func (req *ResolveRequest) resolveCredentialPolicyObserved(adapter envregistry.Adapter, release string) (*effectiveCredentialPolicy, error) {
-	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release {
+	// Public policy consumers that do not assemble a home must still admit
+	// persisted authority before a cache hit or native-store observation.
+	prior, err := req.readOriginMarker(adapter)
+	if err != nil {
+		return nil, err
+	}
+	if prior != nil {
+		_, hash, err := readLock(req.Home, req.Profile)
+		if err != nil {
+			return nil, err
+		}
+		if err := req.prepareProvisioningOrigin(adapter, hash, prior); err != nil {
+			return nil, err
+		}
+	}
+	inputs, err := json.Marshal(struct {
+		Machine envregistry.MachineConfig
+		Adapter envregistry.Adapter
+	}{req.Machine, adapter})
+	if err != nil {
+		return nil, err
+	}
+	inputHash := fmt.Sprintf("%x", sha256.Sum256(inputs))
+	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release && cached.origin == req.originPolicyIdentity() && cached.inputs == inputHash {
 		return cached.policy, cached.err
 	}
 	policy, err := req.computeCredentialPolicy(adapter, release)
-	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, policy: policy, err: err}
+	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, origin: req.originPolicyIdentity(), inputs: inputHash, policy: policy, err: err}
 	return policy, err
 }
 
@@ -94,7 +121,7 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	}
 	var native string
 	if adapter.ID == envregistry.CodexCLI {
-		native, err = req.nativeHome(adapter.ID)
+		native, err = req.credentialNativeHome(adapter.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +161,7 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 			return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
 		}
 		if native == "" && len(entries) > 0 {
-			native, err = req.nativeHome(adapter.ID)
+			native, err = req.credentialNativeHome(adapter.ID)
 			if err != nil {
 				return nil, err
 			}

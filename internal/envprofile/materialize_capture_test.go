@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/transaction"
@@ -53,6 +54,41 @@ func requireCaptureRefusal(t *testing.T, req MaterializeCaptureRequest, code str
 	if err == nil || !strings.Contains(err.Error(), code) || got != nil {
 		t.Fatalf("capture = %v, %v; want %s and no output", got, err, code)
 	}
+}
+
+// A valid provenance-only record change leaves the fragment unchanged but
+// still invalidates capture. The unchanged fixture exercises the same entry.
+func TestMaterializeCaptureProvisioningOriginIdentity(t *testing.T) {
+	fx, req := captureFixture(t)
+	if _, err := CaptureMaterialize(req); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), envorigin.Name)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := req.Capture
+	req.Capture = func(c *MaterializeCapture) ([]byte, error) {
+		content, err := original(c)
+		if err != nil {
+			return nil, err
+		}
+		record, err := envorigin.Parse(before)
+		if err != nil {
+			return nil, err
+		}
+		record.Capture.Time = "2026-01-01T00:00:00Z"
+		changed, err := record.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(path, changed, 0600); err != nil {
+			return nil, err
+		}
+		return content, nil
+	}
+	requireCaptureRefusal(t, req, DiagMaterializeCaptureDrift)
 }
 
 func captureTree(t *testing.T, root string) map[string]string {

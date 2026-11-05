@@ -469,7 +469,7 @@ func inventoryHome(req *MigrateRequest, profile string, adapter envregistry.Adap
 		return home
 	}
 	home.credentialRecords = credentials
-	native, err := rr.nativeHome(adapter.ID)
+	native, err := rr.credentialNativeHome(adapter.ID)
 	if err != nil {
 		home.addConflict("", fmt.Sprintf("cannot resolve the native home: %v", err),
 			"restore the native home out of band and re-run")

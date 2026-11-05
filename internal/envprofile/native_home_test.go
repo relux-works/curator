@@ -156,9 +156,9 @@ func TestManagedCallerHomeIsNeverNative(t *testing.T) {
 	}
 }
 
-// Required default-native legacy continuity is grounded in the historical source
-// contract. The selected default is a current origin, not a historical capture;
-// while unchanged original caller controls and state preservation still execute.
+// A captured default origin remains authoritative with an absent, empty,
+// explicit or managed current selector. Verification emits a valid fragment
+// without changing the home; native-skill routing remains a separate contract.
 func TestManagedCallerDefaultOriginPreserved(t *testing.T) {
 	for _, mode := range []string{"verify", "repair-dry-run"} {
 		for _, caller := range []string{"native-unset", "native-empty", "native", "managed", "managed-alias"} {
@@ -195,10 +195,8 @@ func TestManagedCallerDefaultOriginPreserved(t *testing.T) {
 				if err != nil {
 					t.Errorf("unchanged direct-link home gets caller-dependent verdict (%s): %v", caller, err)
 				}
-				if err == nil && (caller == "managed" || caller == "managed-alias") {
-					if result == nil || !strings.Contains(strings.Join(result.Warnings, "\n"), nativeHomeFallbackNotice) {
-						t.Error("managed fallback must report its current-selection notice")
-					}
+				if err == nil && (result == nil || len(result.Document) == 0) {
+					t.Error("valid recorded default origin emitted no fragment")
 				}
 			})
 		}
@@ -347,12 +345,11 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 	}
 }
 
-// A genuine explicit custom origin is valid. With current default-native skills,
-// a managed caller must get the credential conflict in verify/dry-run/repair.
-// An absent default instead keeps the earlier exact native-skills refusal.
-// Every refusal preserves managed/profile/lock and both native fixture trees;
-// no credential payload is read, and no launch fragment may escape.
-func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
+// The captured custom origin survives a managed caller in verify/dry-run/repair
+// when native skills are current. A missing native-skills default still refuses
+// under that independent contract. Both outcomes preserve fixture state, and
+// only the valid outcome emits a fragment; credential bytes are never read.
+func TestManagedCallerCustomOriginPreserved(t *testing.T) {
 	for _, mode := range []string{"verify", "repair-dry-run", "repair", "missing-native-default"} {
 		t.Run(mode, func(t *testing.T) {
 			fx, req := managedCallerFixtureAt(t, true)
@@ -363,7 +360,7 @@ func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
 			defaultNative := filepath.Join(userHome, ".codex")
 			if mode != "missing-native-default" {
 				// Real profile-use setup, not a nativeSkillsState stub: prepare the
-				// selected default so the credential-conflict boundary is reached.
+				// selected native-skills default independently of credential origin.
 				t.Setenv("CODEX_HOME", defaultNative)
 				results, err := UseWithPolicy(fx.home, fx.profile, "codex_cli", "", false, req.Policy)
 				if err != nil {
@@ -396,17 +393,19 @@ func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
 				if err == nil || err.Error() != want {
 					t.Errorf("absent default must retain the earlier exact refusal %q, got %v", want, err)
 				}
-			} else if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
-				t.Errorf("custom-origin mismatch must remain %s, got %v", envregistry.DiagCredentialConflict, err)
-			}
-			if result == nil || !strings.Contains(strings.Join(result.Warnings, "\n"), nativeHomeFallbackNotice) {
-				t.Error("fallback must be reported, including an early refusal")
-			}
-			if result != nil && len(result.Document) != 0 {
-				t.Error("refused origin conflict emitted a fragment")
+				if result != nil && len(result.Document) != 0 {
+					t.Error("native-skills refusal emitted a fragment")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("valid captured custom origin refused: %v", err)
+				}
+				if result == nil || len(result.Document) == 0 {
+					t.Error("valid captured custom origin emitted no fragment")
+				}
 			}
 			if !reflect.DeepEqual(before, managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])) {
-				t.Error("custom-origin refusal changed managed/profile/lock or native fixture state")
+				t.Error("custom-origin operation changed managed/profile/lock or native fixture state")
 			}
 		})
 	}

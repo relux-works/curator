@@ -11,6 +11,7 @@ import (
 
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/pathboundary"
@@ -570,7 +571,7 @@ func (op *operation) captureManaged(plan *homePlan, seeds *seedBundle, recorded 
 	if op.undo == nil {
 		return nil
 	}
-	paths := []string{filepath.Join(plan.homeDir, envmarker.Name), filepath.Join(plan.homeDir, ".agent-environment-backup")}
+	paths := []string{filepath.Join(plan.homeDir, envmarker.Name), filepath.Join(plan.homeDir, envorigin.Name), filepath.Join(plan.homeDir, ".agent-environment-backup")}
 	if plan.adapter.ID == envregistry.Muse {
 		// Directory provisioning changes only existence and permissions; do not
 		// snapshot unrelated runtime data already held under these directories.

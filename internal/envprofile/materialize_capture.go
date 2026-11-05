@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envorigin"
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
@@ -182,7 +183,7 @@ func CaptureMaterialize(req MaterializeCaptureRequest) (result *CapturedMaterial
 	c := &MaterializeCapture{Request: selected, Fragment: append([]byte(nil), verified.Document...), ctx: ctx}
 	defer c.close()
 	// Retain identity as well as bytes for the records that authorize capture.
-	for _, path := range []string{sourcePath(selected.Home, selected.Profile), lockPath(selected.Home, selected.Profile), filepath.Join(ManagedHomeDir(selected.Home, selected.Profile, selected.EnvID), envmarker.Name)} {
+	for _, path := range []string{sourcePath(selected.Home, selected.Profile), lockPath(selected.Home, selected.Profile), filepath.Join(ManagedHomeDir(selected.Home, selected.Profile, selected.EnvID), envmarker.Name), filepath.Join(ManagedHomeDir(selected.Home, selected.Profile, selected.EnvID), envorigin.Name)} {
 		file, err := openReadNoFollow(path)
 		if err != nil {
 			return nil, captureDrift()

@@ -37,15 +37,31 @@ func TestPendingRecoveryReadOnlyPhasesAndTombs(t *testing.T) {
 			if pending, err := engine.PendingRecovery(testLock{}); err != nil || !pending {
 				t.Fatalf("pending inventory = %v, %v", pending, err)
 			}
+			// Observation exposes detached intent, never live mutable engine state.
+			observed, err := engine.PendingJournals(testLock{})
+			if err != nil || len(observed) != 1 || observed[0].TransactionID != "pending" || observed[0].Phase != phase {
+				t.Fatalf("observed journal = %v, %v", observed, err)
+			}
+			observed[0].Targets[0].LivePath = "caller mutation"
+			again, err := engine.PendingJournals(testLock{})
+			if err != nil || len(again) != 1 || again[0].Targets[0].LivePath != target.LivePath {
+				t.Fatalf("caller mutation changed durable observation: %v", err)
+			}
 			if mustRead(t, path) != before || mustRead(t, target.LivePath) != "old" {
 				t.Fatal("observation mutated recovery state")
 			}
 			if _, err := engine.PendingRecovery(testLock{err: errors.New("released")}); err == nil {
 				t.Fatal("accepted released witness")
 			}
+			if observed, err := engine.PendingJournals(testLock{err: errors.New("released")}); err == nil || observed != nil {
+				t.Fatal("journal projection accepted released witness")
+			}
 			mustWrite(t, engine.journalPath("z-corrupt"), "{")
 			if pending, err := engine.PendingRecovery(testLock{}); err == nil || pending {
 				t.Fatalf("valid record masked corrupt evidence: %v, %v", pending, err)
+			}
+			if observed, err := engine.PendingJournals(testLock{}); err == nil || observed != nil {
+				t.Fatal("projection returned partial intent despite corrupt inventory")
 			}
 		})
 	}
