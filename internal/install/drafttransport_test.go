@@ -725,14 +725,19 @@ func TestAcquireDraftNetworkSelection(t *testing.T) {
 		tool, logPath := draftGitTool(t, map[string]draftGitArm{
 			draftSSHPrimary: {succeed: true, fileRepo: bare},
 		})
-		t.Setenv("PATH", t.TempDir())
+		// An unavailable explicit selection must refuse without falling back
+		// to system SSH; the resolved-wrapper positive control is above.
+		t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", filepath.Join(t.TempDir(), "missing-ssh"))
 		policy := draftPolicyFile(t, draftPolicyEntry(draftSSHPrimary))
 		ssh := draftSSHCredentials(t)
 		providers := draftProvidersFile(t, draftSSHProvidersDoc(ssh))
-		_, err := newDeps(tool, true, policy, providers).acquireDraftNetwork(context.Background(), tool,
+		snapshot, err := newDeps(tool, true, policy, providers).acquireDraftNetwork(context.Background(), tool,
 			draftSSHPrimary, "ssh", "fixture.test/repository", lock, "", "", "")
-		if buildrepo.ErrorCode(err) != buildrepo.CodeIdentityInvalid || !strings.Contains(err.Error(), "SSH wrapper policy") {
+		if buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), "no ssh executable found") {
 			t.Fatalf("err = %v, want the SSH base refusal", err)
+		}
+		if snapshot != nil {
+			t.Fatal("unavailable SSH selection published a snapshot")
 		}
 		if fetches := draftFetchLines(t, logPath); len(fetches) != 0 {
 			t.Fatalf("%d fetches, want 0:\n%s", len(fetches), strings.Join(fetches, "\n"))

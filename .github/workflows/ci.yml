@@ -202,7 +202,7 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/install \
-              -run '^Test(DefaultTransportInstallScopes|R1ProjectBinSSHSelected|DefaultTransportMissingCredentialsPortable)$'
+              -run '^Test(DefaultTransportInstallScopes|R1ProjectBinSSHSelected|DefaultTransportMissingCredentialsPortable|AcquireDraftNetworkSelection)$'
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/buildrepo \
