@@ -13,13 +13,30 @@ concurrency:
 
 jobs:
   cold-repository:
-    name: Cold repository install (hosted)
-    runs-on: ubuntu-latest
+    name: Cold repository install (${{ matrix.lane }})
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [hosted, target-linux]
+    # Only same-repository runs can use the configured target Linux host.
+    # Without that route this entry remains hosted and is labelled in the log.
+    runs-on: ${{ matrix.lane == 'target-linux' && vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","relux-linux","curator"]') || 'ubuntu-latest' }}
+    env:
+      GOTOOLCHAIN: local
+      GOENV: 'off'
+      CURATOR_COLD_SCHEDULING_BAND: ${{ runner.environment }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        run: bash .github/ci/isolate-go-state.sh
+      - name: Record measurement host class
+        env:
+          MEASUREMENT_ROUTE: ${{ runner.environment }}
+        run: echo "measurement route=$MEASUREMENT_ROUTE; target evidence requires self-hosted"
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.5'
@@ -35,10 +52,23 @@ jobs:
       - name: Measure cold list and build through the real worker
         env:
           CURATOR_COLD_REPOSITORY: ${{ github.workspace }}/internal/godriver/testdata/coldrepository
-        run: bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -v -timeout=25m ./internal/godriver -run '^TestColdRepositoryMeasurement$'
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -json -timeout=25m ./internal/godriver -run '^TestColdRepositoryMeasurement$' | tee measurement-tests.json
+          python3 .github/ci/required-tests.py measurement-tests.json TestColdRepositoryMeasurement
       - name: Full repository-driver install and PATH witness
         env:
           CURATOR_COLD_REPOSITORY: ${{ github.workspace }}/internal/godriver/testdata/coldrepository
-        run: bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -v -timeout=25m ./cmd/curator -run '^TestColdRepositoryInstallOnPATH$'
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -json -timeout=25m ./cmd/curator -run '^TestColdRepositoryInstallOnPATH$' | tee install-tests.json
+          python3 .github/ci/required-tests.py install-tests.json TestColdRepositoryInstallOnPATH
       - name: Deadline and protocol paired witnesses
-        run: bash .github/ci/isolated-test.sh go test -count=1 -v -timeout=10m ./internal/godriver -run '^Test(WorkerChannelFailureDistinguishesParentDeadline|RealWorkerParentDeadline|WorkerSharesWholeSessionBudget|BuildDeadlineTearsDownDescendants|BuildRejectsArtifactAfterParentDeadline|WorkerRejectsEveryProtocolDeviationBeforeTheCompiler)$'
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go test -count=1 -json -timeout=10m ./internal/godriver -run '^Test(WorkerChannelFailureDistinguishesParentDeadline|RealWorkerParentDeadline|WorkerSharesWholeSessionBudget|BuildDeadlineTearsDownDescendants|BuildRejectsArtifactAfterParentDeadline|BuildRejectsArtifactDuringAcceptance|BuildCallerContextDiagnostics|BuildManagerLifecycle|WorkerRejectsEveryProtocolDeviationBeforeTheCompiler)$' | tee deadline-tests.json
+          python3 .github/ci/required-tests.py deadline-tests.json TestWorkerChannelFailureDistinguishesParentDeadline TestRealWorkerParentDeadline TestWorkerSharesWholeSessionBudget TestBuildDeadlineTearsDownDescendants TestBuildRejectsArtifactAfterParentDeadline TestBuildRejectsArtifactDuringAcceptance TestBuildCallerContextDiagnostics TestBuildManagerLifecycle TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted'
+        continue-on-error: true
+        run: bash scripts/restore-runner-tmp.sh

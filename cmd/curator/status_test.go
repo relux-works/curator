@@ -469,10 +469,9 @@ func cacheFingerprint(t *testing.T, home string) string {
 // TestProbeRejectsAnUncoveredPlatformBeforeTheWorker.
 //
 // The predicate is read from godriver.InventoryPlatform rather than written as
-// a GOOS list here, so it cannot drift from the inventory it stands for. Linux
-// is the platform the rc.5 qualification vector still marks excluded, with
-// until_task TASK-260728-1skseh; when the inventory gains a record for a host,
-// these cases run there without an edit to this helper.
+// a GOOS list here, so it follows execution-inventory coverage. Linux is
+// covered by successor v2. The unchanged rc.5 claim-qualification exclusion is
+// a separate historical claim contract, not permission to skip driver tests.
 func requireNativeControlInventoryPlatform(t *testing.T) {
 	t.Helper()
 	if godriver.InventoryPlatform(runtime.GOOS) == "" {

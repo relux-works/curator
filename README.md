@@ -420,6 +420,12 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+`.github/ci/required-tests.py LOG TEST [TEST ...]` checks exact named PASS
+records in a `go test -json` log. Filtered cold-repository CI steps keep their
+logs in the job workspace and refuse absent, renamed or skipped witnesses.
+Run `go test ./tools/ciworkflow -run 'TestRequiredTests|TestReleaseBuild'` for
+checker controls and the release platform-tag exclusion gate.
+
 `tools/envprofilerace` partitions the native `internal/envprofile` race-build
 list into eight deterministic name-hash shards plus a dedicated shard for the
 measured ownership mutation suite, with exact `-run` selectors. CI runs

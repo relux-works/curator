@@ -40,6 +40,10 @@ func wantedFileLimit(limits ResourceLimits) (uint64, error) {
 // one Linux inventory control. It performs the exact operation the control will
 // perform for this build, starts no program, and caches nothing.
 func probeNativeControl(name string, limits ResourceLimits) (bool, error) {
+	return probeNativeControlWithDescriptorRoot(name, limits, "/proc/self/fd")
+}
+
+func probeNativeControlWithDescriptorRoot(name string, limits ResourceLimits, descriptorRoot string) (bool, error) {
 	switch name {
 	case ControlDescendantDomainTermination:
 		// Session and process-group teardown requires a usable process group and
@@ -82,7 +86,7 @@ func probeNativeControl(name string, limits ResourceLimits) (bool, error) {
 		return applied.Cur == wanted, nil
 	case ControlInheritedHandleRestriction:
 		// Enumerating the manager's own procfs descriptors must be possible.
-		if _, err := os.ReadDir("/proc/self/fd"); err != nil {
+		if err := probeDescriptorRoot(descriptorRoot); err != nil {
 			return false, err
 		}
 		// Close-on-exec must be readable and settable for the descriptors the
@@ -319,7 +323,15 @@ func terminateWorkerDomain(command *exec.Cmd) {
 // Go-created descriptors are close-on-exec, but native libraries or callers may
 // open inheritable descriptors. Seal those too before fork; explicit standard
 // streams are remapped by exec.Cmd. No descriptor is closed in the parent.
+func probeDescriptorRoot(root string) error { _, err := os.ReadDir(root); return err }
+
 func restrictManagerDescriptors(descriptorRoot string) error {
+	return restrictManagerDescriptorsWith(descriptorRoot, unix.FcntlInt)
+}
+
+// The syscall parameter permits exact kernel-error witnesses without replacing
+// the availability decision or worker launch path.
+func restrictManagerDescriptorsWith(descriptorRoot string, fcntl func(uintptr, int, int) (int, error)) error {
 	entries, err := os.ReadDir(descriptorRoot)
 	if err != nil {
 		return err
@@ -329,7 +341,7 @@ func restrictManagerDescriptors(descriptorRoot string) error {
 		if err != nil || fd < 3 {
 			continue
 		}
-		flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFD, 0)
+		flags, err := fcntl(uintptr(fd), unix.F_GETFD, 0)
 		if errors.Is(err, unix.EBADF) {
 			continue
 		} // ReadDir's own descriptor is closed.
@@ -337,7 +349,7 @@ func restrictManagerDescriptors(descriptorRoot string) error {
 			return err
 		}
 		if flags&unix.FD_CLOEXEC == 0 {
-			if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, flags|unix.FD_CLOEXEC); err != nil && !errors.Is(err, unix.EBADF) {
+			if _, err := fcntl(uintptr(fd), unix.F_SETFD, flags|unix.FD_CLOEXEC); err != nil && !errors.Is(err, unix.EBADF) {
 				return err
 			}
 		}

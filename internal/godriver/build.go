@@ -29,6 +29,10 @@ const (
 	defaultProcessLimit  = 64
 )
 
+// DefaultBuildTimeout is the manager-selected per-command worker budget. It is
+// not a receipt/cache input and cannot be enlarged by package data.
+func DefaultBuildTimeout() time.Duration { return defaultBuildTimeout }
+
 var listArguments = []string{"list", "-mod=vendor", "-deps", "-json", "-buildvcs=false", "-compiler=gc", "-pgo=off", "."}
 
 var buildArgumentPrefix = []string{
@@ -159,13 +163,20 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	if err := input.Validate(); err != nil {
 		return Result{}, diagnosticErr("invalid_build_request", err, "invalid go-v1 build input")
 	}
-	if err := request.Source.Recheck(); err != nil {
+	finishSourcePreflight := request.Session.measure("source-recheck-preflight")
+	sourcePreflightErr := request.Source.Recheck()
+	finishSourcePreflight()
+	if err := sourcePreflightErr; err != nil {
 		return Result{}, diagnosticErr("source_mutated", err, "frozen source changed before preflight")
 	}
-	if err := request.Session.VerifyToolchain(ctx); err != nil {
+	finishToolPreflight := request.Session.measure("toolchain-preflight")
+	toolPreflightErr := request.Session.VerifyToolchain(ctx)
+	finishToolPreflight()
+	if err := toolPreflightErr; err != nil {
 		return Result{}, err
 	}
 
+	finishPrelaunch := request.Session.measure("prelaunch")
 	sourceRoot, buildRoot, sourceDir, err := canonicalBuildDirectories(request.Source.Path(), request.BuildRoot, request.SourceDir)
 	if err != nil {
 		return Result{}, err
@@ -228,20 +239,32 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 		Limits:        limits,
 	}
 
+	finishPrelaunch()
+	finishLaunch := request.Session.measure("worker-launch")
 	client, err := launchWorker(ctx, plan)
+	finishLaunch()
 	if err != nil {
 		return Result{}, err
 	}
 	defer client.teardown()
 
-	bracket := func(output Output, runErr error) (Output, error) {
-		if sourceErr := request.Source.Recheck(); sourceErr != nil {
+	bracket := func(phase string, output Output, runErr error) (Output, error) {
+		finishSource := request.Session.measure("source-recheck-" + phase)
+		sourceErr := request.Source.Recheck()
+		finishSource()
+		if sourceErr != nil {
 			runErr = errors.Join(runErr, diagnosticErr("source_mutated", sourceErr, "frozen source changed during a Go child"))
 		}
-		if toolErr := request.Session.VerifyToolchain(ctx); toolErr != nil {
+		finishTool := request.Session.measure("toolchain-" + phase)
+		toolErr := request.Session.VerifyToolchain(ctx)
+		finishTool()
+		if toolErr != nil {
 			runErr = errors.Join(runErr, toolErr)
 		}
-		if stateErr := verifyPrivateState(request.Session.operation, stage, limits.DiskBytes); stateErr != nil {
+		finishDisk := request.Session.measure("disk-" + phase)
+		stateErr := verifyPrivateState(request.Session.operation, stage, limits.DiskBytes)
+		finishDisk()
+		if stateErr != nil {
 			runErr = errors.Join(runErr, stateErr)
 		}
 		if deadlineErr := client.deadlineFailure(); deadlineErr != nil {
@@ -255,14 +278,17 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	if request.Session.observePhase != nil {
 		request.Session.observePhase("list", time.Since(phaseStarted))
 	}
-	listOutput, err := bracket(listRaw, listErr)
+	listOutput, err := bracket("list", listRaw, listErr)
 	if err != nil {
 		return Result{}, classifyListFailure(err, listOutput.Stderr)
 	}
-	if err := validatePackageGraph(listOutput.Stdout, graphValidation{
+	finishGraph := request.Session.measure("graph-validation")
+	graphErr := validatePackageGraph(listOutput.Stdout, graphValidation{
 		BuildRoot: buildRoot, SourceDir: sourceDir, GOROOT: request.Session.GOROOT(),
 		Snapshot: sourceRoot, BuildRootRel: request.BuildRoot, Modules: request.Modules,
-	}); err != nil {
+	})
+	finishGraph()
+	if err := graphErr; err != nil {
 		return Result{}, err
 	}
 
@@ -271,31 +297,47 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	if request.Session.observePhase != nil {
 		request.Session.observePhase("build", time.Since(phaseStarted))
 	}
-	buildOutput, err := bracket(buildRaw, buildErr)
+	buildOutput, err := bracket("build", buildRaw, buildErr)
 	if err != nil {
 		return Result{}, classifyBuildFailure(err, buildOutput.Stderr)
 	}
+	if request.Session.beforeAcceptance != nil {
+		request.Session.beforeAcceptance(client.runContext)
+	}
+	finishArtifact := request.Session.measure("artifact-verification")
 	metadata, err := verifyArtifact(stage, artifactPath, artifactRel, limits.ArtifactBytes)
+	finishArtifact()
 	if err != nil {
-		return Result{}, err
+		return Result{}, errors.Join(client.deadlineFailure(), err)
 	}
 
 	// Step 11: re-verify the worker, source-snapshot, and fingerprinted
 	// toolchain identities, then terminate and join the complete worker domain
 	// before anything is published.
-	if err := request.Source.Recheck(); err != nil {
+	finishSourceAcceptance := request.Session.measure("source-recheck-acceptance")
+	sourceAcceptanceErr := request.Source.Recheck()
+	finishSourceAcceptance()
+	if err := sourceAcceptanceErr; err != nil {
 		return Result{}, errors.Join(client.deadlineFailure(), diagnosticErr("source_mutated", err, "frozen source changed before artifact acceptance"))
 	}
-	if err := request.Session.VerifyToolchain(ctx); err != nil {
+	finishToolAcceptance := request.Session.measure("toolchain-acceptance")
+	toolAcceptanceErr := request.Session.VerifyToolchain(ctx)
+	finishToolAcceptance()
+	if err := toolAcceptanceErr; err != nil {
 		return Result{}, errors.Join(client.deadlineFailure(), err)
 	}
-	if err := executable.Verify(); err != nil {
+	finishWorkerAcceptance := request.Session.measure("worker-acceptance")
+	workerAcceptanceErr := executable.Verify()
+	finishWorkerAcceptance()
+	if err := workerAcceptanceErr; err != nil {
 		return Result{}, errors.Join(client.deadlineFailure(), err)
 	}
 	if err := client.deadlineFailure(); err != nil {
 		return Result{}, err
 	}
+	finishTeardown := request.Session.measure("teardown")
 	client.teardown()
+	finishTeardown()
 	return Result{Artifact: Artifact{StagedPath: artifactPath, Metadata: metadata}, Evidence: client.Evidence()}, nil
 }
 
@@ -658,4 +700,14 @@ func containsExact(values []string, want string) bool {
 func (limits ResourceLimits) String() string {
 	return fmt.Sprintf("timeout=%s output=%d artifact=%d file=%d disk=%d memory=%d processes=%d",
 		limits.Timeout, limits.OutputBytes, limits.ArtifactBytes, limits.FileBytes, limits.DiskBytes, limits.MemoryBytes, limits.Processes)
+}
+
+// Measurement observers select no policy or identity and run only on the caller.
+func (session *Session) measure(phase string) func() {
+	started := time.Now()
+	return func() {
+		if session.observePhase != nil {
+			session.observePhase(phase, time.Since(started))
+		}
+	}
 }

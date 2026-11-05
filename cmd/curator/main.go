@@ -42,6 +42,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/opaquescan"
+	"github.com/relux-works/curator/internal/processcontext"
 	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/rustsource"
@@ -190,6 +191,7 @@ func (source fileConfigSource) Load(warn func(string)) (*config.Config, error) {
 }
 
 type cli struct {
+	context  context.Context
 	config   configSource
 	stdout   io.Writer
 	stderr   io.Writer
@@ -274,7 +276,9 @@ func runEnforcedShim(executable string, args []string) int {
 // output writers are explicit so callers can run concurrent invocations without
 // mutating CURATOR_CONFIG, os.Stdout, or os.Stderr.
 func run(args []string, source configSource, stdout, stderr io.Writer) int {
-	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir, posture: &postureState{}}
+	ctx, stop := processcontext.Notify(context.Background())
+	defer stop()
+	command := cli{context: ctx, config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir, posture: &postureState{}}
 	return command.run(args)
 }
 
@@ -732,7 +736,15 @@ func (c cli) installFlags(args []string) (install.Options, []string, bool, strin
 	if err != nil {
 		return install.Options{}, nil, false, "", err
 	}
+	operationContext := c.context
+	if operationContext == nil {
+		operationContext = context.Background()
+	}
 	return install.Options{
+		Context: operationContext,
+		OnLockWait: func(scope string) {
+			_, _ = fmt.Fprintln(c.stderr, "curator: waiting for the", scope, "operation lock; another install may still be building")
+		},
 		DryRun: *dryRun, FixGitignore: *fixGitignore,
 		StrictTags: *strictTags, Verbose: *verbose,
 		BuildSSH: install.BuildSSHFlags{
@@ -770,7 +782,7 @@ func (c cli) cmdInstallMode(args []string, fetch bool) int {
 		cfgCopy.Audit.Mode = auditMode
 		cfg = &cfgCopy
 	}
-	authority, err := preflightCLIExecution(context.Background(), cfg)
+	authority, err := preflightCLIExecution(opts.Context, cfg)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
@@ -1619,8 +1631,13 @@ func (c cli) cmdGlobal(args []string) int {
 		}
 		operation := manager.NewOperation(false)
 		defer func() { _ = operation.Close() }()
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		parent := c.context
+		if parent == nil {
+			parent = context.Background()
+		}
+		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 		defer cancel()
+		_, _ = fmt.Fprintln(c.stderr, "curator: acquiring the global operation lock (up to 30 seconds); another install may still be building")
 		if _, err := operation.AcquireProjects(ctx, install.GlobalRoot(cfg.Home())); err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator: acquire the global operation lock:", err)
 			return exitFail
@@ -1887,7 +1904,7 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 		cfgCopy.Audit.Mode = auditMode
 		cfg = &cfgCopy
 	}
-	authority, err := preflightCLIExecution(context.Background(), cfg)
+	authority, err := preflightCLIExecution(opts.Context, cfg)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail

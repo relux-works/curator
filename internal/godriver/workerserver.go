@@ -46,10 +46,11 @@ type workerSession struct {
 	input  io.Reader
 	output io.Writer
 
-	nonce   string
-	request *workerRequest
-	started int
-	context context.Context
+	nonce    string
+	request  *workerRequest
+	started  int
+	context  context.Context
+	messages <-chan workerRead
 }
 
 func (session *workerSession) run() error {
@@ -62,6 +63,16 @@ func (session *workerSession) run() error {
 	var cancel context.CancelFunc
 	session.context, cancel = context.WithDeadline(context.Background(), started.Add(session.limits().Timeout))
 	defer cancel()
+	done := make(chan struct{})
+	defer close(done)
+	session.messages = monitorWorkerInput(session.input, done)
+	go func() {
+		select {
+		case <-done:
+		case <-session.context.Done():
+			stopOrphanedWorkerDomain()
+		}
+	}()
 	if err := session.serveList(); err != nil {
 		return err
 	}
@@ -156,7 +167,13 @@ func (session *workerSession) awaitShutdown() error {
 // including a second list or a second build request, tears the session down
 // without starting a compiler.
 func (session *workerSession) expect(kind string) (workerMessage, error) {
-	message, err := readMessage(session.input)
+	var incoming workerRead
+	select {
+	case incoming = <-session.messages:
+	case <-session.context.Done():
+		return workerMessage{}, contextFailure(session.context)
+	}
+	message, err := incoming.message, incoming.err
 	if err != nil {
 		return workerMessage{}, err
 	}
@@ -467,4 +484,38 @@ func verifyGoLauncher(path string) error {
 		return diagnosticErr(CodeWorkerIdentityInvalid, err, "the Go launcher is not the fingerprinted native executable")
 	}
 	return nil
+}
+
+// Exactly one goroutine reads the parent-held protocol pipe, including while a
+// Go child runs. Compiler children never inherit its write end. EOF therefore
+// means the manager is gone; it must stop this domain without waiting for Go.
+type workerRead struct {
+	message workerMessage
+	err     error
+}
+
+func monitorWorkerInput(input io.Reader, done <-chan struct{}) <-chan workerRead {
+	messages := make(chan workerRead, 1)
+	go func() {
+		for {
+			message, err := readMessage(input)
+			if errors.Is(err, errProtocolClosed) || errors.Is(err, io.ErrUnexpectedEOF) {
+				select {
+				case <-done:
+					return
+				default:
+					stopOrphanedWorkerDomain()
+				}
+			}
+			select {
+			case messages <- workerRead{message, err}:
+			case <-done:
+				return
+			}
+			if err != nil || message.Kind == kindShutdown {
+				return
+			}
+		}
+	}()
+	return messages
 }

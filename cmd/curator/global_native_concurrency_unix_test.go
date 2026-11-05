@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
 )
@@ -59,9 +60,9 @@ func TestNativeCommandProcess(_ *testing.T) {
 	os.Exit(94)
 }
 
-// A CLI can run the production two-minute compiler before verification and
+// A CLI can run the production per-command compiler budget before verification and
 // publication. This fixture watchdog is not a CLI latency requirement.
-const nativeCommandWatchdog = 3 * time.Minute
+var nativeCommandWatchdog = godriver.DefaultBuildTimeout() + time.Minute
 
 type nativeCommand struct {
 	cmd      *exec.Cmd

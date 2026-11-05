@@ -203,7 +203,7 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 	}
 
 	// The shim resolves to the cached artifact and runs it.
-	shimCommand := shim
+	shimCommand := exportName
 	var shimArgs []string
 	if runtime.GOOS == "windows" {
 		// Batch shims need the native command interpreter; CreateProcess

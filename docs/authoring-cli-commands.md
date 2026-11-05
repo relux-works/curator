@@ -46,7 +46,7 @@ The driver enforces strict compilation constraints before and during execution:
 - **External linking prohibition**: Builds enforce internal linking (`-ldflags=-linkmode=internal -libgcc=none`). Linker modes requiring host external linkers are rejected with `external_link_forbidden`, and host linker fallbacks are rejected with `libgcc_fallback_forbidden`.
 - **Toolchain switching prohibition**: Directives requesting another toolchain version in `go.mod` are rejected with `toolchain_switch_forbidden`.
 - **Workspace prohibition**: The presence of `go.work` files inside the build root is rejected with `workspace_dependency_forbidden`.
-- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No parent-death signal is installed: if the manager is killed, its teardown cannot run; the orphan is bounded by the worker's own whole-session deadlines and exits when its protocol pipe breaks. No hardened isolation guarantee is claimed.
+- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No parent-death signal is installed. The worker concurrently watches a pipe held only by its manager: EOF after manager death, or the worker deadline, kills the worker's entire private process group. Ctrl-C and termination cancel the manager promptly. Descendants deliberately leaving that session/group remain outside this guarantee. No hardened isolation guarantee is claimed.
 
 ## Script commands
 
@@ -273,18 +273,48 @@ children of that manager process. This side effect is intentional.
 
 The Go drivers allow **15 minutes for one complete worker session**, including
 `go list`, the manager's graph and identity checks, and `go build`. The build
-phase receives only the remaining time. The parent has a further five seconds
-of bounded shutdown grace and tears down the descendant domain on expiry.
-A parent deadline reports `process_timeout`; malformed live worker messages
-still report `build_execution_worker_protocol_invalid`. Package data cannot
-select or extend this budget. The driver still uses an empty private build
-cache and never downloads a toolchain or dependencies.
+phase receives only the remaining time. The parent has five seconds of shutdown
+grace. A shorter caller deadline takes precedence. Deadline expiry reports
+`process_timeout`, caller cancellation reports `process_canceled`, and malformed
+messages in a live session still report
+`build_execution_worker_protocol_invalid`. The acceptance guard also rejects a
+result when the deadline expires during post-build verification.
 
-This is a manager execution bound. It is absent from the closed go-v1 logical
-build input, receipt, cache key and capability-evidence record; changing it
-does not relabel or invalidate an already installed artifact. Protocol Core
-requires a bounded whole-session deadline and specifies no numeric duration.
-The 15-minute bound is qualified with cold repository measurements and a real
-repository-driver install/PATH witness in `Cold repository install (hosted)`.
-Measurements are observations of those hosts, not a speed guarantee for every
-machine. A shorter caller context still takes precedence.
+On Linux and macOS, this permits up to 15 minutes of **unbounded aggregate CPU
+and memory use** per compiled command: neither an aggregate memory limit nor an
+active-process-count limit is available. The per-file size limit still applies.
+The private disk-tree budget is checked after each child, not continuously; it
+cannot prevent a transient excess before that check. An install with N compiled
+commands can consume N times 15 minutes of worker time, plus source admission,
+toolchain establishment and verification, cache work and publication. There is
+no install-level deadline; independent projects can also build concurrently.
+Contending installs report when they are waiting for an operation lock.
+
+Keep the 15-minute per-command ceiling, and add an explicit operator-selected
+install-level deadline and concurrency policy in a follow-up. An implicit
+install cap here would reject valid multi-command installs without a defined
+owner policy. Package data cannot extend the worker budget. Its value is absent
+from the closed logical build input, receipt, cache key and capability-evidence
+record; it does not relabel or invalidate installed artifacts. Protocol Core
+requires a bounded whole session but specifies no numeric duration.
+
+The hosted public-fixture witness demonstrates a cold repository build and full
+install, with the test explicitly prepending the project bin directory to PATH
+and invoking the installed command **by name**. It does not demonstrate that
+Curator edits the user's ambient PATH. Earlier hosted runs completed in 19–41
+seconds, below the harness's two-minute per-command ceiling: they do **not**
+qualify the 15-minute ceiling. The over-budget negative qualifies timeout and
+descendant teardown, independently of successful build speed.
+
+The cold workflow records toolchain establishment/fingerprinting, source
+rechecks, toolchain rechecks, graph validation, disk scans, artifact/worker
+verification, list, build and teardown separately. Establish retains its
+separate two-minute fingerprint ceiling and 15-second probe ceilings; these can
+refuse before the worker budget starts. The configured target Linux lane
+provides budget measurements; a hosted fallback is labelled and is not target
+host evidence. Local macOS measurements from the producer's PRI 4 background
+scheduling band, including the earlier 598-second install with 320 seconds
+unattributed, are **not** evidence for a generally slow host or for this budget.
+Those old uninstrumented seconds cannot be retrospectively assigned to a phase.
+The new phase diagnostics permit attribution on a new public-fixture run.
+No new a2a-source execution or qualification is part of this witness.

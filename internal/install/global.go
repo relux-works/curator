@@ -50,7 +50,9 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 		return failedResult("global", GlobalRoot(cfg.Home()), err)
 	}
 	ctx := opts.context()
+	finishNotice := lockWaitNotice(opts.OnLockWait, "global")
 	locks, err := commit.Locks.AcquireProjects(ctx, GlobalRoot(cfg.Home()))
+	finishNotice()
 	if err != nil {
 		return failedResult("global", GlobalRoot(cfg.Home()),
 			fmt.Errorf("acquire the global operation lock: %w", err))

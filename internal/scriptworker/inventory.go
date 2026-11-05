@@ -21,15 +21,11 @@ import (
 // otherwise — a control the probe did not find never rejects the
 // invocation and never produces a diagnostic.
 //
-// This inventory is independent of `rc5-native-control-inventory-v1`. Its
-// first five rows carry the same macOS and Windows verdicts because the
-// underlying host facts do not depend on what the child is, and the probe
-// and application mechanisms for those rows are the same ones the go-v1
-// worker uses (process-group teardown, exact-limit Job Objects, RLIMIT_FSIZE
-// across the fork, close-on-exec plus explicit release); Linux-only rows
-// (delegated cgroup v2, Landlock, network namespaces) have no go-v1
-// counterpart because the portable build policy is specified for macOS and
-// Windows only.
+// This script inventory is independent of the Go native-control inventory,
+// whose successor v2 also covers Linux. The shared macOS/Windows rows reflect
+// the same kernel mechanisms. Linux script-only host-conditional mechanisms
+// (delegated cgroup v2, Landlock and network namespaces) are not Go controls;
+// portable Linux Go builds require no cgroup delegation.
 const (
 	// ScriptInventoryVersion is the exhaustive native-control inventory of
 	// one enforced script invocation.

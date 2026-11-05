@@ -25,9 +25,11 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 	plants := []struct{ name, file, before, after, witness, message string }{
 		{"omit-group-kill", "controls_" + runtime.GOOS + ".go", "_ = unix.Kill(-pid, unix.SIGKILL)", "_ = pid", "TestBuildTerminatesTheCompleteWorkerDomain", "outlived the worker domain teardown: survival marker"},
 		{"restore-readiness-sleep", "testdata/stubgo/main.go", "_, readyErr := io.ReadFull(ready, acknowledgement[:])", "_, readyErr := 0, error(nil)\n time.Sleep(500*time.Millisecond)\n acknowledgement[0] = 1\n _ = io.ReadFull", "TestBuildWaitsForDelayedDescendantReadiness", "tool children did not publish their identities"},
+		{"omit-acceptance-deadline", "build.go", "if err := client.deadlineFailure(); err != nil {\n\t\treturn Result{}, err\n\t}\n\tfinishTeardown", "finishTeardown", "TestBuildRejectsArtifactDuringAcceptance", "post-bracket deadline accepted or misdiagnosed"},
 	}
 	if runtime.GOOS == "linux" {
 		plants = append(plants,
+			struct{ name, file, before, after, witness, message string }{"omit-deadline-domain-termination", "orphan_unix.go", "_ = unix.Kill(-os.Getpid(), unix.SIGKILL)", "_ = os.Getpid()", "TestBuildDeadlineTearsDownDescendants", "timed-out descendant published survival marker"},
 			struct{ name, file, before, after, witness, message string }{"omit-descriptor-seal", "controls_linux.go", "restrictManagerDescriptors(domain.descriptorRoot)", "error(nil)", "TestLinuxNativeControls/descriptor", "private descriptor leaked"},
 			struct{ name, file, before, after, witness, message string }{"extra-file-admitted", "controls_linux.go", "len(command.ExtraFiles) != 0", "len(command.ExtraFiles) > 1", "TestLinuxControlLaunchRefusals/extra-files", "extra-files was admitted"},
 			struct{ name, file, before, after, witness, message string }{"sealing-error-admitted", "controls_linux.go", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil {", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil && false {", "TestLinuxControlLaunchRefusals/sealing-failure", "sealing-failure was admitted"},
@@ -77,7 +79,27 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 			if err := os.WriteFile(replacement, []byte(strings.Replace(source, plant.before, plant.after, 1)), 0600); err != nil {
 				t.Fatal(err)
 			}
-			payload, err := json.Marshal(map[string]any{"Replace": map[string]string{sourcePath: replacement}})
+			replacements := map[string]string{sourcePath: replacement}
+			if plant.name == "omit-deadline-domain-termination" {
+				parent, err := filepath.Abs("controls_linux.go")
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, err := os.ReadFile(parent)
+				if err != nil {
+					t.Fatal(err)
+				}
+				const anchor = "_ = unix.Kill(-pid, unix.SIGKILL)"
+				if strings.Count(string(raw), anchor) != 1 {
+					t.Fatal("parent deadline plant anchor not unique")
+				}
+				replacementParent := filepath.Join(scratch, "controls_linux.go")
+				if err := os.WriteFile(replacementParent, []byte(strings.Replace(string(raw), anchor, "_ = pid", 1)), 0600); err != nil {
+					t.Fatal(err)
+				}
+				replacements[parent] = replacementParent
+			}
+			payload, err := json.Marshal(map[string]any{"Replace": replacements})
 			if err != nil {
 				t.Fatal(err)
 			}
