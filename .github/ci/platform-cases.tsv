@@ -951,3 +951,8 @@ internal/godriver	TestWorkerClosedManagerPipes/held-stdout	linux,darwin	-	-	Clos
 internal/godriver	TestWorkerClosedManagerPipes/plain-EOF	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
 internal/godriver	TestWorkerClosedManagerPipes/session-failure	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
 internal/godriver	TestWorkerClosedManagerPipes/read-error	linux,darwin	-	-	Closed manager pipe row retains descendant evidence
+internal/godriver	TestWorkerPipeHandlerDoesNotLeakToExec	linux,darwin	-	-	Worker exec disposition and status precedence regression
+internal/godriver	TestWorkerCodedCauseKeepsTeardownStatus	linux,darwin	-	-	Worker exec disposition and status precedence regression
+internal/godriver	TestWorkerExitNarrowingControls/ignored-SIGPIPE	linux,darwin	-	-	Worker exec disposition and status precedence regression
+internal/godriver	TestWorkerExitNarrowingControls/coded-cause-first	linux,darwin	-	-	Worker exec disposition and status precedence regression
+internal/godriver	TestWorkerExitNarrowingControls/main-failure-closed-output	linux,darwin	-	-	Worker exec disposition and status precedence regression

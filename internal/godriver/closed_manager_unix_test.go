@@ -102,9 +102,10 @@ func exitReport(t *testing.T, w *rawWorker, barrier string, pids []int) (status 
 	return
 }
 
-// Both pipes disappear after a live descendant acknowledgement. Header-only
-// uses no seam; session/read faults force the two diagnostic-write paths.
-// Held-stdout and plain EOF rows are positive controls for the same domain.
+// Closed output and broken input model manager loss after acknowledged live
+// descendants. The session-failure row holds stdin open until exit, preventing
+// EOF cleanup from masking main-path teardown. Header-only uses no seam;
+// held-stdout and plain EOF are controls for the same domain.
 func TestWorkerClosedManagerPipes(t *testing.T) {
 	for _, mode := range []string{"header", "held-stdout", "plain-EOF", "session-failure", "read-error"} {
 		t.Run(mode, func(t *testing.T) {
@@ -126,9 +127,9 @@ func TestWorkerClosedManagerPipes(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(barrier, "fail"), nil, 0600); err != nil {
 					t.Fatal(err)
 				}
-				// Both manager pipe ends disappear at the frame boundary.
-				_ = w.stdin.Close()
+				// Hold input until the main failure path exits; EOF cannot mask it.
 				exitReport(t, w, barrier, pids)
+				_ = w.stdin.Close()
 				return
 			}
 			_ = w.stdin.Close()

@@ -345,7 +345,9 @@ with worker status 4. Status 4 means teardown is **unconfirmed**, and an absent
 response with that status is reported as
 `build_execution_worker_teardown_failed` when no primary deadline or framed
 failure takes precedence. Status 4 is not currently preserved as a secondary
-diagnostic alongside those primary failures or during final successful teardown.
+diagnostic alongside any earlier primary failure, including non-frame coded
+failures from response validation and acceptance rejections, or during final
+successful teardown. The manager also leaves its own group-kill result unchecked.
 Windows closes the worker query handle during admission, before acknowledgement.
 The manager then holds the last Job Object handle; manager death alone activates
 kill-on-close. Live-manager termination is tested on Windows; manager death is

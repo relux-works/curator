@@ -15,6 +15,9 @@ import (
 // subprocess control. A build error or unrelated failure is not detection.
 func TestWorkerExitNarrowingControls(t *testing.T) {
 	for _, p := range []struct{ name, file, before, after, witness, reason string }{
+		{"ignored-SIGPIPE", "orphan_unix.go", "signal.Notify(c, syscall.SIGPIPE)", "signal.Ignore(syscall.SIGPIPE)", "TestWorkerPipeHandlerDoesNotLeakToExec", "exec child inherited ignored SIGPIPE"},
+		{"coded-cause-first", "workerclient.go", "if client.command != nil && client.command.ProcessState != nil && client.command.ProcessState.ExitCode() == exitWorkerTeardownFailed {", "if DiagnosticCode(cause) != \"\" { return cause }; if client.command != nil && client.command.ProcessState != nil && client.command.ProcessState.ExitCode() == exitWorkerTeardownFailed {", "TestWorkerCodedCauseKeepsTeardownStatus", "coded cause diagnostic=build_execution_worker_protocol_invalid"},
+		{"main-failure-closed-output", "workerserver.go", "session.fail(err)\n\t\tstopOrphanedWorkerDomain()", "session.fail(err)", "TestWorkerClosedManagerPipes/session-failure", "domain closure: status=exit 4 alive=2 markers=2"},
 		{"fatal-SIGPIPE", "orphan_unix.go", "signal.Notify(c, syscall.SIGPIPE)", "signal.Stop(c); _ = syscall.SIGPIPE", "TestWorkerClosedManagerPipes/header", "domain closure: status=signal broken pipe"},
 		{"no-worker-deadline", "workerserver.go", "default:\n\t\t\t}\n\t\t\tstopOrphanedWorkerDomain()", "default:\n\t\t\t}\n\t\t\t// omitted watcher kill", "TestWorkerIndependentDeadline", "worker deadline watcher did not terminate domain"},
 		{"no-success-teardown", "orphan_unix.go", "func finishWorkerDomain() { stopOrphanedWorkerDomain() }", "func finishWorkerDomain() {}", "TestWorkerSuccessfulShutdownKillsDescendants", "domain closure: status=exit 0"},
