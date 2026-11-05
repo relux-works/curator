@@ -24,7 +24,6 @@ jobs:
     env:
       GOTOOLCHAIN: local
       GOENV: 'off'
-      CURATOR_COLD_SCHEDULING_BAND: ${{ runner.environment }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +35,9 @@ jobs:
       - name: Record measurement host class
         env:
           MEASUREMENT_ROUTE: ${{ runner.environment }}
-        run: echo "measurement route=$MEASUREMENT_ROUTE; target evidence requires self-hosted"
+        run: |
+          echo "measurement route=$MEASUREMENT_ROUTE; target evidence requires self-hosted"
+          echo "CURATOR_COLD_SCHEDULING_BAND=$MEASUREMENT_ROUTE" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.5'
