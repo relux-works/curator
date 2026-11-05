@@ -39,6 +39,12 @@ func gitFileURLFor(slashed, volume string) string {
 // exercise the loader set CURATOR_CONFIG/CURATOR_SYSTEM_CONFIG to their own
 // files with t.Setenv, which overrides this base for the test.
 func TestMain(m *testing.M) {
+	if name := filepath.Base(os.Args[0]); name == "pin-transport" || name == "pin-transport.exe" {
+		os.Exit(runPinTransport())
+	}
+	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
+		os.Exit(runMissingPinGit())
+	}
 	dir, err := os.MkdirTemp("", "curator-test-noconfig-*")
 	if err == nil {
 		// Never created: the loader maps an absent file to an empty policy.
