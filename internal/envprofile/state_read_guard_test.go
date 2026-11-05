@@ -64,6 +64,7 @@ func reviewedManagerReadExceptions() map[string]string {
 	allow("Reads operator-owned configuration or policy input; a documented missing configuration has its own outcome, and other I/O failures propagate.",
 		"cmd/curator/main.go:cli.cmdBootstrap",
 		"internal/config/config.go:readObject",
+		"internal/config/claude_auth_edit.go:claudeAuthPolicyAt",
 		"internal/config/sourcepolicy.go:LoadSourcePolicy",
 		"internal/config/sourceproviders.go:LoadSourceProviders",
 		"internal/rustsource/pipeline.go:rejectAmbientCargoConfig",

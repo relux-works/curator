@@ -299,11 +299,19 @@ curator ui          # open interactive terminal status dashboard
 ```bash
 curator config show         # display active configuration parameters
 curator config launcher     # export selected launcher metadata as JSON
+curator config claude-auth  # plan, apply or restore OAuth metadata references
 curator config build-ssh    # configure SSH credentials for external build repos
 curator config build-https  # configure HTTPS credentials for external build repos
 ```
 
 </details>
+
+`config claude-auth` validates a schema-2 or schema-7 machine file, creates a
+private candidate, and applies inspected bytes with source, result and system
+policy digest guards. It retains an exact private backup for guarded restore.
+Restore refuses later unrelated extension changes, including proxy selection.
+It never resolves credentials. See the [command contract](docs/cli.md#curator-config-claude-auth)
+for phase outcomes and the exclusive-custody requirement.
 
 ## Skillfile schema 2 project sources
 

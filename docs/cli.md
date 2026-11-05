@@ -1203,6 +1203,69 @@ and `claude_auth` references; see [machine configuration](environment-config.md)
 The output contains references, never credential material. Do not use it as an
 authentication or proxy qualification result.
 
+### curator config claude-auth
+
+```bash
+curator config claude-auth plan --keychain-service SERVICE --keychain-account ACCOUNT --out CANDIDATE
+curator config claude-auth plan --file /absolute/token-file --out CANDIDATE
+curator config claude-auth apply --keychain-service SERVICE --keychain-account ACCOUNT --expect-source-sha256 SOURCE --expect-result-sha256 RESULT --expect-policy-sha256 POLICY
+curator config claude-auth restore --backup BACKUP --expect-current-sha256 CURRENT
+```
+
+Use the same store flags for plan and apply. Exactly one file reference or a
+complete Keychain service/account pair is required; references are metadata.
+The command never opens a token file or looks up a Keychain item. The selected
+machine path follows ordinary discovery, including `CURATOR_CONFIG`. The
+writer supports Unix owner/mode and no-follow semantics; other platforms
+refuse this operation.
+
+Plan supports schema 2 to 7 and schema 7 to 7, preserving existing proxy and
+unrelated declarations. It refuses other schemas, including newer carriers,
+and allocates no new schema version. A missing, nonregular, linked,
+non-private, differently owned or system configuration source refuses. JSON
+grammar and reference validation reject unknown/duplicate fields, inline
+credentials, mixed stores and unsafe file paths before candidate/backup
+creation. Both source and candidate must pass the ordinary loader and system
+overlay with equal effective non-extension settings.
+
+Plan creates only the explicitly named candidate with exclusive creation and
+mode 0600. Its JSON output reports the selected path and selection source,
+source/candidate/system-policy digests, schema transition, selected auth
+references and preserved top-level key names. Other configuration values
+appear only in that private candidate. Inspect its diff privately. A policy
+digest binds the selected policy's identity and bytes, or its absence.
+
+Apply recomputes the candidate and requires the exact three digests printed
+by plan. It writes one exclusive 0600 exact-source backup named
+`<config>.bak-<UTC timestamp>`, syncs the backup and its parent directory,
+then writes and syncs one sibling temporary file before atomic rename.
+No receipt, lock or journal is created, and a failed rename has no
+remove-and-retry fallback. Preflight refusals create no backup. A failure
+after backup publication but before rename leaves the source unchanged and
+retains/reports the recovery copy. A successful rename reports `applied`
+even if subsequent readback, parent-directory sync, output or cancellation
+fails; `readback_verified` and `durable` report the actual post-rename checks.
+An applied result with `durable=false` has unconfirmed directory durability.
+
+Restore validates the named sibling backup's bytes, digest, regular type,
+owner and mode, and binds the current source to `CURRENT`. It validates
+ordinary loading/non-extension equivalence and equality of extensions other
+than `claude_auth`. A later proxy change refuses even when `CURRENT` is its
+freshly observed digest. Restore rechecks source, policy and backup before
+replacement, and retains the backup. A changed source or
+backup refuses; a successful rename reports `restored` with the same
+durability/readback semantics. The optional library-level expected-backup
+digest can additionally bind caller-held provenance.
+
+Apply and restore require an exclusive finite configuration custody window.
+Expected hashes and the last pre-rename recheck prove observed freshness;
+rename is **not atomic compare-and-swap** against a nonparticipating writer.
+`env config set` does not participate in a shared lock. A concurrent write
+after the final recheck can therefore be overwritten. Directory fsync after
+rename is the reported crash-durability boundary; it does not close that
+concurrency gap. Configuration editing alone neither installs a launcher
+nor demonstrates a successful authenticated runtime launch.
+
 ### curator config build-ssh
 
 `curator config build-ssh` configures SSH credentials for external build repositories.
