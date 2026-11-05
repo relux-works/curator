@@ -4,10 +4,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -54,6 +54,10 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 	if command == "" {
 		command = "tool"
 	}
+	exportName := "coldtool"
+	if command == "a2a" {
+		exportName = "a2a"
+	}
 	if err := os.CopyFS(filepath.Join(work, "tools"), os.DirFS(source)); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +100,7 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 			"tools": map[string]any{"git": "https://fixture.test/tools.git", "locked_commit": map[string]any{"object_format": "sha1", "hex": lock}},
 		},
 		"commands": map[string]any{
-			"coldtool": map[string]any{"type": "build", "driver": "go-repository-v1", "repository": "tools", "target": "tool"},
+			exportName: map[string]any{"type": "build", "driver": "go-repository-v1", "repository": "tools", "target": "tool"},
 		},
 	})
 	if err != nil {
@@ -138,7 +142,7 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 		}
 		return stdout
 	}
-	shim := filepath.Join(project, ".agents", "bin", "coldtool")
+	shim := filepath.Join(project, ".agents", "bin", exportName)
 	if runtime.GOOS == "windows" {
 		shim += ".cmd"
 	}
@@ -170,11 +174,20 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 	if !strings.Contains(stdout, "BUILD REPOSITORY SUBSTITUTION skill-a.tools") {
 		t.Fatalf("install did not report the local substitution:\n%s", stdout)
 	}
-	row := regexp.MustCompile(`skill-a\.coldtool external build key=sha256:([0-9a-f]{64}) outcome=would-preflight-and-build`).FindStringSubmatch(stdout)
-	if len(row) != 2 {
-		t.Fatalf("install did not publish a real build outcome: %s", stdout)
+	var key string
+	prefix := "skill-a." + exportName + " external build key=sha256:"
+	for _, line := range strings.Split(stdout, "\n") {
+		if at := strings.Index(line, prefix); at >= 0 {
+			fields := strings.Fields(line[at+len(prefix):])
+			if len(fields) > 1 && fields[1] == "outcome=would-preflight-and-build" {
+				key = fields[0]
+			}
+		}
 	}
-	key := row[1]
+	if len(key) != 64 {
+		t.Fatal(fmt.Sprintf("install did not publish a real build outcome: %s", stdout))
+	}
+
 	buildRoot := filepath.Join(artifacts, key)
 	receipt := filepath.Join(buildRoot, "receipt.json")
 	_ = blackboxRead(t, receipt)
@@ -199,7 +212,7 @@ func TestColdRepositoryInstallOnPATH(t *testing.T) {
 		shimArgs = []string{"/d", "/c", "call", shim}
 	}
 	t.Setenv("PATH", filepath.Join(project, ".agents", "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
-	resolved, err := exec.LookPath("coldtool")
+	resolved, err := exec.LookPath(exportName)
 	if err != nil || resolved != shim {
 		t.Fatalf("installed command is not on PATH: %s %v", resolved, err)
 	}
