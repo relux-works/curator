@@ -244,6 +244,9 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 		if stateErr := verifyPrivateState(request.Session.operation, stage, limits.DiskBytes); stateErr != nil {
 			runErr = errors.Join(runErr, stateErr)
 		}
+		if deadlineErr := client.deadlineFailure(); deadlineErr != nil {
+			runErr = errors.Join(deadlineErr, runErr)
+		}
 		return output, runErr
 	}
 
@@ -281,12 +284,15 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	// toolchain identities, then terminate and join the complete worker domain
 	// before anything is published.
 	if err := request.Source.Recheck(); err != nil {
-		return Result{}, diagnosticErr("source_mutated", err, "frozen source changed before artifact acceptance")
+		return Result{}, errors.Join(client.deadlineFailure(), diagnosticErr("source_mutated", err, "frozen source changed before artifact acceptance"))
 	}
 	if err := request.Session.VerifyToolchain(ctx); err != nil {
-		return Result{}, err
+		return Result{}, errors.Join(client.deadlineFailure(), err)
 	}
 	if err := executable.Verify(); err != nil {
+		return Result{}, errors.Join(client.deadlineFailure(), err)
+	}
+	if err := client.deadlineFailure(); err != nil {
 		return Result{}, err
 	}
 	client.teardown()

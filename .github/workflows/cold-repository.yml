@@ -41,4 +41,4 @@ jobs:
           CURATOR_COLD_REPOSITORY: ${{ github.workspace }}/internal/godriver/testdata/coldrepository
         run: bash .github/ci/isolated-test.sh go test -tags=curator_cold_repository -count=1 -v -timeout=25m ./cmd/curator -run '^TestColdRepositoryInstallOnPATH$'
       - name: Deadline and protocol paired witnesses
-        run: bash .github/ci/isolated-test.sh go test -count=1 -v -timeout=10m ./internal/godriver -run '^Test(WorkerChannelFailureDistinguishesParentDeadline|RealWorkerParentDeadline|WorkerSharesWholeSessionBudget|BuildDeadlineTearsDownDescendants|WorkerRejectsEveryProtocolDeviationBeforeTheCompiler)$'
+        run: bash .github/ci/isolated-test.sh go test -count=1 -v -timeout=10m ./internal/godriver -run '^Test(WorkerChannelFailureDistinguishesParentDeadline|RealWorkerParentDeadline|WorkerSharesWholeSessionBudget|BuildDeadlineTearsDownDescendants|BuildRejectsArtifactAfterParentDeadline|WorkerRejectsEveryProtocolDeviationBeforeTheCompiler)$'

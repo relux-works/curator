@@ -345,8 +345,8 @@ func (client *workerClient) receive(kind string) (workerMessage, error) {
 func (client *workerClient) protocolFailure(cause error, format string, args ...any) error {
 	// EOF/EPIPE after CommandContext killed the domain is a deadline, not a
 	// malformed session. Preserve genuine framing/nonce failures while live.
-	if client.runContext != nil && errors.Is(client.runContext.Err(), context.DeadlineExceeded) {
-		return diagnosticErr("process_timeout", context.DeadlineExceeded, "worker domain exceeded its whole-session deadline")
+	if err := client.deadlineFailure(); err != nil {
+		return err
 	}
 	if DiagnosticCode(cause) != "" {
 		return cause
@@ -420,4 +420,13 @@ func workerEnvironment() []string {
 		values = map[string]string{}
 	}
 	return environmentSlice(values)
+}
+
+// deadlineFailure also guards artifact acceptance after successful child output:
+// a watchdog expiring during manager verification cannot turn into success.
+func (client *workerClient) deadlineFailure() error {
+	if client.runContext != nil && errors.Is(client.runContext.Err(), context.DeadlineExceeded) {
+		return diagnosticErr("process_timeout", context.DeadlineExceeded, "worker domain exceeded its whole-session deadline")
+	}
+	return nil
 }
