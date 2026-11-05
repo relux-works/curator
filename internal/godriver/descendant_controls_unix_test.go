@@ -81,6 +81,27 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 				t.Fatal(err)
 			}
 			replacements := map[string]string{sourcePath: replacement}
+			if plant.name == "omit-group-kill" {
+				// Parent teardown and the worker's EOF/deadline watcher independently
+				// kill this group. Suppress both to expose a genuine surviving domain.
+				worker, err := filepath.Abs("orphan_unix.go")
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, err := os.ReadFile(worker)
+				if err != nil {
+					t.Fatal(err)
+				}
+				const anchor = "_ = unix.Kill(-os.Getpid(), unix.SIGKILL)"
+				if strings.Count(string(raw), anchor) != 1 {
+					t.Fatal("worker group plant anchor not unique")
+				}
+				replacementWorker := filepath.Join(scratch, "orphan_unix.go")
+				if err := os.WriteFile(replacementWorker, []byte(strings.Replace(string(raw), anchor, "_ = unix.SIGKILL", 1)), 0600); err != nil {
+					t.Fatal(err)
+				}
+				replacements[worker] = replacementWorker
+			}
 			if plant.name == "omit-deadline-domain-termination" {
 				parent, err := filepath.Abs("controls_linux.go")
 				if err != nil {
