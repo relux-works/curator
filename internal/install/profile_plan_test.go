@@ -30,13 +30,13 @@ func init() {
 // ordinary private Go compiler/receipt path before record publication. Invalid
 // Go and post-receipt artifact replacement each refuse with the old lock and
 // routing intact. This proves preparation only, not command/PATH adoption.
-// Native execution controls are allocated only for macOS and Windows. Other
-// hosts must report unavailable execution controls without reaching the staged
-// receipt callback or changing lock/routing preimages; they cannot provide the
-// native positive compilation witness.
+// The driver platform inventory selects native compilation witnesses. Hosts
+// absent from that inventory must refuse without reaching the staged receipt
+// callback or changing lock/routing preimages. Adding a supported inventory
+// platform automatically enables the same positive and negative build modes.
 func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
 	modes := []string{"success", "compiler-failure", "artifact-tamper"}
-	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+	if godriver.InventoryPlatform(runtime.GOOS) == "" {
 		modes = []string{"unsupported-host"}
 	}
 	for _, mode := range modes {
