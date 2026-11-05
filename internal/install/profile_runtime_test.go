@@ -203,6 +203,17 @@ func TestProfileRuntimePublication(t *testing.T) {
 				if result.Lock.SchemaVersion != 5 || bytes.Equal(before, after) {
 					t.Fatal("runtime did not publish v5")
 				}
+				// Private journal sources must remain private after publication;
+				// inactive preparation still publishes its protected generation.
+				generation := filepath.Join(skillruntime.DomainDir(e.home), "generations", strings.TrimPrefix(result.LockHash, "sha256:")+".json")
+				if err := privatedir.ValidateFile(generation); err != nil {
+					t.Fatalf("published generation is not private: %v", err)
+				}
+				if mode != "inactive-script" {
+					if err := privatedir.ValidateFile(filepath.Join(skillruntime.DomainDir(e.home), "routing.json")); err != nil {
+						t.Fatalf("published routing is not private: %v", err)
+					}
+				}
 				// Public adoption remains unavailable even with prepared shims and
 				// an admitted internal publisher; the refusal preserves both records.
 				if _, err := envprofile.UseWithPolicy(e.home, "profile", "", "", false, policy); err == nil || !strings.Contains(err.Error(), skillruntime.CompanionRequired) {

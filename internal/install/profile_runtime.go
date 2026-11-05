@@ -3,7 +3,6 @@ package install
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/globalbins"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/staging"
@@ -101,7 +101,17 @@ func stageProfileRuntime(cfg *config.Config, profile string, lock *contextlock.L
 		return fail(err)
 	}
 	generationStaged := filepath.Join(stageRoot, "generation.json")
-	if err := os.WriteFile(generationStaged, generationBytes, 0600); err != nil {
+	// Private journal sources need a protected DACL at creation on Windows;
+	// inheriting the staging directory's owner-only ACL is insufficient.
+	generationFile, err := privatedir.Create(generationStaged, 0600)
+	if err != nil {
+		return fail(err)
+	}
+	if _, err := generationFile.Write(generationBytes); err != nil {
+		_ = generationFile.Close()
+		return fail(err)
+	}
+	if err := generationFile.Close(); err != nil {
 		return fail(err)
 	}
 	generationLive := filepath.Join(skillruntime.DomainDir(cfg.Home()), "generations", strings.TrimPrefix(binding.LockHash, "sha256:")+".json")

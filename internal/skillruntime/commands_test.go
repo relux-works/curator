@@ -274,6 +274,7 @@ func TestClosedRootInventory(t *testing.T) {
 
 // The transition carries retained bytes opaquely and rejects an omitted active
 // export or stale removal. It cannot publish a second live command transaction.
+// Successful transitions stage an owner-only routing source for that journal.
 func TestBindRequiresCompleteTransition(t *testing.T) {
 	for _, mode := range []string{"complete", "missing-selected", "missing-stale", "retained", "retained-replacement"} {
 		t.Run(mode, func(t *testing.T) {
@@ -312,6 +313,18 @@ func TestBindRequiresCompleteTransition(t *testing.T) {
 				}
 				if err := publication.Verify(); err != nil {
 					t.Fatal(err)
+				}
+				routingSources := 0
+				for _, target := range publication.Plan.Targets {
+					if target.Class == "85-profile-routing" {
+						routingSources++
+						if err := privatedir.ValidateFile(target.StagedPath); err != nil {
+							t.Fatalf("routing journal source is not private: %v", err)
+						}
+					}
+				}
+				if routingSources != 1 {
+					t.Fatalf("routing journal sources=%d, want 1", routingSources)
 				}
 				if retained {
 					for _, target := range publication.Plan.Targets {

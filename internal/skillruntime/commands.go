@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/stateread"
@@ -327,7 +327,17 @@ func (s *Session) Bind(stageRoot string, binding Binding, selected []Export, inv
 		return Publication{}, err
 	}
 	staged := filepath.Join(stageRoot, "profile-routing.json")
-	if err := os.WriteFile(staged, payload, 0600); err != nil {
+	// The transaction's private-file contract requires a protected Windows
+	// DACL on the source itself, not only an owner-only parent directory.
+	file, err := privatedir.Create(staged, 0600)
+	if err != nil {
+		return Publication{}, err
+	}
+	if _, err := file.Write(payload); err != nil {
+		_ = file.Close()
+		return Publication{}, err
+	}
+	if err := file.Close(); err != nil {
 		return Publication{}, err
 	}
 	filtered.Replace("85-profile-routing", "routing", statePath(s.domain.Home), staged)
