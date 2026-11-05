@@ -407,7 +407,7 @@ jobs:
             GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/install \
-              -run '^TestProjectBinUnreadable(Ledger|Unrelated)$'
+              -run '^TestProjectBin(Unreadable(Ledger|Unrelated)|WindowsShareDenialBackupIntent)$'
 
   windows-test-shards:
     name: Windows tests (shard ${{ matrix.shard }})
