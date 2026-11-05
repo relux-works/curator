@@ -190,7 +190,8 @@ func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, 
 // report B1. Stale pins, unmanaged roots, companion refusals and failed native
 // compilation leave lock/current/root/declaration preimages unchanged.
 // Scoped directory variants also publish and repeat from v5, then refuse
-// injected store siblings while preserving lock/routing. The root variant is
+// injected store siblings while preserving lock/previous lock, routing,
+// generations, runtime trees and both shim roots. The root variant is
 // the whole-repository positive control. POSIX executes the final child; Windows proves staging only. This is an
 // install witness, not final-agent PATH or real supervisor proof.
 func TestProfileRuntimePublication(t *testing.T) {
@@ -320,26 +321,34 @@ func TestProfileRuntimePublication(t *testing.T) {
 					if _, err := PrepareProfileSkillRuntime(e.cfg, "profile", result.LockHash, policy, Options{}, supervisor, checks); err != nil {
 						t.Fatalf("pinned repeat: %v", err)
 					}
+					// A pinned repeat preserves the exact v5 lock bytes in root and
+					// scoped modes, independent of any later binding check.
+					if repeated, err := os.ReadFile(path); err != nil || !bytes.Equal(after, repeated) {
+						t.Fatalf("pinned repeat changed lock: %v", err)
+					}
 					if strings.HasPrefix(mode, "scoped-") {
 						member, _ := result.Lock.Find("skill", "slice-skill")
 						entry := contextstore.GitEntryDir(e.home, "skill", member.Name, member.Commit, member.Directory)
 						e.write(entry, "outside.txt", "injected sibling")
-						lockBefore, err := os.ReadFile(path)
-						if err != nil {
-							t.Fatal(err)
-						}
-						routingPath := filepath.Join(skillruntime.DomainDir(e.home), "routing.json")
-						routingBefore, err := os.ReadFile(routingPath)
-						if err != nil {
-							t.Fatal(err)
+						// Sibling refusal must preserve every publication surface,
+						// including prior generations and both command shim hops.
+						preimages := sharedState{}
+						for _, target := range []string{path, filepath.Join(filepath.Dir(path), "lock.prev.json"), skillruntime.DomainDir(e.home), filepath.Join(e.home, "runtime"), filepath.Join(e.home, "global/bin"), admission.domain.UserBin} {
+							digest := entryDigest(target)
+							if strings.Contains(digest, "unreadable:") {
+								t.Fatalf("publication snapshot unreadable: %s", target)
+							}
+							preimages[target] = digest
 						}
 						if _, err := PrepareProfileSkillRuntime(e.cfg, "profile", result.LockHash, policy, Options{}, supervisor, checks); err == nil || !strings.Contains(err.Error(), "profile_skill_plan_invalid") {
 							t.Fatalf("scoped runtime sibling tamper refusal: %v", err)
 						}
-						lockAfter, _ := os.ReadFile(path)
-						routingAfter, _ := os.ReadFile(routingPath)
-						if !bytes.Equal(lockBefore, lockAfter) || !bytes.Equal(routingBefore, routingAfter) {
-							t.Fatal("scoped refusal changed published records")
+						postimages := sharedState{}
+						for target := range preimages {
+							postimages[target] = entryDigest(target)
+						}
+						if changes := preimages.diff(postimages); len(changes) != 0 {
+							t.Fatalf("scoped refusal changed publication state: %v", changes)
 						}
 					}
 
