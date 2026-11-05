@@ -99,10 +99,15 @@ jobs:
           set -euo pipefail
           fixture="$(mktemp -d "$HOME/curator-ssh-control.XXXXXX")"
           server_pid=""
+          test_home=""
           cleanup() {
             if [ -f "$fixture/server.log" ]; then sudo cat "$fixture/server.log"; fi
             if [ -n "$server_pid" ]; then sudo kill "$server_pid" || true; fi
             sudo rm -rf "$fixture"
+            if [ -n "$test_home" ]; then
+              chmod -R u+w "$test_home"
+              rm -rf "$test_home"
+            fi
           }
           trap cleanup EXIT
           chmod 755 "$fixture"
@@ -145,7 +150,6 @@ jobs:
             go build -o "$fixture/control" ./.github/ci/openssh89
           env -i PATH="$PATH" HOME="$test_home" \
             "$fixture/control" "$fixture" "$commit" "$(id -un)"
-          rm -rf "$test_home"
   default-build-transport:
     name: Default build transport (hosted Linux)
     runs-on: ubuntu-latest
