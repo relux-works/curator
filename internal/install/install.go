@@ -37,6 +37,7 @@ import (
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/skillcheck"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/sourcelock"
@@ -858,6 +859,37 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			result.failf("%v", err)
 			return result, nil
 		}
+	}
+
+	// Ownership refusal is a read-only pre-build decision, including dry-run.
+	desiredProjectCommands := map[string]bool{}
+	for _, node := range nodes {
+		for _, name := range node.ActiveCommandNames() {
+			command := node.Spec.Commands[name]
+			if command.Type == "system" {
+				continue
+			}
+			if scriptpolicy.Enforced(command) {
+				destination, err := runtimestore.NewManagedEnforcedShim(runtimestore.ProjectShim, binDir, name, platform)
+				if err != nil {
+					result.failf("%v", err)
+					return result, nil
+				}
+				desiredProjectCommands[destination.Path()] = true
+				desiredProjectCommands[destination.SidecarPath()] = true
+			} else {
+				destination, err := runtimestore.NewManagedShim(runtimestore.ProjectShim, binDir, name, platform)
+				if err != nil {
+					result.failf("%v", err)
+					return result, nil
+				}
+				desiredProjectCommands[destination.Path()] = true
+			}
+		}
+	}
+	if _, err := inspectProjectBin(cfg.Home(), binDir, platform, externalPlan.deps.StoreRoot, desiredProjectCommands); err != nil {
+		result.failf("%v", err)
+		return result, nil
 	}
 
 	// 18. Dry run stops before any file changes.

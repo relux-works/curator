@@ -15,9 +15,14 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/scriptpolicy"
+	"github.com/relux-works/curator/internal/scriptworker"
+	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/snapshot"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -40,10 +45,16 @@ type projectBinOwnership struct {
 
 // Ownership is a previous journaled fingerprint plus an exact live match.
 // Before the first ledger, legacy adoption requires an installed marker naming
-// this command and a byte-exact old launcher to that marker's runtime/cache.
+// this command and either an exact old script or a marker-derived enforced sidecar.
 // A changed live entry never inherits ownership from its name or old ledger.
-func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[string]bool) (projectBinOwnership, error) {
-	state := projectBinOwnership{owned: map[string]bool{}, preimages: map[string]string{}, ledgerPath: filepath.Join(filepath.Dir(binDir), projectBinLedgerName)}
+func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[string]bool) (state projectBinOwnership, resultErr error) {
+	defer func() {
+		var stateErr *stateread.Error
+		if errors.As(resultErr, &stateErr) {
+			resultErr = fmt.Errorf("%w; restore read access to this manager state before reinstalling", resultErr)
+		}
+	}()
+	state = projectBinOwnership{owned: map[string]bool{}, preimages: map[string]string{}, ledgerPath: filepath.Join(filepath.Dir(binDir), projectBinLedgerName)}
 	desiredKeys := map[string]bool{}
 	for path := range desired {
 		state.preimages[path] = ""
@@ -60,19 +71,18 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 	} else {
 		info := metadata.Info
 		if !info.Mode().IsRegular() || info.Size() > 1<<20 {
-			return state, fmt.Errorf("project_bin_ownership_invalid: %s", state.ledgerPath)
+			return state, projectBinRefusal("project_bin_ownership_invalid", state.ledgerPath)
 		}
-		file, err := os.Open(state.ledgerPath)
+		file, err := stateread.ReadFile(state.ledgerPath)
 		if err != nil {
 			return state, err
 		}
-		decoder := json.NewDecoder(file)
+		decoder := json.NewDecoder(bytes.NewReader(file.Bytes))
 		decoder.DisallowUnknownFields()
 		err = decoder.Decode(&ledger)
 		tail := decoder.Decode(&struct{}{})
-		_ = file.Close()
 		if err != nil || tail != io.EOF || ledger.SchemaVersion != 1 || ledger.Entries == nil {
-			return state, fmt.Errorf("project_bin_ownership_invalid: %s", state.ledgerPath)
+			return state, projectBinRefusal("project_bin_ownership_invalid", state.ledgerPath)
 		}
 	}
 	metadata, err = stateread.Lstat(binDir)
@@ -80,7 +90,7 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 		return state, err
 	}
 	if metadata.Kind == stateread.KindPresent && (!metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0) {
-		return state, fmt.Errorf("project_bin_ownership_invalid: %s", binDir)
+		return state, projectBinRefusal("project_bin_ownership_invalid", binDir)
 	}
 	listing, err := stateread.ReadDir(binDir)
 	if err != nil {
@@ -97,17 +107,57 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 			return state, err
 		}
 	}
+	// Legacy enforced ownership derives the complete sidecar from the old marker's
+	// frozen manifest. The old manager executable bytes are deliberately not proof.
+	enforced := map[string]bool{}
+	legacyEnforced := map[string]bool{}
+	if legacy {
+		for name, records := range previous {
+			for _, recorded := range records {
+				expected, candidate, err := legacyEnforcedSidecar(home, binDir, platform, name, recorded)
+				if err != nil {
+					return state, err
+				}
+				if !candidate {
+					continue
+				}
+				destination, err := runtimestore.NewManagedEnforcedShim(runtimestore.ProjectShim, binDir, name, platform)
+				if err != nil {
+					return state, err
+				}
+				legacyEnforced[destination.Path()] = true
+				legacyEnforced[destination.SidecarPath()] = true
+				sidecar, err := stateread.ReadRegularFile(destination.SidecarPath())
+				if err != nil {
+					return state, err
+				}
+				if sidecar.Kind == stateread.KindPresent && bytes.Equal(sidecar.Bytes, expected) {
+					enforced[destination.Path()] = true
+					enforced[destination.SidecarPath()] = true
+				}
+			}
+		}
+	}
 	for _, entry := range entries {
 		path := filepath.Join(binDir, entry.Name())
+		key := projectBinKey(path, platform)
+		name := entry.Name()
+		if platform == "windows" {
+			name = strings.TrimSuffix(name, ".cmd")
+		}
+		relevant := desiredKeys[key] || ledger.Entries[entry.Name()] != "" || len(previous[name]) != 0 || legacyEnforced[path] || (legacy && (strings.HasSuffix(path, scriptworker.ShimSidecarSuffix) || hasEnforcedSidecar(path)))
+		if !relevant {
+			state.messages = append(state.messages, projectBinRefusal(projectBinPreserved, path).Error())
+			continue // An unrelated entry's bytes, permissions and size are never read.
+		}
 		fingerprint, err := shimFingerprint(path)
 		if err != nil {
 			return state, err
 		}
 		owned := fingerprint != "" && ledger.Entries[entry.Name()] == fingerprint
-		if legacy {
-			name := entry.Name()
-			if platform == "windows" {
-				name = strings.TrimSuffix(name, ".cmd")
+		if legacy && fingerprint != "" {
+			if enforced[path] && entry.Type().IsRegular() {
+				owned = true
 			}
 			for _, recorded := range previous[name] {
 				if runtimestore.MatchesLegacyShim(path, platform, func(target string) bool { return legacyTargetOwned(target, home, externalRoot, name, recorded) }) {
@@ -118,14 +168,18 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 		}
 		if owned {
 			state.preimages[path] = fingerprint
-			state.owned[projectBinKey(path, platform)] = true
+			state.owned[key] = true
 			continue
 		}
-		if desiredKeys[projectBinKey(path, platform)] {
-			return state, fmt.Errorf("%s: %s", projectBinConflict, path)
+		if legacy && (legacyEnforced[path] || strings.HasSuffix(path, scriptworker.ShimSidecarSuffix) || hasEnforcedSidecar(path)) {
+			return state, projectBinRefusal("project_bin_legacy_enforced", path)
 		}
-		state.messages = append(state.messages, fmt.Sprintf("%s: %s", projectBinPreserved, path))
+		if desiredKeys[key] {
+			return state, projectBinRefusal(projectBinConflict, path)
+		}
+		state.messages = append(state.messages, projectBinRefusal(projectBinPreserved, path).Error())
 	}
+
 	return state, nil
 }
 
@@ -232,7 +286,7 @@ func shimFingerprint(path string) (string, error) {
 		return "", err
 	}
 	if !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
-		return "", fmt.Errorf("%s: %s", projectBinConflict, path)
+		return "", projectBinRefusal(projectBinConflict, path)
 	}
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -243,7 +297,7 @@ func shimFingerprint(path string) (string, error) {
 		return "", err
 	}
 	if !current.Mode().IsRegular() || !os.SameFile(opened, current) {
-		return "", fmt.Errorf("%s: %s", projectBinConflict, path)
+		return "", projectBinRefusal(projectBinConflict, path)
 	}
 	return "file:" + hex.EncodeToString(hash.Sum(nil)), nil
 }
@@ -259,7 +313,7 @@ func (state projectBinOwnership) stageLedger(stageRoot string, plan *staging.Pla
 			return err
 		}
 		if fingerprint == "" {
-			return fmt.Errorf("project_bin_ownership_invalid: staged shim is not a file")
+			return projectBinRefusal("project_bin_ownership_invalid", target.StagedPath)
 		}
 		entries[filepath.Base(target.LivePath)] = fingerprint
 	}
@@ -292,4 +346,88 @@ func projectBinKey(path, platform string) string {
 func isShimLink(path string) bool {
 	info, err := os.Lstat(path)
 	return err == nil && info.Mode()&os.ModeSymlink != 0
+}
+
+// Each diagnostic carries one action; no refusal authorizes automatic recovery.
+func projectBinRefusal(code, path string) error {
+	remedy := "move this foreign entry before reinstalling"
+	switch code {
+	case projectBinPreserved:
+		remedy = "leave this foreign entry in place or move it manually"
+	case "project_bin_ownership_invalid":
+		remedy = "restore the ownership ledger from a trusted backup before reinstalling"
+	case "project_bin_legacy_enforced":
+		remedy = "move the legacy launcher and its sidecar aside before reinstalling"
+	}
+	return fmt.Errorf("%s: %s; %s", code, path, remedy)
+}
+
+func hasEnforcedSidecar(path string) bool {
+	metadata, err := stateread.Lstat(path + scriptworker.ShimSidecarSuffix)
+	return err == nil && metadata.Kind == stateread.KindPresent
+}
+
+// The marker selects a frozen manifest, whose enforced declaration and sidecar
+// derivation supply legacy evidence. Missing evidence never authorizes adoption.
+func legacyEnforcedSidecar(home, binDir, platform, name string, recorded *marker.Marker) ([]byte, bool, error) {
+	key, source, commit, directory := recorded.Commit, recorded.Source, recorded.Commit, "."
+	if recorded.Git != "" {
+		source = identity.Canonical(recorded.Git)
+	}
+	var roots []string
+	if recorded.Package != nil {
+		pkg := recorded.Package
+		digest, err := pkg.Digest()
+		if err != nil {
+			return nil, false, err
+		}
+		key, err = runtimestore.SourceV1Key(digest)
+		if err != nil {
+			return nil, false, err
+		}
+		if pkg.Kind == "local-snapshot" {
+			roots = []string{filepath.Join(snapshot.LocalStoreDir(home), strings.TrimPrefix(pkg.Snapshot, "sha256:"), "snapshot")}
+		} else if pkg.Commit != nil {
+			commit, directory = pkg.Commit.Hex, pkg.Directory
+			roots = []string{snapshot.Dir(home, pkg.Source, commit), snapshot.Dir(home, pkg.Repository, commit), snapshot.Dir(home, recorded.Name, commit)}
+		}
+	} else {
+		roots = []string{snapshot.Dir(home, source, commit)}
+	}
+	for _, root := range roots {
+		if directory != "" && directory != "." {
+			root = filepath.Join(root, filepath.FromSlash(directory))
+		}
+		metadata, err := stateread.Lstat(root)
+		if err != nil {
+			return nil, false, err
+		}
+		if metadata.Kind == stateread.KindAbsent {
+			continue
+		}
+		spec, err := skillspec.Load(root)
+		if err != nil {
+			return nil, false, stateread.UnusableError(root, err)
+		}
+		command, ok := spec.Commands[name]
+		if !ok || !scriptpolicy.Enforced(command) {
+			continue
+		}
+		capabilities, err := rawDeclaredCapabilities(root)
+		if err != nil {
+			return nil, true, err
+		}
+		runtimeDir := runtimestore.Dir(home, recorded.Name, key)
+		entry := command.UnixPath
+		if platform == "windows" {
+			entry = command.WinPath
+		}
+		sidecar, err := scriptworker.NewShimSidecar(recorded.Name, name, command.Interpreter, filepath.Join(runtimeDir, filepath.FromSlash(entry)), runtimeDir, filepath.Dir(filepath.Dir(binDir)), recorded.SkillSchemaVersion, capabilities)
+		if err != nil {
+			return nil, true, err
+		}
+		payload, err := sidecar.Marshal()
+		return payload, true, err
+	}
+	return nil, false, nil
 }

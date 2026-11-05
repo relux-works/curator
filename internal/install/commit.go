@@ -977,7 +977,7 @@ func journalPlan(request commitRequest, targets scopeTargets) (transaction.Plan,
 				return transaction.Plan{}, created, err
 			}
 			if actual != expected {
-				return transaction.Plan{}, created, fmt.Errorf("%s: %s", projectBinConflict, target.LivePath)
+				return transaction.Plan{}, created, projectBinRefusal(projectBinConflict, target.LivePath)
 			}
 		}
 		plan.Targets = append(plan.Targets, transaction.Target{

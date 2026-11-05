@@ -213,32 +213,41 @@ func TestProjectBinInvalidOwnershipLedger(t *testing.T) {
 // Ownership checked during staging remains pinned when the journal captures
 // preimages: a later foreign replacement refuses before any journal/write.
 func TestProjectBinOwnershipSwapBeforeJournal(t *testing.T) {
-	root := t.TempDir()
-	live := filepath.Join(root, "tool")
-	staged := filepath.Join(root, "staged")
-	for _, p := range []string{live, staged} {
-		if err := os.WriteFile(p, []byte("managed"), 0755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	expected, err := shimFingerprint(live)
-	if err != nil {
-		t.Fatal(err)
-	}
-	targets := scopeTargets{projectBinPreimages: map[string]string{live: expected}}
-	targets.plan.Replace(staging.ClassCanonicalShim, "tool", live, staged)
-	req := commitRequest{commit: CommitDeps{NewTransactionID: func() (string, error) { return "fixture", nil }}}
-	if _, _, err := journalPlan(req, targets); err != nil {
-		t.Fatalf("unchanged positive control: %v", err)
-	}
-	if err := os.WriteFile(live, []byte("foreign"), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := journalPlan(req, targets); err == nil || !strings.Contains(err.Error(), projectBinConflict) || !strings.Contains(err.Error(), live) {
-		t.Fatalf("swap refusal: %v", err)
-	}
-	if got, _ := os.ReadFile(live); string(got) != "foreign" {
-		t.Fatal("foreign replacement changed")
+	for _, remove := range []bool{false, true} {
+		t.Run(fmt.Sprint(remove), func(t *testing.T) {
+			root := t.TempDir()
+			live := filepath.Join(root, "tool")
+			staged := filepath.Join(root, "staged")
+			for _, p := range []string{live, staged} {
+				if err := os.WriteFile(p, []byte("managed"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			expected, err := shimFingerprint(live)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targets := scopeTargets{projectBinPreimages: map[string]string{live: expected}}
+			if remove {
+				targets.plan.Remove("tool", live)
+			} else {
+				targets.plan.Replace(staging.ClassCanonicalShim, "tool", live, staged)
+			}
+			req := commitRequest{commit: CommitDeps{NewTransactionID: func() (string, error) { return "fixture", nil }}}
+			if _, _, err := journalPlan(req, targets); err != nil {
+				t.Fatalf("unchanged positive control: %v", err)
+			}
+			if err := os.WriteFile(live, []byte("foreign"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := journalPlan(req, targets); err == nil || !strings.Contains(err.Error(), projectBinConflict) || !strings.Contains(err.Error(), live) {
+				t.Fatalf("swap refusal: %v", err)
+			}
+			if got, _ := os.ReadFile(live); string(got) != "foreign" {
+				t.Fatal("foreign replacement changed")
+			}
+
+		})
 	}
 }
 

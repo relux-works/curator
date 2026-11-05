@@ -688,3 +688,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workf
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+[Project-bin ownership](docs/project-bin.md) describes the read-only preflight,
+legacy launcher evidence and manual recovery. Run the focused controls with
+`go test ./internal/install -run '^TestProjectBin'`; results appear in the test
+output and hosted CI logs.
