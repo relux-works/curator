@@ -20,11 +20,40 @@ import (
 // preparation or publication. Scoped v5 pins reject sibling and payload drift;
 // retained members keep verification through their existing legacy cache.
 // Foreign origins and cache links outside home refuse after an intact control;
-// file/gitlink selections and case/normalization collisions never publish.
+// file/gitlink selections refuse. Case/normalization pairs refuse where the
+// destination folds them; otherwise both byte-exact names publish with valid pins.
 func TestSkillPlanDirectorySnapshots(t *testing.T) {
 	for _, mode := range []string{"selected", "retained", "discovery-link", "root", "root-link", "selected-link", "ancestor-link", "missing", "selection-file", "selection-submodule", "case-collision", "normalization-collision", "cache-foreign-origin", "cache-outside-home"} {
 		t.Run(mode, func(t *testing.T) {
 			home := gitFixtureHome(t)
+			// Probe each pair on the destination volume, independently: a volume
+			// may preserve case distinctions while folding normalization forms.
+			var distinctNames []string
+			folds := false
+			switch mode {
+			case "case-collision":
+				distinctNames = []string{"Case", "case"}
+			case "normalization-collision":
+				distinctNames = []string{"caf\u00e9", "cafe\u0301"}
+			}
+			if len(distinctNames) != 0 {
+				probe, err := os.MkdirTemp(home, "destination-probe-")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(probe, distinctNames[0]), nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+				_, err = os.Stat(filepath.Join(probe, distinctNames[1]))
+				if err != nil && !os.IsNotExist(err) {
+					t.Fatal(err)
+				}
+				folds = err == nil
+				if err := os.RemoveAll(probe); err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("destination pair %q folds=%t", distinctNames, folds)
+			}
 			ids := newGitIdentities(t)
 			key, pub := statusSignerKey(t)
 			directory := "skills/memory"
@@ -147,9 +176,10 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 				"root-link": "links in git snapshots", "selected-link": "links in git snapshots",
 				"ancestor-link": "links in git snapshots", "missing": "does not exist",
 				"selection-file": "is not a Git tree", "selection-submodule": "is not a Git tree",
-				"case-collision":          "duplicate platform path in git snapshot",
-				"normalization-collision": "duplicate platform path in git snapshot",
 			}[mode]
+			if folds {
+				refusal = "duplicate platform path in git snapshot"
+			}
 			if refusal != "" {
 				if err == nil || !strings.Contains(err.Error(), refusal) {
 					t.Fatalf("intended snapshot refusal %q: %v", refusal, err)
@@ -184,6 +214,30 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 			}
 			if failure := validateNamedStorePins(home, result.Lock); failure != nil {
 				t.Fatalf("valid v5 pins: %v", failure)
+			}
+			if len(distinctNames) != 0 {
+				// Coexistence must publish both exact directory-entry names and
+				// their distinct bytes, not merely admit or resolve an alias.
+				// Selected snapshots retain their repository-relative prefix.
+				selectedEntry := filepath.Join(entry, filepath.FromSlash(prefix))
+				entries, err := os.ReadDir(selectedEntry)
+				if err != nil {
+					t.Fatal(err)
+				}
+				published := map[string]bool{}
+				for _, item := range entries {
+					published[item.Name()] = true
+				}
+				for i, name := range distinctNames {
+					if !published[name] {
+						t.Fatalf("published entry missing byte-exact name %q", name)
+					}
+					got, err := os.ReadFile(filepath.Join(selectedEntry, name))
+					want := []string{"first\n", "second\n"}[i]
+					if err != nil || string(got) != want {
+						t.Fatalf("published %q = %q, want %q: %v", name, got, want, err)
+					}
+				}
 			}
 			if strings.HasPrefix(mode, "cache-") {
 				// Source binding is required even when every pinned tree byte is
