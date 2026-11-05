@@ -70,9 +70,7 @@ func globalSkillOperation(home string, policy Policy, machine envregistry.Machin
 		return Info{}, err
 	}
 	manager := newGitManager(home).withPolicy(policy)
-	if err := fetchLockedSources(manager, oldLock); err != nil {
-		return Info{}, err
-	}
+	manager.refreshResults = make(map[string]error)
 	input, err := globalSkillInput(home, profile, source, oldLock, manager, policy, addition)
 	if err != nil {
 		return Info{}, err

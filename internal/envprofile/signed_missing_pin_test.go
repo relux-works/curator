@@ -31,10 +31,11 @@ func TestIndependentSignedMissingPin(t *testing.T) {
 			if mode == "cached-offline" {
 				// Same signed selection, but cached: unreachable origin proves no fetch.
 				gitRun(t, f.cache, "fetch", "--no-tags", "--no-write-fetch-head", "origin", f.pin)
-				gitRun(t, f.cache, "remote", "set-url", "origin", gitFileURL(filepath.Join(t.TempDir(), "absent")))
+				f.ids.serve(filepath.Join(t.TempDir(), "absent"), f.operand)
 			}
 			refs := fixtureGitOutput(t, f.cache, "show-ref")
 			trace := filepath.Join(t.TempDir(), "trace")
+			installMissingPinGit(t, "observe", trace)
 			t.Setenv("GIT_TRACE", trace)
 			policy := Policy{SourceSigners: map[string][]contextresolve.Signer{f.source: {{Type: "ssh", Key: pub}}}}
 			info, _, _, installErr := Install(f.home, InstallOptions{Operand: f.root, Policy: policy})
@@ -90,7 +91,7 @@ func TestIndependentSignedMissingPin(t *testing.T) {
 			if got := strings.Count(string(raw), "built-in: git fetch "); got != want {
 				t.Fatalf("fetches = %d, want %d", got, want)
 			}
-			if want == 1 && !strings.Contains(string(raw), "fetch --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin "+f.pin) {
+			if want == 1 && !strings.Contains(string(raw), "fetch --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= "+f.operand+" "+f.pin) {
 				t.Fatal("exact acquisition flags missing")
 			}
 		})
@@ -119,7 +120,7 @@ func TestInstallMissingPinPreservesConfiguredRefs(t *testing.T) {
 					if mode == "cached-offline" {
 						// Same signed selection, but cached: unreachable origin proves no fetch.
 						gitRun(t, f.cache, "fetch", "--no-tags", "--no-write-fetch-head", "origin", f.pin)
-						gitRun(t, f.cache, "remote", "set-url", "origin", gitFileURL(filepath.Join(t.TempDir(), "absent")))
+						f.ids.serve(filepath.Join(t.TempDir(), "absent"), f.operand)
 					}
 					// The expected destination is grounded in the original remote history,
 					// independently of the new pin and the implementation under test.
@@ -137,6 +138,7 @@ func TestInstallMissingPinPreservesConfiguredRefs(t *testing.T) {
 					}
 					refs := fixtureGitOutput(t, f.cache, "show-ref")
 					trace := filepath.Join(t.TempDir(), "trace")
+					installMissingPinGit(t, "observe", trace)
 					t.Setenv("GIT_TRACE", trace)
 					policy := Policy{SourceSigners: map[string][]contextresolve.Signer{f.source: {{Type: "ssh", Key: pub}}}}
 					info, _, _, installErr := Install(f.home, InstallOptions{Operand: f.root, Policy: policy})

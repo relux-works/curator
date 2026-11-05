@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/testgitdispatch"
 )
 
 // These tests drive the §2.3 surfacing rows and the §2.2 empty-allowlist
@@ -27,9 +28,9 @@ func writeGitRepoFile(t *testing.T, repo, name, content string) {
 
 func runGitRepo(t *testing.T, repo string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := testgitdispatch.Command(t, args...)
 	cmd.Dir = repo
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+	cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -44,19 +45,15 @@ func commitGitRepo(t *testing.T, repo, tag string) {
 }
 
 // serveGitRepos maps https identities onto local fixture repositories
-// through one insteadOf gitconfig.
+// through explicit subprocess dispatch, independently of inherited Git config.
 func serveGitRepos(t *testing.T, repos map[string]string) {
 	t.Helper()
-	var rewrite strings.Builder
-	for identity, repo := range repos {
-		rewrite.WriteString("[url \"" + gitFileURL(repo) + "\"]\n\tinsteadOf = " + identity + "\n")
-	}
-	gitconfig := filepath.Join(t.TempDir(), "gitconfig")
-	if err := os.WriteFile(gitconfig, []byte(rewrite.String()), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	path := testgitdispatch.New(t)
+	testgitdispatch.Configure(t, path, func(config *testgitdispatch.Config) {
+		for endpoint, repo := range repos {
+			config.Routes[endpoint] = repo
+		}
+	})
 }
 
 func requireGit(t *testing.T) {

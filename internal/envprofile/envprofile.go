@@ -836,7 +836,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil)
+			info, _, err := updateLocked(op, manager, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -964,9 +964,7 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	if err := fetchLockedSources(manager, oldLock); err != nil {
-		return Info{}, false, false, err
-	}
+	manager.refreshResults = make(map[string]error)
 	overlays, err := resolveOverlays(home, manager, name, policy)
 	if err != nil {
 		return Info{}, false, false, err
@@ -1193,11 +1191,11 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile)
+	return updateLocked(op, newGitManager(home).withPolicy(options.Policy), home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+func updateLocked(op *operation, manager *gitManager, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
 	}
@@ -1242,10 +1240,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	if source.Kind == KindPath && (!hasRootMember || rootMember.StateHash == "") {
 		return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
 	}
-	manager := newGitManager(home).withPolicy(policy)
-	if err := fetchLockedSources(manager, oldLock); err != nil {
-		return Info{}, false, err
-	}
+	// Refresh on demand after the resolver records each current declaration.
+	// Portable lock identities cannot choose an acquisition endpoint.
+	manager.refreshResults = make(map[string]error)
 	var input contextresolve.Input
 	switch source.Kind {
 	case KindGit:
@@ -1388,31 +1385,6 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		return Info{}, false, err
 	}
 	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Delta: deltaLines, Surfacing: surfacing}, true, nil
-}
-
-// fetchLockedSources refreshes every Git identity in the current closure
-// before resolving an update. A profile's root manifest can remain pinned
-// while one of its existing context, skill, or MCP dependencies publishes a
-// newer candidate; fetching only the root would silently miss that resolved
-// version delta (§9.2).
-func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
-	sources := map[string]bool{}
-	for _, member := range lock.Members {
-		if member.Source != "" {
-			sources[member.Source] = true
-		}
-	}
-	ordered := make([]string, 0, len(sources))
-	for source := range sources {
-		ordered = append(ordered, source)
-	}
-	sort.Strings(ordered)
-	for _, source := range ordered {
-		if err := manager.fetch(source); err != nil {
-			return fmt.Errorf("%s: %v", DiagSourceInvalid, err)
-		}
-	}
-	return nil
 }
 
 // Remove deletes a profile that is current in no scope and an overlay of

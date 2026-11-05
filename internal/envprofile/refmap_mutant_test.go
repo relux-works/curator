@@ -12,25 +12,25 @@ import (
 	"testing"
 )
 
-// Only refmap suppression is removed: transport, protocol policy and every
-// other fetch guard remain. Behavioral failures, not token searches, kill it.
+// Only the v1.0.0 destination is admitted by the exact-pin refmap: transport,
+// protocol policy and every other fetch guard remain. Behavioral failures, not token searches, kill it.
 func TestMissingPinRefmapNarrowingMutant(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	source := filepath.Join(root, "internal", "envprofile", "gitsource.go")
+	source := filepath.Join(root, "internal", "gitops", "gitops.go")
 	raw, err := os.ReadFile(source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	const anchor = `"--refmap=", `
+	const anchor = `"--refmap=", trimmed, commit`
 	if strings.Count(string(raw), anchor) != 1 {
 		t.Fatal("refmap anchor must be unique")
 	}
 	dir := t.TempDir()
 	plant := filepath.Join(dir, "gitsource.go")
-	if err := os.WriteFile(plant, []byte(strings.Replace(string(raw), anchor, "", 1)), 0o600); err != nil {
+	if err := os.WriteFile(plant, []byte(strings.Replace(string(raw), anchor, `func() string { mapping, _ := run(repo, "config", "--get", "remote.origin.fetch"); if strings.HasSuffix(mapping, ":refs/tags/v1.0.0") { return "--refmap=" + mapping }; return "--refmap=" }(), trimmed, commit`, 1)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{source: plant}})
@@ -69,7 +69,7 @@ func TestMissingPinRefmapNarrowingMutant(t *testing.T) {
 		for _, absent := range []bool{false, true} {
 			for _, mode := range []string{"stale", "unsigned", "wrong-signer", "cached-offline"} {
 				name := fmt.Sprintf("TestInstallMissingPinPreservesConfiguredRefs/%s/absent-%t/%s", dest, absent, mode)
-				if mode == "cached-offline" {
+				if mode == "cached-offline" || dest != "refs/tags/v1.0.0" {
 					if actions[name] != "pass" {
 						t.Errorf("valid neighbour did not pass: %s: %s", name, diagnostics[name])
 					}

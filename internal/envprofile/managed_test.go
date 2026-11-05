@@ -4,8 +4,8 @@ package envprofile
 
 import (
 	"encoding/json"
+	"github.com/relux-works/curator/internal/testgitdispatch"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -115,9 +115,9 @@ func writeGitStoreFixture(t *testing.T, home, kind, name, source string, files m
 
 func fixtureGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := testgitdispatch.Command(t, args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+	cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
 		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

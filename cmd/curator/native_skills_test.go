@@ -30,6 +30,8 @@ func TestNativeSkillsCLIOperations(t *testing.T) {
 			}
 			t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
 			t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+			// Claim: this CLI path installs real fixture objects through declared-endpoint dispatch.
+			serveGitRepos(t, map[string]string{"https://example.com/native-skill": repo})
 			pkg := t.TempDir()
 			writeContextPackage(t, pkg, "native-profile", "1.0.0", "native\n")
 			manifest := `{"schema_version":1,"name":"native-profile","version":"1.0.0","context":{"modules":[{"path":"a.md"}]},"requires":{"skills":{"myskill":{"git":"https://example.com/native-skill","tag":"v1.0.0"}}}}`

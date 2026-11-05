@@ -30,6 +30,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/testgitdispatch"
 	"github.com/relux-works/curator/internal/testgitenv"
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
@@ -51,8 +52,14 @@ func TestMain(m *testing.M) {
 	restoreGitEnv := testgitenv.Isolate()
 	if os.Getenv(cliHelperProcess) == "1" {
 		code := m.Run()
+		testgitdispatch.Cleanup()
 		restoreGitEnv()
 		os.Exit(code)
+	}
+	if err := testgitdispatch.Build(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		restoreGitEnv()
+		os.Exit(1)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -62,6 +69,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
+	testgitdispatch.Cleanup()
 	restoreGitEnv()
 	if lock != nil {
 		if closeErr := lock.Close(); closeErr != nil {

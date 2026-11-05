@@ -244,11 +244,11 @@ func runWithEnv(dir string, env []string, args ...string) (string, error) {
 // Clone clones a remote URL into destination. It refuses suspicious URLs
 // (empty or dash-prefixed) and passes the URL positionally after "--".
 func Clone(remoteURL, destination string) error {
-	return cloneWith(remoteURL, destination, run)
+	return acquisitionError(remoteURL, CloneIsolated(remoteURL, destination))
 }
 
-// CloneIsolated is the draft literal-URL lane's clone: identical to Clone
-// except the invocation runs on the allow-list environment with pinned
+// CloneIsolated is the lower-level draft literal-URL clone. Like Clone,
+// its invocation runs on the allow-list environment with pinned
 // transport (no user or system git configuration — no
 // insteadOf/pushInsteadOf, url rewriting, helpers, includes, or
 // core.sshCommand from configuration files — no ambient GIT_* override,
@@ -353,11 +353,42 @@ func hasRemoteWith(repo string, runFn func(dir string, args ...string) (string, 
 // The origin-less skip happens only after a successful empty remote
 // enumeration; a failed enumeration fails the fetch.
 func Fetch(repo string) error {
-	return fetchWith(repo, run)
+	if err := EnsureRepo(repo); err != nil {
+		return err
+	}
+	env, cleanup, err := isolatedGitEnv()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	names, err := runWithEnv(repo, env, "remote")
+	if err != nil {
+		return acquisitionError("", err)
+	}
+	type remote struct{ name, endpoint string }
+	remotes := []remote{}
+	for _, name := range strings.Fields(names) {
+		endpoint, err := runWithEnv(repo, env, "config", "-z", "--get-all", "remote."+name+".url")
+		if err != nil {
+			return acquisitionError("", err)
+		}
+		endpoint = strings.SplitN(endpoint, "\x00", 2)[0]
+		remotes = append(remotes, remote{name, endpoint})
+	}
+	// These are independently configured remotes, not fallback endpoints.
+	// Retain Fetch's all-remotes refresh even when one remote fails.
+	var firstErr error
+	for _, remote := range remotes {
+		_, err := runWithEnv(repo, env, withIsolatedConfigArgs([]string{"fetch", "--tags", "--prune", "--", remote.name})...)
+		if err != nil && firstErr == nil {
+			firstErr = acquisitionError(remote.endpoint, err)
+		}
+	}
+	return firstErr
 }
 
-// FetchIsolated is the draft literal-URL lane's fetch: identical to Fetch
-// except the invocation runs on the allow-list environment with pinned
+// FetchIsolated is the lower-level draft literal-URL fetch; its raw errors
+// remain available for admitted policy classification. It runs with pinned
 // transport, like CloneIsolated, independent of HOME.
 func FetchIsolated(repo string) error {
 	env, cleanup, err := isolatedGitEnv()
@@ -394,7 +425,7 @@ func FetchURLIsolated(repo, remoteURL string) error {
 		"+refs/tags/*:refs/tags/*",
 	}
 	_, err = runWithEnv(repo, env, withIsolatedConfigArgs(args)...)
-	return err
+	return acquisitionError(trimmed, err)
 }
 
 // FetchCommitIsolated requests one locked object ID from the repository's
@@ -469,7 +500,7 @@ func FetchCommitFromURLIsolated(repo, remoteURL, commit string) error {
 	} else if err := EnsureRepo(repo); err != nil {
 		return err
 	}
-	_, err = runWithEnv(repo, env, withIsolatedConfigArgs([]string{"fetch", "--no-tags", "--no-write-fetch-head", trimmed, commit})...)
+	_, err = runWithEnv(repo, env, withIsolatedConfigArgs([]string{"fetch", "--no-tags", "--no-write-fetch-head", "--no-auto-maintenance", "--recurse-submodules=no", "--refmap=", trimmed, commit})...)
 	return err
 }
 

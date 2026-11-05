@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"github.com/relux-works/curator/internal/testgitdispatch"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,7 +20,7 @@ import (
 )
 
 // The reviewer regression keeps its original name. Both origin substitution
-// and operator rewrites must obey the same protocol policy as gitops.Fetch.
+// is refused by Fetch; Install ignores stale origin and inherited rewrites.
 // ext uses a portable executable that either fails or serves real Git objects;
 // fd must fail at the policy check, not at file-descriptor/helper setup.
 func TestReviewMissingPinPreservesProtocolAllowlist(t *testing.T) {
@@ -30,31 +30,36 @@ func TestReviewMissingPinPreservesProtocolAllowlist(t *testing.T) {
 			protocol := "ext"
 			remote := "ext::" + strings.ReplaceAll(filepath.ToSlash(f.helper), " ", "% ")
 			if strings.HasPrefix(mode, "fd") {
-				protocol, remote = "fd", "fd::99"
+				protocol = "fd"
+				remote = "fd::99"
 			}
 			f.configureHelper(t, strings.HasPrefix(mode, "fails"))
-			gitRun(t, f.cache, "config", "protocol."+protocol+".allow", "always")
-			// Also prove an inherited permissive protocol environment cannot
-			// override the production restriction.
 			t.Setenv("GIT_ALLOW_PROTOCOL", gitops.AllowedProtocols+":ext:fd")
-			f.selectRemote(t, remote, strings.HasSuffix(mode, "-rewrite"))
-			beforeCache := hashTreeForTest(t, f.cache)
-			if err := gitops.Fetch(f.cache); err == nil || !strings.Contains(err.Error(), "transport '"+protocol+"' not allowed") {
-				t.Fatalf("reference refusal missing: %v", err)
+			rewrite := strings.HasSuffix(mode, "-rewrite")
+			if rewrite {
+				// A valid file endpoint is the shared Fetch sibling: its inherited
+				// rewrite to ext/fd is ignored. Install still uses its own declaration.
+				gitRun(t, f.cache, "remote", "set-url", "origin", gitFileURL(f.repo))
+				gitRun(t, f.cache, "config", "--file", f.ids.path, "url."+remote+".insteadOf", gitFileURL(f.repo))
+			} else {
+				gitRun(t, f.cache, "remote", "set-url", "origin", remote)
+				if err := gitops.Fetch(f.cache); err == nil || !strings.Contains(err.Error(), "transport '"+protocol+"' not allowed") {
+					t.Fatalf("reference refusal missing: %v", err)
+				}
 			}
-			_, _, _, installErr := Install(f.home, InstallOptions{Operand: f.root})
+			gitRun(t, f.cache, "config", "--file", f.ids.path, "url."+remote+".insteadOf", f.operand)
+			if _, _, _, err := Install(f.home, InstallOptions{Operand: f.root}); err != nil {
+				t.Fatal(err)
+			}
+			f.assertPreserved(t, true)
+			if rewrite {
+				if err := gitops.Fetch(f.cache); err != nil {
+					t.Fatalf("valid endpoint did not ignore rewrite: %v", err)
+				}
+			}
 			if _, err := os.Stat(f.marker); !os.IsNotExist(err) {
-				t.Fatalf("missing-pin Install executed forbidden transport; install error: %v", installErr)
+				t.Fatal("forbidden helper ran")
 			}
-			if installErr == nil || !strings.Contains(installErr.Error(), DiagSourceInvalid) ||
-				!strings.Contains(installErr.Error(), "transport '"+protocol+"' not allowed") {
-				t.Fatalf("wrong protocol refusal: %v", installErr)
-			}
-			if hashTreeForTest(t, f.cache) != beforeCache {
-				t.Fatal("denied acquisition changed selected cache objects, refs or metadata")
-			}
-			assertPinTransportMissing(t, f.cache, f.pin)
-			f.assertPreserved(t, false)
 		})
 	}
 }
@@ -69,7 +74,7 @@ func TestInstallMissingPinAllowedTransports(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/rewrite-%t", transport, rewrite), func(t *testing.T) {
 				f := newPinTransportFixture(t)
 				var requests atomic.Int32
-				remote := "ssh://fixture.invalid/repository"
+				remote := "ssh://example.com/review-transport"
 				if transport == "https" {
 					gitRun(t, f.repo, "update-server-info")
 					handler := http.FileServer(http.Dir(filepath.Join(f.repo, ".git")))
@@ -82,7 +87,7 @@ func TestInstallMissingPinAllowedTransports(t *testing.T) {
 					if err := os.WriteFile(cert, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0o600); err != nil {
 						t.Fatal(err)
 					}
-					t.Setenv("GIT_SSL_CAINFO", cert)
+					gitRun(t, f.cache, "config", "http.sslCAInfo", cert)
 					t.Setenv("GIT_SSL_NO_VERIFY", "false")
 					t.Setenv("NO_PROXY", "*")
 					// Git for Windows may select Schannel; explicitly let it
@@ -91,10 +96,20 @@ func TestInstallMissingPinAllowedTransports(t *testing.T) {
 					remote = server.URL
 				} else {
 					// Git parses this as a shell command on all native platforms.
-					t.Setenv("GIT_SSH_COMMAND", "'"+strings.ReplaceAll(filepath.ToSlash(f.helper), "'", "'\\''")+"'")
+					// The fixture supplies the ssh executable; production must select
+					// it through its own hardened command, not an inherited command.
+					installPinSSH(t, f)
 					t.Setenv("GIT_SSH_VARIANT", "ssh")
 				}
-				f.selectRemote(t, remote, rewrite)
+				f.ids.serve(remote, f.operand)
+				if transport == "ssh" {
+					f.operand = remote
+					f.ids.configureDispatch(func(c *declaredFixture) { c.Direct = append(c.Direct, remote) })
+					writeManifestPackage(t, f.root, fmt.Sprintf(`{"schema_version":1,"name":"review-transport-root","version":"1.0.0","requires":{"contexts":{"dep":{"git":%q,"revision":%q}}}}`, f.operand, f.pin), nil)
+				}
+				if rewrite {
+					gitRun(t, f.cache, "config", "--file", f.ids.path, "url.https://forbidden.invalid/.insteadOf", f.operand)
+				}
 				refs := fixtureGitOutput(t, f.cache, "show-ref")
 				info, _, _, err := Install(f.home, InstallOptions{Operand: f.root})
 				if err != nil {
@@ -113,7 +128,7 @@ func TestInstallMissingPinAllowedTransports(t *testing.T) {
 				}
 				if transport == "ssh" {
 					raw, err := os.ReadFile(f.marker)
-					if err != nil || !strings.Contains(string(raw), "git-upload-pack") || !strings.Contains(string(raw), "fixture.invalid") {
+					if err != nil || !strings.Contains(string(raw), "git-upload-pack") || !strings.Contains(string(raw), "example.com") {
 						t.Fatalf("SSH transport was not exercised: %q %v", raw, err)
 					}
 				}
@@ -201,44 +216,18 @@ func newPinTransportFixture(t *testing.T) *pinTransportFixture {
 	if runtime.GOOS == "windows" {
 		f.helper += ".exe"
 	}
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(self)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(f.helper, data, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	testgitdispatch.Install(t, f.helper)
 	f.configureHelper(t, false)
 	return f
 }
 
 func assertPinTransportMissing(t *testing.T, cache, pin string) {
 	t.Helper()
-	cmd := exec.Command("git", "-C", cache, "cat-file", "--batch-check")
+	cmd := testgitdispatch.Command(t, "-C", cache, "cat-file", "--batch-check")
 	cmd.Stdin = strings.NewReader(pin + "\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != pin+" missing\n" {
 		t.Fatalf("fixture pin must be absent: %q %v", out, err)
-	}
-}
-
-func (f *pinTransportFixture) selectRemote(t *testing.T, remote string, rewrite bool) {
-	t.Helper()
-	// Remove the initial file rewrite; positives must use HTTPS/SSH themselves.
-	if err := os.WriteFile(f.ids.path, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if rewrite {
-		gitRun(t, f.cache, "config", "--file", f.ids.path, "url."+remote+".insteadOf", f.operand)
-		if got := fixtureGitOutput(t, f.cache, "config", "--get", "remote.origin.url"); got != f.operand {
-			t.Fatalf("canonical origin changed: %q", got)
-		}
-	} else {
-		gitRun(t, f.cache, "remote", "set-url", "origin", remote)
 	}
 }
 
@@ -282,31 +271,22 @@ func (f *pinTransportFixture) configureHelper(t *testing.T, fail bool) {
 	}
 }
 
-// Runs before TestMain isolates config. This is an actual Git ext/SSH helper,
-// not a replacement git command; admission is decided by the real Git binary.
-func runPinTransport() int {
-	self, err := os.Executable()
-	if err != nil {
-		return 98
+func installPinSSH(t *testing.T, f *pinTransportFixture) {
+	t.Helper()
+	name := "ssh"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
 	}
-	raw, err := os.ReadFile(self + ".json")
-	if err != nil {
-		return 98
+	target := filepath.Join(filepath.Dir(f.helper), name)
+	testgitdispatch.Install(t, target)
+	for _, suffix := range []string{".json"} {
+		raw, err := os.ReadFile(f.helper + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target+suffix, raw, 0700); err != nil {
+			t.Fatal(err)
+		}
 	}
-	var config pinTransportConfig
-	if err := json.Unmarshal(raw, &config); err != nil {
-		return 98
-	}
-	if err := os.WriteFile(config.Marker, []byte(strings.Join(os.Args, "\n")), 0o600); err != nil {
-		return 98
-	}
-	if config.Fail {
-		return 1
-	}
-	cmd := exec.Command("git", "upload-pack", config.Repo)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return 1
-	}
-	return 0
+	t.Setenv("PATH", filepath.Dir(f.helper)+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

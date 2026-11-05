@@ -47,6 +47,8 @@ func newGlobalLockCLIFixture(t *testing.T) globalLockCLIFixture {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", gitConfig)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	// Claim: this CLI path installs real fixture objects through declared-endpoint dispatch.
+	serveGitRepos(t, map[string]string{"https://example.com/new-skill": repo})
 	fixture := globalLockCLIFixture{
 		source: source, home: home, gitURL: "https://example.com/new-skill", codex: codex,
 		managed: filepath.Join(envprofile.ManagedHomeDir(home, "default", "codex_cli"), "skills", "new-skill"),

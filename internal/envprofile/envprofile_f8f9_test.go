@@ -18,8 +18,8 @@ import (
 // TestCanonicalIdentityUnifiesSpellings checks F8 through Install: one
 // repository installed under an https spelling (with .git and an uppercase
 // host), an scp-style spelling, and an ssh:// spelling resolves to one
-// canonical identity, one lock_sha256, and one store entry. git insteadOf
-// keeps the test offline. The produced lock and marker carry the canonical
+// canonical identity, one lock_sha256, and one store entry. Explicit fixture dispatch
+// keeps the test offline; inherited rewrites are not acquisition authority. The produced lock and marker carry the canonical
 // identity and validate.
 func TestCanonicalIdentityUnifiesSpellings(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
@@ -30,8 +30,7 @@ func TestCanonicalIdentityUnifiesSpellings(t *testing.T) {
 			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
 		"context/a.md": "hello\n",
 	}, "v1.0.0")
-	// Every spelling routes through the shared insteadOf helper, so the
-	// fixture remote always takes the git-safe file URL form.
+	// Every spelling is an explicit dispatch route to the same real Git objects.
 	ids := newGitIdentities(t)
 	for _, operand := range []string{
 		"https://EXAMPLE.com/acme.git",

@@ -608,6 +608,8 @@ func TestProfileUpdateResyncPassesLockedRequire(t *testing.T) {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	// Claim: this CLI path installs real fixture objects through declared-endpoint dispatch.
+	serveGitRepos(t, map[string]string{"https://example.com/groot": repo})
 	if code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/groot"); code != exitOK {
 		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
 	}

@@ -1,6 +1,9 @@
 package envprofile
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/relux-works/curator/internal/testgitdispatch"
 	"github.com/relux-works/curator/internal/testgitenv"
 	"os"
 	"path/filepath"
@@ -39,12 +42,6 @@ func gitFileURLFor(slashed, volume string) string {
 // exercise the loader set CURATOR_CONFIG/CURATOR_SYSTEM_CONFIG to their own
 // files with t.Setenv, which overrides this base for the test.
 func TestMain(m *testing.M) {
-	if name := filepath.Base(os.Args[0]); name == "pin-transport" || name == "pin-transport.exe" {
-		os.Exit(runPinTransport())
-	}
-	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
-		os.Exit(runMissingPinGit())
-	}
 	dir, err := os.MkdirTemp("", "curator-test-noconfig-*")
 	if err == nil {
 		// Never created: the loader maps an absent file to an empty policy.
@@ -52,20 +49,27 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv("CURATOR_SYSTEM_CONFIG", "")
 	}
 	restoreGitEnv := testgitenv.Isolate()
+	if err := testgitdispatch.Build(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		restoreGitEnv()
+		os.Exit(1)
+	}
 	code := m.Run()
+	testgitdispatch.Cleanup()
 	restoreGitEnv()
 	os.Exit(code)
 }
 
 // gitIdentities serves local git repositories under fake canonical network
-// identities for one test, through git insteadOf rewrites. A file:// remote
+// identities for one test, through explicit subprocess fixture dispatch. A file:// remote
 // is rejected at the identity boundary (see canonicalGit) and must never
 // appear as an operand or a requirement source; these fixtures exercise the
 // production network identity path — canonicalization, the source allowlist,
 // revocation, and schema-shaped locks — hermetically and offline.
 type gitIdentities struct {
-	t    *testing.T
-	path string
+	t        *testing.T
+	path     string
+	dispatch string
 }
 
 func newGitIdentities(t *testing.T) *gitIdentities {
@@ -76,7 +80,7 @@ func newGitIdentities(t *testing.T) *gitIdentities {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", path)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	return &gitIdentities{t: t, path: path}
+	return &gitIdentities{t: t, path: path, dispatch: newDeclaredFixture(t)}
 }
 
 // TestGitFileURLForKeepsVolumesOutOfTheHost narrows the fixture-remote
@@ -124,8 +128,8 @@ func TestServeWritesTheGitSafeRemote(t *testing.T) {
 }
 
 // serve maps one operand URL onto a local repository and returns the operand
-// for installation or declaration. Every call appends one insteadOf block to
-// the test's gitconfig; operands must be distinct per repository.
+// for installation or declaration. A synthetic legacy rewrite is also planted
+// so fixture setup commands can use origin; product acquisition ignores it.
 func (g *gitIdentities) serve(repo, operand string) string {
 	g.t.Helper()
 	block := "[url \"" + gitFileURL(repo) + "\"]\n\tinsteadOf = " + operand + "\n"
@@ -138,6 +142,22 @@ func (g *gitIdentities) serve(repo, operand string) string {
 		g.t.Fatal(err)
 	}
 	if err := file.Close(); err != nil {
+		g.t.Fatal(err)
+	}
+	raw, err := os.ReadFile(g.dispatch)
+	if err != nil {
+		g.t.Fatal(err)
+	}
+	var fixture declaredFixture
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		g.t.Fatal(err)
+	}
+	fixture.Routes[operand] = repo
+	raw, err = json.Marshal(fixture)
+	if err != nil {
+		g.t.Fatal(err)
+	}
+	if err := os.WriteFile(g.dispatch, raw, 0600); err != nil {
 		g.t.Fatal(err)
 	}
 	return operand

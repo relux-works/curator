@@ -282,6 +282,8 @@ func newProfileInstallFixture(t *testing.T, shape string) profileInstallFixture 
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", gitConfig)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	// Claim: this CLI path installs real fixture objects through declared-endpoint dispatch.
+	serveGitRepos(t, map[string]string{operand: repo})
 	return profileInstallFixture{
 		operand: operand,
 		args:    args,

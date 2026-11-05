@@ -50,6 +50,8 @@ func TestProfileGitReinstallHonoursUseAndTakeover(t *testing.T) {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	// Claim: this CLI path installs real fixture objects through declared-endpoint dispatch.
+	serveGitRepos(t, map[string]string{"https://example.com/groot": repo})
 	const operand = "https://example.com/groot"
 
 	currentOf := func(t *testing.T, source stubConfigSource) string {

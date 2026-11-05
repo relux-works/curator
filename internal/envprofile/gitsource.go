@@ -31,15 +31,9 @@ import (
 //
 // The cache is keyed by the core §6.1 canonical source identity
 // (environments §1): SSH and HTTPS spellings of one repository share one
-// clone. fetchRaw remembers the raw clone URL each canonical identity was
-// first seen under so ensureRepo can clone through the operator's transport
-// (including git insteadOf rewrites, which hermetic tests use to serve fake
-// network identities from local repositories); a canonical identity with no
-// recorded raw clones through https://canonical. A transitive requirement
-// declared git@host:org/dep is canonicalized before any raw is recorded and
-// therefore clones over https://, which can surprise an SSH-only operator.
-// File:// remotes are rejected at the identity boundary (see canonicalGit)
-// and never reach this cache.
+// clone. fetchRaw retains the current declared endpoint independently of
+// canonical identity (repository-transport §§1–3). It is operation-local;
+// neither the endpoint nor credentials enter portable locks.
 type gitManager struct {
 	home           string
 	fetchRaw       map[string]string
@@ -47,6 +41,9 @@ type gitManager struct {
 	// Non-nil only during new-profile installation. Each missing exact pin
 	// gets at most one acquisition attempt within that operation.
 	missingPins map[string]bool
+	// Non-nil for update/reinstall/global re-resolution. Refresh after Identity records the declaration,
+	// once per source; retain failures rather than silently retrying them.
+	refreshResults map[string]error
 }
 
 func newGitManager(home string) *gitManager {
@@ -103,14 +100,9 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 	if err := os.MkdirAll(m.reposDir(), 0o755); err != nil {
 		return "", err
 	}
-	cloneURL := canonical
-	if raw, ok := m.fetchRaw[canonical]; ok {
-		cloneURL = raw
-	} else if identity.ValidCanonical(canonical) {
-		cloneURL = "https://" + canonical
-	}
+	cloneURL := m.endpoint(canonical)
 	if err := gitops.Clone(cloneURL, dir); err != nil {
-		return "", fmt.Errorf("%s: clone %s: %v", DiagSourceInvalid, canonical, err)
+		return "", fmt.Errorf("%s: clone %s: %w", DiagSourceInvalid, canonical, err)
 	}
 	return dir, nil
 }
@@ -142,9 +134,21 @@ func (m *gitManager) gateSource(canonical string) error {
 	return fmt.Errorf("%s: source %s is outside the machine's allowed sources", DiagSourceInvalid, canonical)
 }
 
+// endpoint retains the legacy canonical-operand HTTPS default, but a URL
+// declaration always takes precedence over that default and cached origin.
+func (m *gitManager) endpoint(canonical string) string {
+	if raw, ok := m.fetchRaw[canonical]; ok {
+		return raw
+	}
+	if identity.ValidCanonical(canonical) {
+		return "https://" + canonical
+	}
+	return canonical
+}
+
 // recordRaw remembers the raw clone URL for a canonical identity so later
-// clones of the same identity reuse the operator's transport. First spelling
-// wins; every spelling of one repository resolves to the same bytes.
+// clones of the same identity reuse the operator's transport. The current declaration
+// wins over a previous spelling or the cached clone origin.
 func (m *gitManager) recordRaw(canonical, raw string) {
 	if m.fetchRaw == nil {
 		m.fetchRaw = map[string]string{}
@@ -156,9 +160,7 @@ func (m *gitManager) recordRaw(canonical, raw string) {
 	if identity.ValidCanonical(trimmed) {
 		return
 	}
-	if _, exists := m.fetchRaw[canonical]; !exists {
-		m.fetchRaw[canonical] = trimmed
-	}
+	m.fetchRaw[canonical] = trimmed
 }
 
 // fetch updates the cached clone.
@@ -167,10 +169,26 @@ func (m *gitManager) fetch(canonical string) error {
 	if err != nil {
 		return err
 	}
-	if err := gitops.Fetch(dir); err != nil {
-		return fmt.Errorf("fetch %s: %v", canonical, err)
+	if m.refreshResults != nil {
+		if previous, attempted := m.refreshResults[canonical]; attempted {
+			return previous
+		}
 	}
-	return nil
+	// Updates read canonical identities from portable locks. Without a new
+	// declaration, retain the cached repository's configured endpoint; never
+	// synthesize a replacement for a known origin. A current declaration wins.
+	if endpoint, declared := m.fetchRaw[canonical]; declared {
+		err = gitops.FetchURLIsolated(dir, endpoint)
+	} else {
+		err = gitops.Fetch(dir)
+	}
+	if err != nil {
+		err = fmt.Errorf("fetch %s: %w", canonical, err)
+	}
+	if m.refreshResults != nil {
+		m.refreshResults[canonical] = err
+	}
+	return err
 }
 
 // Identity returns the core §6.1 canonical source identity for a declared
@@ -202,6 +220,11 @@ func (m *gitManager) Candidates(_ string, name, source string) ([]contextresolve
 	dir, err := m.ensureRepo(source)
 	if err != nil {
 		return nil, err
+	}
+	if m.refreshResults != nil {
+		if err := m.fetch(source); err != nil {
+			return nil, err
+		}
 	}
 	out, err := exec.Command("git", "-C", dir, "tag", "--list").Output() // #nosec G204 -- dir is the manager cache
 	if err != nil {
@@ -324,13 +347,8 @@ func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
 		return fmt.Errorf("pinned object remains unavailable after acquisition")
 	}
 	m.missingPins[key] = true
-	cmd := exec.Command("git", "-C", dir, "fetch", "--no-tags", "--no-write-fetch-head",
-		"--no-auto-maintenance", "--recurse-submodules=no", "--refmap=", "origin", commit) // #nosec G204 -- validated exact commit, fixed remote
-	// Preserve operator transport configuration, but apply the same protocol
-	// boundary as every gitops network operation, including after rewrites.
-	cmd.Env = append(os.Environ(), "GIT_ALLOW_PROTOCOL="+gitops.AllowedProtocols)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("fetch exact pin: %w: %s", err, strings.TrimSpace(string(out)))
+	if err := gitops.FetchDeclaredCommit(dir, m.endpoint(source), commit); err != nil {
+		return err
 	}
 	// Re-probe, retaining the attempted key: a successful transport that did
 	// not supply the object must refuse, never fetch repeatedly.
@@ -809,10 +827,9 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 }
 
 // packageOf maps a validated context manifest onto the resolution package.
-// Every requirement source is canonicalized through identity.Parse at this
-// boundary (environments §1): two spellings of one repository enter
-// resolution as one identity, so they never produce a spurious
-// context_source_mismatch. A malformed network source passes through here
+// Requirements retain declared endpoints until Source.Identity; the resolver
+// compares canonical identities separately (core §6.1). A malformed network
+// source passes through here
 // and is rejected at the Identity boundary with profile_source_invalid, as
 // is a file:// requirement source, which carries no network identity.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
@@ -820,7 +837,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindContext, Name: name, Source: canonicalRequirementSource(requirement.Git),
+			Kind: contextlock.KindContext, Name: name, Source: requirement.Git,
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Weight: requirement.Weight,
 		})
@@ -828,7 +845,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.Skills) {
 		requirement := manifest.Skills[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindSkill, Name: name, Source: canonicalRequirementSource(requirement.Git),
+			Kind: contextlock.KindSkill, Name: name, Source: requirement.Git,
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Mode: requirement.Mode, Commands: requirement.Commands,
 		})
@@ -836,7 +853,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.MCP) {
 		requirement := manifest.MCP[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindMCP, Name: name, Source: canonicalRequirementSource(requirement.Git),
+			Kind: contextlock.KindMCP, Name: name, Source: requirement.Git,
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory,
 		})
@@ -848,22 +865,6 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 		return pkg.Requires[i].Kind < pkg.Requires[j].Kind
 	})
 	return pkg
-}
-
-// canonicalRequirementSource canonicalizes one manifest requirement source
-// for resolution. Network URLs become their core §6.1 identity; a file://
-// remote or a malformed network source passes through here and is rejected
-// at the Identity boundary with profile_source_invalid.
-func canonicalRequirementSource(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" || identity.ValidCanonical(trimmed) {
-		return trimmed
-	}
-	canonical, err := identity.Parse(trimmed)
-	if err != nil || canonical == "" {
-		return trimmed
-	}
-	return canonical
 }
 
 // lookPath resolves an executable on PATH.

@@ -3,6 +3,7 @@ package envprofile
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/relux-works/curator/internal/testgitdispatch"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,7 +76,7 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 				}
 			}
 			if mode == "missing-offline" || mode == "cached-offline" {
-				gitRun(t, manager.repoDir(source), "remote", "set-url", "origin", gitFileURL(filepath.Join(t.TempDir(), "absent")))
+				ids.serve(filepath.Join(t.TempDir(), "absent"), operand)
 			}
 			if mode == "fetch-failure" {
 				pin = strings.Repeat("a", 40)
@@ -91,6 +92,8 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 			trace := filepath.Join(t.TempDir(), "git-trace")
 			if mode == "still-absent" || mode == "probe-failure" {
 				installMissingPinGit(t, mode, trace)
+			} else {
+				installMissingPinGit(t, "observe", trace)
 			}
 			// An unrelated repository, including all refs/objects, is outside
 			// the selected cache acquisition surface.
@@ -118,6 +121,7 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 			if mode == "denied" {
 				policy.AllowedSources = []string{"example.com/other"}
 			}
+			_ = os.Remove(trace)
 			t.Setenv("GIT_TRACE", trace)
 			info, _, _, installErr := Install(home, InstallOptions{Operand: root, Policy: policy})
 			success := mode == "fresh" || mode == "stale" || mode == "cached-offline"
@@ -210,22 +214,12 @@ func installMissingPinGit(t *testing.T, mode, trace string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(self)
-	if err != nil {
-		t.Fatal(err)
-	}
 	dir := t.TempDir()
 	name := "git"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	if err := os.WriteFile(filepath.Join(dir, name), data, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	testgitdispatch.Install(t, filepath.Join(dir, name))
 	config, err := json.Marshal(pinGitConfig{Binary: gitBinary, Mode: mode, Trace: trace})
 	if err != nil {
 		t.Fatal(err)
@@ -237,67 +231,6 @@ func installMissingPinGit(t *testing.T, mode, trace string) {
 }
 
 type pinGitConfig struct{ Binary, Mode, Trace string }
-
-func runMissingPinGit() int {
-	self, err := os.Executable()
-	if err != nil {
-		return 98
-	}
-	data, err := os.ReadFile(filepath.Join(filepath.Dir(self), "pin-git.json"))
-	if err != nil {
-		return 98
-	}
-	var config pinGitConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return 98
-	}
-	args := os.Args[1:]
-	mode := config.Mode
-	// Isolated Git deliberately discards ambient tracing. The executable
-	// observer's sidecar survives that environment boundary.
-	if os.Getenv("GIT_TRACE") == "" && mode == "observe" {
-		f, err := os.OpenFile(config.Trace, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-		if err != nil {
-			return 98
-		}
-		command := args
-		for len(command) >= 2 && (command[0] == "-C" || command[0] == "-c") {
-			command = command[2:]
-		}
-		_, err = fmt.Fprintln(f, "observer: built-in: git "+strings.Join(command, " "))
-		if closeErr := f.Close(); err != nil || closeErr != nil {
-			return 98
-		}
-	}
-	if len(args) >= 3 && args[2] == "fetch" && mode == "still-absent" {
-		prior, _ := os.ReadFile(config.Trace)
-		f, err := os.OpenFile(config.Trace, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-		if err != nil {
-			return 98
-		}
-		_, err = fmt.Fprintln(f, "fault plant: built-in: git fetch successful without object")
-		if closeErr := f.Close(); err != nil || closeErr != nil {
-			return 98
-		}
-		// Bound the known-violation control even if the retry guard mutates.
-		if strings.Contains(string(prior), "fault plant: built-in: git fetch") {
-			return 96
-		}
-		return 0
-	}
-	if len(args) >= 3 && args[2] == "cat-file" && mode == "probe-failure" {
-		return 97
-	}
-	cmd := exec.Command(config.Binary, args...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		if exit, ok := err.(*exec.ExitError); ok {
-			return exit.ExitCode()
-		}
-		return 99
-	}
-	return 0
-}
 
 func TestMissingPinManagerAttemptBoundAndCacheOnlyDefault(t *testing.T) {
 	ids := newGitIdentities(t)
