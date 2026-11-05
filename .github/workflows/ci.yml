@@ -100,6 +100,7 @@ jobs:
           fixture="$(mktemp -d "$HOME/curator-ssh-control.XXXXXX")"
           server_pid=""
           cleanup() {
+            if [ -f "$fixture/server.log" ]; then sudo cat "$fixture/server.log"; fi
             if [ -n "$server_pid" ]; then sudo kill "$server_pid" || true; fi
             sudo rm -rf "$fixture"
           }
@@ -112,6 +113,7 @@ jobs:
           printf '127.0.0.1 %s\n' "$(cut -d ' ' -f 1,2 "$fixture/host-key.pub")" > "$fixture/known-hosts"
           touch "$fixture/empty-config" "$fixture/empty-hosts"
           cat > "$fixture/sshd-config" <<EOF
+          LogLevel VERBOSE
           Port 22
           ListenAddress 127.0.0.1
           HostKey $fixture/host-key

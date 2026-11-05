@@ -261,6 +261,9 @@ exit "$status"
 	case "missing-hosts-file":
 		tool.SSHCredentials.KnownHosts += "-missing"
 	case "no-ssh":
+		// A zero base requests production discovery; an unavailable explicit
+		// operator path exercises its actual fail-closed no-executable path.
+		t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", filepath.Join(root, "missing-ssh"))
 		tool.SSHBase = buildrepo.SSHWrapperBase{}
 	}
 	// Plant ambient hooks that would fail or leak into argv if inherited. Paths
