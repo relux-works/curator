@@ -239,10 +239,11 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 				sharedCalls := 0
 				newEngine := newOperationEngine
 				newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
-					if len(options) == 0 {
-						options = recoveryCounter(&sharedCalls)
-					}
-					return newEngine(home, options...)
+					// Admission options do not imply a recovery observer. Supply the
+					// public-entry observer first; explicitly counted entries retain
+					// their own hooks, which override this default without replacing
+					// the product's commit/recovery admission check.
+					return newEngine(home, append(recoveryCounter(&sharedCalls), options...)...)
 				}
 				t.Cleanup(func() { newOperationEngine = newEngine })
 				result := entry.run(t, fx, id)
