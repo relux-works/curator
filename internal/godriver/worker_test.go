@@ -135,9 +135,17 @@ type workerScenario struct {
 }
 
 func newWorkerScenario(t *testing.T) *workerScenario {
+	return newWorkerScenarioWithScript(t, nil)
+}
+
+func newWorkerScenarioWithScript(t *testing.T, configure func(*workerFixture) stubScript) *workerScenario {
 	t.Helper()
 	fixture := newSnapshotFixture(t)
-	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
+	script := stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"}
+	if configure != nil {
+		script = configure(fixture)
+	}
+	fixture.start(script)
 
 	identity, err := resolveExecutableIdentity(managerExecutable())
 	if err != nil {

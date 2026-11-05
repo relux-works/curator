@@ -512,7 +512,7 @@ func monitorWorkerInput(input io.Reader, done <-chan struct{}) <-chan workerRead
 			case <-done:
 				return
 			}
-			if err != nil || message.Kind == kindShutdown {
+			if err != nil {
 				return
 			}
 		}

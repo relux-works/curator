@@ -930,3 +930,4 @@ internal/godriver	TestExplicitNativeControlVectorCannotDisappear	linux,darwin,wi
 internal/godriver	TestProductionHostIgnoresPlatformTestSelector	linux,darwin,windows	-	-	default builds ignore the host override reserved for explicitly tagged test binaries
 internal/godriver	TestLinuxDescriptorProbeAndSyscallFailures	linux	-	-	missing procfs and injected fcntl errors refuse descriptor admission; valid descriptors remain sealed and open
 cmd/curator	TestNativeInstallSignalCancellation	linux,darwin	-	-	actual install entrypoint cancels its paused worker on interrupt/termination without publishing the compiled skill
+internal/godriver	TestWorkerEOFWhileShutdownQueued	linux,darwin	-	-	Queued shutdown preserves EOF teardown of the live worker domain

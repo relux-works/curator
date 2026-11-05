@@ -25,6 +25,7 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 	plants := []struct{ name, file, before, after, witness, message string }{
 		{"omit-group-kill", "controls_" + runtime.GOOS + ".go", "_ = unix.Kill(-pid, unix.SIGKILL)", "_ = pid", "TestBuildTerminatesTheCompleteWorkerDomain", "outlived the worker domain teardown: survival marker"},
 		{"restore-readiness-sleep", "testdata/stubgo/main.go", "_, readyErr := io.ReadFull(ready, acknowledgement[:])", "_, readyErr := 0, error(nil)\n time.Sleep(500*time.Millisecond)\n acknowledgement[0] = 1\n _ = io.ReadFull", "TestBuildWaitsForDelayedDescendantReadiness", "tool children did not publish their identities"},
+		{"stop-EOF-watch-at-shutdown", "workerserver.go", "if err != nil {\n\t\t\t\treturn\n\t\t\t}\n\t\t}\n\t}()\n\treturn messages", "if err != nil || message.Kind == kindShutdown {\n\t\t\t\treturn\n\t\t\t}\n\t\t}\n\t}()\n\treturn messages", "TestWorkerEOFWhileShutdownQueued", "queued shutdown hid EOF"},
 		{"omit-acceptance-deadline", "build.go", "if err := client.deadlineFailure(); err != nil {\n\t\treturn Result{}, err\n\t}\n\tfinishTeardown", "finishTeardown", "TestBuildRejectsArtifactDuringAcceptance", "post-bracket deadline accepted or misdiagnosed"},
 	}
 	if runtime.GOOS == "linux" {
