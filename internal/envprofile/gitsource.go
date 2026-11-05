@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,9 +36,9 @@ import (
 // first seen under so ensureRepo can clone through the operator's transport
 // (including git insteadOf rewrites, which hermetic tests use to serve fake
 // network identities from local repositories); a canonical identity with no
-// recorded raw clones through https://canonical. A transitive requirement
-// declared git@host:org/dep is canonicalized before any raw is recorded and
-// therefore clones over https://, which can surprise an SSH-only operator.
+// recorded raw clones through https://canonical. Transitive requirements
+// retain their declared source through packageOf so Identity can record the
+// transport before returning the canonical resolver/cache key.
 // File:// remotes are rejected at the identity boundary (see canonicalGit)
 // and never reach this cache.
 type gitManager struct {
@@ -149,7 +150,7 @@ func (m *gitManager) recordRaw(canonical, raw string) {
 	if m.fetchRaw == nil {
 		m.fetchRaw = map[string]string{}
 	}
-	trimmed := strings.TrimSpace(raw)
+	trimmed := strings.TrimSpace(safeGitDeclaration(raw))
 	if canonical == "" || trimmed == "" || trimmed == canonical {
 		return
 	}
@@ -159,6 +160,25 @@ func (m *gitManager) recordRaw(canonical, raw string) {
 	if _, exists := m.fetchRaw[canonical]; !exists {
 		m.fetchRaw[canonical] = trimmed
 	}
+}
+
+// safeGitDeclaration removes username-only HTTP(S) credentials before a
+// declaration can reach acquisition metadata or resolver diagnostics. Password
+// sources remain intact so the existing identity validation still refuses them;
+// SSH usernames are transport hints and remain intact as well.
+func safeGitDeclaration(raw string) string {
+	if _, err := canonicalGit(raw); err != nil {
+		return raw
+	}
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.User == nil || (!strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https")) {
+		return raw
+	}
+	if _, password := parsed.User.Password(); password {
+		return raw
+	}
+	parsed.User = nil
+	return parsed.String()
 }
 
 // fetch updates the cached clone.
@@ -809,18 +829,17 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 }
 
 // packageOf maps a validated context manifest onto the resolution package.
-// Every requirement source is canonicalized through identity.Parse at this
-// boundary (environments §1): two spellings of one repository enter
-// resolution as one identity, so they never produce a spurious
-// context_source_mismatch. A malformed network source passes through here
-// and is rejected at the Identity boundary with profile_source_invalid, as
-// is a file:// requirement source, which carries no network identity.
+// Requirement sources retain their declared transport after HTTP(S) credential
+// stripping: the resolver calls Identity to record that transport and compare
+// canonical identities (environments §1).
+// Malformed network and file:// sources also pass through here and are
+// rejected at that Identity boundary with profile_source_invalid.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindContext, Name: name, Source: canonicalRequirementSource(requirement.Git),
+			Kind: contextlock.KindContext, Name: name, Source: safeGitDeclaration(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Weight: requirement.Weight,
 		})
@@ -828,7 +847,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.Skills) {
 		requirement := manifest.Skills[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindSkill, Name: name, Source: canonicalRequirementSource(requirement.Git),
+			Kind: contextlock.KindSkill, Name: name, Source: safeGitDeclaration(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Mode: requirement.Mode, Commands: requirement.Commands,
 		})
@@ -836,7 +855,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.MCP) {
 		requirement := manifest.MCP[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindMCP, Name: name, Source: canonicalRequirementSource(requirement.Git),
+			Kind: contextlock.KindMCP, Name: name, Source: safeGitDeclaration(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory,
 		})
@@ -848,22 +867,6 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 		return pkg.Requires[i].Kind < pkg.Requires[j].Kind
 	})
 	return pkg
-}
-
-// canonicalRequirementSource canonicalizes one manifest requirement source
-// for resolution. Network URLs become their core §6.1 identity; a file://
-// remote or a malformed network source passes through here and is rejected
-// at the Identity boundary with profile_source_invalid.
-func canonicalRequirementSource(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" || identity.ValidCanonical(trimmed) {
-		return trimmed
-	}
-	canonical, err := identity.Parse(trimmed)
-	if err != nil || canonical == "" {
-		return trimmed
-	}
-	return canonical
 }
 
 // lookPath resolves an executable on PATH.
