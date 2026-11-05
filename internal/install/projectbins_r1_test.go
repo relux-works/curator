@@ -88,24 +88,29 @@ func TestProjectBinUnreadableUnrelated(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(bin, "private-tool")
-	if err := os.WriteFile(path, []byte("foreign"), 0000); err != nil {
+	if err := os.WriteFile(path, []byte("foreign"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(path, 0600) })
-	state, err := inspectProjectBin(t.TempDir(), bin, installPlatform(), "", nil)
-	if err != nil || len(state.preimages) != 0 || !strings.Contains(fmt.Sprint(state.messages), projectBinPreserved) {
-		t.Fatalf("unrelated entry was inspected: %+v %v", state, err)
-	}
-	// A directory is a platform-neutral collision control, including Windows.
-	declared := filepath.Join(bin, "declared")
-	if err := os.Mkdir(declared, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := inspectProjectBin(t.TempDir(), bin, installPlatform(), "", map[string]bool{declared: true}); err == nil || !strings.Contains(err.Error(), projectBinConflict) {
-		t.Fatalf("declared collision: %v", err)
-	}
-	if _, err := os.Lstat(path); err != nil {
-		t.Fatal(err)
+	t.Run("unreadable", func(t *testing.T) {
+		denyProjectLedgerRead(t, path)
+		state, err := inspectProjectBin(t.TempDir(), bin, installPlatform(), "", nil)
+		if err != nil || len(state.preimages) != 0 || !strings.Contains(fmt.Sprint(state.messages), projectBinPreserved) {
+			t.Fatalf("unrelated entry was inspected: %+v %v", state, err)
+		}
+		// A directory is a platform-neutral collision control, including Windows.
+		declared := filepath.Join(bin, "declared")
+		if err := os.Mkdir(declared, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := inspectProjectBin(t.TempDir(), bin, installPlatform(), "", map[string]bool{declared: true}); err == nil || !strings.Contains(err.Error(), projectBinConflict) {
+			t.Fatalf("declared collision: %v", err)
+		}
+		if _, err := os.Lstat(path); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if got, err := os.ReadFile(path); err != nil || string(got) != "foreign" {
+		t.Fatalf("restored foreign preimage: %q %v", got, err)
 	}
 }
 

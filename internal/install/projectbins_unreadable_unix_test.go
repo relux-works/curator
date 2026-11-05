@@ -13,4 +13,7 @@ func denyProjectLedgerRead(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(path, 0600) })
+	if _, err := os.ReadFile(path); !os.IsPermission(err) {
+		t.Fatalf("unreadable-state fixture did not deny a real read: %v", err)
+	}
 }
