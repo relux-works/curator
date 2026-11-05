@@ -217,7 +217,7 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 		if err != nil {
 			return nil, err
 		}
-		if err := gitops.Extract(repo, pin.Commit, tree); err != nil {
+		if err := gitops.ExtractDirectory(repo, pin.Commit, skillSnapshotDirectory("skill", directory), tree); err != nil {
 			return nil, err
 		}
 		selected, spec, err := manifest.SelectSkillPackage(tree, directory, name)
@@ -283,9 +283,21 @@ func PrepareSkillPlan(home, profile, expectedHash string, policy Policy, prepare
 	// Selected immutable snapshots only; unrelated direct installations and
 	// retained lock members are neither opened for repair nor rewritten.
 	for _, node := range plan.Nodes {
-		entry, err := contextstore.EnsureGit(home, "skill", node.Name, node.Repo, node.Resolved.Commit)
+		entry, err := contextstore.EnsureGitDirectory(home, "skill", node.Name, node.Repo, node.Resolved.Commit, skillSnapshotDirectory("skill", node.Directory))
 		if err != nil {
 			return SkillPlanResult{}, err
+		}
+
+		member, found := plan.Lock.Find(contextlock.KindSkill, node.Name)
+		if !found {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: selected store member missing")
+		}
+		actualPin, expectedPin, err := skillPlanStorePinHashes(home, member, entry, hashing.VersionV2)
+		if err != nil {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: selected store pin: %w", err)
+		}
+		if actualPin != expectedPin {
+			return SkillPlanResult{}, fmt.Errorf("profile_skill_plan_invalid: selected store projection differs from admitted pin")
 		}
 		selected, _, err := manifest.SelectSkillPackage(entry, node.Directory, node.Name)
 		if err != nil {
@@ -384,4 +396,16 @@ func newSkillPlanGitManager(home string) *gitManager {
 	manager.sourceCacheRoot = filepath.Join(home, "profile-skill-repos")
 	manager.missingPins = map[string]bool{}
 	return manager
+}
+
+// v5 plan skills use the source-bound profile-plan cache, not the legacy
+// profile cache. Compare the complete stored projection (including ancestors)
+// so sibling injection cannot hide behind an unchanged selected package hash.
+func skillPlanStorePinHashes(home string, member contextlock.Member, entry string, version hashing.Version) (string, string, error) {
+	repo := newSkillPlanGitManager(home).repoDir(member.Source)
+	expected, format, err := gitops.PinnedDirectorySnapshotTree(repo, member.Commit, skillSnapshotDirectory(member.Kind, member.Directory))
+	if err != nil {
+		return "", "", fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)
+	}
+	return storeEntryHashesFromPin(member, entry, version, expected, format)
 }

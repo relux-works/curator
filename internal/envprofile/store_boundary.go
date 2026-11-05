@@ -161,7 +161,16 @@ func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pat
 func validateNamedStorePins(home string, lock *contextlock.Lock) *storeEntryFailure {
 	for _, member := range lock.Members {
 		entry := memberEntryPath(home, member)
-		actual, expected, err := storeEntryPinHashes(home, member, entry, lock.ContentHashVersion())
+		pinHashes := storeEntryPinHashes
+		if lock.SchemaVersion == 5 && lock.SkillPlan != nil && member.Kind == contextlock.KindSkill && member.Commit != "" {
+			for _, node := range lock.SkillPlan.Nodes {
+				if node.Name == member.Name {
+					pinHashes = skillPlanStorePinHashes
+					break
+				}
+			}
+		}
+		actual, expected, err := pinHashes(home, member, entry, lock.ContentHashVersion())
 		if err != nil {
 			return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: err}
 		}

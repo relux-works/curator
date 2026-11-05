@@ -950,10 +950,11 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 // lookPath resolves an executable on PATH.
 func lookPath(command string) (string, error) { return exec.LookPath(command) }
 
-// Directory scoping is the schema-4 selected-skill contract. Context and MCP
-// snapshots keep their established whole-repository pin and extraction rules.
+// Directory scoping is the schema-4 selected-skill contract; schema 5 uses
+// "." for repository-root selection. Context and MCP snapshots keep their
+// established whole-repository pin and extraction rules.
 func skillSnapshotDirectory(kind, directory string) string {
-	if kind == contextlock.KindSkill {
+	if kind == contextlock.KindSkill && directory != "." {
 		return directory
 	}
 	return ""
