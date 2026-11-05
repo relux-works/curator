@@ -3,6 +3,7 @@
 package testcli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -10,16 +11,25 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/godriver"
 )
 
-// RunColdManager keeps the ordinary two-minute harness ceiling and requests a
-// Go stack dump from this owned manager before timeout. It does not signal
-// other processes or change the production budget. Cold CI can then identify
-// the actual blocked install phase instead of guessing from a silent timeout.
+// RunColdManager allows one production worker budget plus five minutes for
+// full transactional publication. The target-host probe reached journal fsync
+// after compilation and exceeded the former two-minute harness cap. This is a
+// test watchdog, not an install-level product limit. Only this owned manager
+// receives a Go stack dump shortly before the watchdog expires.
 func RunColdManager(t *testing.T, dir string, env []string, name string, args ...string) (int, string, string) {
 	t.Helper()
-	ctx, cancel := fixtureContext(t)
+	deadline := time.Now().Add(godriver.DefaultBuildTimeout() + 5*time.Minute)
+	if outer, ok := t.Deadline(); ok && outer.Add(-2*time.Second).Before(deadline) {
+		deadline = outer.Add(-2 * time.Second)
+	}
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
 	defer cancel()
+	started := time.Now()
+	defer func() { t.Logf("cold manager elapsed=%s (worker and transactional publication)", time.Since(started)) }()
 	command := exec.CommandContext(ctx, name, args...) // #nosec G204 -- test-only invocation of the freshly built manager binary
 	configureFixtureProcess(command)
 	command.Dir = dir
@@ -32,7 +42,7 @@ func RunColdManager(t *testing.T, dir string, env []string, name string, args ..
 		t.Fatal(err)
 	}
 	done := make(chan struct{})
-	timer := time.AfterFunc(110*time.Second, func() { defer close(done); _ = command.Process.Signal(syscall.SIGQUIT) })
+	timer := time.AfterFunc(max(time.Until(deadline)-10*time.Second, 0), func() { defer close(done); _ = command.Process.Signal(syscall.SIGQUIT) })
 	err := command.Wait()
 	if !timer.Stop() {
 		<-done

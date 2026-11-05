@@ -94,8 +94,13 @@ driver, records establishment/fingerprint and all verification phases as well
 as cold list/build durations, and performs a full `go-repository-v1` install.
 The test prepends the project bin directory to PATH and invokes the exported
 command by name. This is test-configured PATH, not proof of a persistent change
-to the user's shell. The harness caps each command at two minutes; earlier
-19–41 second hosted runs prove this fixture succeeds, not the 15-minute limit.
+to the user's shell. Earlier
+19–41 second hosted runs used the two-minute harness and prove this fixture
+succeeds, not the 15-minute limit. The target-host diagnostic subsequently
+reached journal fsync in transactional publication at 110 seconds, after
+compilation. The full-install watchdog now allows one worker budget plus five
+minutes for publication (20 minutes); it records elapsed time and obtains owned
+manager stacks before expiry. This test ceiling adds no product install bound.
 The over-budget negative independently qualifies stop and descendant teardown.
 
 The `hosted` entry always uses `ubuntu-latest`. The `target-linux` entry uses the

@@ -302,7 +302,7 @@ The hosted public-fixture witness demonstrates a cold repository build and full
 install, with the test explicitly prepending the project bin directory to PATH
 and invoking the installed command **by name**. It does not demonstrate that
 Curator edits the user's ambient PATH. Earlier hosted runs completed in 19–41
-seconds, below the harness's two-minute per-command ceiling: they do **not**
+seconds, below the then-current harness's two-minute ceiling: they do **not**
 qualify the 15-minute ceiling. The over-budget negative qualifies timeout and
 descendant teardown, independently of successful build speed.
 
@@ -318,3 +318,13 @@ unattributed, are **not** evidence for a generally slow host or for this budget.
 Those old uninstrumented seconds cannot be retrospectively assigned to a phase.
 The new phase diagnostics permit attribution on a new public-fixture run.
 No new a2a-source execution or qualification is part of this witness.
+
+A target-Linux public-fixture run measured Establish fingerprinting at 0.513 s,
+list at 0.091 s, build at 13.281 s and the whole Build call at 16.426 s. This
+supports this fixture's fit within the retained 15-minute ceiling, not a claim
+about every cold repository. The separate full-install probe exceeded the old
+two-minute harness ceiling; its owned-manager stack at 110 s was in transaction
+staging `saveJournal`/`File.Sync`, after compilation. It was not a worker-budget
+expiry. The cold-install harness now allows one worker budget plus five minutes
+for transactional publication (20 minutes total); the public job records its
+actual elapsed time. That is a test watchdog, not a product install deadline.
