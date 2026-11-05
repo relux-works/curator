@@ -387,6 +387,27 @@ jobs:
   # dropped without appearing in the uploaded evidence.
   # ---------------------------------------------------------------------------
   # Four jobs share all three measured slow Windows packages; no OS cross product.
+  project-bin-windows-read-controls:
+    name: Project-bin native Windows read controls
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Prove native read denial before project-bin assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d)"
+          trap 'chmod -R u+w "$test_home"; rm -rf "$test_home"' EXIT
+          env -i PATH="$PATH" SystemRoot="$SYSTEMROOT" HOME="$test_home" \
+            TEMP="$test_home" TMP="$test_home" USERPROFILE="$test_home" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=10m -v ./internal/install \
+              -run '^TestProjectBinUnreadable(Ledger|Unrelated)$'
+
   windows-test-shards:
     name: Windows tests (shard ${{ matrix.shard }})
     runs-on: windows-latest
