@@ -119,15 +119,16 @@ func TestProductionExternalDepsFalseDrivesMirrorFetchToSink(t *testing.T) {
 		draftCLISSH:   {succeed: true, fileRepo: fixture.sshBare},
 	}, map[string]string{"prov-a": secretMarker})
 
-	// Production composition uses process environment (PATH for git
-	// discovery, the draft switch) exactly like runDraftInstall, but this
+	// Production composition uses explicit absolute operator-selected fake
+	// Git and SSH tools, plus the draft switch, like runDraftInstall. This
 	// run is a REAL install (dryRun=false) so productionExternalDeps is
 	// constructed with false. Manual save/restore keeps the run bounded
 	// and isolated; this test never runs in parallel.
 	saved := map[string]*string{}
 	set := map[string]string{
 		"PATH":                              fakeDir + string(os.PathListSeparator) + fixture.origPath,
-		"GIT_SSH":                           fixture.staticSSH,
+		"CURATOR_BUILD_GIT_EXECUTABLE":      filepath.Join(fakeDir, "git"),
+		"CURATOR_BUILD_SSH_EXECUTABLE":      fixture.staticSSH,
 		"CURATOR_BUILD_SSH_IDENTITY":        fixture.identity,
 		"CURATOR_BUILD_SSH_KNOWN_HOSTS":     fixture.knownHosts,
 		install.EnvDraftTransportResolution: "1",

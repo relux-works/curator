@@ -3,7 +3,7 @@ package main
 // Draft transport resolution at the CLI entry point.
 //
 // These tests drive `install --dry-run` (and, where pinned, `status`)
-// through run() with a stand-in git on PATH: a POSIX shell script that
+// through run() with an absolute operator-selected stand-in Git: a POSIX script that
 // fails a fetch with fixture stderr or rewrites it to a fixture bare
 // repository. Everything else — manifest and
 // closure evaluation, credential selection, the strict lane, audit,
@@ -188,8 +188,8 @@ func draftCLISkillRepo(t *testing.T, skillsRoot, httpsLock, sshLock string) {
 	draftCLIGit(t, repo, "tag", "v1")
 }
 
-// installDraftFakeGit writes a stand-in git named `git` onto a fresh PATH
-// directory and returns its argv log path. Callers scope PATH per run.
+// installDraftFakeGit writes a stand-in Git in a fresh directory and returns
+// its argv log path. Callers select it through the absolute operator override.
 // creds arms provider HTTPS secrets by provider name for `credential fill`
 // calls from the manager's broker reader; an unarmed provider stays silent
 // (exit 1, no material). Every fill request is logged as a `cred:` line so
@@ -455,7 +455,7 @@ func (f *draftCLIFixture) runDraftInstall(t *testing.T, fakeDir, logPath string,
 }
 
 // runDraftCLI runs one CLI invocation with the same per-run process
-// environment as runDraftInstall: PATH with the stand-in git, the bound
+// environment as runDraftInstall: absolute operator-selected fake tools, bound
 // lane credentials, the draft switch, and the policy/providers files.
 func (f *draftCLIFixture) runDraftCLI(t *testing.T, fakeDir, logPath string, switchOn bool, policy, providers *string, args ...string) (int, string, string, []string) {
 	t.Helper()

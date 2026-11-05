@@ -176,7 +176,7 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \
-              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden)$'
+              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden|ProductionExternalDepsFalseDrivesMirrorFetchToSink)$'
       - name: Detect a dropped default-lane SSH policy
         shell: bash
         run: |
