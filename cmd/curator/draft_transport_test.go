@@ -197,7 +197,7 @@ func draftCLISkillRepo(t *testing.T, skillsRoot, httpsLock, sshLock string) {
 func (f *draftCLIFixture) installDraftFakeGit(t *testing.T, arms map[string]draftCLIArm, creds map[string]string) (fakeDir, logPath string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
+		t.Skip("test transport wrapper is POSIX-only; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 	realGit, err := exec.LookPath("git")
 	if err != nil {
@@ -558,7 +558,7 @@ func draftCLILegacyRun(t *testing.T, root string, code int, stdout string, fetch
 // the manager SSH wrapper; inherited GIT_SSH cannot select the wire transport.
 func TestDraftTransportLegacyGolden(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
+		t.Skip("test transport wrapper is POSIX-only; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 	fixture := setupDraftCLI(t)
 	policy := draftCLIPolicy(map[string][]string{
@@ -621,7 +621,7 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 
 func TestDraftTransportResolvedMatrix(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
+		t.Skip("test transport wrapper is POSIX-only; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 
 	t.Run("fallback on availability then success", func(t *testing.T) {
@@ -703,7 +703,7 @@ func TestDraftTransportResolvedMatrix(t *testing.T) {
 // broker traffic.
 func TestDraftTransportProviderAdmission(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
+		t.Skip("test transport wrapper is POSIX-only; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 
 	t.Run("unknown https provider refuses before any fetch", func(t *testing.T) {
@@ -819,7 +819,7 @@ func TestDraftTransportProviderAdmission(t *testing.T) {
 // remediation, with zero fetch attempts.
 func TestDraftTransportIdentityInvalidSurfacesThroughCLI(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell capture requires Unix; native binary wrapper and portable selection witnesses cover Windows separately")
+		t.Skip("test transport wrapper is POSIX-only; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
 	fixture := setupDraftCLI(t)
 	fakeDir, logPath := fixture.installDraftFakeGit(t, draftCLISuccessArms(fixture), nil)
