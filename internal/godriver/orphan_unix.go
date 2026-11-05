@@ -3,14 +3,26 @@
 package godriver
 
 import (
-	"os"
-
 	"golang.org/x/sys/unix"
+	"os"
+	"time"
 )
 
-// Kill the verified private worker group, including this process. Killing only
-// exec.Cmd.Process would leave compiler tool descendants alive after manager death.
+// These seams are assigned only in isolated test subprocesses.
+var orphanKill = unix.Kill
+var orphanSignalWait = func() { time.Sleep(workerShutdownGrace) }
+
+// Never interpret an ignored kill error or a returned syscall as teardown.
+// Only our verified private group may be signalled. Successful self-group
+// SIGKILL normally never returns; allow a bounded delivery window if it does.
 func stopOrphanedWorkerDomain() {
-	_ = unix.Kill(-os.Getpid(), unix.SIGKILL)
-	os.Exit(exitWorkerFailure)
+	group, err := unix.Getpgid(0)
+	if err != nil || group != os.Getpid() {
+		os.Exit(exitWorkerTeardownFailed)
+	}
+	if err := orphanKill(-os.Getpid(), unix.SIGKILL); err != nil {
+		os.Exit(exitWorkerTeardownFailed)
+	}
+	orphanSignalWait()
+	os.Exit(exitWorkerTeardownFailed)
 }

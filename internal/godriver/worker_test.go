@@ -14,6 +14,8 @@ import (
 // rawWorker drives a real hidden-mode worker process over the session channel
 // with complete control over the framing, so every identity and protocol
 // rejection is proved against the shipped worker rather than a mock.
+var rawWorkerEnvExtra []string
+
 type rawWorker struct {
 	t       *testing.T
 	command *exec.Cmd
@@ -37,7 +39,7 @@ func startRawWorker(t *testing.T, identity ExecutableIdentity, limits ResourceLi
 func startRawWorkerFrom(t *testing.T, launchPath string, limits ResourceLimits, probes []ControlProbe) *rawWorker {
 	t.Helper()
 	command := exec.Command(launchPath, WorkerMode) // #nosec G204 -- identity-verified re-execution of the test binary
-	command.Env = workerEnvironment()
+	command.Env = append(workerEnvironment(), rawWorkerEnvExtra...)
 	command.SysProcAttr = workerSysProcAttr()
 	stdin, err := command.StdinPipe()
 	if err != nil {

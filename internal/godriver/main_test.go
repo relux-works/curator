@@ -21,6 +21,8 @@ import (
 // start this binary through a launcher link and read back the identity the
 // started process resolves for itself, which is the only way to observe what
 // os.Executable reports for a real launch shape rather than to assume it.
+var workerInputTransform func(io.Reader) io.Reader
+
 const identityProbeMode = "-curator-test-identity-probe"
 
 // TestMain gives the test binary the same fixed hidden worker mode the
@@ -28,7 +30,11 @@ const identityProbeMode = "-curator-test-identity-probe"
 // process instead of an in-process mock.
 func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == WorkerMode {
-		os.Exit(RunWorker(os.Stdin, os.Stdout))
+		input := io.Reader(os.Stdin)
+		if workerInputTransform != nil {
+			input = workerInputTransform(input)
+		}
+		os.Exit(RunWorker(input, os.Stdout))
 	}
 	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
 		os.Exit(runIdentityProbe(os.Stdout))

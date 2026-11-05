@@ -78,11 +78,15 @@ func TestWorkerEOFWhileShutdownQueued(t *testing.T) {
 				err := worker.command.Wait()
 				var exit *exec.ExitError
 				if !errors.As(err, &exit) {
-					t.Fatalf("EOF did not kill worker: %v", err)
+					t.Errorf("EOF did not kill worker: %v", err)
 				}
-				status, ok := exit.Sys().(syscall.WaitStatus)
+				var status syscall.WaitStatus
+				ok := false
+				if exit != nil {
+					status, ok = exit.Sys().(syscall.WaitStatus)
+				}
 				if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
-					t.Fatalf("EOF worker exit: %v", err)
+					t.Errorf("EOF worker exit: %v", err)
 				}
 				deadline = time.Now().Add(10 * time.Second)
 				for _, pid := range pids {
@@ -90,7 +94,7 @@ func TestWorkerEOFWhileShutdownQueued(t *testing.T) {
 						time.Sleep(10 * time.Millisecond)
 					}
 					if processAlive(pid) {
-						t.Fatalf("queued shutdown hid EOF: process %d survived", pid)
+						t.Errorf("queued shutdown hid EOF: process %d survived", pid)
 					}
 				}
 			}
@@ -111,7 +115,7 @@ func TestWorkerEOFWhileShutdownQueued(t *testing.T) {
 						t.Fatalf("live control did not publish: %v", err)
 					}
 				} else if _, err := os.Stat(marker); !os.IsNotExist(err) {
-					t.Fatalf("EOF descendant published marker: %v", err)
+					t.Errorf("EOF descendant published marker: %v", err)
 				}
 			}
 		})

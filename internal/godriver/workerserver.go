@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,24 +28,22 @@ import (
 func RunWorker(input io.Reader, output io.Writer) int {
 	session := &workerSession{input: input, output: output}
 	if err := session.run(); err != nil {
-		code := DiagnosticCode(err)
-		if code == "" {
-			code = CodeWorkerProtocolInvalid
-		}
-		_ = writeMessage(output, workerMessage{
-			Kind: kindFailure, Nonce: session.nonce,
-			Failure: &workerFailure{Code: code, Detail: err.Error()},
-		})
-		return exitWorkerFailure
+		session.fail(err)
+		stopOrphanedWorkerDomain()
+		return exitWorkerTeardownFailed
 	}
 	return 0
 }
 
 const exitWorkerFailure = 3
 
+// Fault seam is nil in production; assigned only by isolated test workers.
+var workerRunFault func([]string) error
+
 type workerSession struct {
-	input  io.Reader
-	output io.Writer
+	outputMutex sync.Mutex
+	input       io.Reader
+	output      io.Writer
 
 	nonce    string
 	request  *workerRequest
@@ -65,11 +64,21 @@ func (session *workerSession) run() error {
 	defer cancel()
 	done := make(chan struct{})
 	defer close(done)
-	session.messages = monitorWorkerInput(session.input, done)
+	session.messages = monitorWorkerInput(session.input, done, func(err error) {
+		if !errors.Is(err, errProtocolClosed) && !errors.Is(err, io.ErrUnexpectedEOF) {
+			session.fail(err)
+		}
+		stopOrphanedWorkerDomain()
+	})
 	go func() {
 		select {
 		case <-done:
 		case <-session.context.Done():
+			select {
+			case <-done:
+				return
+			default:
+			}
 			stopOrphanedWorkerDomain()
 		}
 	}()
@@ -121,7 +130,7 @@ func (session *workerSession) accept() error {
 	if err := validateCapabilityEvidence(evidence, request.Platform, request.Probes); err != nil {
 		return err
 	}
-	return writeMessage(session.output, workerMessage{
+	return session.write(workerMessage{
 		Kind: kindReady, Nonce: session.nonce,
 		Ready: &workerReady{
 			ExecutablePath: identity.Path, ExecutableSHA256: identity.SHA256, ExecutableSize: identity.Size,
@@ -138,7 +147,7 @@ func (session *workerSession) serveList() error {
 	if err != nil {
 		return err
 	}
-	return writeMessage(session.output, workerMessage{Kind: kindListResult, Nonce: session.nonce, Result: result})
+	return session.write(workerMessage{Kind: kindListResult, Nonce: session.nonce, Result: result})
 }
 
 func (session *workerSession) serveBuild() error {
@@ -153,7 +162,7 @@ func (session *workerSession) serveBuild() error {
 	if err != nil {
 		return err
 	}
-	return writeMessage(session.output, workerMessage{Kind: kindBuildResult, Nonce: session.nonce, Result: result})
+	return session.write(workerMessage{Kind: kindBuildResult, Nonce: session.nonce, Result: result})
 }
 
 func (session *workerSession) awaitShutdown() error {
@@ -446,7 +455,15 @@ func (session *workerSession) runGo(argv []string) (*workerResult, error) {
 	command.Stdout = stdout
 	command.Stderr = stderr
 
-	runErr := command.Run()
+	runErr := command.Start()
+	if runErr == nil {
+		if workerRunFault != nil {
+			if err := workerRunFault(argv); err != nil {
+				return nil, err
+			}
+		}
+		runErr = command.Wait()
+	}
 	result := &workerResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), Started: session.started}
 	if ctx.Err() != nil {
 		result.TimedOut = true
@@ -494,17 +511,17 @@ type workerRead struct {
 	err     error
 }
 
-func monitorWorkerInput(input io.Reader, done <-chan struct{}) <-chan workerRead {
+func monitorWorkerInput(input io.Reader, done <-chan struct{}, fail func(error)) <-chan workerRead {
 	messages := make(chan workerRead, 1)
 	go func() {
 		for {
 			message, err := readMessage(input)
-			if errors.Is(err, errProtocolClosed) || errors.Is(err, io.ErrUnexpectedEOF) {
+			if err != nil {
 				select {
 				case <-done:
 					return
 				default:
-					stopOrphanedWorkerDomain()
+					fail(err)
 				}
 			}
 			select {
@@ -518,4 +535,19 @@ func monitorWorkerInput(input io.Reader, done <-chan struct{}) <-chan workerRead
 		}
 	}()
 	return messages
+}
+
+// Serialize frames from the session and the concurrent pipe monitor.
+func (session *workerSession) write(message workerMessage) error {
+	session.outputMutex.Lock()
+	defer session.outputMutex.Unlock()
+	return writeMessage(session.output, message)
+}
+
+func (session *workerSession) fail(err error) {
+	code := DiagnosticCode(err)
+	if code == "" {
+		code = CodeWorkerProtocolInvalid
+	}
+	_ = session.write(workerMessage{Kind: kindFailure, Nonce: session.nonce, Failure: &workerFailure{Code: code, Detail: err.Error()}})
 }

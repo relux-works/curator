@@ -17,6 +17,9 @@ const (
 	CodePackageInfluenceForbidden = "build_execution_package_influence_forbidden"
 )
 
+// Local worker termination failure; no receipt or capability-evidence input.
+const CodeWorkerTeardownFailed = "build_execution_worker_teardown_failed"
+
 // Portable execution-policy identity and the two closed record versions of
 // Protocol Core section 4.2.1.
 const (

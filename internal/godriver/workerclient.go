@@ -357,6 +357,11 @@ func (client *workerClient) protocolFailure(cause error, format string, args ...
 	if err := client.deadlineFailure(); err != nil {
 		return err
 	}
+	// Join only after teardown has signalled the still-reserved group identity.
+	client.teardown()
+	if client.command != nil && client.command.ProcessState != nil && client.command.ProcessState.ExitCode() == exitWorkerTeardownFailed {
+		return diagnosticErr(CodeWorkerTeardownFailed, cause, "worker could not confirm descendant-domain teardown")
+	}
 	if DiagnosticCode(cause) != "" {
 		return cause
 	}

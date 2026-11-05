@@ -335,3 +335,24 @@ PATH. Its separate cold Build took 7.805 s (list 0.089 s, build 5.623 s), with
 fingerprinting at 0.480 s. Those measurements and the earlier transaction-stack
 sample separate compilation from full-install publication overhead; they do not
 provide an install-level runtime guarantee.
+
+Worker failure handling: on Unix, a protocol/session failure writes its existing
+failure diagnostic when possible and then kills the verified private process
+group. Every parent-pipe read error also triggers teardown, including errors
+other than EOF. Successful group SIGKILL has a bounded five-second delivery
+window; a failed kill, missing private group, or expired delivery window exits
+with worker status 4. Status 4 means teardown is **unconfirmed**, and an absent
+response with that status is reported as
+`build_execution_worker_teardown_failed`, never as a protocol violation.
+Windows retains its Job Object ownership model: the worker holds query access,
+not termination access. With the manager alive, the manager tears down the job;
+after manager death, closing the last job handle on worker exit activates
+kill-on-close. This change does not claim worker-owned Windows termination.
+
+The macOS Race exit-3 cause remains unproven. Both candidate exit paths are
+closed without attributing that hosted failure to either one. The separate
+profile-plan native success witness also reported a missing build-result frame;
+its handoff/log contain no worker exit status or descendant evidence, so the
+same mechanism is possible but unestablished. No change to that profile-plan
+branch is implied. Local PRI 4 background-band timings are not evidence about
+target Linux performance.

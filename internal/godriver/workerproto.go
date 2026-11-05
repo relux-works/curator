@@ -19,6 +19,11 @@ import (
 const WorkerMode = "__curator-go-worker-v1"
 
 // protocolVersion pins the framing and message vocabulary of one session.
+// exitWorkerTeardownFailed means group termination could not be confirmed:
+// the kill failed, the worker lacked a private group, or delivery exceeded the
+// bounded grace. It never denotes successful teardown.
+const exitWorkerTeardownFailed = 4
+
 const protocolVersion = "curator-go-worker-v1"
 
 // maxProtocolFrame bounds every framed message. The list result carries the

@@ -30,7 +30,7 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 	}
 	if runtime.GOOS == "linux" {
 		plants = append(plants,
-			struct{ name, file, before, after, witness, message string }{"omit-deadline-domain-termination", "orphan_unix.go", "_ = unix.Kill(-os.Getpid(), unix.SIGKILL)", "_ = unix.SIGKILL", "TestBuildDeadlineTearsDownDescendants", "timed-out descendant published survival marker"},
+			struct{ name, file, before, after, witness, message string }{"omit-deadline-domain-termination", "orphan_unix.go", "orphanKill(-os.Getpid(), unix.SIGKILL)", "error(nil)", "TestBuildDeadlineTearsDownDescendants", "timed-out descendant published survival marker"},
 			struct{ name, file, before, after, witness, message string }{"omit-descriptor-seal", "controls_linux.go", "restrictManagerDescriptors(domain.descriptorRoot)", "error(nil)", "TestLinuxNativeControls/descriptor", "private descriptor leaked"},
 			struct{ name, file, before, after, witness, message string }{"extra-file-admitted", "controls_linux.go", "len(command.ExtraFiles) != 0", "len(command.ExtraFiles) > 1", "TestLinuxControlLaunchRefusals/extra-files", "extra-files was admitted"},
 			struct{ name, file, before, after, witness, message string }{"sealing-error-admitted", "controls_linux.go", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil {", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil && false {", "TestLinuxControlLaunchRefusals/sealing-failure", "sealing-failure was admitted"},
@@ -92,12 +92,12 @@ func TestBuildDescendantNarrowingControls(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				const anchor = "_ = unix.Kill(-os.Getpid(), unix.SIGKILL)"
+				const anchor = "orphanKill(-os.Getpid(), unix.SIGKILL)"
 				if strings.Count(string(raw), anchor) != 1 {
 					t.Fatal("worker group plant anchor not unique")
 				}
 				replacementWorker := filepath.Join(scratch, "orphan_unix.go")
-				if err := os.WriteFile(replacementWorker, []byte(strings.Replace(string(raw), anchor, "_ = unix.SIGKILL", 1)), 0600); err != nil {
+				if err := os.WriteFile(replacementWorker, []byte(strings.Replace(string(raw), anchor, "error(nil)", 1)), 0600); err != nil {
 					t.Fatal(err)
 				}
 				replacements[worker] = replacementWorker
