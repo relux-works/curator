@@ -42,6 +42,11 @@ func TestSkillPlanDirectorySnapshots(t *testing.T) {
 			}, "v1")
 			// Index objects make collision/gitlink witnesses independent of the
 			// host filesystem's case folding, normalization and submodule checkout.
+			if strings.HasSuffix(mode, "collision") {
+				// macOS Git otherwise precomposes argv before update-index sees it.
+				gitRun(t, repo, "config", "core.precomposeunicode", "false")
+				gitRun(t, repo, "config", "core.ignorecase", "false")
+			}
 			addObject := func(mode, name, content string) {
 				t.Helper()
 				object := content
