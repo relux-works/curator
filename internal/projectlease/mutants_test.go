@@ -42,8 +42,14 @@ func TestLeaseNarrowingMutants(t *testing.T) {
 		{"profile-recovered-lifecycle", "internal/envprofile/lock.go", "projectlease.RecoverUnderLock(home, lock, engine)", "engine.RecoverWithOutcome(lock)", "envprofile", "TestRecoveredLeaseLifecycle", "recovered lifecycle remained prepared/active or released"},
 		{"install-recovered-lifecycle", "internal/install/commit.go", "projectlease.RecoverUnderLock(journal.home, lock, journal.Engine)", "journal.Engine.RecoverWithOutcome(lock)", "install", "TestRecoveredLeaseLifecycle", "recovered lifecycle remained prepared/active or released"},
 
-		{"profile-recovery-policy", "internal/envprofile/lock.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "envprofile", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
-		{"install-recovery-policy", "internal/install/commit.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "install", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
+		// Mutate the final combined checks, which override the base engine option.
+		// The base option in envprofile/lock.go also serves beginCaptureOperation.
+		// No extra commit-check mutant targets capture: its sole caller,
+		// CaptureMaterialize, only calls PendingRecovery (also before returning),
+		// and never Prepare, Commit, Recover or publish on that engine. Pending
+		// observation does not invoke commit checks and cannot commit a journal.
+		{"profile-recovery-policy", "internal/envprofile/lock.go", "return projectlease.TransactionCheck(home)(w, j)", "_ = projectlease.TransactionCheck(home); return nil", "envprofile", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
+		{"install-recovery-policy", "internal/install/commit.go", "return projectlease.TransactionCheck(home)(w, j)", "_ = projectlease.TransactionCheck(home); return nil", "install", "TestDefaultRecoveryChecksLeaseJournal", "default lease recovery policy missing"},
 		{"pending-gc-preserves-other-owners", "internal/projectlease/manager.go", "engine.PendingRecoveryFor(lock, \"project-leases\")", "engine.PendingRecovery(lock)", "scopes", "TestCollectWithUnrelatedPendingTransaction", "unrelated pending transaction blocked legacy GC"},
 		{"pending-owner-filter", "internal/transaction/pending.go", "journal.ProjectIdentity == projectIdentity", "false && journal.ProjectIdentity == projectIdentity", "transaction", "TestPendingRecoveryForOwner", "owner-filtered pending"},
 		{"gc-cli-recovery-policy", "cmd/curator/main.go", "transaction.WithCommitCheck(projectlease.TransactionCheck(home))", "transaction.WithCommitCheck(func() transaction.CommitCheck { _ = projectlease.TransactionCheck(home); return nil }())", "cmd/curator", "TestGCRecoversProjectLeaseArtifacts", "GC recovery committed missing artifact"},
