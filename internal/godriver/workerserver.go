@@ -49,12 +49,19 @@ type workerSession struct {
 	nonce   string
 	request *workerRequest
 	started int
+	context context.Context
 }
 
 func (session *workerSession) run() error {
+	started := time.Now()
 	if err := session.accept(); err != nil {
 		return err
 	}
+	// One deadline is shared by both children and the parent validation gap;
+	// starting the build never grants a fresh full allowance.
+	var cancel context.CancelFunc
+	session.context, cancel = context.WithDeadline(context.Background(), started.Add(session.limits().Timeout))
+	defer cancel()
 	if err := session.serveList(); err != nil {
 		return err
 	}
@@ -409,8 +416,7 @@ func (session *workerSession) runGo(argv []string) (*workerResult, error) {
 	}
 	session.started++
 	limits := session.limits()
-	ctx, cancel := context.WithTimeout(context.Background(), limits.Timeout)
-	defer cancel()
+	ctx := session.context
 
 	command := exec.CommandContext(ctx, request.GoExecutable, argv...) // #nosec G204 -- fixed manager-owned vector against a verified launcher
 	command.Dir = request.Directory

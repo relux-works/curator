@@ -117,6 +117,9 @@ func ConfigFromEnvironment(privateBase string, forbiddenRoots ...string) Config 
 // Session owns one operation-private telemetry/config/cache root and the
 // frozen native target plus portable toolchain identity derived from it.
 type Session struct {
+	// observePhase is an internal measurement hook; it selects no build input.
+	observePhase func(string, time.Duration)
+
 	executable         string
 	goroot             string
 	operation          string

@@ -87,3 +87,12 @@ released conformance pin supplies v2; it does not widen the frozen v1 vector.
 The hosted lane also runs `TestCompiledInstallRefusesUncoveredHost` with
 `-tags=curator_test_platform`, exercising production install preflight and status
 without exposing an override in release binaries.
+
+The `Cold repository build` workflow runs on `ubuntu-latest` with Go 1.25.5,
+Node 22 and the isolation wrapper. It prepares a pinned public dependency
+fixture before invoking the offline driver, measures list/build with empty
+operation caches, then performs a full `go-repository-v1` install and resolves
+and runs its command on PATH. `curator_cold_repository` includes only the
+explicit measurement/install witnesses; it adds no release-binary input or
+platform override. Paired deadline/protocol tests and a descendant-survival
+barrier require a runaway build to stop with `process_timeout` and no artifact.

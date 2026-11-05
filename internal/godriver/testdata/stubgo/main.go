@@ -205,9 +205,6 @@ func build(loaded script, argv []string) int {
 		fmt.Fprintln(os.Stderr, "stubgo: build without a manager-derived output")
 		return 2
 	}
-	if loaded.BuildSleepMS > 0 {
-		time.Sleep(time.Duration(loaded.BuildSleepMS) * time.Millisecond)
-	}
 	if loaded.PrivateFileBytes > 0 && loaded.PrivateFileName != "" {
 		target := filepath.Join(os.Getenv("GOCACHE"), loaded.PrivateFileName)
 		if err := os.WriteFile(target, make([]byte, loaded.PrivateFileBytes), 0o600); err != nil { // #nosec G306 -- deliberate private-state probe
@@ -242,6 +239,9 @@ func build(loaded script, argv []string) int {
 				return 1
 			}
 		}
+	}
+	if loaded.BuildSleepMS > 0 {
+		time.Sleep(time.Duration(loaded.BuildSleepMS) * time.Millisecond)
 	}
 	if loaded.BuildStderr != "" {
 		_, _ = os.Stderr.WriteString(loaded.BuildStderr)

@@ -434,8 +434,8 @@ func testBuildTerminatesTheCompleteWorkerDomain(t *testing.T, readyDelayMS int) 
 	if err := os.WriteFile(filepath.Join(barrier, "release"), nil, 0600); err != nil {
 		t.Fatal(err)
 	}
-	// Three minutes is only a hang guard (above the two-minute manager build
-	// budget), not a death verdict. Normal survivors fail via their marker.
+	// Three minutes is only a hang guard (above this fixture's 60-second
+	// worker budget), not a death verdict. Normal survivors fail via their marker.
 	watchdog, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
 	for _, raw := range pids {
