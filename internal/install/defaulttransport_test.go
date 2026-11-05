@@ -21,7 +21,7 @@ import (
 // native compiler containment or cryptographic SSH authentication.
 func TestDefaultTransportInstallScopes(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX capture transport; Windows policy has separate argv tests")
+		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
 	}
 	for _, scope := range []string{"project", "global"} {
 		for _, mode := range []string{"selected", "pinned-agent", "missing", "wrong-pin", "transport", "missing-wrapper", "https"} {
