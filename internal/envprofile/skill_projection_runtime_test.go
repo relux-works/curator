@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/skillruntime"
 	"github.com/relux-works/curator/internal/staging"
@@ -48,6 +49,14 @@ func runtimeSession(t *testing.T, home, profile, current string) (*skillruntime.
 	bin := filepath.Join(user, "bin")
 	for _, path := range []string{skillruntime.DomainDir(home), filepath.Join(home, "global", "bin"), bin} {
 		if err := privatedir.MakeAll(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// MakeAll leaves existing temp roots untouched. The supervisor fixture
+	// must protect those roots and existing route parents too, including their
+	// Windows DACLs; a private leaf alone cannot prove a private routing domain.
+	for _, root := range []string{home, user} {
+		if err := pathboundary.ProtectTree(root); err != nil {
 			t.Fatal(err)
 		}
 	}

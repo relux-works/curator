@@ -87,15 +87,25 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	// An explicit system-policy override must name an existing file. Keep the
+	// CLI fixtures isolated without making their config.Load fail on setup.
+	if err := os.WriteFile(filepath.Join(testHome, "system-config.json"), []byte("{\"schema_version\":1}\n"), 0600); err != nil {
+		panic(err)
+	}
+	// Global tests supply their own user homes. An explicit bin from this
+	// package home would correctly be refused as outside those homes. Tests
+	// exercising explicit selection set their own override with t.Setenv.
+	if err := os.Unsetenv("CURATOR_GLOBAL_USER_BIN"); err != nil {
+		panic(err)
+	}
 	for key, value := range map[string]string{
 		"HOME": testHome, "USERPROFILE": testHome,
 		"CURATOR_CONFIG": filepath.Join(testHome, "config.json"), "CURATOR_SYSTEM_CONFIG": filepath.Join(testHome, "system-config.json"),
-		"CLAUDE_CONFIG_DIR":       filepath.Join(testHome, ".claude"),
-		"CODEX_HOME":              filepath.Join(testHome, ".codex"),
-		"XDG_CONFIG_HOME":         filepath.Join(testHome, ".config"),
-		"XDG_STATE_HOME":          filepath.Join(testHome, ".local", "state"),
-		"PI_CODING_AGENT_DIR":     filepath.Join(testHome, ".pi"),
-		"CURATOR_GLOBAL_USER_BIN": filepath.Join(testHome, "bin"),
+		"CLAUDE_CONFIG_DIR":   filepath.Join(testHome, ".claude"),
+		"CODEX_HOME":          filepath.Join(testHome, ".codex"),
+		"XDG_CONFIG_HOME":     filepath.Join(testHome, ".config"),
+		"XDG_STATE_HOME":      filepath.Join(testHome, ".local", "state"),
+		"PI_CODING_AGENT_DIR": filepath.Join(testHome, ".pi"),
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			panic(err)

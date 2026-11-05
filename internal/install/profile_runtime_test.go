@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/globalbins"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/skillruntime"
@@ -51,6 +52,14 @@ func profileDomain(t *testing.T, e *env) *profileRuntimeAdmission {
 	bin := filepath.Join(user, "private-bin")
 	for _, path := range []string{skillruntime.DomainDir(e.home), filepath.Join(e.home, "global", "bin"), bin} {
 		if err := privatedir.MakeAll(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// MakeAll leaves existing temp roots untouched. Protect the fixture's
+	// manager/user roots and existing route parents as well as new leaves;
+	// inherited Windows mutation grants are not a private routing domain.
+	for _, root := range []string{e.home, user} {
+		if err := pathboundary.ProtectTree(root); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -385,20 +394,23 @@ func TestProfileRuntimePreservesRetainedDirectExports(t *testing.T) {
 }
 
 // A child package test starts with fixture "native" roots outside its HOME.
-// TestMain must replace each override, so a regression would fail this probe
-// before any product test could address those roots.
+// TestMain must replace adapter/config roots and clear inherited per-test bin
+// selection, so a regression fails before a product test addresses those roots.
 func TestProfileRuntimePackageHomeIsolation(t *testing.T) {
 	if os.Getenv("CURATOR_TEST_HOME_PROBE") == "1" {
 		home := os.Getenv("HOME")
 		if !strings.HasPrefix(filepath.Base(home), "curator-package-home-") {
 			t.Fatal("HOME not pinned by TestMain")
 		}
-		for _, key := range []string{"USERPROFILE", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "PI_CODING_AGENT_DIR", "CURATOR_CONFIG", "CURATOR_SYSTEM_CONFIG", "CURATOR_GLOBAL_USER_BIN"} {
+		for _, key := range []string{"USERPROFILE", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "PI_CODING_AGENT_DIR", "CURATOR_CONFIG", "CURATOR_SYSTEM_CONFIG"} {
 			path := os.Getenv(key)
 			rel, err := filepath.Rel(home, path)
 			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 				t.Fatalf("%s escapes package HOME", key)
 			}
+		}
+		if _, present := os.LookupEnv("CURATOR_GLOBAL_USER_BIN"); present {
+			t.Fatal("inherited explicit user-bin selection was not cleared")
 		}
 		return
 	}
