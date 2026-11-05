@@ -25,7 +25,7 @@
 #
 # `class` records WHY a tolerated skip is legitimate and is checked against
 # the reason text the test actually printed:
-#   platform-control  a control rc5-native-control-inventory-v1 defines for
+#   platform-control  a control rc5-native-control-inventory-v2 defines for
 #                     another platform only -- the AC's explicit carve-out
 #   host-capability   the runner filesystem cannot create the artefact the
 #                     vector needs (symlink, hard link, reparse point, FIFO,
@@ -131,10 +131,10 @@ internal/install	TestDryRunTouchesNothing	linux,darwin,windows	-	-	proves a dry 
 internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	-	proves runtime roots stay outside the copied agent context
 
 # ====================================================================
-# Resource policy -- rc5-native-control-inventory-v1
+# Resource policy -- rc5-native-control-inventory-v2
 # ====================================================================
 internal/godriver	TestResourceLimitsStayInsideManagerBounds	linux,darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
-internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	linux,darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
+internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	linux,darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v2 exactly
 internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	linux,darwin,windows	-	-	every native control seam failure rejects before the worker executes
 internal/godriver	TestPerFileSizeLimitIsReallyApplied	linux,darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS and Linux
 internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	linux,darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
@@ -286,7 +286,7 @@ internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	linux,dar
 
 # ====================================================================
 # Compiled-build surface runs on Linux, macOS, and Windows.
-cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
+cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v2 covers, and fails closed on the others
 cmd/curator	TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt	linux,darwin,windows	-	-	real compiled command path runs on Linux with native execution controls
 cmd/curator	TestCompiledProjectStatusAndUntrustedRecovery	linux,darwin,windows	-	-	compiled currentness and untrusted-state repair over one real installation
 cmd/curator	TestCompiledProjectRepairsCorruptCompiledState	linux,darwin,windows	-	-	corrupt compiled-cache repair over one real installation
@@ -921,3 +921,5 @@ internal/envprofile	TestProfileMCPCredentialPublicationBoundary	linux,darwin,win
 internal/envprofile	TestProjectMCPAuthorityBeforeState	linux,darwin,windows	-	-	MCP authority precedes empty acquisition and invalid or missing lock processing with explicit per-home diagnostic controls
 internal/envprofile	TestMCPCredentialAuthorityNarrowingControls	linux,darwin,windows	-	-	six bounded plants fail at intended MCP admission or prepublication assertions rather than setup or timeout
 internal/godriver	TestLinuxNativeControls	linux	-	-	real Linux kernel enforces file bounds, descriptor isolation, and descendant teardown
+
+internal/godriver	TestLinuxControlLaunchRefusals	linux	-	-	real pre-fork ExtraFiles and descriptor enumeration refusals leave no process or applied evidence

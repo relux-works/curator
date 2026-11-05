@@ -15,16 +15,25 @@ import (
 
 // Paired real-worker witnesses reject omitted domain termination at the
 // survival assertion. A setup failure, hang, skip or unrelated error never
-// counts as detection. The Go witness also rejects restored readiness sleeps.
+// counts as detection. Linux also probes descriptor leaks and pre-fork refusals.
+// The Go witness rejects restored readiness sleeps.
 func TestBuildDescendantNarrowingControls(t *testing.T) {
 	goTool := os.Getenv("CURATOR_GO")
 	if goTool == "" {
 		goTool = "go"
 	}
-	for _, plant := range []struct{ name, file, before, after, witness, message string }{
+	plants := []struct{ name, file, before, after, witness, message string }{
 		{"omit-group-kill", "controls_" + runtime.GOOS + ".go", "_ = unix.Kill(-pid, unix.SIGKILL)", "_ = pid", "TestBuildTerminatesTheCompleteWorkerDomain", "outlived the worker domain teardown: survival marker"},
 		{"restore-readiness-sleep", "testdata/stubgo/main.go", "_, readyErr := io.ReadFull(ready, acknowledgement[:])", "_, readyErr := 0, error(nil)\n time.Sleep(500*time.Millisecond)\n acknowledgement[0] = 1\n _ = io.ReadFull", "TestBuildWaitsForDelayedDescendantReadiness", "tool children did not publish their identities"},
-	} {
+	}
+	if runtime.GOOS == "linux" {
+		plants = append(plants,
+			struct{ name, file, before, after, witness, message string }{"omit-descriptor-seal", "controls_linux.go", "restrictManagerDescriptors(domain.descriptorRoot)", "error(nil)", "TestLinuxNativeControls/descriptor", "private descriptor leaked"},
+			struct{ name, file, before, after, witness, message string }{"extra-file-admitted", "controls_linux.go", "len(command.ExtraFiles) != 0", "len(command.ExtraFiles) > 1", "TestLinuxControlLaunchRefusals/extra-files", "extra-files was admitted"},
+			struct{ name, file, before, after, witness, message string }{"sealing-error-admitted", "controls_linux.go", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil {", "if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil && false {", "TestLinuxControlLaunchRefusals/sealing-failure", "sealing-failure was admitted"},
+		)
+	}
+	for _, plant := range plants {
 		t.Run(plant.name, func(t *testing.T) {
 			sourcePath, err := filepath.Abs(plant.file)
 			if err != nil {

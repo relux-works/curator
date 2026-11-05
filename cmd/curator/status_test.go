@@ -1656,9 +1656,10 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
 // TestCompiledInstallFollowsTheNativeControlInventoryExactly asserts the
 // platform carve-out of the compiled-build surface positively, in both
 // directions, on every runner — including the one where the carved-out cases
-// above do not run.
+// above do not run. The test-tagged unsupported-host witness preserves the
+// refusal branch on supported CI runners.
 //
-// rc5-native-control-inventory-v2 defines control records for exactly macOS and
+// rc5-native-control-inventory-v2 defines control records for exactly macOS, Linux and
 // Windows. The claim under test is that a compiled install succeeds on exactly
 // those platforms and fails closed everywhere else, so:
 //

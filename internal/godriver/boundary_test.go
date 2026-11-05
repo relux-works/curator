@@ -265,7 +265,7 @@ func encodeWorkerFrame(t *testing.T, message workerMessage) []byte {
 // refused by the kernel.
 func TestBuildFailsClosedWhenTheGoChildCannotStart(t *testing.T) {
 	if runtime.GOOS != "windows" {
-		t.Skip("active-process-count-limit is available only on Windows in rc5-native-control-inventory-v1")
+		t.Skip("active-process-count-limit is available only on Windows in rc5-native-control-inventory-v2")
 	}
 	fixture := newSnapshotFixture(t)
 	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})

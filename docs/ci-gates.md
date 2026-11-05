@@ -79,3 +79,11 @@ The 28 manager-config overlay gaps are attributed to the unsupported `permission
 
 The rose-air lane needs exactly one thing installed on the runner by hand:
 rustup. See [self-hosted-runner-setup.md](self-hosted-runner-setup.md).
+
+The Linux inventory successor is consumed from the separate
+`conformance/go-native-controls-v2` namespace. Default conformance lanes retain
+the frozen rc.14 predecessor. The transitional v1 reader is retained until a
+released conformance pin supplies v2; it does not widen the frozen v1 vector.
+The hosted lane also runs `TestCompiledInstallRefusesUncoveredHost` with
+`-tags=curator_test_platform`, exercising production install preflight and status
+without exposing an override in release binaries.

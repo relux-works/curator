@@ -9,13 +9,13 @@ import (
 	"syscall"
 )
 
-// rc5-native-control-inventory-v1 defines records for exactly macOS and
+// rc5-native-control-inventory-v2 defines records for exactly macOS and
 // Windows. On any other host probeNativeControls rejects before the worker
 // starts, so these entry points exist only to keep the package buildable and
 // must never be reached.
 
 func probeNativeControl(name string, _ ResourceLimits) (bool, error) {
-	return false, fmt.Errorf("rc5-native-control-inventory-v1 has no record for control %q on this platform", name)
+	return false, fmt.Errorf("rc5-native-control-inventory-v2 has no record for control %q on this platform", name)
 }
 
 // controlDomain is the manager-owned native control domain. It cannot exist on

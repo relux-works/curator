@@ -43,7 +43,8 @@ type packageInfluenceCase struct {
 	Published       bool   `json:"published"`
 }
 
-// hostExecutionVector is the accepted rc.5 authority for the portable
+// hostExecutionVector consumes the frozen predecessor or the separately pinned
+// successor authority for the portable
 // manager-worker-v1 execution policy.
 type hostExecutionVector struct {
 	ProtocolVersion                 string   `json:"protocol_version"`
@@ -161,6 +162,9 @@ func loadHostExecutionVector(t *testing.T) hostExecutionVector {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
 	}
 	path := filepath.Join(root, "vectors", "go-host-execution-policy.json")
+	if successor := os.Getenv("CURATOR_GO_CONTROL_CONFORMANCE_ROOT"); successor != "" {
+		path = filepath.Join(successor, "go-host-execution-policy.json")
+	}
 	payload, err := os.ReadFile(path) // #nosec G304 -- explicit conformance input
 	if os.IsNotExist(err) {
 		t.Skipf("%s is a pre-revision root and publishes no portable execution-policy vector", root)

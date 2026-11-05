@@ -46,7 +46,7 @@ The driver enforces strict compilation constraints before and during execution:
 - **External linking prohibition**: Builds enforce internal linking (`-ldflags=-linkmode=internal -libgcc=none`). Linker modes requiring host external linkers are rejected with `external_link_forbidden`, and host linker fallbacks are rejected with `libgcc_fallback_forbidden`.
 - **Toolchain switching prohibition**: Directives requesting another toolchain version in `go.mod` are rejected with `toolchain_switch_forbidden`.
 - **Workspace prohibition**: The presence of `go.work` files inside the build root is rejected with `workspace_dependency_forbidden`.
-- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No hardened isolation guarantee is claimed.
+- **Platform support**: Compilation is supported on macOS, Linux, and Windows. Other platforms refuse before worker launch with `build_execution_control_unavailable`. Linux uses private session/process-group teardown, `RLIMIT_FSIZE`, and close-on-exec plus explicit descriptor release. Aggregate memory and active process limits are unavailable (`no-private-aggregate-domain`); root, sudo, and cgroups are not required. Descendants that create a new session are not confined by process-group teardown. No parent-death signal is installed: if the manager is killed, its teardown cannot run; the orphan is bounded by the worker's own per-child deadlines and exits when its protocol pipe breaks. No hardened isolation guarantee is claimed.
 
 ## Script commands
 
@@ -263,3 +263,8 @@ nonstandard manager descriptors before launching the worker; it closes none in
 the parent. The launch rejects extra descriptor mappings and fails before the
 worker if descriptor sealing cannot be completed. The host must expose its own
 process descriptors through procfs.
+
+Descriptor sealing permanently sets `FD_CLOEXEC` on every manager descriptor
+numbered 3 or higher. It closes none in the parent, but inherited pass-through
+descriptors such as jobserver pipes or activation sockets will not reach later
+children of that manager process. This side effect is intentional.

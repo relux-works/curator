@@ -94,7 +94,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
-          ref: 559daf2875cf32751f9d1f824a4c1876e936bab2
+          ref: 8b34c870ab7deba99b243ba26646d68b07bb630b
           path: protocol-spec
       - uses: actions/setup-go@v5
         with:
@@ -111,10 +111,14 @@ jobs:
           [[ "$actual" == "go version go$QUALIFIED_GO_VERSION "* ]]
           [[ "$(go env GOTOOLCHAIN)" == local ]]
           [[ -z "$(go env GOENV)" || "$(go env GOENV)" == off ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Driver qualification and reproducibility
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CURATOR_GO_CONTROL_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/go-native-controls-v2
           CURATOR_REAL_GO_TEST: '1'
           CURATOR_REAL_GO_BUILD_TEST: '1'
           GOFLAGS: '-work'
@@ -123,10 +127,13 @@ jobs:
           bash .github/ci/isolated-test.sh go test -count=1 -timeout=10m -json ./internal/godriver | tee driver-tests.json
           python3 - <<'PYCODE'
           import json
-          required = {"TestLinuxNativeControls", "TestLinuxNativeControls/file-bound", "TestLinuxNativeControls/descriptor", "TestLinuxNativeControls/descendant", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
+          required = {"TestLinuxControlLaunchRefusals", "TestLinuxNativeControls", "TestLinuxNativeControls/file-bound", "TestLinuxNativeControls/descriptor", "TestLinuxNativeControls/descendant", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
           passed = {row.get("Test") for line in open("driver-tests.json") if (row := json.loads(line)).get("Action") == "pass"}
           assert required <= passed, required - passed
           PYCODE
+      - name: Unsupported-host CLI refusal through the production install path
+        shell: bash
+        run: bash .github/ci/isolated-test.sh go test -tags=curator_test_platform -count=1 -timeout=10m -v ./cmd/curator -run '^TestCompiledInstallRefusesUncoveredHost$'
       - name: Driver vet
         run: go vet ./internal/godriver
       - name: Build manager
@@ -162,7 +169,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
-          ref: 559daf2875cf32751f9d1f824a4c1876e936bab2
+          ref: 8b34c870ab7deba99b243ba26646d68b07bb630b
           path: protocol-spec
       - uses: actions/setup-go@v5
         with:
@@ -179,10 +186,14 @@ jobs:
           [[ "$actual" == "go version go$QUALIFIED_GO_VERSION "* ]]
           [[ "$(go env GOTOOLCHAIN)" == local ]]
           [[ -z "$(go env GOENV)" || "$(go env GOENV)" == off ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Driver qualification and reproducibility
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CURATOR_GO_CONTROL_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/go-native-controls-v2
           CURATOR_REAL_GO_TEST: '1'
           CURATOR_REAL_GO_BUILD_TEST: '1'
           GOFLAGS: '-work'
@@ -214,9 +225,9 @@ jobs:
   # deferred set is empty here and every package runs with
   # CURATOR_CONFORMANCE_ROOT exported; a pin that stopped publishing one would
   # defer its package and name the missing artefact in the report rather than
-  # dropping it. `internal/godriver` -- which implements
-  # rc5-native-control-inventory-v2, defined for macOS and Windows only -- is
-  # excluded on linux with its fail-closed rejection asserted there. Nothing is
+  # dropping it. `internal/godriver` implements the successor native inventory
+  # on macOS, Linux and Windows; unsupported-host refusal is exercised separately
+  # through a test-tagged production CLI entry point. Nothing is
   # dropped without appearing in the uploaded evidence.
   # ---------------------------------------------------------------------------
   # Four jobs share all three measured slow Windows packages; no OS cross product.

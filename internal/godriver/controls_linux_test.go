@@ -87,10 +87,25 @@ func TestLinuxNativeControls(t *testing.T) {
 		if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, 0); err != nil {
 			t.Fatal(err)
 		}
-		cmd := exec.Command("/bin/sh", "-c", `test "$(readlink /proc/self/fd/"$1")" != "$2"`, "control", strconv.Itoa(fd), target)
+		// -ef compares object identity, including symlinked TMPDIR components.
+		// Exit 42 means the private object is inherited; other failures are not
+		// evidence that the isolation witness detected a leak.
+		probe := func() *exec.Cmd {
+			return exec.Command("/bin/sh", "-c", `if [ /proc/self/fd/"$1" -ef "$2" ]; then exit 42; fi`, "control", strconv.Itoa(fd), target)
+		}
+		unsealed := probe()
+		var detected *exec.ExitError
+		if err := unsealed.Run(); !errors.As(err, &detected) || detected.ExitCode() != 42 {
+			t.Fatalf("unsealed descriptor detection control missed the leak: %v", err)
+		}
+		cmd := probe()
 		launch(cmd)
 		if err := cmd.Wait(); err != nil {
-			t.Fatalf("private descriptor leaked: %v", err)
+			var exit *exec.ExitError
+			if errors.As(err, &exit) && exit.ExitCode() == 42 {
+				t.Fatalf("private descriptor leaked: %v", err)
+			}
+			t.Fatalf("descriptor probe failed outside the leak assertion: %v", err)
 		}
 		// The parent retains a usable descriptor after worker isolation.
 		if _, err := unix.Write(fd, []byte("parent retains custody")); err != nil {
@@ -131,4 +146,58 @@ func TestLinuxNativeControls(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	})
+}
+
+// Rejections leave no worker and no applied evidence; the positive launch uses
+// the same manager domain and command, with its real descriptor enumeration.
+func TestLinuxControlLaunchRefusals(t *testing.T) {
+	limits, err := normalizeBuildLimits(ResourceLimits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, probes, err := probeNativeControls(limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"valid", "extra-files", "sealing-failure"} {
+		t.Run(name, func(t *testing.T) {
+			domain, err := prepareControlDomain(limits, probes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("/bin/sh", "-c", "exit 0")
+			t.Cleanup(func() { domain.destroy(cmd) })
+			if name == "extra-files" {
+				file, err := os.Open(os.DevNull)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = file.Close() })
+				cmd.ExtraFiles = []*os.File{file}
+			}
+			if name == "sealing-failure" {
+				// Exercise an actual enumeration error without changing live procfs.
+				domain.descriptorRoot = filepath.Join(t.TempDir(), "absent-proc-fd")
+			}
+			err = domain.launch(cmd)
+			if name == "valid" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(domain.installedControls()) != 3 {
+					t.Fatal("valid launch lacks installed evidence")
+				}
+				if err := cmd.Wait(); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if DiagnosticCode(err) != CodeControlUnavailable {
+				t.Fatalf("%s was admitted or reported the wrong refusal: %v", name, err)
+			}
+			if cmd.Process != nil || len(domain.installedControls()) != 0 {
+				t.Fatalf("%s refusal created a worker or applied evidence", name)
+			}
+		})
+	}
 }

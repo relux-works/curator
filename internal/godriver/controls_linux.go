@@ -81,6 +81,10 @@ func probeNativeControl(name string, limits ResourceLimits) (bool, error) {
 		}
 		return applied.Cur == wanted, nil
 	case ControlInheritedHandleRestriction:
+		// Enumerating the manager's own procfs descriptors must be possible.
+		if _, err := os.ReadDir("/proc/self/fd"); err != nil {
+			return false, err
+		}
 		// Close-on-exec must be readable and settable for the descriptors the
 		// worker holds when the compiler starts.
 		var pair [2]int
@@ -110,11 +114,12 @@ func probeNativeControl(name string, limits ResourceLimits) (bool, error) {
 // worker and every descendant inherit it. Nothing is applied after the worker
 // begins executing, so CodeControlUnavailable cannot first appear there.
 type controlDomain struct {
-	controls  []string
-	session   bool
-	fileBound bool
-	fileBytes uint64
-	installed bool
+	controls       []string
+	session        bool
+	fileBound      bool
+	fileBytes      uint64
+	installed      bool
+	descriptorRoot string // manager-selected procfs path; never package input
 }
 
 // prepareControlDomain builds the Linux domain from this operation's probes. It
@@ -124,7 +129,7 @@ func prepareControlDomain(limits ResourceLimits, probes []ControlProbe) (*contro
 	if err := seamFault(seamPrepare); err != nil {
 		return nil, diagnosticErr(CodeControlUnavailable, err, "cannot create the manager-owned native control domain")
 	}
-	domain := &controlDomain{}
+	domain := &controlDomain{descriptorRoot: "/proc/self/fd"}
 	for _, name := range installableControls(probes) {
 		switch name {
 		case ControlDescendantDomainTermination:
@@ -157,7 +162,7 @@ func (domain *controlDomain) launch(command *exec.Cmd) error {
 	if len(command.ExtraFiles) != 0 {
 		return diagnostic(CodeControlUnavailable, "worker launch cannot inherit extra descriptors")
 	}
-	if err := restrictManagerDescriptors(); err != nil {
+	if err := restrictManagerDescriptors(domain.descriptorRoot); err != nil {
 		return diagnosticErr(CodeControlUnavailable, err, "cannot restrict inherited descriptors before worker launch")
 	}
 
@@ -314,8 +319,8 @@ func terminateWorkerDomain(command *exec.Cmd) {
 // Go-created descriptors are close-on-exec, but native libraries or callers may
 // open inheritable descriptors. Seal those too before fork; explicit standard
 // streams are remapped by exec.Cmd. No descriptor is closed in the parent.
-func restrictManagerDescriptors() error {
-	entries, err := os.ReadDir("/proc/self/fd")
+func restrictManagerDescriptors(descriptorRoot string) error {
+	entries, err := os.ReadDir(descriptorRoot)
 	if err != nil {
 		return err
 	}

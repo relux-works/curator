@@ -39,7 +39,7 @@ var buildArgumentPrefix = []string{
 // ResourceLimits is the bounded execution request applied to one operation.
 // Timeout, OutputBytes, and ArtifactBytes are parent-enforced over the whole
 // worker domain. FileBytes, MemoryBytes, and Processes are applied only where
-// rc5-native-control-inventory-v1 marks the corresponding control available;
+// rc5-native-control-inventory-v2 marks the corresponding control available;
 // the portable profile claims no hard aggregate descendant bound.
 type ResourceLimits struct {
 	Timeout       time.Duration

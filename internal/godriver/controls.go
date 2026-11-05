@@ -1,7 +1,6 @@
 package godriver
 
 import (
-	"runtime"
 	"sort"
 
 	"github.com/relux-works/curator/internal/buildmeta"
@@ -240,7 +239,7 @@ func inInventory(name string) bool {
 // controls this host provides for exactly these limits. It is called in the
 // parent before the worker exists and starts no program.
 func probeNativeControls(limits ResourceLimits) (string, []ControlProbe, error) {
-	return probeNativeControlsFor(InventoryPlatform(runtime.GOOS), limits)
+	return probeNativeControlsFor(InventoryPlatform(nativeControlHost()), limits)
 }
 
 // probeNativeControlsFor is the platform-parameterized probe. A platform the
@@ -251,7 +250,7 @@ func probeNativeControlsFor(platform string, limits ResourceLimits) (string, []C
 	if platform == "" || nativeControlPlatforms[platform] == nil {
 		return "", nil, diagnostic(CodeControlUnavailable,
 			"rc5-native-control-inventory-v2 defines no record for host %s (platform %q); the portable execution policy is specified for macOS, Linux, and Windows only",
-			runtime.GOOS, platform)
+			nativeControlHost(), platform)
 	}
 	records := nativeControlPlatforms[platform]
 	probes := make([]ControlProbe, 0, len(nativeControlInventory))
