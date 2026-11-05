@@ -38,7 +38,7 @@ func TestColdRepositoryMeasurement(t *testing.T) {
 	config := ConfigFromEnvironment(t.TempDir(), snapshot)
 	config.CuratorGo = filepath.Join(build.Default.GOROOT, "bin", platformGoName)
 	config.observePhase = func(phase string, elapsed time.Duration) { t.Logf("cold phase=%s elapsed=%s", phase, elapsed) }
-	t.Logf("measurement scheduling band=%s (unset means unclassified)", os.Getenv("CURATOR_COLD_SCHEDULING_BAND"))
+	t.Logf("measurement host class=%s (unset means unclassified)", os.Getenv("CURATOR_COLD_HOST_CLASS"))
 	session, err := Establish(t.Context(), config)
 	if err != nil {
 		t.Fatal(err)

@@ -328,3 +328,10 @@ staging `saveJournal`/`File.Sync`, after compilation. It was not a worker-budget
 expiry. The cold-install harness now allows one worker budget plus five minutes
 for transactional publication (20 minutes total); the public job records its
 actual elapsed time. That is a test watchdog, not a product install deadline.
+
+The rerun on the configured target Linux host completed the full install in
+183.915 s and then resolved and ran `coldtool` by name through the test-configured
+PATH. Its separate cold Build took 7.805 s (list 0.089 s, build 5.623 s), with
+fingerprinting at 0.480 s. Those measurements and the earlier transaction-stack
+sample separate compilation from full-install publication overhead; they do not
+provide an install-level runtime guarantee.
