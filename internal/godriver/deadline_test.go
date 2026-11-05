@@ -94,3 +94,40 @@ func TestWorkerSharesWholeSessionBudget(t *testing.T) {
 		})
 	}
 }
+
+// A successful compiler result is still rejected when the parent deadline
+// expires before verification/acceptance. The live control publishes normally.
+func TestBuildRejectsArtifactAfterParentDeadline(t *testing.T) {
+	for _, expire := range []bool{false, true} {
+		t.Run(map[bool]string{false: "live", true: "expired"}[expire], func(t *testing.T) {
+			fixture := newSnapshotFixture(t)
+			fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
+			duration := time.Minute
+			if expire {
+				duration = 2 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), duration)
+			defer cancel()
+			var completed bool
+			fixture.session.observePhase = func(phase string, _ time.Duration) {
+				if phase == "build" {
+					completed = true
+					if expire {
+						<-ctx.Done()
+					}
+				}
+			}
+			result, err := Build(ctx, fixture.request(ResourceLimits{}))
+			if !completed {
+				t.Fatal("compiler did not complete before the acceptance barrier")
+			}
+			if expire {
+				if DiagnosticCode(err) != "process_timeout" || result.Artifact.StagedPath != "" {
+					t.Fatalf("expired artifact accepted: result=%+v err=%v", result, err)
+				}
+			} else if err != nil || result.Artifact.StagedPath == "" {
+				t.Fatalf("live artifact rejected: result=%+v err=%v", result, err)
+			}
+		})
+	}
+}
