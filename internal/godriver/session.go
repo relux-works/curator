@@ -360,7 +360,8 @@ func (session *Session) VerifyToolchain(ctx context.Context) error {
 		return errors.Join(contextFailure(ctx), diagnosticErr("toolchain_mutated", err, "cannot revalidate toolchain"))
 	}
 	if digest != session.toolchain.ContentSHA256 || !reflect.DeepEqual(state, session.state) {
-		return diagnostic("toolchain_mutated", "toolchain tree changed during operation")
+		path, change := firstToolchainChange(session.state, state)
+		return diagnostic("toolchain_mutated", "toolchain tree changed during operation: path=%q change=%s", path, change)
 	}
 	return nil
 }
