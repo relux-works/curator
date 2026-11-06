@@ -1,0 +1,171 @@
+{
+  "controls": [
+    {
+      "case": "mismatch-replay",
+      "exit": 2,
+      "expected_reason": "candidate digest differs: codex; no execution or admission",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "mismatch-startup",
+      "exit": 2,
+      "expected_reason": "candidate digest differs: codex; no execution or admission",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "mismatch-canary",
+      "exit": 3,
+      "expected_reason": "candidate digest differs: codex; no execution or admission",
+      "plant_executed": false,
+      "admitted": false
+    },
+    {
+      "case": "missing-provider-replay",
+      "exit": 2,
+      "expected_reason": "candidate must pin all three providers",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "missing-provider-startup",
+      "exit": 2,
+      "expected_reason": "candidate must pin all three providers",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "missing-provider-canary",
+      "exit": 3,
+      "expected_reason": "candidate must pin all three providers",
+      "plant_executed": false,
+      "admitted": false
+    },
+    {
+      "case": "missing-digest-replay",
+      "exit": 2,
+      "expected_reason": "missing or invalid candidate digest: codex",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "missing-digest-startup",
+      "exit": 2,
+      "expected_reason": "missing or invalid candidate digest: codex",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "missing-digest-canary",
+      "exit": 3,
+      "expected_reason": "missing or invalid candidate digest: codex",
+      "plant_executed": false,
+      "admitted": false
+    },
+    {
+      "case": "missing-version-replay",
+      "exit": 2,
+      "expected_reason": "missing or invalid candidate version: codex",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "missing-version-startup",
+      "exit": 2,
+      "expected_reason": "missing or invalid candidate version: codex",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "missing-version-canary",
+      "exit": 3,
+      "expected_reason": "missing or invalid candidate version: codex",
+      "plant_executed": false,
+      "admitted": false
+    },
+    {
+      "case": "admission-injection-replay",
+      "exit": 2,
+      "expected_reason": "invalid candidate format, platform or admission",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "admission-injection-startup",
+      "exit": 2,
+      "expected_reason": "invalid candidate format, platform or admission",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "admission-injection-canary",
+      "exit": 3,
+      "expected_reason": "invalid candidate format, platform or admission",
+      "plant_executed": false,
+      "admitted": false
+    },
+    {
+      "case": "absent-candidate-replay",
+      "exit": 2,
+      "expected_reason": "candidate digest differs: codex; no execution or admission",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "absent-candidate-startup",
+      "exit": 2,
+      "expected_reason": "candidate digest differs: codex; no execution or admission",
+      "plant_executed": false,
+      "admitted": false,
+      "fixture_created": false
+    },
+    {
+      "case": "matching-replay",
+      "exit": 0,
+      "expected_reason": null,
+      "plant_executed": false,
+      "admitted": false,
+      "candidate_recorded": true
+    },
+    {
+      "case": "matching-canary",
+      "exit": 2,
+      "expected_reason": null,
+      "plant_executed": false,
+      "admitted": false
+    }
+  ],
+  "matching_replay_exit": 0,
+  "candidate": {
+    "format": "provider-release-candidate-v1",
+    "platform": "darwin/arm64",
+    "admitted": false,
+    "releases": {
+      "codex": {
+        "version": "0.164.0",
+        "sha256": "d8990e3ee7acfbc26f91265b12a1a83f0fee40d0e0f8f1f40a37d4ec21f499cf"
+      },
+      "claude": {
+        "version": "2.1.311",
+        "sha256": "85d8c08707fcfd1e78ffa0204eefbc6ec9e4fe22f375fb2767ef85d957ed3161"
+      },
+      "muse": {
+        "version": "1.4.13-R6996.1",
+        "sha256": "9fd40ae9c6dfb847e3ef58b61405c004d0ebbf19ceb0297be966f750b3b84aa0"
+      }
+    }
+  },
+  "admitted": false
+}

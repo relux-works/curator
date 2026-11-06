@@ -48,7 +48,7 @@ def main():
     for case in fixture["bundle_cases"]:
         bundle = scratch / case["name"]
         bundle.mkdir()
-        for name in ("canary.py", "canary-fixture.json", "baseline.json"):
+        for name in ("canary.py", "candidate.py", "canary-fixture.json", "baseline.json"):
             shutil.copyfile(HERE / name, bundle / name)
         shutil.copytree(HERE / "evidence", bundle / "evidence")
         candidate = bundle / "baseline.json"
