@@ -1036,3 +1036,6 @@ internal/projectcontext	TestCompositionUnknownRead/publish	linux,darwin	-	-	publ
 internal/projectcontext	TestCompositionUnknownRead/resolve	linux,darwin	-	-	resolve refuses unknown metadata without a lapse or authority result; recovery and record preservation pass
 internal/projectcontext	TestCompositionUnknownRead/authorize	linux,darwin	-	-	authorize refuses unknown metadata without a lapse or authority result; recovery and record preservation pass
 internal/projectcontext	TestRegistrationFilesystemQualification	linux,darwin,windows	-	-	fresh native registration succeeds where qualified and otherwise retains unsupported refusal before manager or checkout writes; portable equal-binding control passes
+internal/projectcontext	TestRegistrationRootReadWindow/ordinary-checkout	linux,darwin	-	-	ordinary branch switches preserve an unchanged tuple while real root replacement durably lapses
+internal/projectcontext	TestRegistrationRootReadWindow/replaced-root	linux,darwin	-	-	ordinary branch switches preserve an unchanged tuple while real root replacement durably lapses
+internal/projectcontext	TestRegistrationRootReadWindow/valid-mode-change	linux,darwin	-	-	admitted directory mode changes are not checkout identity changes

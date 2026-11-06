@@ -214,7 +214,12 @@ func bind(p string) (binding, error) {
 	if (readErr != nil && readErr != io.EOF) || statErr != nil {
 		return b, bindingUnknown("root cannot be verified; explicitly rebind")
 	}
-	if !same(st, opened) {
+	if !opened.IsDir() || opened.Mode().Perm()&0500 != 0500 {
+		return b, bindingFailure("root is unreadable or not a directory")
+	}
+	// Root resampling asks for device/inode stability, not unchanged directory
+	// contents. Ordinary commits/branch switches may change size and mtime.
+	if !os.SameFile(st, opened) {
 		return b, bindingFailure("root cannot be verified; explicitly rebind")
 	}
 	fs, err := filesystemIdentity(st)
@@ -262,7 +267,10 @@ func bind(p string) (binding, error) {
 	if err != nil {
 		return b, bindingPathReadFailure(err, "root changed while binding")
 	}
-	if !same(st, after) {
+	if !after.IsDir() || after.Mode().Perm()&0500 != 0500 {
+		return b, bindingFailure("root is unreadable or not a directory")
+	}
+	if !os.SameFile(st, after) {
 		return b, bindingFailure("root changed while binding")
 	}
 	b = binding{repository{canonical, remote, commit}, fs}
