@@ -951,7 +951,7 @@ func AcquireNetworkResolved(ctx context.Context, base NetworkRequest, plan Trans
 	refuse := func(record *AttemptRecord, err error) (bool, error) {
 		record.Class, record.NetworkAttempted = classifyAttemptError(ctx, err), false
 		emit(*record)
-		return gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(err))
+		return gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(err, base.Source.Transport))
 	}
 	for index, attempt := range plan.Attempts {
 		// Provenance is bound before any traffic: the canonical plan
@@ -1003,7 +1003,7 @@ func AcquireNetworkResolved(ctx context.Context, base NetworkRequest, plan Trans
 		record.NetworkAttempted = true
 		record.Class = classifyAttemptError(ctx, attemptErr)
 		emit(record)
-		if done, terminal := gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(attemptErr)); done {
+		if done, terminal := gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(attemptErr, request.Source.Transport)); done {
 			return nil, terminal
 		}
 	}

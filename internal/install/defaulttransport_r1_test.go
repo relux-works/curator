@@ -61,6 +61,8 @@ func TestR1ProjectBinSSHSelected(t *testing.T) {
 // Missing credentials refuse on the actual default acquisition path before
 // any Git/SSH probe on every platform, including Windows. No network or writes.
 func TestDefaultTransportMissingCredentialsPortable(t *testing.T) {
+	// Invalid explicit selection guarantees this never depends on host ssh.
+	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", "relative-ssh")
 	source, err := buildrepo.ParseSource("git@example.test:skills/tool.git")
 	if err != nil {
 		t.Fatal(err)

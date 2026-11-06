@@ -612,3 +612,15 @@ shim, no real Windows SSH fetch and no real security-token control.
 The hosted controls qualify source acquisition and native build/publication
 separately. A single Linux install combining real SSH fetch, native build and
 publication end to end has not been witnessed by this change.
+
+### Diagnostic and executable-selection limits
+
+Remote banner or stderr text on an already failing fetch can produce a false
+`host_key_verification_failed` label. The result remains fail-closed: no fallback
+is allowed and remote text is never echoed. The label alone does not prove that
+the pinned host key changed.
+
+Managed-root matching conservatively checks path segments. It can refuse a
+configured path that is not actually managed, such as
+`/opt/runtime/openssh/bin/ssh`. Select an absolute client outside those segments
+with `CURATOR_BUILD_SSH_EXECUTABLE`; the override does not bypass this check.

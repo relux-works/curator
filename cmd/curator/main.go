@@ -2046,7 +2046,7 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 	// operation-diagnostics log, never a portable artifact. The sink is
 	// always assigned so a real opted-in acquisition records its
 	// canonical identity with the listed and resolved mirror provenance;
-	// the legacy lane never invokes it.
+	// unresolved acquisition never invokes it.
 	deps.DraftTransportTrace = install.DraftTransportProvenanceTrace(cfg.Home())
 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
 		candidate := audit.Subject{
@@ -2075,7 +2075,7 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 func productionGitTool() buildrepo.GitTool {
 	gitPath, err := buildrepo.SelectTrustedExecutable("git", os.Getenv("CURATOR_BUILD_GIT_EXECUTABLE"), buildrepo.OperatorManagedExecutableRoots()...)
 	if err != nil {
-		return buildrepo.GitTool{SelectionError: buildrepo.TrustedExecutableSelectionError(err)}
+		return buildrepo.GitTool{SelectionError: buildrepo.TrustedExecutableSelectionError(fmt.Errorf("%w; configure CURATOR_BUILD_GIT_EXECUTABLE with an admitted absolute executable", err))}
 	}
 	run := func(args ...string) string {
 		command := exec.Command(gitPath, args...) // #nosec G204 G702 -- SelectTrustedExecutable rejects relative and managed paths; fixed discovery arguments, no shell.

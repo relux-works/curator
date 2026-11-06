@@ -147,7 +147,7 @@ manager-home operation diagnostics log
 `draft-transport-provenance.jsonl` (mode 0600, fixed allowlisted fields
 only: canonical identity, listed URL, resolved host and port, alias and
 `mirror_of` when used, lane transport, provider identifier, outcome) —
-never portable artifacts. The legacy lane never invokes it, so
+never portable artifacts. The default acquisition path never invokes it, so
 disabled-gate runs create no file.
 
 Policy-named providers resolve only through the operator's provider table,

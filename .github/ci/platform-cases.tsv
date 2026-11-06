@@ -962,3 +962,5 @@ internal/godriver	TestWorkerExitNarrowingControls/coded-cause-first	linux,darwin
 internal/godriver	TestWorkerExitNarrowingControls/main-failure-closed-output	linux,darwin	-	-	Worker exec disposition and status precedence regression
 internal/install	TestProfileSkillPlanRealCompileBeforeLock	linux,darwin,windows	-	-	real profile native compile and compiler/artifact refusals precede v5 lock publication
 internal/install	TestProfileRuntimePublication	linux,darwin,windows	-	-	private profile runtime publication and refusals; POSIX shim execution requires exact fixture output
+
+internal/buildrepo	TestSSHGitSelectionPrecedence	linux,darwin,windows	-	-	missing Git refuses deterministically before secondary paths without executing a fixture

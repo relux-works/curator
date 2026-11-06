@@ -100,23 +100,31 @@ func TestNoSSHExecutableDiagnostic(t *testing.T) {
 // Static authentication and host verification labels survive the pipeline as
 // typed reasons. An ordinary connection refusal remains a transport failure;
 // unrelated message text cannot promote an untyped error to either category.
+// Only SSH authentication gets the provider remedy; HTTPS 401 must not.
 func TestCredentialFailureTypedReasons(t *testing.T) {
 	for _, c := range []struct {
-		stderr string
-		reason AcquisitionReason
-		code   string
+		stderr    string
+		transport string
+		reason    AcquisitionReason
+		code      string
 	}{
-		{"Permission denied (publickey).", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
-		{"Host key verification failed.", ReasonHostKeyFailed, CodeCredentialPolicyInvalid},
-		{"Connection refused", ReasonTransportFailed, CodeSourceUnavailable},
+		{"Permission denied (publickey).", "ssh", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
+		{"The requested URL returned error: 401", "https", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
+		{"Host key verification failed.", "ssh", ReasonHostKeyFailed, CodeCredentialPolicyInvalid},
+		{"Connection refused", "ssh", ReasonTransportFailed, CodeSourceUnavailable},
 	} {
-		_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Acquire: func(context.Context) (*Snapshot, error) { return nil, laneDiagnostic(&fetchError{stderr: c.stderr}) }})
+		_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Acquire: func(context.Context) (*Snapshot, error) {
+			return nil, laneDiagnostic(&fetchError{stderr: c.stderr}, c.transport)
+		}})
 		var typed *AdmissionError
 		if !errors.As(err, &typed) || typed.Reason != c.reason || typed.Code != c.code || strings.Contains(err.Error(), c.stderr) {
 			t.Fatalf("typed refusal: %v", err)
 		}
-		if c.reason == ReasonAuthenticationFailed && (strings.Count(err.Error(), ";") != 1 || !strings.Contains(err.Error(), "security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE")) {
+		if c.reason == ReasonAuthenticationFailed && c.transport == "ssh" && (strings.Count(err.Error(), ";") != 1 || !strings.Contains(err.Error(), "security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE")) {
 			t.Fatalf("static authentication remedy: %v", err)
+		}
+		if c.transport == "https" && strings.Contains(err.Error(), "CURATOR_BUILD_SSH_EXECUTABLE") {
+			t.Fatalf("HTTPS got SSH remedy: %v", err)
 		}
 	}
 	untyped := admissionError(CodeIdentityInvalid, "text (authentication_failed)")
@@ -236,5 +244,44 @@ Host key verification failed.
 		if AllowSecondAttempt(TransportFallbackAvailabilityAuth, ClassifyFetchOutput(c.output)) {
 			t.Fatal("host key permitted fallback")
 		}
+	}
+}
+
+// SSH admission preserves credential, Git selection, then wrapper order. Missing,
+// relative and managed-root selections produce no snapshot or file mutation;
+// the selected-file control reaches the neighboring wrapper refusal.
+func TestSSHGitSelectionPrecedence(t *testing.T) {
+	source, err := ParseSource("git@fixture.test:tools.git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "git")
+	if err := os.WriteFile(p, []byte("unchanged"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, reason := range []string{"", "git executable must be absolute", "git executable is inside a managed command root"} {
+		tool := GitTool{}
+		want := "no git executable found"
+		if reason != "" {
+			tool.SelectionError = TrustedExecutableSelectionError(errors.New(reason))
+			want = reason
+		}
+		request := NetworkRequest{Source: source, Tool: tool, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}}
+		snapshot, err := AcquireNetwork(context.Background(), request)
+		if snapshot != nil || ErrorCode(err) != CodeSSHCredentialMissing {
+			t.Fatalf("credential precedence: %v", err)
+		}
+		request.Tool.SSHCredentials.Identity = p
+		snapshot, err = AcquireNetwork(context.Background(), request)
+		if snapshot != nil || ErrorCode(err) != CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), want) {
+			t.Fatalf("selection %q: %v", want, err)
+		}
+	}
+	snapshot, err := AcquireNetwork(context.Background(), NetworkRequest{Source: source, Tool: GitTool{Executable: p, SSHCredentials: OperatorSSHCredentials{Identity: p}}, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}})
+	if snapshot != nil || !strings.Contains(err.Error(), "SSH requires the exact manager wrapper") {
+		t.Fatalf("selected control: %v", err)
+	}
+	if got, err := os.ReadFile(p); err != nil || string(got) != "unchanged" {
+		t.Fatalf("fixture changed: %v", err)
 	}
 }

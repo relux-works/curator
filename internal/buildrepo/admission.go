@@ -299,7 +299,7 @@ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, err
 	defer cancel()
 	snapshot, err := acquireNetworkFormat(ctx, request, limits)
 	if err != nil {
-		return nil, laneDiagnostic(err)
+		return nil, laneDiagnostic(err, request.Source.Transport)
 	}
 	return snapshot, nil
 }
@@ -334,6 +334,11 @@ func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
 		return admissionError(CodeSSHCredentialMissing,
 			"SSH build repositories require an operator identity or agent")
 	}
+	if request.Source.Transport == "ssh" {
+		if err := validateGitSelection(request.Tool); err != nil {
+			return err
+		}
+	}
 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
 		return admissionError(CodeCredentialPolicyInvalid, "SSH requires the exact manager wrapper")
 	}
@@ -360,7 +365,7 @@ func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
 
 // fetchError is a failed exact-ref fetch with its bounded stderr retained
 // for transport failure classification. The message never carries the
-// output: AcquireNetwork maps it to the legacy lane diagnostic, and the
+// output: AcquireNetwork maps it to the default acquisition diagnostic, and the
 // bounded resolver classifies from the field without interpolating it.
 // truncated reports that stderr overflowed the bound, so the retained
 // prefix is incomplete and must never authorize a fallback.
@@ -372,10 +377,10 @@ type fetchError struct {
 func (e *fetchError) Error() string { return "exact source fetch failed" }
 
 // laneDiagnostic maps an internal acquisition failure to the lane's own
-// diagnostic: a fetch failure becomes the legacy CodeSourceUnavailable
+// diagnostic: a fetch failure becomes the default CodeSourceUnavailable
 // error, which never carries fetch output. Every other error already is
 // a lane diagnostic and passes through unchanged.
-func laneDiagnostic(err error) error {
+func laneDiagnostic(err error, transport ...string) error {
 	var fetch *fetchError
 	if errors.As(err, &fetch) {
 		reason, code := ReasonTransportFailed, CodeSourceUnavailable
@@ -390,7 +395,7 @@ func laneDiagnostic(err error) error {
 			}
 		}
 		message := fmt.Sprintf("exact source fetch failed (%s)", reason)
-		if reason == ReasonAuthenticationFailed {
+		if reason == ReasonAuthenticationFailed && len(transport) == 1 && transport[0] == "ssh" {
 			message += "; a security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE"
 		}
 		return &AdmissionError{Code: code, Reason: reason, err: errors.New(message)}

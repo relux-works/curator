@@ -332,7 +332,7 @@ func TestDraftSSHWrapperBase(t *testing.T) {
 		t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", filepath.Join(root, "absent-ssh"))
 		base, cleanup, err := draftSSHWrapperBase()
 		defer cleanup()
-		if buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || err.Error() != buildrepo.CodeCredentialPolicyInvalid+": no ssh executable found" {
+		if buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || err.Error() != buildrepo.CodeCredentialPolicyInvalid+": no ssh executable found; configure CURATOR_BUILD_SSH_EXECUTABLE with an admitted absolute executable" {
 			t.Fatalf("selection refusal: %v", err)
 		}
 		if entries, err := os.ReadDir(root); err != nil || len(entries) != 0 {

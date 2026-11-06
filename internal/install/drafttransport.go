@@ -238,7 +238,7 @@ func draftSSHWrapperBase() (buildrepo.SSHWrapperBase, func(), error) {
 	none := func() {}
 	ssh, err := buildrepo.SelectTrustedExecutable("ssh", os.Getenv("CURATOR_BUILD_SSH_EXECUTABLE"), buildrepo.OperatorManagedExecutableRoots()...)
 	if err != nil {
-		return buildrepo.SSHWrapperBase{}, none, buildrepo.TrustedExecutableSelectionError(err)
+		return buildrepo.SSHWrapperBase{}, none, buildrepo.TrustedExecutableSelectionError(fmt.Errorf("%w; configure CURATOR_BUILD_SSH_EXECUTABLE with an admitted absolute executable", err))
 	}
 	dir, err := os.MkdirTemp("", "curator-draft-ssh-")
 	if err != nil {
@@ -283,6 +283,9 @@ func draftManagerExecutableFrom(executable string) (string, error) {
 // wrapper policy as resolved transport. An injected base is used by isolated
 // transport fixtures; production discovers the SSH executable and empty files.
 func acquireDefaultNetwork(ctx context.Context, base buildrepo.NetworkRequest) (*buildrepo.Snapshot, error) {
+	if base.Source.Transport == "ssh" && !base.Tool.SSHCredentials.Selected() {
+		return buildrepo.AcquireNetwork(ctx, base)
+	}
 	if base.Source.Transport == "ssh" && base.Tool.SSHBase == (buildrepo.SSHWrapperBase{}) {
 		sshBase, cleanup, err := draftSSHWrapperBase()
 		if err != nil {
