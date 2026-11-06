@@ -1004,7 +1004,7 @@ internal/projectcontext	TestGitTagEnumerationBounds	linux,darwin,windows	-	-	bou
 internal/projectcontext	TestBindingObservationDisposition	linux,darwin,windows	-	-	unknown reads are distinguished from observed change and open conservative cases; equal tuple passes
 internal/projectcontext	TestRegistrationUnknownRead	linux,darwin	-	-	real spawn refusal denies public use without writing state or lapse; same tuple recovers
 internal/projectcontext	TestRegistrationChangeAfterUnknown	linux,darwin	-	-	real root remote and root ancestor changes lapse permanently during or after unknown metadata
-internal/projectcontext	TestRegistrationOpenLapseCases	linux,darwin	-	-	missing root repository exit128 and multiple roots retain conservative durable lapse pending owner decision
+internal/projectcontext	TestRegistrationOpenLapseCases	linux,darwin	-	-	missing root and multiple roots retain conservative durable lapse pending owner decision
 internal/projectcontext	TestRegistrationUnknownRead/Inspect	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
 internal/projectcontext	TestRegistrationUnknownRead/Inspect/final-recheck	linux,darwin	-	-	a refused second observation denies publication without a lapse or state write
 internal/projectcontext	TestRegistrationUnknownRead/Preview	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
@@ -1027,7 +1027,6 @@ internal/projectcontext	TestRegistrationChangeAfterUnknown/removed-remote/after	
 internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-root-ancestor/during	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
 internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-root-ancestor/after	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
 internal/projectcontext	TestRegistrationOpenLapseCases/missing-root	linux,darwin	-	-	open case retains the existing conservative lapse and rejects restoration
-internal/projectcontext	TestRegistrationOpenLapseCases/not-a-repository	linux,darwin	-	-	open case retains the existing conservative lapse and rejects restoration
 internal/projectcontext	TestRegistrationOpenLapseCases/multiple-roots	linux,darwin	-	-	open case retains the existing conservative lapse and rejects restoration
 internal/projectcontext	TestRegistrationUnavailableCWDUnknownRead	linux,darwin	-	-	unknown root metadata cannot authorize a missing child CWD or lapse its valid root; healthy root recovers
 internal/projectcontext	TestCompositionUnknownRead	linux,darwin	-	-	local manager composition calls refuse unknown reads without lapsing or mutating retained records; same tuple recovers
@@ -1039,3 +1038,73 @@ internal/projectcontext	TestRegistrationFilesystemQualification	linux,darwin,win
 internal/projectcontext	TestRegistrationRootReadWindow/ordinary-checkout	linux,darwin	-	-	ordinary branch switches preserve an unchanged tuple while real root replacement durably lapses
 internal/projectcontext	TestRegistrationRootReadWindow/replaced-root	linux,darwin	-	-	ordinary branch switches preserve an unchanged tuple while real root replacement durably lapses
 internal/projectcontext	TestRegistrationRootReadWindow/valid-mode-change	linux,darwin	-	-	admitted directory mode changes are not checkout identity changes
+internal/projectcontext	TestRegistrationUnknownRead/Inspect/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Inspect/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Inspect/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Preview/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Preview/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Preview/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Review/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Review/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Review/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Approve/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Approve/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Approve/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Admitted/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Admitted/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Admitted/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Locate/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Locate/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/Locate/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/LocateFor/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/LocateFor/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/LocateFor/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/PackageInstruction/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/PackageInstruction/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/PackageInstruction/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/ReadSnapshot/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/ReadSnapshot/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/ReadSnapshot/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/ReviewContent/rev-parse	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/ReviewContent/rev-list	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestRegistrationUnknownRead/ReviewContent/config	linux,darwin	-	-	real refused start at this read site denies use without state or lapse writes and permits same-tuple recovery
+internal/projectcontext	TestBindingObservationDisposition/start	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/timeout	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/signal	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/output-bound	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/indeterminate-exit	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/repository-exit128-unknown	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/unreadable-metadata	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/unknown-error-open	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/missing-root-open	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/parent-file-open	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/symlink-loop-open	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/io-read	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/permission-read	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/multiple-roots-open	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestBindingObservationDisposition/ambiguous-remote-open	linux,darwin,windows	-	-	unknown reads and observed or held-open changes have distinct dispositions beside equal controls
+internal/projectcontext	TestRegistrationObservedBeforeFailure/all-starts-refused	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationObservedBeforeFailure/root-before-rev-parse	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationObservedBeforeFailure/root-before-rev-list	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationObservedBeforeFailure/root-before-config	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationObservedBeforeFailure/commit-before-config	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationGitExit128Unknown/not-a-repository	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationGitExit128Unknown/bad-config	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationGitExit128Unknown/unreadable-config	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationGitExit128Unknown/missing-object	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationGitExit128Unknown/ownership-refused	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationAncestorDisposition/parent-file	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationAncestorDisposition/parent-loop	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationAncestorDisposition/ancestor-unreadable	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationHeldOpenRows/root-mode-lost	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationHeldOpenRows/root-type-change	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationHeldOpenRows/exact-root	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationHeldOpenRows/ambiguous-remote	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationHeldOpenRows/noncanonical-remote	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestRegistrationHeldOpenRows/multiple-roots	linux,darwin	-	-	real public refusal and durable-lapse or unknown recovery disposition preserve post-failure state beside a healthy control
+internal/projectcontext	TestBindingPartialObservation/root	linux,darwin,windows	-	-	only already-observed differing components lapse despite a later failure; unread components cannot manufacture a lapse
+internal/projectcontext	TestBindingPartialObservation/remote	linux,darwin,windows	-	-	only already-observed differing components lapse despite a later failure; unread components cannot manufacture a lapse
+internal/projectcontext	TestBindingPartialObservation/commit	linux,darwin,windows	-	-	only already-observed differing components lapse despite a later failure; unread components cannot manufacture a lapse
+internal/projectcontext	TestBindingPartialObservation/filesystem	linux,darwin,windows	-	-	only already-observed differing components lapse despite a later failure; unread components cannot manufacture a lapse
+internal/projectcontext	TestRegistrationRemoteBeforeFilesystemFailure/same-remote	linux,darwin	-	-	an observed remote difference survives a later filesystem failure; equal remote stays unknown and recovers without writes
+internal/projectcontext	TestRegistrationRemoteBeforeFilesystemFailure/changed-remote	linux,darwin	-	-	an observed remote difference survives a later filesystem failure; equal remote stays unknown and recovers without writes

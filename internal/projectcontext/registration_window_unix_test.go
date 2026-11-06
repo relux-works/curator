@@ -15,6 +15,11 @@ import (
 // before the following observations. The sentinel fires once, not as a retry.
 func bindingWindowPlant(t *testing.T, action string) string {
 	t.Helper()
+	return bindingReadWindowPlant(t, "rev-parse --show-toplevel", action)
+}
+
+func bindingReadWindowPlant(t *testing.T, site, action string) string {
+	t.Helper()
 	realGit, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatal(err)
@@ -24,7 +29,7 @@ func bindingWindowPlant(t *testing.T, action string) string {
 	script := fmt.Sprintf(`#!/bin/sh
 %[1]q "$@"; rc=$?
 case " $* " in
- *" rev-parse --show-toplevel "*)
+ *" %[4]s "*)
   if [ ! -e %[2]q ]; then
    : > %[2]q
    %[3]s
@@ -32,7 +37,7 @@ case " $* " in
  ;;
 esac
 exit "$rc"
-`, realGit, sentinel, action)
+`, realGit, sentinel, action, site)
 	if err = os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +86,12 @@ func TestRegistrationRootReadWindow(t *testing.T) {
 				}
 				if _, err = os.Stat(filepath.Join(f.root, "branch-entry")); kind == "ordinary-checkout" && err != nil {
 					t.Fatal("real checkout plant did not run", err)
+				}
+				if kind == "valid-mode-change" {
+					st, e := os.Stat(f.root)
+					if e != nil || st.Mode().Perm() != 0500 {
+						t.Fatal("mode plant did not run", e)
+					}
 				}
 				live, e := bind(f.root)
 				if e != nil || identity(live) != f.registration.RootIdentity {

@@ -156,34 +156,69 @@ func (e *bindingReadError) Error() string {
 func bindingFailure(detail string) error { return &bindingReadError{detail: detail} }
 
 // Unknown observations refuse use without converting an unreadable tuple into
-// a durable identity change. The diagnostic text remains the same safe refusal.
+// a durable identity change. Static classes distinguish failures and recovery advice.
 type bindingUnknownError struct{ error }
 
 func (e *bindingUnknownError) Unwrap() error { return e.error }
 func bindingUnknown(detail string) error     { return &bindingReadError{detail: detail, unknown: true} }
-func bindingPathReadFailure(err error, detail string) error {
-	// Missing-root lapse treatment is deliberately unchanged pending its decision.
-	if errors.Is(err, os.ErrNotExist) {
-		return bindingFailure(detail)
+
+// Only failures to read metadata are unknown. Structural path loss and
+// unclassified failures keep the conservative refuse-and-lapse disposition.
+func filesystemReadClass(err error) string {
+	switch {
+	case errors.Is(err, os.ErrPermission):
+		return "permission denied"
+	case errors.Is(err, syscall.EIO):
+		return "I/O failure"
+	case errors.Is(err, syscall.EMFILE):
+		return "process descriptor limit"
+	case errors.Is(err, syscall.ENFILE):
+		return "system descriptor limit"
+	case errors.Is(err, syscall.EAGAIN):
+		return "temporarily unavailable"
+	case errors.Is(err, syscall.ETIMEDOUT):
+		return "timed out"
 	}
-	return bindingUnknown(detail)
+	return ""
+}
+func bindingPathReadFailure(err error, detail string) error {
+	if class := filesystemReadClass(err); class != "" {
+		return bindingUnknown(strings.TrimSuffix(detail, "; explicitly rebind") + "; filesystem metadata read failed: " + class)
+	}
+	return bindingFailure(detail)
 }
 func unknownBindingRead(err error) bool {
 	var gitErr *localGitError
 	if errors.As(err, &gitErr) {
-		// Exit 128 can mean that the recorded path is no longer a repository.
-		// Keep that conservative outcome until the open policy question is settled.
-		return gitErr.class != "exit" || gitErr.code != 128
+		// These failed commands did not answer about the tuple. In particular,
+		// exit 128 also covers ownership, config and missing-object failures;
+		// do not guess an identity from localized stderr or partial stdout.
+		return true
 	}
 	var readErr *bindingReadError
 	if errors.As(err, &readErr) {
 		return readErr.unknown
 	}
-	return true
+	return filesystemReadClass(err) != ""
 }
 
-func bind(p string) (binding, error) {
-	var b binding
+// Observation flags are local read progress, never wire identity or authority.
+// A later failure must not discard an earlier successfully read difference.
+type bindingObservationError struct {
+	error
+	filesystem, root, commit, remote bool
+}
+
+func (e *bindingObservationError) Unwrap() error { return e.error }
+
+func bind(p string) (b binding, resultErr error) {
+	observed := &bindingObservationError{}
+	defer func() {
+		if resultErr != nil {
+			observed.error = resultErr
+			resultErr = observed
+		}
+	}()
 	abs, err := filepath.Abs(p)
 	if err != nil {
 		return b, bindingFailure("root path cannot be resolved")
@@ -204,6 +239,12 @@ func bind(p string) (binding, error) {
 	if !st.IsDir() || st.Mode().Perm()&0500 != 0500 {
 		return b, bindingFailure("root is unreadable or not a directory")
 	}
+	fs, err := filesystemIdentity(st)
+	if err != nil {
+		return b, err
+	}
+	b.Repository.Root, b.Filesystem = canonical, fs
+	observed.root, observed.filesystem = true, true
 	f, err := os.Open(canonical)
 	if err != nil {
 		return b, bindingPathReadFailure(err, "root cannot be read; explicitly rebind")
@@ -212,7 +253,10 @@ func bind(p string) (binding, error) {
 	opened, statErr := f.Stat()
 	_ = f.Close()
 	if (readErr != nil && readErr != io.EOF) || statErr != nil {
-		return b, bindingUnknown("root cannot be verified; explicitly rebind")
+		if statErr != nil {
+			return b, bindingPathReadFailure(statErr, "root cannot be verified")
+		}
+		return b, bindingPathReadFailure(readErr, "root cannot be verified")
 	}
 	if !opened.IsDir() || opened.Mode().Perm()&0500 != 0500 {
 		return b, bindingFailure("root is unreadable or not a directory")
@@ -221,11 +265,6 @@ func bind(p string) (binding, error) {
 	// contents. Ordinary commits/branch switches may change size and mtime.
 	if !os.SameFile(st, opened) {
 		return b, bindingFailure("root cannot be verified; explicitly rebind")
-	}
-	fs, err := filesystemIdentity(st)
-	if err != nil {
-		// Preserve admission diagnostics; a failed recheck classifies this as unknown.
-		return b, err
 	}
 	root, err := gitLocal(canonical, "rev-parse", "--show-toplevel")
 	if err != nil {
@@ -245,6 +284,7 @@ func bind(p string) (binding, error) {
 	if len(strings.Fields(commit)) != 1 || !contextCommit(commit) {
 		return b, bindingFailure("repository root commit is unavailable or ambiguous")
 	}
+	b.Repository.RootCommit, observed.commit = commit, true
 	var remote *string
 	raw, e := gitLocal(canonical, "config", "--get-all", "remote.origin.url")
 	if e == nil {
@@ -263,6 +303,7 @@ func bind(p string) (binding, error) {
 		}
 
 	}
+	b.Repository.PrimaryRemote, observed.remote = remote, true
 	after, err := os.Lstat(canonical)
 	if err != nil {
 		return b, bindingPathReadFailure(err, "root changed while binding")
@@ -301,12 +342,11 @@ func contextCommit(s string) bool {
 }
 func verifyBinding(r registered) error {
 	resolvedRoot, err := filepath.EvalSymlinks(r.Record.ProjectRoot)
-	if err != nil || resolvedRoot != r.Record.ProjectRoot {
-		refusal := fail("project_registration_mismatch", "checkout moved or is unreadable; explicitly rebind")
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return &bindingUnknownError{refusal}
-		}
-		return refusal
+	if err != nil {
+		return verifyBindingResult(r, binding{}, bindingPathReadFailure(err, "checkout moved or is unreadable; explicitly rebind"))
+	}
+	if resolvedRoot != r.Record.ProjectRoot {
+		return fail("project_registration_mismatch", "checkout moved or is unreadable; explicitly rebind")
 	}
 	b, err := bind(r.Record.ProjectRoot)
 	return verifyBindingResult(r, b, err)
@@ -325,16 +365,45 @@ func verifyBindingResult(r registered, b binding, err error) error {
 		case errors.As(err, &gitErr):
 			detail = gitErr.diagnostic()
 		}
-		refusal := fail("project_registration_mismatch", "checkout binding recheck failed: "+detail+"; explicitly rebind")
-		if unknownBindingRead(err) {
-			return &bindingUnknownError{refusal}
+		var observed *bindingObservationError
+		if errors.As(err, &observed) {
+			if fields := observedBindingChanges(r.Binding, b, observed); len(fields) != 0 {
+				return fail("project_registration_mismatch", "checkout binding changed: "+strings.Join(fields, ", ")+"; later recheck failed: "+detail+"; explicitly rebind")
+			}
 		}
-		return refusal
+		if unknownBindingRead(err) {
+			return &bindingUnknownError{fail("project_registration_mismatch", "checkout binding recheck failed: "+detail+"; no state changed; retrying is safe once Git and filesystem metadata are readable")}
+		}
+		return fail("project_registration_mismatch", "checkout binding recheck failed: "+detail+"; explicitly rebind")
 	}
 	if identity(b) != r.Record.RootIdentity {
 		return fail("project_registration_mismatch", "checkout binding changed: "+strings.Join(bindingChangedFields(r.Binding, b), ", ")+"; explicitly rebind")
 	}
 	return nil
+}
+
+func observedBindingChanges(saved, live binding, observed *bindingObservationError) []string {
+	fields := []string{}
+	if observed.root && saved.Repository.Root != live.Repository.Root {
+		fields = append(fields, "repository.root")
+	}
+	if observed.remote {
+		a, b := saved.Repository.PrimaryRemote, live.Repository.PrimaryRemote
+		if (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b) {
+			fields = append(fields, "repository.primary_remote")
+		}
+	}
+	if observed.commit && saved.Repository.RootCommit != live.Repository.RootCommit {
+		fields = append(fields, "repository.root_commit")
+	}
+	if observed.filesystem {
+		for _, key := range []string{"device", "inode"} {
+			if saved.Filesystem[key] != live.Filesystem[key] {
+				fields = append(fields, "filesystem."+key)
+			}
+		}
+	}
+	return fields
 }
 
 func bindingChangedFields(saved, live binding) []string {

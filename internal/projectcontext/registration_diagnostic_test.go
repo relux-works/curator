@@ -82,7 +82,15 @@ func TestBindingRecheckDiagnostics(t *testing.T) {
 				Observed binding
 			}{r, b})
 			got := verifyBindingResult(r, b, err)
-			want := "project_registration_mismatch: " + tc.want + "; explicitly rebind"
+			remedy := "; explicitly rebind"
+			// These static cases represent unknown observations; other rows are
+			// observed changes or conservative, unclassified failures.
+			for _, name := range []string{"git-exit", "git-start", "git-timeout", "git-signal", "git-output-bound", "untrusted-error"} {
+				if tc.name == name {
+					remedy = "; no state changed; retrying is safe once Git and filesystem metadata are readable"
+				}
+			}
+			want := "project_registration_mismatch: " + tc.want + remedy
 			if got == nil || got.Error() != want {
 				t.Fatalf("got %v, want %s", got, want)
 			}

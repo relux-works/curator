@@ -220,6 +220,19 @@ func TestRegistrationChangeAfterUnknown(t *testing.T) {
 				if !isCode(err, "project_registration_mismatch") || !strings.Contains(err.Error(), "start refused (EACCES)") {
 					t.Fatal("unknown authorized or lost class", err)
 				}
+				if when == "during" && kind == "changed-root" {
+					if !strings.Contains(err.Error(), "filesystem.inode") || !strings.Contains(err.Error(), "explicitly rebind") {
+						t.Fatal("already observed root change lost to failed Git", err)
+					}
+					retainedBindingLapse(t, f, before)
+					t.Setenv("PATH", orig)
+					restore()
+					if _, err = f.store.Inspect(id); !isCode(err, "project_registration_mismatch") || !strings.Contains(err.Error(), "authority lapsed") {
+						t.Fatal("restore erased observed root change", err)
+					}
+					retainedBindingLapse(t, f, before)
+					return
+				}
 				sameBindingRecords(t, f, before)
 				t.Setenv("PATH", orig)
 				if when == "after" {
@@ -242,11 +255,11 @@ func TestRegistrationChangeAfterUnknown(t *testing.T) {
 	}
 }
 
-// Claim: the three explicitly undecided cases retain their existing durable
+// Claim: the remaining explicitly undecided cases retain their existing durable
 // refuse-and-lapse behavior, including after restoration. This pins the current
 // conservative default; it does not resolve the open normative questions.
 func TestRegistrationOpenLapseCases(t *testing.T) {
-	for _, kind := range []string{"missing-root", "not-a-repository", "multiple-roots"} {
+	for _, kind := range []string{"missing-root", "multiple-roots"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
 			id := f.registration.CheckoutID
@@ -263,17 +276,6 @@ func TestRegistrationOpenLapseCases(t *testing.T) {
 				}
 				restore = func() {
 					if err := os.Rename(moved, f.root); err != nil {
-						t.Fatal(err)
-					}
-				}
-			case "not-a-repository":
-				original := filepath.Join(f.root, ".git")
-				moved := f.root + "-git"
-				if err := os.Rename(original, moved); err != nil {
-					t.Fatal(err)
-				}
-				restore = func() {
-					if err := os.Rename(moved, original); err != nil {
 						t.Fatal(err)
 					}
 				}

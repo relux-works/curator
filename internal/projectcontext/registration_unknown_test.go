@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -23,10 +25,13 @@ func TestBindingObservationDisposition(t *testing.T) {
 		{"signal", &localGitError{class: "signal", code: -1}, true},
 		{"output-bound", &localGitError{class: "output bound exceeded", code: -1}, true},
 		{"indeterminate-exit", &localGitError{class: "exit", code: 129}, true},
-		{"repository-exit128-open", &localGitError{class: "exit", code: 128}, false},
+		{"repository-exit128-unknown", &localGitError{class: "exit", code: 128}, true},
 		{"unreadable-metadata", bindingUnknown("root cannot be verified"), true},
-		{"unknown-error", errors.New("/do-not-report"), true},
+		{"unknown-error-open", errors.New("/do-not-report"), false},
 		{"missing-root-open", bindingPathReadFailure(os.ErrNotExist, "root is missing"), false},
+		{"parent-file-open", bindingPathReadFailure(syscall.ENOTDIR, "root unavailable"), false},
+		{"symlink-loop-open", bindingPathReadFailure(errors.New("loop"), "root unavailable"), false},
+		{"io-read", bindingPathReadFailure(syscall.EIO, "root unavailable"), true},
 		{"permission-read", bindingPathReadFailure(os.ErrPermission, "root cannot be read"), true},
 		{"multiple-roots-open", bindingFailure("repository root commit is unavailable or ambiguous"), false},
 		{"ambiguous-remote-open", bindingFailure("primary remote is ambiguous"), false},
@@ -86,5 +91,64 @@ func TestRegistrationFilesystemQualification(t *testing.T) {
 	entries, err := os.ReadDir(root)
 	if err != nil || len(entries) != 0 {
 		t.Fatal("unsupported registration changed checkout", err)
+	}
+}
+
+// Claim: a successfully observed differing component takes precedence over a
+// later unknown failure. An unobserved component cannot manufacture a change;
+// equal observations are valid controls and classification mutates no inputs.
+func TestBindingPartialObservation(t *testing.T) {
+	remote := "https://example.invalid/recorded.git"
+	saved := binding{Repository: repository{Root: "/checkout", PrimaryRemote: &remote, RootCommit: strings.Repeat("1", 40)}, Filesystem: map[string]string{"device": "3", "inode": "4"}}
+	r := registered{Binding: saved}
+	r.Record.RootIdentity = identity(saved)
+	for _, field := range []string{"root", "remote", "commit", "filesystem"} {
+		t.Run(field, func(t *testing.T) {
+			if err := verifyBindingResult(r, saved, nil); err != nil {
+				t.Fatal("equal control", err)
+			}
+			live := binding{Repository: saved.Repository, Filesystem: map[string]string{"device": "3", "inode": "4"}}
+			observed := &bindingObservationError{error: &localGitError{site: "config", class: "start refused", errno: "EACCES", code: -1}}
+			want := ""
+			switch field {
+			case "root":
+				live.Repository.Root = "/different"
+				observed.root = true
+				want = "repository.root"
+			case "remote":
+				live.Repository.PrimaryRemote = nil
+				observed.remote = true
+				want = "repository.primary_remote"
+			case "commit":
+				live.Repository.RootCommit = strings.Repeat("2", 40)
+				observed.commit = true
+				want = "repository.root_commit"
+			case "filesystem":
+				live.Filesystem["inode"] = "5"
+				observed.filesystem = true
+				want = "filesystem.inode"
+			}
+			before := identity(struct {
+				Saved registered
+				Live  binding
+			}{r, live})
+			err := verifyBindingResult(r, live, observed)
+			var unknown *bindingUnknownError
+			if !isCode(err, "project_registration_mismatch") || errors.As(err, &unknown) || !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "start refused (EACCES)") || !strings.Contains(err.Error(), "explicitly rebind") {
+				t.Fatal("observed difference discarded", err)
+			}
+			if identity(struct {
+				Saved registered
+				Live  binding
+			}{r, live}) != before {
+				t.Fatal("classification mutated binding")
+			}
+			observed.root, observed.remote, observed.commit, observed.filesystem = false, false, false, false
+			err = verifyBindingResult(r, live, observed)
+			unknown = nil
+			if !errors.As(err, &unknown) || strings.Contains(err.Error(), "explicitly rebind") {
+				t.Fatal("unobserved field manufactured a lapse", err)
+			}
+		})
 	}
 }

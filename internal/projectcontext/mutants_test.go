@@ -66,7 +66,7 @@ func TestAdmissionNarrowingMutants(t *testing.T) {
 			}
 			mutant := strings.Replace(string(source), tc.old, tc.new, 1)
 			if tc.name == "root-access" {
-				for old, replacement := range map[string]string{"f, err := os.Open(canonical)": "if false { f, err := os.Open(canonical)", "fs, err := filesystemIdentity(st)": "}; fs, err := filesystemIdentity(st)"} {
+				for old, replacement := range map[string]string{"f, err := os.Open(canonical)": "if false { f, err := os.Open(canonical)", "root, err := gitLocal(canonical, \"rev-parse\", \"--show-toplevel\")": "}; root, err := gitLocal(canonical, \"rev-parse\", \"--show-toplevel\")", "after.Mode().Perm()&0500 != 0500": "after.Mode().Perm()&0500 == 0"} {
 					if strings.Count(mutant, old) != 1 {
 						t.Fatal("root access secondary anchor differs")
 					}

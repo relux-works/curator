@@ -57,18 +57,38 @@ profile/environment parameters; the deepest registered root shadows a parent,
 including when its requested environment slot is absent. Unqualified ambiguous
 selection refuses.
 
-Moved, replaced or unreadable checkouts require an explicit repair:
+An observed changed root device/inode, canonical remote or unique root ancestor
+refuses use and is retained as a protected authority lapse, even when detected
+by inspect or CWD lookup. An already-read difference is retained even if a later
+read fails. Restoring the original tuple does not revive its approvals. All
+slots for that root lapse together; a lapsed nested root still shadows its
+parent. Explicit repair allocates fresh authority:
 
 ```sh
 curator project rebind CHECKOUT_ID ./demo
 ```
 
-An observed binding failure is retained as a protected authority lapse, even
-when detected by inspect or CWD lookup. Restoring permissions or returning the
-same directory inode does not revive that registration or its approvals. All
-slots for that root lapse together; a lapsed nested root still shadows its
-parent. An unrelated missing child or unavailable profile lock does not lapse
-a still-verifiable root.
+A refused Git spawn, timeout, signal, output-bound failure or other failed Git
+command (including exit 128) is unknown when no differing component has already
+been observed. A genuine filesystem metadata read failure is also unknown. Use
+refuses with its static failure class, but neither `state.json` nor `lapses.json`
+is rewritten. Retrying is safe once Git and filesystem metadata are readable;
+the same unchanged tuple permits use without rebinding or losing approvals.
+No automatic retry or repair occurs. Git config exit 1 is an answer that the
+origin key is absent, so removing a recorded origin still durably lapses.
+
+Ordinary commits and branch switches preserving the tuple retain consent.
+Root resampling compares device/inode; directory size, mtime and admitted mode
+changes are not identity. Candidate file reads still verify their content
+metadata. The independent admission check for a directory with read/search
+permission remains: observed loss of that root mode still lapses. Missing or
+moved roots, a structural ancestor replaced by a file or symlink loop, root type
+changes, exact-root failures, multiple roots and ambiguous/noncanonical remote
+answers keep conservative refusal and durable lapse. These are held open; this
+change does not resolve their future policy. Restoring permissions or returning
+a lost root does not renew these lapses. Historical lapses, including earlier
+transient-written ones, are never automatically repaired. An unrelated missing
+child or unavailable profile lock does not lapse a still-verifiable root.
 
 Root-lapse IDs are also retained in a separate, manager-owned `lapses.json`
 record under the same home lock. Its 32 KiB bound covers all 256 registration
