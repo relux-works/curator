@@ -336,21 +336,22 @@ func TestProjectBinUnreadableLedger(t *testing.T) {
 	}
 }
 
-// A stale marker with no live entry does not load an unusable frozen manifest
-// during a real upgrade. A live candidate still refuses unknown ownership;
-// readable frozen evidence is the nearby upgrade/removal positive control.
+// A stale enforced marker with neither live launcher nor sidecar does not load
+// an unusable frozen manifest during a real upgrade. A live enforced pair still
+// refuses unknown ownership; readable evidence permits upgrade/removal.
 func TestProjectBinStaleMarkerManifest(t *testing.T) {
 	for _, scenario := range []string{"readable-live", "unusable-stale", "unusable-live"} {
 		t.Run(scenario, func(t *testing.T) {
 			e := newEnv(t)
-			e.skill("old")
+			e.schema8ScriptSkill("old", true)
 			e.skill("new")
 			e.declare("old")
 			if r := e.install(Options{}); r.Status != "ok" {
 				t.Fatalf("positive install: %+v", r)
 			}
 			bin := filepath.Join(e.project, ".agents", "bin")
-			launcher := filepath.Join(bin, shimName("old-tool"))
+			launcher := filepath.Join(bin, nativeLauncherName("old-tool"))
+			sidecar := launcher + ".curator-shim.json"
 			installed := filepath.Join(e.project, ".agents", "skills", "old")
 			m, _, err := marker.ReadState(installed)
 			if err != nil || m == nil {
@@ -360,7 +361,12 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 			if m.Git != "" {
 				source = identity.Canonical(m.Git)
 			}
-			frozen := filepath.Join(snapshot.Dir(e.home, source, m.Commit), "csk-skill.json")
+			frozen := filepath.Join(snapshot.Dir(e.home, source, m.Commit), "agent-skill.json")
+			for _, path := range []string{launcher, sidecar, frozen} {
+				if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
+					t.Fatalf("enforced fixture precondition %s: %v", path, err)
+				}
+			}
 			if scenario != "readable-live" {
 				if err := os.Chmod(frozen, 0600); err != nil {
 					t.Fatal(err)
@@ -373,25 +379,41 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 			if scenario == "unusable-stale" {
-				if err := os.Remove(launcher); err != nil {
-					t.Fatal(err)
+				for _, path := range []string{launcher, sidecar} {
+					if err := os.Remove(path); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
-			before, _ := os.ReadFile(launcher)
-			lock, _ := os.ReadFile(filepath.Join(e.project, "Skillfile.lock"))
+			before := map[string][]byte{}
+			for _, path := range []string{launcher, sidecar, filepath.Join(installed, ".csk-install.json"), filepath.Join(e.project, "Skillfile.lock")} {
+				before[path], _ = os.ReadFile(path)
+			}
 			e.declare("new")
 			r := e.install(Options{})
 			if scenario == "unusable-live" {
 				if r.Status == "ok" || !strings.Contains(fmt.Sprint(r.Errors), "project_bin_legacy_enforced") || !strings.Contains(fmt.Sprint(r.Errors), "move the legacy launcher and its sidecar aside") {
 					t.Fatalf("unknown live evidence: %+v", r)
 				}
-				got, _ := os.ReadFile(launcher)
-				after, _ := os.ReadFile(filepath.Join(e.project, "Skillfile.lock"))
-				if string(got) != string(before) || string(after) != string(lock) {
-					t.Fatal("refusal changed installed state")
+				for path, want := range before {
+					if got, err := os.ReadFile(path); err != nil || string(got) != string(want) {
+						t.Fatalf("refusal changed installed state %s: %v", path, err)
+					}
+				}
+				if _, err := os.Lstat(filepath.Join(filepath.Dir(bin), projectBinLedgerName)); !os.IsNotExist(err) {
+					t.Fatalf("refusal published ledger: %v", err)
 				}
 			} else if r.Status != "ok" {
 				t.Fatalf("stale/readable upgrade: %+v", r)
+			} else {
+				for _, path := range []string{launcher, sidecar} {
+					if _, err := os.Lstat(path); !os.IsNotExist(err) {
+						t.Fatalf("old enforced entry survived removal: %s %v", path, err)
+					}
+				}
+				if _, err := os.Stat(filepath.Join(bin, shimName("new-tool"))); err != nil {
+					t.Fatalf("positive upgrade omitted new command: %v", err)
+				}
 			}
 		})
 	}
