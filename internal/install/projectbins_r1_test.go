@@ -11,8 +11,48 @@ import (
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/snapshot"
+	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/transaction"
 )
+
+type projectBinTestImage struct {
+	bytes  []byte
+	absent bool
+}
+
+// Preserve real file bytes or verified absence; a failed read of an existing
+// entry must never masquerade as an absent preimage in ownership tests.
+func captureProjectBinImages(t *testing.T, paths ...string) map[string]projectBinTestImage {
+	t.Helper()
+	images := map[string]projectBinTestImage{}
+	for _, path := range paths {
+		payload, err := os.ReadFile(path)
+		if err == nil {
+			images[path] = projectBinTestImage{bytes: payload}
+			continue
+		}
+		if _, statErr := os.Lstat(path); !os.IsNotExist(err) || !os.IsNotExist(statErr) {
+			t.Fatalf("capture existing state %s: %v", path, err)
+		}
+		images[path] = projectBinTestImage{absent: true}
+	}
+	return images
+}
+
+func assertProjectBinImages(t *testing.T, images map[string]projectBinTestImage) {
+	t.Helper()
+	for path, image := range images {
+		if image.absent {
+			if _, err := os.Lstat(path); !os.IsNotExist(err) {
+				t.Fatalf("refusal published previously absent state %s: %v", path, err)
+			}
+			continue
+		}
+		if payload, err := os.ReadFile(path); err != nil || string(payload) != string(image.bytes) {
+			t.Fatalf("refusal changed installed state %s: %v", path, err)
+		}
+	}
+}
 
 // Legacy enforced launchers use the marker-selected manifest and exact sidecar;
 // altered/missing evidence refuses with every installed byte preserved. A valid
@@ -45,10 +85,7 @@ func TestProjectBinLegacyEnforcedEvidence(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			before := map[string][]byte{}
-			for _, path := range []string{launcher, sidecar, ledger, filepath.Join(e.project, "Skillfile.lock")} {
-				before[path], _ = os.ReadFile(path)
-			}
+			before := captureProjectBinImages(t, launcher, sidecar, ledger, sourcelock.PathIn(e.project))
 			if scenario == "remove" {
 				e.declare()
 			}
@@ -57,12 +94,7 @@ func TestProjectBinLegacyEnforcedEvidence(t *testing.T) {
 				if result.Status == "ok" || !strings.Contains(fmt.Sprint(result.Errors), "project_bin_legacy_enforced") {
 					t.Fatalf("intended refusal: %+v", result)
 				}
-				for path, want := range before {
-					got, _ := os.ReadFile(path)
-					if string(got) != string(want) {
-						t.Fatalf("refusal changed %s", path)
-					}
-				}
+				assertProjectBinImages(t, before)
 				return
 			}
 			if result.Status != "ok" {
@@ -385,21 +417,19 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 					}
 				}
 			}
-			before := map[string][]byte{}
-			for _, path := range []string{launcher, sidecar, filepath.Join(installed, ".csk-install.json"), filepath.Join(e.project, "Skillfile.lock")} {
-				before[path], _ = os.ReadFile(path)
+			// Schema-1 installs do not create the canonical portable lock.
+			lockPath := sourcelock.PathIn(e.project)
+			if _, err := os.Lstat(lockPath); !os.IsNotExist(err) {
+				t.Fatalf("legacy fixture unexpectedly has a portable lock: %v", err)
 			}
+			before := captureProjectBinImages(t, launcher, sidecar, filepath.Join(installed, ".csk-install.json"), lockPath)
 			e.declare("new")
 			r := e.install(Options{})
 			if scenario == "unusable-live" {
 				if r.Status == "ok" || !strings.Contains(fmt.Sprint(r.Errors), "project_bin_legacy_enforced") || !strings.Contains(fmt.Sprint(r.Errors), "move the legacy launcher and its sidecar aside") {
 					t.Fatalf("unknown live evidence: %+v", r)
 				}
-				for path, want := range before {
-					if got, err := os.ReadFile(path); err != nil || string(got) != string(want) {
-						t.Fatalf("refusal changed installed state %s: %v", path, err)
-					}
-				}
+				assertProjectBinImages(t, before)
 				if _, err := os.Lstat(filepath.Join(filepath.Dir(bin), projectBinLedgerName)); !os.IsNotExist(err) {
 					t.Fatalf("refusal published ledger: %v", err)
 				}
@@ -414,6 +444,9 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(bin, shimName("new-tool"))); err != nil {
 					t.Fatalf("positive upgrade omitted new command: %v", err)
 				}
+			}
+			if _, err := os.Lstat(lockPath); !os.IsNotExist(err) {
+				t.Fatalf("legacy install published a portable lock: %v", err)
 			}
 		})
 	}

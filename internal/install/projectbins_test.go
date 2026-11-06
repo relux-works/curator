@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/staging"
 )
 
@@ -26,9 +27,7 @@ func TestProjectBinForeignCollision(t *testing.T) {
 					t.Fatalf("positive install: %+v", r)
 				}
 			}
-			previousMarker, _ := os.ReadFile(markerPath)
-			lockPath := filepath.Join(e.project, "Skillfile.lock")
-			previousLock, _ := os.ReadFile(lockPath)
+			before := captureProjectBinImages(t, markerPath, sourcelock.PathIn(e.project))
 			if err := os.MkdirAll(filepath.Dir(shim), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -44,12 +43,10 @@ func TestProjectBinForeignCollision(t *testing.T) {
 			if r.Status == "ok" || !strings.Contains(text, projectBinConflict) || !strings.Contains(text, shim) {
 				t.Fatalf("expected named collision: %+v", r)
 			}
-			for path, want := range map[string][]byte{shim: foreign, markerPath: previousMarker, lockPath: previousLock} {
-				got, _ := os.ReadFile(path)
-				if string(got) != string(want) {
-					t.Fatalf("refusal changed %s", path)
-				}
+			if got, err := os.ReadFile(shim); err != nil || string(got) != string(foreign) {
+				t.Fatalf("refusal changed foreign entry: %v", err)
 			}
+			assertProjectBinImages(t, before)
 		})
 	}
 }

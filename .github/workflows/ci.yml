@@ -396,7 +396,7 @@ jobs:
         with:
           go-version: '1.25.5'
           cache: false
-      - name: Prove native read denial before project-bin assertions
+      - name: Prove native read denial and legacy ownership controls
         shell: bash
         run: |
           set -euo pipefail
@@ -407,7 +407,7 @@ jobs:
             GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/install \
-              -run '^TestProjectBin(Unreadable(Ledger|Unrelated)|WindowsShareDenialBackupIntent)$'
+              -run '^TestProjectBin(Unreadable(Ledger|Unrelated)|WindowsShareDenialBackupIntent|StaleMarkerManifest)$'
 
   windows-test-shards:
     name: Windows tests (shard ${{ matrix.shard }})
