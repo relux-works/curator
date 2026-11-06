@@ -4,57 +4,165 @@ package testtoolchain
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/relux-works/curator/internal/managerlock"
 )
 
-// hostGOROOTLockTimeout bounds how long a waiter queues for the host-toolchain
-// lock. It has to exceed the longest legitimate hold, and since
-// AcquireHostGOROOT lets a package take the lock once for its whole test
-// process, the longest hold is now a complete package run rather than a single
-// test: cmd/curator holds it from TestMain to exit. Five minutes was sized for
-// the old per-test hold and expired on a hosted macOS runner while cmd/curator
-// still had the lock, failing internal/install with a deadline instead of a
-// real fault. This stays well under the per-package go test timeout so a
-// genuine deadlock still surfaces as a lock error rather than a suite timeout.
+// This bounds each test's queue, not a legitimate package-wide hold: observed
+// macOS race runs can exhaust it while cmd/curator is still running tests.
+// Keep the refusal until acquire/release evidence supports a scope/budget change.
 const hostGOROOTLockTimeout = 20 * time.Minute
 
-// AcquireHostGOROOT acquires the cross-process host-toolchain lock for a whole
-// test process. A package whose tests may safely share the host toolchain with
-// each other can hold this once in TestMain, preserving intra-package
-// parallelism while remaining isolated from other package processes.
-func AcquireHostGOROOT(ctx context.Context) (*managerlock.HomeLock, error) {
+type hostGOROOTOwner struct {
+	Name       string    `json:"name"`
+	PID        int       `json:"pid"`
+	Process    string    `json:"process"`
+	AcquiredAt time.Time `json:"acquired_at"`
+}
+
+// HostGOROOTLock adds diagnostic metadata to the unchanged manager-home lock.
+// Metadata never authorizes access; only the operating-system lock does.
+type HostGOROOTLock struct {
+	lock  *managerlock.HomeLock
+	owner hostGOROOTOwner
+	path  string
+	logf  func(string, ...any)
+	once  sync.Once
+	err   error
+}
+
+type hostGOROOTWaitError struct {
+	cause  error
+	waiter string
+	waited time.Duration
+	holder *hostGOROOTOwner
+	held   time.Duration
+}
+
+func (err *hostGOROOTWaitError) Unwrap() error { return err.cause }
+
+func (err *hostGOROOTWaitError) Error() string {
+	detail := "holder=unknown (metadata unavailable)"
+	if err.holder != nil {
+		detail = fmt.Sprintf("holder=%q pid=%d process=%q held=%s (metadata snapshot)",
+			err.holder.Name, err.holder.PID, err.holder.Process, err.held.Round(time.Millisecond))
+	}
+	return fmt.Sprintf("%v; waiter=%q waited=%s; %s", err.cause, err.waiter, err.waited.Round(time.Millisecond), detail)
+}
+
+// AcquireHostGOROOT acquires the cross-process macOS host-toolchain lock for a
+// named test process. The caller retains its previous timeout and lock scope.
+func AcquireHostGOROOT(ctx context.Context, owner string) (*HostGOROOTLock, error) {
 	if runtime.GOOS != "darwin" {
 		return nil, nil
 	}
-	manager, err := managerlock.New(filepath.Join(os.TempDir(), "curator-host-goroot-test-lock-v1"))
+	return acquireHostGOROOT(ctx, filepath.Join(os.TempDir(), "curator-host-goroot-test-lock-v1"), owner,
+		func(format string, args ...any) { _, _ = fmt.Fprintf(os.Stderr, format+"\n", args...) })
+}
+
+func acquireHostGOROOT(ctx context.Context, root, owner string, logf func(string, ...any)) (*HostGOROOTLock, error) {
+	started := time.Now()
+	logf("host GOROOT test lock waiting: owner=%q pid=%d", owner, os.Getpid())
+	manager, err := managerlock.New(root)
 	if err != nil {
 		return nil, err
 	}
-	return manager.AcquireHomeOnly(ctx, false)
+	path := filepath.Join(root, "holder.json")
+	lock, err := manager.AcquireHomeOnly(ctx, false)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			// An owner may release or change while this snapshot is read. Missing
+			// or invalid metadata is unknown, never evidence of an unlocked tree.
+			holder := readHostGOROOTOwner(path)
+			failure := &hostGOROOTWaitError{cause: err, waiter: owner, waited: time.Since(started), holder: holder}
+			if holder != nil {
+				failure.held = time.Since(holder.AcquiredAt)
+			}
+			return nil, failure
+		}
+		return nil, err
+	}
+	record := hostGOROOTOwner{Name: owner, PID: os.Getpid(), Process: filepath.Base(os.Args[0]), AcquiredAt: time.Now().UTC()}
+	if err := writeHostGOROOTOwner(path, record); err != nil {
+		_ = lock.Close()
+		// Do not add a metadata path to the caller's failure output.
+		return nil, errors.New("record host GOROOT test lock holder failed")
+	}
+	logf("host GOROOT test lock acquired: owner=%q pid=%d waited=%s", owner, record.PID, time.Since(started).Round(time.Millisecond))
+	return &HostGOROOTLock{lock: lock, owner: record, path: path, logf: logf}, nil
+}
+
+func writeHostGOROOTOwner(path string, record hostGOROOTOwner) error {
+	data, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	file, err := os.CreateTemp(filepath.Dir(path), ".holder-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	_, writeErr := file.Write(data)
+	if err := errors.Join(writeErr, file.Close()); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), path)
+}
+
+func readHostGOROOTOwner(path string) *hostGOROOTOwner {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, 4097))
+	var owner hostGOROOTOwner
+	if err != nil || len(data) > 4096 || json.Unmarshal(data, &owner) != nil || owner.Name == "" || owner.PID <= 0 || owner.Process == "" || owner.AcquiredAt.IsZero() || owner.AcquiredAt.After(time.Now()) {
+		return nil
+	}
+	return &owner
+}
+
+// Close removes the diagnostic record while still owning the OS lock, then
+// releases that lock. The stable manager lock file is never removed.
+func (lock *HostGOROOTLock) Close() error {
+	if lock == nil {
+		return nil
+	}
+	lock.once.Do(func() {
+		if err := os.Remove(lock.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			lock.err = errors.New("remove host GOROOT test lock holder record failed")
+		}
+		held := time.Since(lock.owner.AcquiredAt)
+		lock.err = errors.Join(lock.err, lock.lock.Close())
+		lock.logf("host GOROOT test lock released: owner=%q pid=%d held=%s", lock.owner.Name, lock.owner.PID, held.Round(time.Millisecond))
+	})
+	return lock.err
 }
 
 // LockHostGOROOT serializes only the macOS tests that either keep a whole-tree
 // GOROOT fingerprint across an operation or execute the real tools from that
-// same host tree. Two hosted macOS runs observed the tool tree change while
-// those exact test classes overlapped; the lock gives that shared external test
-// fixture one owner without changing production toolchain verification or
-// serializing unrelated tests.
+// same host tree. It retains ownership through all child tests and cleanup.
 func LockHostGOROOT(t testing.TB) {
 	t.Helper()
+	if runtime.GOOS != "darwin" {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), hostGOROOTLockTimeout)
 	t.Cleanup(cancel)
-	lock, err := AcquireHostGOROOT(ctx)
+	lock, err := acquireHostGOROOT(ctx, filepath.Join(os.TempDir(), "curator-host-goroot-test-lock-v1"), t.Name(), t.Logf)
 	if err != nil {
 		t.Fatalf("acquire host GOROOT test lock: %v", err)
-	}
-	if lock == nil {
-		return
 	}
 	t.Cleanup(func() {
 		if closeErr := lock.Close(); closeErr != nil {
