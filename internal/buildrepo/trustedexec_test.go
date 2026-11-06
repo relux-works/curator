@@ -202,11 +202,14 @@ Offending ED25519 key in /fixture/known-hosts:1
 Host key for 127.0.0.1 has changed and you have requested strict checking.
 Host key verification failed.
 `
+	// The image's Ubuntu 8.9 package patches in this advisory pair. A
+	// neighboring command spelling is unknown and cannot inherit its label.
+	ubuntu := strings.Replace(changed, "Offending ED25519 key in /fixture/known-hosts:1\n", "Offending ED25519 key in /fixture/known-hosts:1\n  remove with:\n  ssh-keygen -f \"/fixture/known-hosts\" -R \"127.0.0.1\"\n", 1)
 	for _, c := range []struct {
 		output    string
 		truncated bool
 		reason    AcquisitionReason
-	}{{changed, false, ReasonHostKeyFailed}, {changed + "unknown detail", false, ReasonTransportFailed}, {changed, true, ReasonTransportFailed}} {
+	}{{changed, false, ReasonHostKeyFailed}, {ubuntu, false, ReasonHostKeyFailed}, {strings.Replace(ubuntu, "ssh-keygen -f", "foreign-command -f", 1), false, ReasonTransportFailed}, {changed + "unknown detail", false, ReasonTransportFailed}, {changed, true, ReasonTransportFailed}} {
 		err := laneDiagnostic(&fetchError{stderr: c.output, truncated: c.truncated})
 		var typed *AdmissionError
 		if !errors.As(err, &typed) || typed.Reason != c.reason || strings.Contains(err.Error(), "/fixture") {

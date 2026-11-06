@@ -234,6 +234,11 @@ var transportLineSignals = []struct {
 	{regexp.MustCompile(`^Offending (RSA|DSA|ECDSA|ED25519) key in [^\r\n]+:[0-9]+$`), FailureHostKey, false},
 	{regexp.MustCompile(`^Host key for ` + transportHost + ` has changed and you have requested strict checking\.$`), FailureHostKey, false},
 
+	// Ubuntu's packaged OpenSSH adds this exact advisory pair. It is
+	// classification evidence only: no suggested command is ever executed.
+	{regexp.MustCompile(`^remove with:$`), FailureHostKey, false},
+	{regexp.MustCompile(`^ssh-keygen -f "[^"\r\n]+" -R "` + transportHost + `"$`), FailureHostKey, false},
+
 	// Missing or moved refs (fail closed).
 	{regexp.MustCompile(`(?i)^fatal: couldn't find remote ref [A-Za-z0-9_./-]+\.?$`), FailureRef, false},
 	{regexp.MustCompile(`^fatal: (remote error: upload-pack: not our ref|git upload-pack: not our ref) [0-9a-f]{40}([0-9a-f]{24})?$`), FailureRef, false},
