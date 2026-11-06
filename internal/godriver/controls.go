@@ -242,21 +242,25 @@ func inInventory(name string) bool {
 // controls this host provides for exactly these limits. It is called in the
 // parent before the worker exists and starts no program.
 func probeNativeControls(limits ResourceLimits) (string, []ControlProbe, error) {
-	if testUncoveredControlPlatform {
-		return probeNativeControlsFor("", limits)
+	if testUncoveredControlHost != "" {
+		return probeNativeControlsFor(InventoryPlatform(testUncoveredControlHost), limits)
 	}
 	return probeNativeControlsFor(InventoryPlatform(nativeControlHost()), limits)
 }
 
-var testUncoveredControlPlatform bool
+var testUncoveredControlHost string
 
 // OverrideUncoveredControlPlatformForTest exercises the real pre-worker refusal
-// on every host. It can only remove platform coverage, never grant controls.
+// on every host with a named host absent from the inventory. It can only remove
+// platform coverage, never grant controls.
 // Callers must run sequentially and defer the returned restore function.
-func OverrideUncoveredControlPlatformForTest() (restore func()) {
-	previous := testUncoveredControlPlatform
-	testUncoveredControlPlatform = true
-	return func() { testUncoveredControlPlatform = previous }
+func OverrideUncoveredControlPlatformForTest(goos string) (restore func()) {
+	if goos == "" || InventoryPlatform(goos) != "" {
+		panic("test override requires a named uncovered host")
+	}
+	previous := testUncoveredControlHost
+	testUncoveredControlHost = goos
+	return func() { testUncoveredControlHost = previous }
 }
 
 // probeNativeControlsFor is the platform-parameterized probe. A platform the

@@ -34,9 +34,14 @@ func init() {
 // absent from that inventory must refuse without reaching the staged receipt
 // callback or changing lock/routing preimages. Adding a supported inventory
 // platform automatically enables the same positive and negative build modes.
-// An injected uncovered platform always exercises the real pre-worker refusal,
+// Injected FreeBSD coverage exercises the real pre-worker refusal,
 // even when every CI host has a native inventory. This test is sequential.
 func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
+	// Linux is covered after inventory v2; FreeBSD remains the negative witness.
+	const uncoveredHost = "freebsd"
+	if godriver.InventoryPlatform("linux") != godriver.PlatformLinux || godriver.InventoryPlatform(uncoveredHost) != "" {
+		t.Fatal("expected covered Linux and uncovered FreeBSD inventory entries")
+	}
 	modes := []string{"unsupported-host"}
 	if godriver.InventoryPlatform(runtime.GOOS) != "" {
 		modes = append(modes, "success", "compiler-failure", "artifact-tamper")
@@ -44,7 +49,7 @@ func TestProfileSkillPlanRealCompileBeforeLock(t *testing.T) {
 	for _, mode := range modes {
 		t.Run(mode, func(t *testing.T) {
 			if mode == "unsupported-host" {
-				defer godriver.OverrideUncoveredControlPlatformForTest()()
+				defer godriver.OverrideUncoveredControlPlatformForTest(uncoveredHost)()
 			}
 			e := newEnv(t)
 			e.buildSkill("compiler", "profile-tool")
