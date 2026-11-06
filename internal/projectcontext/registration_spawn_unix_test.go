@@ -17,7 +17,7 @@ import (
 // The exit control counts every invocation so a silent bind retry is detected.
 func bindingGitPlant(t *testing.T, site int, mode string) (string, string) {
 	t.Helper()
-	real, err := exec.LookPath("git")
+	realGit, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ fi
 %[4]q "$@"; rc=$?
 if [ %[3]q = spawn ] && [ "$((n+1))" -eq %[2]d ]; then /bin/mv %[5]q %[6]q; fi
 exit "$rc"
-`, count, site, mode, real, denied, filepath.Join(dir, "git"))
+`, count, site, mode, realGit, denied, filepath.Join(dir, "git"))
 	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
