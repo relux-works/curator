@@ -126,9 +126,27 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 			if !live[projectBinKey(destination.Path(), platform)] && !live[projectBinKey(destination.SidecarPath(), platform)] {
 				continue
 			}
+			// A plain launcher proves ownership from its exact bytes and target.
+			// Without a live sidecar, it needs no frozen enforced manifest.
+			plain := false
+			if !live[projectBinKey(destination.SidecarPath(), platform)] {
+				for _, recorded := range records {
+					if runtimestore.MatchesLegacyShim(destination.Path(), platform, func(target string) bool { return legacyTargetOwned(target, home, externalRoot, name, recorded) }) {
+						plain = true
+						break
+					}
+				}
+			}
+			if plain {
+				continue
+			}
 			for _, recorded := range records {
 				expected, candidate, err := legacyEnforcedSidecar(home, binDir, platform, name, recorded)
 				if err != nil {
+					var readErr *os.PathError
+					if errors.As(err, &readErr) {
+						return state, err
+					}
 					// Decoding frozen ownership evidence is not repaired by
 					// changing permissions; manual relocation is sufficient.
 					return state, projectBinRefusal("project_bin_legacy_enforced", destination.Path())

@@ -371,18 +371,28 @@ func TestProjectBinUnreadableLedger(t *testing.T) {
 // A stale enforced marker with neither live launcher nor sidecar does not load
 // an unusable frozen manifest during a real upgrade. A live enforced pair still
 // refuses unknown ownership; readable evidence permits upgrade/removal.
+// A live plain script needs no snapshot on any platform. Real permission denial
+// retains manager_state_unreadable; relocation still permits recovery.
 func TestProjectBinStaleMarkerManifest(t *testing.T) {
-	for _, scenario := range []string{"readable-live", "unusable-stale", "unusable-live"} {
+	for _, scenario := range []string{"readable-live", "unusable-stale", "unusable-live", "plain-unusable-live", "permission-live"} {
 		t.Run(scenario, func(t *testing.T) {
 			e := newEnv(t)
-			e.schema8ScriptSkill("old", true)
+			if scenario == "plain-unusable-live" {
+				e.skill("old")
+			} else {
+				e.schema8ScriptSkill("old", true)
+			}
 			e.skill("new")
 			e.declare("old")
 			if r := e.install(Options{}); r.Status != "ok" {
 				t.Fatalf("positive install: %+v", r)
 			}
 			bin := filepath.Join(e.project, ".agents", "bin")
-			launcher := filepath.Join(bin, nativeLauncherName("old-tool"))
+			launcherName := nativeLauncherName("old-tool")
+			if scenario == "plain-unusable-live" {
+				launcherName = shimName("old-tool")
+			}
+			launcher := filepath.Join(bin, launcherName)
 			sidecar := launcher + ".curator-shim.json"
 			installed := filepath.Join(e.project, ".agents", "skills", "old")
 			m, _, err := marker.ReadState(installed)
@@ -394,12 +404,19 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 				source = identity.Canonical(m.Git)
 			}
 			frozen := filepath.Join(snapshot.Dir(e.home, source, m.Commit), "agent-skill.json")
-			for _, path := range []string{launcher, sidecar, frozen} {
+			if scenario == "plain-unusable-live" {
+				frozen = filepath.Join(filepath.Dir(frozen), "csk-skill.json")
+			}
+			required := []string{launcher, frozen}
+			if scenario != "plain-unusable-live" {
+				required = append(required, sidecar)
+			}
+			for _, path := range required {
 				if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
 					t.Fatalf("enforced fixture precondition %s: %v", path, err)
 				}
 			}
-			if scenario != "readable-live" {
+			if scenario != "readable-live" && scenario != "permission-live" {
 				if err := os.Chmod(frozen, 0600); err != nil {
 					t.Fatal(err)
 				}
@@ -424,15 +441,43 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 			}
 			before := captureProjectBinImages(t, launcher, sidecar, filepath.Join(installed, ".csk-install.json"), lockPath)
 			e.declare("new")
-			r := e.install(Options{})
-			if scenario == "unusable-live" {
-				if r.Status == "ok" || !strings.Contains(fmt.Sprint(r.Errors), "project_bin_legacy_enforced") || !strings.Contains(fmt.Sprint(r.Errors), "move the legacy launcher and its sidecar aside") {
+			var r Result
+			if scenario == "permission-live" {
+				// A real denied frozen-manifest read keeps the state-read code;
+				// the same readable pair is the nearby upgrade positive control.
+				t.Run("denied", func(t *testing.T) {
+					denyProjectLedgerRead(t, frozen)
+					r = e.install(Options{})
+				})
+			} else {
+				r = e.install(Options{})
+			}
+			if scenario == "unusable-live" || scenario == "permission-live" {
+				want := "project_bin_legacy_enforced"
+				if scenario == "permission-live" {
+					want = "manager_state_unreadable"
+				}
+				remedy := "move the legacy launcher and its sidecar aside"
+				if scenario == "permission-live" {
+					remedy = "restore read access"
+				}
+				if r.Status == "ok" || !strings.Contains(fmt.Sprint(r.Errors), want) || strings.Count(fmt.Sprint(r.Errors), remedy) != 1 {
 					t.Fatalf("unknown live evidence: %+v", r)
 				}
 				assertProjectBinImages(t, before)
 				if _, err := os.Lstat(filepath.Join(filepath.Dir(bin), projectBinLedgerName)); !os.IsNotExist(err) {
 					t.Fatalf("refusal published ledger: %v", err)
 				}
+				// The documented relocation remedy leaves stale markers harmless.
+				for _, path := range []string{launcher, sidecar} {
+					if err := os.Rename(path, path+".saved"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if retry := e.install(Options{}); retry.Status != "ok" {
+					t.Fatalf("relocation remedy: %+v", retry)
+				}
+
 			} else if r.Status != "ok" {
 				t.Fatalf("stale/readable upgrade: %+v", r)
 			} else {
