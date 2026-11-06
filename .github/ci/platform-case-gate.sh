@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # Platform case gate.
 #
-# Enforces two tiers against a real `go test -json` stream, so a green
-# `go test` can never mean a smaller suite than the one that was asked for.
+# Enforces named-case requirements and skip policy against a real
+# `go test -json` stream. A parent row alone does not require each subtest.
 #
 #   TIER 1 -- `.github/ci/platform-cases.tsv`
 #     The compiled-build behaviour the acceptance criteria require this runner
 #     to execute. Every row listing this GOOS in `must_run_on` must be observed
 #     PASSING. A rename, a deletion, a `-run` filter matching nothing, a missing
 #     interpreter or a package that stopped being built all fail here BY NAME
-#     rather than shrinking the run. A skip of a listed case -- or of any of its
-#     subtests -- is fatal unless the row tolerates it on this GOOS, and then
-#     only if the reason the test actually printed carries the class the row
-#     declared AND that class's own policy admits it in this lane. A ledger row
+#     rather than shrinking the run. Subtest requirements need their own rows:
+#     any passing child can satisfy its top-level parent row. A skip matching
+#     an exact row or a `Parent/*` rule is fatal unless tolerated on this GOOS,
+#     and only if the reason the test actually printed carries the declared
+#     class AND that class's own policy admits it in this lane. A ledger row
 #     tolerates a skip; it does not repeal the policy. `root-unset` is
 #     `deferred-only`, so a listed case that skips for an unset root inside a
 #     package this lane SERVES is fatal whether the ledger lists it or not.

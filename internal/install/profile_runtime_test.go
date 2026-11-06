@@ -292,12 +292,13 @@ func TestProfileRuntimePublication(t *testing.T) {
 					if _, err := os.Stat(canonical.Path()); err != nil {
 						t.Fatal(err)
 					}
+					var launch func() error
 					if runtime.GOOS != "windows" {
 						want := "slice-skill\n"
 						if build {
 							want = profileRuntimeBuildSentinel
 						}
-						launch := func() error {
+						launch = func() error {
 							child := exec.Command(forward.Path())
 							child.Env = append(os.Environ(), "PATH="+admission.domain.FixedPATH)
 							out, err := child.CombinedOutput()
@@ -365,6 +366,14 @@ func TestProfileRuntimePublication(t *testing.T) {
 					// scoped modes, independent of any later binding check.
 					if repeated, err := os.ReadFile(path); err != nil || !bytes.Equal(after, repeated) {
 						t.Fatalf("pinned repeat changed lock: %v", err)
+					}
+					// After shim restoration, the pinned repeat leaves a command that
+					// still produces the exact fixture output through both shim hops.
+					if launch != nil {
+						if err := launch(); err != nil {
+							t.Fatalf("pinned repeat command: %v", err)
+						}
+						t.Log("pinned repeat forwarding shim output matched")
 					}
 					if strings.HasPrefix(mode, "scoped-") {
 						member, _ := result.Lock.Find("skill", "slice-skill")

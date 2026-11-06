@@ -8,12 +8,14 @@
 #     A rename, a deletion, a `-run` filter matching nothing, a missing
 #     interpreter or an unset conformance root all fail here by name instead
 #     of quietly shrinking the run.
-#   * a skip of a listed case -- or of any of its subtests -- is FATAL unless
-#     a row tolerates it on this GOOS.
+#   * a skip matching an exact row or a `Parent/*` rule is FATAL unless
+#     that row tolerates it on this GOOS. A parent row alone neither requires
+#     every subtest nor applies its skip policy to unlisted subtests.
 #   * `.github/ci/ledger-consistency.sh` separately proves, from `go list` on
 #     each target GOOS, that every case a row requires is actually compiled
-#     into that platform's build, and that no platform where a case IS
-#     compiled in is left undeclared.
+#     into that platform's build, and that no platform where a top-level case
+#     IS compiled in is left undeclared. Subtest rows check their compiled
+#     parent; their platform lists need execution evidence for the subtest.
 #
 # Columns are TAB separated:
 #   package  test  must_run_on  skip_allowed_on  class  behaviour
@@ -966,3 +968,9 @@ internal/install	TestProfileRuntimePublication	linux,darwin,windows	-	-	private 
 internal/buildrepo	TestSSHGitSelectionPrecedence	linux,darwin,windows	-	-	missing Git refuses deterministically before secondary paths without executing a fixture
 internal/install	TestProjectBinStaleMarkerManifest	linux,darwin,windows	-	-	stale absent commands need no frozen manifest while unknown live ownership refuses before mutation
 internal/install	TestProjectBinRelevantReadDiagnostics	linux,darwin,windows	-	-	relevant read failures retain stable state code and remedy without changing entry or ledger
+internal/install	TestProfileSkillPlanRealCompileBeforeLock/success	linux,darwin,windows	-	-	real profile native compile succeeds before v5 lock publication
+internal/install	TestProfileSkillPlanRealCompileBeforeLock/compiler-failure	linux,darwin,windows	-	-	real profile compiler failure refuses v5 lock publication
+internal/install	TestProfileSkillPlanRealCompileBeforeLock/artifact-tamper	linux,darwin,windows	-	-	real profile artifact tamper refuses v5 lock publication
+internal/install	TestProfileRuntimePublication/current-build	linux,darwin,windows	-	-	compiled runtime publication; exact shim output and restored-state launch on POSIX only
+internal/install	TestProfileRuntimePublication/current-build/zero-exit-without-sentinel	linux,darwin	-	-	zero-exit shim is refused for missing compiled fixture sentinel
+internal/install	TestProfileRuntimePublication/compiler-failure	linux,darwin,windows	-	-	real runtime compiler failure preserves the lock and publication surfaces

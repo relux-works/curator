@@ -61,7 +61,7 @@ The platform-case ledger requires the formerly excluded Linux cases to execute; 
 Publishing a family in a conformance root does not prove that a build reads it. Analysis showed that pinned implementation jobs returned exit 0 against a schema-8 suite while consuming none of it. Two tables resolve both aspects:
 
 - **Presence**: [`root-artifacts.tsv`](../.github/ci/root-artifacts.tsv) declares root artifacts read by a package conformance test without guards. If a root stops publishing an artifact, the package defers testing. Setting `CI_REQUIRE_FULL_ROOT=1` makes deferrals fatal in candidate verification lanes.
-- **Consumption**: [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) specifies cases that read each artifact per runner. Renames, deletions, or unmatched `-run` filters trigger named failures rather than silent test suite reductions.
+- **Consumption**: [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) specifies cases that read each artifact per runner. Renames, deletions, or `-run` filters that omit a required named row trigger failures by that name. A parent row can pass through a passing child, so required subtests need explicit rows. The ledger pins execution names, not the assertions inside those tests.
 
 For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, `vectors/module-roots.json`, and `vectors/script-host-execution-policy.json`. These are consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`, `internal/godriver`, and `internal/scriptpolicy`.
 
