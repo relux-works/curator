@@ -145,12 +145,42 @@ func gitLocal(dir string, args ...string) (string, error) {
 }
 
 // bindingReadError carries only static, path-free detail owned by bind.
-type bindingReadError struct{ detail string }
+type bindingReadError struct {
+	detail  string
+	unknown bool
+}
 
 func (e *bindingReadError) Error() string {
 	return "project_registration_mismatch: " + e.detail
 }
-func bindingFailure(detail string) error { return &bindingReadError{detail} }
+func bindingFailure(detail string) error { return &bindingReadError{detail: detail} }
+
+// Unknown observations refuse use without converting an unreadable tuple into
+// a durable identity change. The diagnostic text remains the same safe refusal.
+type bindingUnknownError struct{ error }
+
+func (e *bindingUnknownError) Unwrap() error { return e.error }
+func bindingUnknown(detail string) error     { return &bindingReadError{detail: detail, unknown: true} }
+func bindingPathReadFailure(err error, detail string) error {
+	// Missing-root lapse treatment is deliberately unchanged pending its decision.
+	if errors.Is(err, os.ErrNotExist) {
+		return bindingFailure(detail)
+	}
+	return bindingUnknown(detail)
+}
+func unknownBindingRead(err error) bool {
+	var gitErr *localGitError
+	if errors.As(err, &gitErr) {
+		// Exit 128 can mean that the recorded path is no longer a repository.
+		// Keep that conservative outcome until the open policy question is settled.
+		return gitErr.class != "exit" || gitErr.code != 128
+	}
+	var readErr *bindingReadError
+	if errors.As(err, &readErr) {
+		return readErr.unknown
+	}
+	return true
+}
 
 func bind(p string) (binding, error) {
 	var b binding
@@ -160,7 +190,7 @@ func bind(p string) (binding, error) {
 	}
 	canonical, err := filepath.EvalSymlinks(abs)
 	if err != nil {
-		return b, bindingFailure("root is missing, moved or unreadable; explicitly rebind")
+		return b, bindingPathReadFailure(err, "root is missing, moved or unreadable; explicitly rebind")
 	}
 	// Explicit registration canonicalizes an operator path once. Use requires
 	// the saved canonical spelling and the retained filesystem identity.
@@ -168,29 +198,38 @@ func bind(p string) (binding, error) {
 		return b, bindingFailure("root path is invalid or exceeds its bound")
 	}
 	st, err := os.Lstat(canonical)
-	if err != nil || !st.IsDir() || st.Mode().Perm()&0500 != 0500 {
+	if err != nil {
+		return b, bindingPathReadFailure(err, "root is unreadable or not a directory")
+	}
+	if !st.IsDir() || st.Mode().Perm()&0500 != 0500 {
 		return b, bindingFailure("root is unreadable or not a directory")
 	}
 	f, err := os.Open(canonical)
 	if err != nil {
-		return b, bindingFailure("root cannot be read; explicitly rebind")
+		return b, bindingPathReadFailure(err, "root cannot be read; explicitly rebind")
 	}
 	_, readErr := f.Readdirnames(1)
 	opened, statErr := f.Stat()
 	_ = f.Close()
-	if (readErr != nil && readErr != io.EOF) || statErr != nil || !same(st, opened) {
+	if (readErr != nil && readErr != io.EOF) || statErr != nil {
+		return b, bindingUnknown("root cannot be verified; explicitly rebind")
+	}
+	if !same(st, opened) {
 		return b, bindingFailure("root cannot be verified; explicitly rebind")
 	}
 	fs, err := filesystemIdentity(st)
 	if err != nil {
-		return b, err
+		return b, bindingUnknown("checkout identity is unavailable")
 	}
 	root, err := gitLocal(canonical, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return b, err
 	}
 	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil || resolvedRoot != canonical {
+	if err != nil {
+		return b, bindingPathReadFailure(err, "registration requires the exact checkout root")
+	}
+	if resolvedRoot != canonical {
 		return b, bindingFailure("registration requires the exact checkout root")
 	}
 	commit, err := gitLocal(canonical, "rev-list", "--max-parents=0", "HEAD")
@@ -219,7 +258,10 @@ func bind(p string) (binding, error) {
 
 	}
 	after, err := os.Lstat(canonical)
-	if err != nil || !same(st, after) {
+	if err != nil {
+		return b, bindingPathReadFailure(err, "root changed while binding")
+	}
+	if !same(st, after) {
 		return b, bindingFailure("root changed while binding")
 	}
 	b = binding{repository{canonical, remote, commit}, fs}
@@ -251,7 +293,11 @@ func contextCommit(s string) bool {
 func verifyBinding(r registered) error {
 	resolvedRoot, err := filepath.EvalSymlinks(r.Record.ProjectRoot)
 	if err != nil || resolvedRoot != r.Record.ProjectRoot {
-		return fail("project_registration_mismatch", "checkout moved or is unreadable; explicitly rebind")
+		refusal := fail("project_registration_mismatch", "checkout moved or is unreadable; explicitly rebind")
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return &bindingUnknownError{refusal}
+		}
+		return refusal
 	}
 	b, err := bind(r.Record.ProjectRoot)
 	return verifyBindingResult(r, b, err)
@@ -270,7 +316,11 @@ func verifyBindingResult(r registered, b binding, err error) error {
 		case errors.As(err, &gitErr):
 			detail = gitErr.diagnostic()
 		}
-		return fail("project_registration_mismatch", "checkout binding recheck failed: "+detail+"; explicitly rebind")
+		refusal := fail("project_registration_mismatch", "checkout binding recheck failed: "+detail+"; explicitly rebind")
+		if unknownBindingRead(err) {
+			return &bindingUnknownError{refusal}
+		}
+		return refusal
 	}
 	if identity(b) != r.Record.RootIdentity {
 		return fail("project_registration_mismatch", "checkout binding changed: "+strings.Join(bindingChangedFields(r.Binding, b), ", ")+"; explicitly rebind")
@@ -309,7 +359,8 @@ func bindingChangedFields(saved, live binding) []string {
 	return fields
 }
 
-// verifyRegistration retains observed loss of root authority independently of
+// verifyRegistration refuses unknown metadata without writing a lapse. It
+// retains observed loss of root authority independently of
 // the immutable registration record. Restoring the old inode or permissions
 // cannot revive approvals; only Rebind allocates new authority. Lapsed slots
 // remain active shadows so a parent registration cannot inherit their CWDs.
@@ -318,6 +369,10 @@ func (op *operation) verifyRegistration(r registered) error {
 		return fail("project_registration_mismatch", "registration authority lapsed; explicitly rebind")
 	}
 	if err := verifyBinding(r); err != nil {
+		var unknown *bindingUnknownError
+		if errors.As(err, &unknown) {
+			return err
+		}
 		for id, slot := range op.state.Registrations {
 			if slot.Active && slot.Record.ProjectRoot == r.Record.ProjectRoot {
 				slot.Lapsed = true

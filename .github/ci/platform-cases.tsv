@@ -1001,3 +1001,37 @@ internal/projectcontext	TestGitObjectOutputBounds/tag-line	linux,darwin,windows	
 internal/projectcontext	TestGitTreeInventoryCaps	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
 internal/projectcontext	TestGitBlobOutputCap	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
 internal/projectcontext	TestGitTagEnumerationBounds	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
+internal/projectcontext	TestBindingObservationDisposition	linux,darwin,windows	-	-	unknown reads are distinguished from observed change and open conservative cases; equal tuple passes
+internal/projectcontext	TestRegistrationUnknownRead	linux,darwin	-	-	real spawn refusal denies public use without writing state or lapse; same tuple recovers
+internal/projectcontext	TestRegistrationChangeAfterUnknown	linux,darwin	-	-	real root remote and root ancestor changes lapse permanently during or after unknown metadata
+internal/projectcontext	TestRegistrationOpenLapseCases	linux,darwin	-	-	missing root repository exit128 and multiple roots retain conservative durable lapse pending owner decision
+internal/projectcontext	TestRegistrationUnknownRead/Inspect	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/Inspect/final-recheck	linux,darwin	-	-	a refused second observation denies publication without a lapse or state write
+internal/projectcontext	TestRegistrationUnknownRead/Preview	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/Preview/final-recheck	linux,darwin	-	-	a refused second observation denies publication without a lapse or state write
+internal/projectcontext	TestRegistrationUnknownRead/Review	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/Approve	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/Approve/final-recheck	linux,darwin	-	-	a refused second observation denies publication without a lapse or state write
+internal/projectcontext	TestRegistrationUnknownRead/Admitted	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/Locate	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/LocateFor	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/PackageInstruction	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/ReadSnapshot	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationUnknownRead/ReviewContent	linux,darwin	-	-	real refused starts preserve both records and deny use; healthy same-ID recovery passes
+internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-root/during	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-root/after	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-remote/during	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-remote/after	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/removed-remote/during	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/removed-remote/after	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-root-ancestor/during	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationChangeAfterUnknown/changed-root-ancestor/after	linux,darwin	-	-	observed real change after unknown still lapses permanently and restoration refuses
+internal/projectcontext	TestRegistrationOpenLapseCases/missing-root	linux,darwin	-	-	open case retains the existing conservative lapse and rejects restoration
+internal/projectcontext	TestRegistrationOpenLapseCases/not-a-repository	linux,darwin	-	-	open case retains the existing conservative lapse and rejects restoration
+internal/projectcontext	TestRegistrationOpenLapseCases/multiple-roots	linux,darwin	-	-	open case retains the existing conservative lapse and rejects restoration
+internal/projectcontext	TestRegistrationUnavailableCWDUnknownRead	linux,darwin	-	-	unknown root metadata cannot authorize a missing child CWD or lapse its valid root; healthy root recovers
+internal/projectcontext	TestCompositionUnknownRead	linux,darwin	-	-	local manager composition calls refuse unknown reads without lapsing or mutating retained records; same tuple recovers
+internal/projectcontext	TestCompositionUnknownRead/preview	linux,darwin	-	-	preview refuses unknown metadata without a lapse or authority result; recovery and record preservation pass
+internal/projectcontext	TestCompositionUnknownRead/publish	linux,darwin	-	-	publish refuses unknown metadata without a lapse or authority result; recovery and record preservation pass
+internal/projectcontext	TestCompositionUnknownRead/resolve	linux,darwin	-	-	resolve refuses unknown metadata without a lapse or authority result; recovery and record preservation pass
+internal/projectcontext	TestCompositionUnknownRead/authorize	linux,darwin	-	-	authorize refuses unknown metadata without a lapse or authority result; recovery and record preservation pass
