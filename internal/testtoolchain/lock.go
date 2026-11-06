@@ -54,7 +54,7 @@ func (err *hostGOROOTWaitError) Unwrap() error { return err.cause }
 func (err *hostGOROOTWaitError) Error() string {
 	detail := "holder=unknown (metadata unavailable)"
 	if err.holder != nil {
-		detail = fmt.Sprintf("holder=%q pid=%d process=%q held=%s (metadata snapshot)",
+		detail = fmt.Sprintf("holder=%q pid=%d process=%q held=%s (unverified record; current holder may differ)",
 			err.holder.Name, err.holder.PID, err.holder.Process, err.held.Round(time.Millisecond))
 	}
 	return fmt.Sprintf("%v; waiter=%q waited=%s; %s", err.cause, err.waiter, err.waited.Round(time.Millisecond), detail)
@@ -94,9 +94,10 @@ func acquireHostGOROOT(ctx context.Context, root, owner string, logf func(string
 	}
 	record := hostGOROOTOwner{Name: owner, PID: os.Getpid(), Process: filepath.Base(os.Args[0]), AcquiredAt: time.Now().UTC()}
 	if err := writeHostGOROOTOwner(path, record); err != nil {
-		_ = lock.Close()
-		// Do not add a metadata path to the caller's failure output.
-		return nil, errors.New("record host GOROOT test lock holder failed")
+		_, _ = fmt.Fprintln(os.Stderr, "warning: publish host GOROOT holder record failed; continuing with OS lock")
+		if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			_, _ = fmt.Fprintln(os.Stderr, "warning: remove old host GOROOT holder record failed; record may be stale")
+		}
 	}
 	logf("host GOROOT test lock acquired: owner=%q pid=%d waited=%s", owner, record.PID, time.Since(started).Round(time.Millisecond))
 	return &HostGOROOTLock{lock: lock, owner: record, path: path, logf: logf}, nil
@@ -120,12 +121,16 @@ func writeHostGOROOTOwner(path string, record hostGOROOTOwner) error {
 }
 
 func readHostGOROOTOwner(path string) *hostGOROOTOwner {
-	file, err := os.Open(path) // #nosec G304 -- fixed holder metadata beneath the test coordination root.
+	file, err := openHostGOROOTRecord(path)
 	if err != nil {
 		return nil
 	}
 	defer func() { _ = file.Close() }()
-	data, err := io.ReadAll(io.LimitReader(file, 4097))
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return nil
+	}
+	data, err := readHostGOROOTRecord(file)
 	var owner hostGOROOTOwner
 	if err != nil || len(data) > 4096 || json.Unmarshal(data, &owner) != nil || owner.Name == "" || owner.PID <= 0 || owner.Process == "" || owner.AcquiredAt.IsZero() || owner.AcquiredAt.After(time.Now()) {
 		return nil
@@ -141,10 +146,10 @@ func (lock *HostGOROOTLock) Close() error {
 	}
 	lock.once.Do(func() {
 		if err := os.Remove(lock.path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			lock.err = errors.New("remove host GOROOT test lock holder record failed")
+			_, _ = fmt.Fprintln(os.Stderr, "warning: remove host GOROOT holder record failed; record may be stale")
 		}
 		held := time.Since(lock.owner.AcquiredAt)
-		lock.err = errors.Join(lock.err, lock.lock.Close())
+		lock.err = lock.lock.Close()
 		lock.logf("host GOROOT test lock released: owner=%q pid=%d held=%s", lock.owner.Name, lock.owner.PID, held.Round(time.Millisecond))
 	})
 	return lock.err
@@ -169,4 +174,8 @@ func LockHostGOROOT(t testing.TB) {
 			t.Errorf("release host GOROOT test lock: %v", closeErr)
 		}
 	})
+}
+
+func readHostGOROOTRecord(file io.Reader) ([]byte, error) {
+	return io.ReadAll(io.LimitReader(file, 4097))
 }

@@ -1108,3 +1108,8 @@ internal/projectcontext	TestBindingPartialObservation/commit	linux,darwin,window
 internal/projectcontext	TestBindingPartialObservation/filesystem	linux,darwin,windows	-	-	only already-observed differing components lapse despite a later failure; unread components cannot manufacture a lapse
 internal/projectcontext	TestRegistrationRemoteBeforeFilesystemFailure/same-remote	linux,darwin	-	-	an observed remote difference survives a later filesystem failure; equal remote stays unknown and recovers without writes
 internal/projectcontext	TestRegistrationRemoteBeforeFilesystemFailure/changed-remote	linux,darwin	-	-	an observed remote difference survives a later filesystem failure; equal remote stays unknown and recovers without writes
+internal/testtoolchain	TestHostGOROOTLockContention/stuck-holder-named-within-bound	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockContention/released-holder-admits-waiter	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockUnknownHolder/missing	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockUnknownHolder/malformed	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockMetadataFailureReleases	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
