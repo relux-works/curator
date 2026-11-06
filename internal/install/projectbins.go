@@ -109,21 +109,32 @@ func inspectProjectBin(home, binDir, platform, externalRoot string, desired map[
 	}
 	// Legacy enforced ownership derives the complete sidecar from the old marker's
 	// frozen manifest. The old manager executable bytes are deliberately not proof.
+	live := map[string]bool{}
+	for _, entry := range entries {
+		live[projectBinKey(filepath.Join(binDir, entry.Name()), platform)] = true
+	}
 	enforced := map[string]bool{}
 	legacyEnforced := map[string]bool{}
 	if legacy {
 		for name, records := range previous {
+			destination, err := runtimestore.NewManagedEnforcedShim(runtimestore.ProjectShim, binDir, name, platform)
+			if err != nil {
+				return state, err
+			}
+			// A stale marker with no live launcher or sidecar needs no frozen
+			// manifest. Only live ownership candidates may require that load.
+			if !live[projectBinKey(destination.Path(), platform)] && !live[projectBinKey(destination.SidecarPath(), platform)] {
+				continue
+			}
 			for _, recorded := range records {
 				expected, candidate, err := legacyEnforcedSidecar(home, binDir, platform, name, recorded)
 				if err != nil {
-					return state, err
+					// Decoding frozen ownership evidence is not repaired by
+					// changing permissions; manual relocation is sufficient.
+					return state, projectBinRefusal("project_bin_legacy_enforced", destination.Path())
 				}
 				if !candidate {
 					continue
-				}
-				destination, err := runtimestore.NewManagedEnforcedShim(runtimestore.ProjectShim, binDir, name, platform)
-				if err != nil {
-					return state, err
 				}
 				legacyEnforced[destination.Path()] = true
 				legacyEnforced[destination.SidecarPath()] = true
@@ -268,7 +279,7 @@ func shimFingerprint(path string) (string, error) {
 	if info.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(path)
 		if err != nil {
-			return "", err
+			return "", stateread.UnusableError(path, err)
 		}
 		hash := sha256.Sum256([]byte(target))
 		return "link:" + hex.EncodeToString(hash[:]), nil
@@ -278,23 +289,23 @@ func shimFingerprint(path string) (string, error) {
 	}
 	file, err := os.Open(path) // #nosec G304 -- read-only ownership probe of an enumerated bin entry; type and opened identity are checked.
 	if err != nil {
-		return "", err
+		return "", stateread.UnusableError(path, err)
 	}
 	defer func() { _ = file.Close() }()
 	opened, err := file.Stat()
 	if err != nil {
-		return "", err
+		return "", stateread.UnusableError(path, err)
 	}
 	if !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
 		return "", projectBinRefusal(projectBinConflict, path)
 	}
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
+		return "", stateread.UnusableError(path, err)
 	}
 	current, err := os.Lstat(path)
 	if err != nil {
-		return "", err
+		return "", stateread.UnusableError(path, err)
 	}
 	if !current.Mode().IsRegular() || !os.SameFile(opened, current) {
 		return "", projectBinRefusal(projectBinConflict, path)

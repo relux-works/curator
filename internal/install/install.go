@@ -887,13 +887,15 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			}
 		}
 	}
-	if _, err := inspectProjectBin(cfg.Home(), binDir, platform, externalPlan.deps.StoreRoot, desiredProjectCommands); err != nil {
+	projectBinPreflight, err := inspectProjectBin(cfg.Home(), binDir, platform, externalPlan.deps.StoreRoot, desiredProjectCommands)
+	if err != nil {
 		result.failf("%v", err)
 		return result, nil
 	}
 
 	// 18. Dry run stops before any file changes.
 	if opts.DryRun {
+		result.Messages = append(result.Messages, projectBinPreflight.messages...)
 		for _, node := range nodes {
 			result.Messages = append(result.Messages, fmt.Sprintf("%s: %s (planned)", alias, nodeSummary(node)))
 		}

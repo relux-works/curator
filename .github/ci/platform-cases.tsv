@@ -964,3 +964,5 @@ internal/install	TestProfileSkillPlanRealCompileBeforeLock	linux,darwin,windows	
 internal/install	TestProfileRuntimePublication	linux,darwin,windows	-	-	private profile runtime publication and refusals; POSIX shim execution requires exact fixture output
 
 internal/buildrepo	TestSSHGitSelectionPrecedence	linux,darwin,windows	-	-	missing Git refuses deterministically before secondary paths without executing a fixture
+internal/install	TestProjectBinStaleMarkerManifest	linux,darwin,windows	-	-	stale absent commands need no frozen manifest while unknown live ownership refuses before mutation
+internal/install	TestProjectBinRelevantReadDiagnostics	linux,darwin,windows	-	-	relevant read failures retain stable state code and remedy without changing entry or ledger

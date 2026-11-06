@@ -36,7 +36,8 @@ Use `curator install` to reconcile the project after resolving a collision.
 Move a foreign entry yourself if you intend Curator to own that command name.
 No install or removal silently moves or deletes foreign entries.
 
-Ownership inspection is read-only and precedes builds and the dry-run return.
+Ownership inspection is read-only and precedes builds and the dry-run return,
+after planning has already fetched the declared sources.
 Only desired paths, ledger entries and legacy candidates are fingerprinted;
 unrelated foreign files are reported without reading their contents.
 Unlike a user-bin collision (which warns and skips one forwarding command),
@@ -58,3 +59,10 @@ backup. If no backup exists, move the malformed ledger aside manually; the next
 install attempts legacy adoption and refuses any unprovable enforced pair.
 Unreadable state (`manager_state_unreadable`) needs its permissions or parent
 path repaired before retrying. A refusal never moves a file automatically.
+
+A stale marker with no live launcher or sidecar does not require loading its
+frozen manifest. If a live candidate needs that manifest and it cannot be
+loaded, ownership remains unknown: `project_bin_legacy_enforced` asks you to
+move the launcher and sidecar aside before reinstalling. Desired, ledger-named
+and legacy file read failures retain `manager_state_unreadable` and its remedy.
+The dry-run report includes preserved unrelated entries as well as refusals.

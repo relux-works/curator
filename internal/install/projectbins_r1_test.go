@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/snapshot"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -82,8 +85,10 @@ func TestProjectBinLegacyEnforcedEvidence(t *testing.T) {
 // Unrelated unreadable files are reported without reading or fingerprinting;
 // a nearby declared directory still refuses as a collision on every platform.
 func TestProjectBinUnreadableUnrelated(t *testing.T) {
-	root := t.TempDir()
-	bin := filepath.Join(root, ".agents", "bin")
+	e := newEnv(t)
+	e.skill("tool")
+	e.declare("tool")
+	bin := filepath.Join(e.project, ".agents", "bin")
 	if err := os.MkdirAll(bin, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -93,9 +98,11 @@ func TestProjectBinUnreadableUnrelated(t *testing.T) {
 	}
 	t.Run("unreadable", func(t *testing.T) {
 		denyProjectLedgerRead(t, path)
-		state, err := inspectProjectBin(t.TempDir(), bin, installPlatform(), "", nil)
-		if err != nil || len(state.preimages) != 0 || !strings.Contains(fmt.Sprint(state.messages), projectBinPreserved) {
-			t.Fatalf("unrelated entry was inspected: %+v %v", state, err)
+		for _, dry := range []bool{true, false} {
+			result := e.install(Options{DryRun: dry})
+			if result.Status != "ok" || !strings.Contains(fmt.Sprint(result.Messages), projectBinPreserved) || !strings.Contains(fmt.Sprint(result.Messages), path) {
+				t.Fatalf("dry=%v unrelated entry was read or report lost: %+v", dry, result)
+			}
 		}
 		// A directory is a platform-neutral collision control, including Windows.
 		declared := filepath.Join(bin, "declared")
@@ -326,5 +333,109 @@ func TestProjectBinUnreadableLedger(t *testing.T) {
 	}
 	if _, err := inspectProjectBin(t.TempDir(), bin, installPlatform(), "", nil); err != nil {
 		t.Fatalf("restored control: %v", err)
+	}
+}
+
+// A stale marker with no live entry does not load an unusable frozen manifest
+// during a real upgrade. A live candidate still refuses unknown ownership;
+// readable frozen evidence is the nearby upgrade/removal positive control.
+func TestProjectBinStaleMarkerManifest(t *testing.T) {
+	for _, scenario := range []string{"readable-live", "unusable-stale", "unusable-live"} {
+		t.Run(scenario, func(t *testing.T) {
+			e := newEnv(t)
+			e.skill("old")
+			e.skill("new")
+			e.declare("old")
+			if r := e.install(Options{}); r.Status != "ok" {
+				t.Fatalf("positive install: %+v", r)
+			}
+			bin := filepath.Join(e.project, ".agents", "bin")
+			launcher := filepath.Join(bin, shimName("old-tool"))
+			installed := filepath.Join(e.project, ".agents", "skills", "old")
+			m, _, err := marker.ReadState(installed)
+			if err != nil || m == nil {
+				t.Fatalf("marker: %v", err)
+			}
+			frozen := filepath.Join(snapshot.Dir(e.home, identity.Canonical(m.Git), m.Commit), "csk-skill.json")
+			if scenario != "readable-live" {
+				if err := os.Chmod(frozen, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(frozen, []byte("{broken"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Remove(filepath.Join(filepath.Dir(bin), projectBinLedgerName)); err != nil {
+				t.Fatal(err)
+			}
+			if scenario == "unusable-stale" {
+				if err := os.Remove(launcher); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, _ := os.ReadFile(launcher)
+			lock, _ := os.ReadFile(filepath.Join(e.project, "Skillfile.lock"))
+			e.declare("new")
+			r := e.install(Options{})
+			if scenario == "unusable-live" {
+				if r.Status == "ok" || !strings.Contains(fmt.Sprint(r.Errors), "project_bin_legacy_enforced") || !strings.Contains(fmt.Sprint(r.Errors), "move the legacy launcher and its sidecar aside") {
+					t.Fatalf("unknown live evidence: %+v", r)
+				}
+				got, _ := os.ReadFile(launcher)
+				after, _ := os.ReadFile(filepath.Join(e.project, "Skillfile.lock"))
+				if string(got) != string(before) || string(after) != string(lock) {
+					t.Fatal("refusal changed installed state")
+				}
+			} else if r.Status != "ok" {
+				t.Fatalf("stale/readable upgrade: %+v", r)
+			}
+		})
+	}
+}
+
+// Desired, ledger-named and legacy candidates retain the stable state-read
+// code and one actionable remedy. Readability before and after the isolated
+// denial is a positive control; neither bytes nor the ledger may change.
+func TestProjectBinRelevantReadDiagnostics(t *testing.T) {
+	for _, kind := range []string{"desired", "ledger", "legacy"} {
+		t.Run(kind, func(t *testing.T) {
+			e := newEnv(t)
+			e.skill("tool")
+			e.declare("tool")
+			if r := e.install(Options{}); r.Status != "ok" {
+				t.Fatalf("positive: %+v", r)
+			}
+			bin := filepath.Join(e.project, ".agents", "bin")
+			path := filepath.Join(bin, shimName("tool-tool"))
+			ledger := filepath.Join(filepath.Dir(bin), projectBinLedgerName)
+			if kind != "ledger" {
+				if err := os.Remove(ledger); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, _ := os.ReadFile(path)
+			ledgerBefore, _ := os.ReadFile(ledger)
+			desired := map[string]bool{}
+			if kind == "desired" {
+				desired[path] = true
+			}
+			t.Run("denied", func(t *testing.T) {
+				denyProjectLedgerRead(t, path)
+				_, err := inspectProjectBin(e.home, bin, installPlatform(), "", desired)
+				if err == nil || !strings.Contains(err.Error(), "manager_state_unreadable") || strings.Count(err.Error(), "restore read access") != 1 {
+					t.Fatalf("typed remedy: %v", err)
+				}
+				got, _ := os.ReadFile(ledger)
+				if string(got) != string(ledgerBefore) {
+					t.Fatal("ledger changed")
+				}
+			})
+			if got, _ := os.ReadFile(path); string(got) != string(before) {
+				t.Fatal("entry changed")
+			}
+			if _, err := inspectProjectBin(e.home, bin, installPlatform(), "", desired); err != nil {
+				t.Fatalf("restored control: %v", err)
+			}
+		})
 	}
 }
