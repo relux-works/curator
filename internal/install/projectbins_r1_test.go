@@ -356,7 +356,11 @@ func TestProjectBinStaleMarkerManifest(t *testing.T) {
 			if err != nil || m == nil {
 				t.Fatalf("marker: %v", err)
 			}
-			frozen := filepath.Join(snapshot.Dir(e.home, identity.Canonical(m.Git), m.Commit), "csk-skill.json")
+			source := m.Source
+			if m.Git != "" {
+				source = identity.Canonical(m.Git)
+			}
+			frozen := filepath.Join(snapshot.Dir(e.home, source, m.Commit), "csk-skill.json")
 			if scenario != "readable-live" {
 				if err := os.Chmod(frozen, 0600); err != nil {
 					t.Fatal(err)
