@@ -22,17 +22,17 @@ import (
 )
 
 type boundedOutput struct {
-	bytes.Buffer
+	buffer   bytes.Buffer
 	max      int
 	exceeded bool
 }
 
 func (b *boundedOutput) Write(p []byte) (int, error) {
-	if len(p) > b.max-b.Len() {
+	if len(p) > b.max-b.buffer.Len() {
 		b.exceeded = true
 		return 0, fmt.Errorf("bounded local Git output exceeded")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 
 type localGitError struct {
@@ -123,7 +123,7 @@ func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
 		}
 		return nil, localGitFailure(err, ctx.Err(), out.exceeded || stderr.exceeded, site)
 	}
-	return out.Bytes(), nil
+	return out.buffer.Bytes(), nil
 }
 func gitLocal(dir string, args ...string) (string, error) {
 	b, err := gitBytes(dir, MaxRecord, args...)

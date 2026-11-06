@@ -3,6 +3,7 @@ package projectcontext
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,7 @@ import (
 // Claim: a failed second observation and each changed identity field produce
 // distinct, path-free refusals; unchanged observations pass beside every plant.
 // This exercises the diagnostic boundary on every platform, without Git or a
-// filesystem-identity fixture, and does not reproduce the hosted transient.
+// filesystem-identity fixture, and does not establish the hosted failure cause.
 func TestBindingRecheckDiagnostics(t *testing.T) {
 	remote := "https://example.invalid/repository.git"
 	fresh := func() registered {
@@ -183,5 +184,22 @@ func TestBindingGitFailureClasses(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// Claim: exec's io.Copy path enforces the existing bound even when its reader
+// has no WriterTo method; an embedded Buffer.ReadFrom must not bypass Write.
+// Exact-limit output passes, while overflow refuses without retaining it.
+func TestBindingGitOutputBound(t *testing.T) {
+	for _, n := range []int{8, 9} {
+		out := &boundedOutput{max: 8}
+		_, err := io.Copy(out, io.LimitReader(strings.NewReader(strings.Repeat("x", n)), int64(n)))
+		if n == 8 {
+			if err != nil || out.exceeded || out.buffer.Len() != 8 {
+				t.Fatal("exact-limit control", err)
+			}
+		} else if err == nil || !out.exceeded || out.buffer.Len() > 8 {
+			t.Fatal("copy bypassed bound", err)
+		}
 	}
 }
