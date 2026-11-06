@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -549,4 +550,57 @@ func mustPhysical(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return physical
+}
+
+// Drift remains a refusal and identifies the first root-relative entry and its
+// change kind. Unchanged trees and changes outside the root remain admitted.
+func TestToolchainMutationNamesRelativePath(t *testing.T) {
+	for _, kind := range []string{"changed", "added", "removed"} {
+		t.Run(kind, func(t *testing.T) {
+			root := testToolchain(t)
+			host := hostFacts{runtimeGOROOT: root, goos: runtime.GOOS, goarch: runtime.GOARCH}
+			executor := validProbeExecutor(t, root, host)
+			session, err := establish(context.Background(), Config{PrivateBase: t.TempDir(), CuratorGo: filepath.Join(root, "bin", platformGoName), Executor: executor}, host)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := session.VerifyToolchain(context.Background()); err != nil {
+				t.Fatalf("unchanged tree refused: %v", err)
+			}
+			outside := filepath.Join(t.TempDir(), "outside-secret")
+			writeTestFile(t, outside, []byte("outside"), 0600)
+			if err := session.VerifyToolchain(context.Background()); err != nil {
+				t.Fatalf("outside write changed identity: %v", err)
+			}
+			name := "VERSION"
+			switch kind {
+			case "changed":
+				writeTestFile(t, filepath.Join(root, name), []byte("changed"), 0644)
+			case "added":
+				name = "AAA-added"
+				writeTestFile(t, filepath.Join(root, name), []byte("added"), 0644)
+			case "removed":
+				if err := os.Remove(filepath.Join(root, name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			writeTestFile(t, filepath.Join(root, "ZZZ-second"), []byte("second drift"), 0644)
+			err = session.VerifyToolchain(context.Background())
+			want := fmt.Sprintf("path=%q change=%s", name, kind)
+			if DiagnosticCode(err) != "toolchain_mutated" || !strings.Contains(err.Error(), want) {
+				t.Fatalf("want named drift %s: %v", want, err)
+			}
+			for _, private := range []string{root, outside, filepath.Dir(outside)} {
+				if strings.Contains(err.Error(), private) {
+					t.Fatalf("drift exposed outside path: %v", err)
+				}
+			}
+			if err := session.Close(); DiagnosticCode(err) != "toolchain_mutated" || !strings.Contains(err.Error(), want) {
+				t.Fatalf("close lost named refusal: %v", err)
+			}
+			if _, err := os.Lstat(session.operation); !os.IsNotExist(err) {
+				t.Fatalf("drift retained private operation: %v", err)
+			}
+		})
+	}
 }

@@ -359,3 +359,28 @@ func copyWithContext(ctx context.Context, destination io.Writer, source io.Reade
 		}
 	}
 }
+
+// Both snapshots are root-relative and canonically sorted by the fingerprinter.
+// Report the first changed entry without including the installation's path.
+func firstToolchainChange(before, after []toolchainState) (string, string) {
+	for i, j := 0, 0; i < len(before) || j < len(after); {
+		if i == len(before) {
+			return after[j].path, "added"
+		}
+		if j == len(after) {
+			return before[i].path, "removed"
+		}
+		if before[i].path < after[j].path {
+			return before[i].path, "removed"
+		}
+		if after[j].path < before[i].path {
+			return after[j].path, "added"
+		}
+		if before[i] != after[j] {
+			return before[i].path, "changed"
+		}
+		i++
+		j++
+	}
+	return "", "identity-only"
+}
