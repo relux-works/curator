@@ -75,7 +75,11 @@ func TestHostGOROOTLockContention(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer lock.Close()
+		defer func() {
+			if err := lock.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		owner := readHostGOROOTOwner(path)
 		if owner == nil || owner.Name != t.Name() || owner.PID != os.Getpid() {
 			t.Fatalf("new acquisition did not replace holder identity: %+v", owner)
@@ -96,7 +100,11 @@ func TestHostGOROOTLockContention(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer next.Close()
+		defer func() {
+			if err := next.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		if err := lock.Close(); err != nil {
 			t.Fatal(err)
 		}

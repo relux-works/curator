@@ -111,7 +111,7 @@ func writeHostGOROOTOwner(path string, record hostGOROOTOwner) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(file.Name())
+	defer func() { _ = os.Remove(file.Name()) }()
 	_, writeErr := file.Write(data)
 	if err := errors.Join(writeErr, file.Close()); err != nil {
 		return err
@@ -120,11 +120,11 @@ func writeHostGOROOTOwner(path string, record hostGOROOTOwner) error {
 }
 
 func readHostGOROOTOwner(path string) *hostGOROOTOwner {
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 -- fixed holder metadata beneath the test coordination root.
 	if err != nil {
 		return nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(io.LimitReader(file, 4097))
 	var owner hostGOROOTOwner
 	if err != nil || len(data) > 4096 || json.Unmarshal(data, &owner) != nil || owner.Name == "" || owner.PID <= 0 || owner.Process == "" || owner.AcquiredAt.IsZero() || owner.AcquiredAt.After(time.Now()) {
