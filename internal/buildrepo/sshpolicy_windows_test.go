@@ -131,3 +131,28 @@ func TestWindowsSSHPolicyDirectoryIsPrivate(t *testing.T) {
 		t.Fatalf("current-user write control: %v", err)
 	}
 }
+
+// A regular record is readable, while a native file reparse point refuses
+// without changing either link or target. No SSH client or shell is started.
+func TestWindowsSSHPolicyRecordReparse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record")
+	if err := os.WriteFile(path, []byte("policy"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := sshPolicyPayload(path); err != nil || string(got) != "policy" {
+		t.Fatalf("positive: %q %v", got, err)
+	}
+	link := filepath.Join(t.TempDir(), "record-link")
+	if err := os.Symlink(path, link); err != nil {
+		t.Fatalf("native reparse fixture unavailable: %v", err)
+	}
+	if got, err := sshPolicyPayload(link); err == nil || got != nil {
+		t.Fatalf("reparse accepted: %q %v", got, err)
+	}
+	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("link changed: %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != "policy" {
+		t.Fatal("target changed")
+	}
+}

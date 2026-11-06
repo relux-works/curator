@@ -304,6 +304,9 @@ func TestDraftPlanNamesProvider(t *testing.T) {
 	}
 }
 
+// An admitted executable gets private empty files and cleanup removes them.
+// Invalid explicit selection refuses immediately under Manager 11.1, without
+// creating policy files or falling through to system SSH.
 func TestDraftSSHWrapperBase(t *testing.T) {
 	base, cleanup, err := draftSSHWrapperBase()
 	if err != nil {
@@ -324,12 +327,16 @@ func TestDraftSSHWrapperBase(t *testing.T) {
 		t.Fatalf("empty config survives cleanup: %v", err)
 	}
 
-	t.Run("missing ssh refuses later with a zero base", func(t *testing.T) {
-		t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", filepath.Join(t.TempDir(), "absent-ssh"))
+	t.Run("missing ssh refuses immediately with its selection reason", func(t *testing.T) {
+		root := t.TempDir()
+		t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", filepath.Join(root, "absent-ssh"))
 		base, cleanup, err := draftSSHWrapperBase()
 		defer cleanup()
-		if err != nil {
-			t.Fatal(err)
+		if buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || err.Error() != buildrepo.CodeCredentialPolicyInvalid+": no ssh executable found" {
+			t.Fatalf("selection refusal: %v", err)
+		}
+		if entries, err := os.ReadDir(root); err != nil || len(entries) != 0 {
+			t.Fatalf("refusal created state: %v %v", entries, err)
 		}
 		if base != (buildrepo.SSHWrapperBase{}) {
 			t.Fatalf("base without ssh = %+v, want zero", base)

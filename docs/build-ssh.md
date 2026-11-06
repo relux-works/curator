@@ -563,7 +563,7 @@ transport boundary; it runs no SSH.
 The `OpenSSH 8.9 real fetch` hosted job uses `ubuntu-22.04`, verifies the actual
 client version in its log, starts a fixture sshd with explicit server config,
 and exercises the product wrapper's explicit `-F` client config: key fetch,
-wrong key and unknown host. Real SSH runs only in this hosted job. The default
+wrong key, unknown host and changed host key. Real SSH runs only in this hosted job. The default
 project/global matrix uses POSIX capture scripts and therefore cannot execute
 on Windows. CLI fake-Git shell witnesses have the same POSIX boundary; Windows
 still executes portable missing-credential admission, executable-selection,
@@ -577,7 +577,34 @@ Profile install uses the shared acquisition implementation; this change has no
 separate profile-install credential fixture. Project/global integration evidence
 must not be presented as independent profile-path coverage. Linux **build and
 publication** support depends on #219 and #220. The main branch used by this
-change includes #219's native execution controls; #220's bounded build-session
-and manager-loss controls remain a pending dependency. The fetch controls
+change includes both #219's native execution controls and #220's bounded
+build-session and manager-loss controls; both dependencies have landed. The fetch controls
 qualify source acquisition only; separate native-control jobs cover the
 execution controls present in main.
+
+## Security-key identities and executable limits
+
+An ED25519-SK identity needs an OpenSSH client with an available security-key
+provider. Select its trusted absolute path with `CURATOR_BUILD_SSH_EXECUTABLE`.
+The macOS system client may silently drop this identity when no provider is
+available, leaving only `authentication_failed`. Curator does not parse key
+files or detect providers. Its clean environment removes `SSH_SK_PROVIDER`,
+and the manager-owned empty `-F` configuration does not load an operator's
+`SecurityKeyProvider` setting. The selected client must therefore supply the
+provider itself. A package-manager client is not automatically provider-capable.
+Batch mode cannot answer PIN or passphrase prompts; hardware touch and agent
+interoperability have not been qualified here.
+
+This limit follows source inspection of OpenSSH's
+[private-key loading](https://github.com/openssh/openssh-portable/blob/V_9_9_P2/sshconnect2.c)
+and [provider selection](https://github.com/openssh/openssh-portable/blob/V_9_9_P2/ssh.c).
+No real security token has been used. The authentication diagnostic always
+includes the static client-selection remedy; it does not infer a key type.
+
+The executable fingerprint pins the admitted launcher bytes. For macOS's
+`/usr/bin/git` shim, it does not independently pin the developer-tool Git that
+the launcher selects. Discovery retains inherited `DEVELOPER_DIR`; the clean
+fetch environment does not carry it, so those selections may differ. Windows
+`cmd/git.exe` can likewise be a launcher. This change documents that boundary
+without changing discovery behavior. CI has no real fetch through the macOS
+shim, no real Windows SSH fetch and no real security-token control.

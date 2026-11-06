@@ -537,9 +537,9 @@ func draftCLISuccessArms(f *draftCLIFixture) map[string]draftCLIArm {
 	}
 }
 
-// draftCLILegacyRun formats one legacy run for the golden: exit code,
+// draftCLIDefaultRun formats one default run for the golden: exit code,
 // normalized stdout, and normalized fetch lines.
-func draftCLILegacyRun(t *testing.T, root string, code int, stdout string, fetches []string) string {
+func draftCLIDefaultRun(t *testing.T, root string, code int, stdout string, fetches []string) string {
 	t.Helper()
 	var out strings.Builder
 	_, _ = fmt.Fprintf(&out, "exit: %d\n", code)
@@ -556,7 +556,7 @@ func draftCLILegacyRun(t *testing.T, root string, code int, stdout string, fetch
 
 // Default-lane replay ignores the draft policy/provider table but always uses
 // the manager SSH wrapper; inherited GIT_SSH cannot select the wire transport.
-func TestDraftTransportLegacyGolden(t *testing.T) {
+func TestDraftTransportDefaultGolden(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test transport wrapper is POSIX-only; native binary wrapper and portable selection witnesses cover Windows separately")
 	}
@@ -565,8 +565,8 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 		"fixture.test/https-tools": {draftCLIHTTPS},
 		"fixture.test/ssh-tools":   {draftCLISSH},
 	}, "none")
-	// A present-but-invalid providers file on every legacy run proves the
-	// legacy lane never consults the provider table.
+	// A present-but-invalid providers file on every default run proves the
+	// default lane never consults the provider table.
 	broken := `not json`
 
 	run := func(switchOn bool, policy *string) (int, string, string, []string) {
@@ -583,14 +583,14 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 	if len(fetches) != 2 {
 		t.Fatalf("%d fetches, want 2:\n%s", len(fetches), strings.Join(fetches, "\n"))
 	}
-	golden := draftCLILegacyRun(t, fixture.root, code, stdout, fetches)
+	golden := draftCLIDefaultRun(t, fixture.root, code, stdout, fetches)
 
 	want, err := os.ReadFile(filepath.Join("testdata", "draft-transport-legacy.golden"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if golden != string(want) {
-		t.Fatalf("legacy run differs from the committed golden:\n%s", golden)
+		t.Fatalf("default run differs from the committed golden:\n%s", golden)
 	}
 	for _, fetch := range fetches {
 		sshFetch := strings.Contains(fetch, "<"+draftCLISSH+">")
@@ -606,16 +606,16 @@ func TestDraftTransportLegacyGolden(t *testing.T) {
 		t.Fatalf("switch on without policy = %d\nstdout:\n%s\nstderr:\n%s", code2, stdout2, stderr2)
 	}
 	requirePermissivePostureWarning(t, stderr2)
-	if other := draftCLILegacyRun(t, fixture.root, code2, stdout2, fetches2); other != golden {
-		t.Fatalf("switch on without policy differs from the legacy golden:\n%s", other)
+	if other := draftCLIDefaultRun(t, fixture.root, code2, stdout2, fetches2); other != golden {
+		t.Fatalf("switch on without policy differs from the default golden:\n%s", other)
 	}
 	code3, stdout3, stderr3, fetches3 := run(false, nil)
 	if code3 != exitOK {
 		t.Fatalf("switch off without policy = %d\nstdout:\n%s\nstderr:\n%s", code3, stdout3, stderr3)
 	}
 	requirePermissivePostureWarning(t, stderr3)
-	if other := draftCLILegacyRun(t, fixture.root, code3, stdout3, fetches3); other != golden {
-		t.Fatalf("switch off without policy differs from the legacy golden:\n%s", other)
+	if other := draftCLIDefaultRun(t, fixture.root, code3, stdout3, fetches3); other != golden {
+		t.Fatalf("switch off without policy differs from the default golden:\n%s", other)
 	}
 }
 
@@ -1067,6 +1067,16 @@ func main() {
 	t.Run("malformed state refuses", func(t *testing.T) {
 		bad := writeFile("bad-state.json", []byte("{broken"))
 		refuses(t, []string{"git@fixture.test", "git-upload-pack '/repository.git'"}, bad)
+	})
+
+	// Oversized and directory-backed policy locators must refuse silently before
+	// the fake client, with the original regular policy as the positive control.
+	t.Run("oversized record refuses", func(t *testing.T) {
+		bad := writeFile("oversized-state.json", []byte(strings.Repeat(" ", 8193)))
+		refuses(t, []string{"git@fixture.test", "git-upload-pack '/repository.git'"}, bad)
+	})
+	t.Run("nonregular record refuses", func(t *testing.T) {
+		refuses(t, []string{"git@fixture.test", "git-upload-pack '/repository.git'"}, t.TempDir())
 	})
 	t.Run("wrong fingerprint refuses", func(t *testing.T) {
 		policy["SSHFingerprint"] = strings.Repeat("0", 64)

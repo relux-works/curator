@@ -232,13 +232,13 @@ func draftPlanNeedsSSH(plan buildrepo.TransportPlan) bool {
 // wrapper policies: the platform SSH executable and fresh empty configuration
 // files owned by this fetch. cleanup removes the empty files; the caller runs
 // it after acquisition returns. A missing or unadmitted SSH executable yields
-// a zero base with no error: the executor then refuses every SSH attempt
-// before any traffic. Only empty-file creation failures are errors.
+// a static selection error before any traffic. Empty-file creation failures
+// also refuse; neither case falls back to ambient SSH.
 func draftSSHWrapperBase() (buildrepo.SSHWrapperBase, func(), error) {
 	none := func() {}
 	ssh, err := buildrepo.SelectTrustedExecutable("ssh", os.Getenv("CURATOR_BUILD_SSH_EXECUTABLE"), buildrepo.OperatorManagedExecutableRoots()...)
 	if err != nil {
-		return buildrepo.SSHWrapperBase{}, none, nil
+		return buildrepo.SSHWrapperBase{}, none, buildrepo.TrustedExecutableSelectionError(err)
 	}
 	dir, err := os.MkdirTemp("", "curator-draft-ssh-")
 	if err != nil {
@@ -286,9 +286,7 @@ func acquireDefaultNetwork(ctx context.Context, base buildrepo.NetworkRequest) (
 	if base.Source.Transport == "ssh" && base.Tool.SSHBase == (buildrepo.SSHWrapperBase{}) {
 		sshBase, cleanup, err := draftSSHWrapperBase()
 		if err != nil {
-			// A zero base reaches the shared binder's typed, static policy
-			// refusal. Never expose a temporary path or fall back to SSH.
-			sshBase = buildrepo.SSHWrapperBase{}
+			return nil, err
 		}
 		defer cleanup()
 		base.Tool.SSHBase = sshBase

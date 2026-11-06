@@ -33,15 +33,20 @@ func TestTrustedExecutableSelection(t *testing.T) {
 			if _, err := SelectTrustedExecutable(name, tool, root); err == nil || !strings.Contains(err.Error(), "managed command root") {
 				t.Fatalf("manager bin: %v", err)
 			}
-			project := filepath.Join(t.TempDir(), ".agents", "bin", name)
-			if err := os.MkdirAll(filepath.Dir(project), 0755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(project, []byte("foreign"), 0700); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := SelectTrustedExecutable(name, project); err == nil || !strings.Contains(err.Error(), "managed command root") {
-				t.Fatalf("project bin: %v", err)
+			for _, segment := range []string{".agents/bin", ".curator/bin", "global/bin", "environments/example/bin", "runtime/example/bin"} {
+				project := filepath.Join(t.TempDir(), filepath.FromSlash(segment), name)
+				if err := os.MkdirAll(filepath.Dir(project), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(project, []byte("foreign"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := SelectTrustedExecutable(name, project); err == nil || !strings.Contains(err.Error(), "managed command root") {
+					t.Fatalf("project bin: %v", err)
+				}
+				if got, _ := os.ReadFile(project); string(got) != "foreign" {
+					t.Fatal("rejection changed foreign bytes")
+				}
 			}
 			if _, err := SelectTrustedExecutable(name, name); err == nil || !strings.Contains(err.Error(), "absolute") {
 				t.Fatalf("relative: %v", err)
@@ -49,9 +54,7 @@ func TestTrustedExecutableSelection(t *testing.T) {
 			if _, err := SelectTrustedExecutable(name, tool+"-absent"); err == nil || err.Error() != "no "+name+" executable found" {
 				t.Fatalf("missing: %v", err)
 			}
-			if got, _ := os.ReadFile(project); string(got) != "foreign" {
-				t.Fatal("rejection changed foreign bytes")
-			}
+
 		})
 	}
 }
@@ -112,6 +115,9 @@ func TestCredentialFailureTypedReasons(t *testing.T) {
 		if !errors.As(err, &typed) || typed.Reason != c.reason || typed.Code != c.code || strings.Contains(err.Error(), c.stderr) {
 			t.Fatalf("typed refusal: %v", err)
 		}
+		if c.reason == ReasonAuthenticationFailed && (strings.Count(err.Error(), ";") != 1 || !strings.Contains(err.Error(), "security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE")) {
+			t.Fatalf("static authentication remedy: %v", err)
+		}
 	}
 	untyped := admissionError(CodeIdentityInvalid, "text (authentication_failed)")
 	_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Acquire: func(context.Context) (*Snapshot, error) { return nil, untyped }})
@@ -145,5 +151,69 @@ func TestOpenSSH89UnknownHostDiagnostic(t *testing.T) {
 	var typed *AdmissionError
 	if !errors.As(err, &typed) || typed.Code != CodeCredentialPolicyInvalid || typed.Reason != ReasonHostKeyFailed || strings.Contains(err.Error(), "127.0.0.1") {
 		t.Fatalf("sanitized host-key reason: %v", err)
+	}
+}
+
+// Absent Git has one stable policy diagnostic before secondary paths on HTTPS
+// too; a fixed ordinary-file fixture then reaches the exec-path check without
+// starting the fixture. Both paths preserve its bytes.
+func TestTrustedGitSelectionDiagnostics(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "git")
+	if err := os.WriteFile(p, []byte("not executable code"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	source, parseErr := ParseSource("https://fixture.test/tools.git")
+	if parseErr != nil {
+		t.Fatal(parseErr)
+	}
+	for i := 0; i < 100; i++ {
+		snapshot, err := AcquireNetwork(context.Background(), NetworkRequest{Source: source, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}})
+		if snapshot != nil {
+			t.Fatal("absent Git produced a snapshot")
+		}
+		if ErrorCode(err) != CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), "no git executable found") {
+			t.Fatalf("missing Git: %v", err)
+		}
+	}
+	err := ValidateGitTool(context.Background(), GitTool{Executable: p})
+	if ErrorCode(err) != CodeIdentityInvalid || !strings.Contains(err.Error(), "git exec path path must be absolute") {
+		t.Fatalf("ordered positive: %v", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "not executable code" {
+		t.Fatal("fixture changed")
+	}
+}
+
+// The real OpenSSH changed-key banner retains the typed host-key reason.
+// Unknown adjacent text and truncated evidence never become host-key proof;
+// neither verdict authorizes fallback or exposes remote details.
+func TestOpenSSH89ChangedHostDiagnostic(t *testing.T) {
+	const changed = `@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ED25519 key sent by the remote host is
+SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.
+Please contact your system administrator.
+Add correct host key in /fixture/known-hosts to get rid of this message.
+Offending ED25519 key in /fixture/known-hosts:1
+Host key for 127.0.0.1 has changed and you have requested strict checking.
+Host key verification failed.
+`
+	for _, c := range []struct {
+		output    string
+		truncated bool
+		reason    AcquisitionReason
+	}{{changed, false, ReasonHostKeyFailed}, {changed + "unknown detail", false, ReasonTransportFailed}, {changed, true, ReasonTransportFailed}} {
+		err := laneDiagnostic(&fetchError{stderr: c.output, truncated: c.truncated})
+		var typed *AdmissionError
+		if !errors.As(err, &typed) || typed.Reason != c.reason || strings.Contains(err.Error(), "/fixture") {
+			t.Fatalf("reason: %v", err)
+		}
+		if AllowSecondAttempt(TransportFallbackAvailabilityAuth, ClassifyFetchOutput(c.output)) {
+			t.Fatal("host key permitted fallback")
+		}
 	}
 }

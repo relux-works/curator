@@ -220,6 +220,20 @@ var transportLineSignals = []struct {
 	{regexp.MustCompile(`^No (RSA|DSA|ECDSA|ED25519) host key is known for ` + transportHost + ` and you have requested strict checking\.$`), FailureHostKey, false},
 	{regexp.MustCompile(`(?i)^WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!$`), FailureHostKey, false},
 
+	// OpenSSH 8.9 changed-key banner and its bounded detail sentences. Every
+	// nonempty line still has to match; unknown additions remain fail closed.
+	{regexp.MustCompile(`^@{59}$`), FailureHostKey, false},
+	{regexp.MustCompile(`^@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @$`), FailureHostKey, false},
+	{regexp.MustCompile(`^IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!$`), FailureHostKey, false},
+	{regexp.MustCompile(`^Someone could be eavesdropping on you right now \(man-in-the-middle attack\)!$`), FailureHostKey, false},
+	{regexp.MustCompile(`^It is also possible that a host key has just been changed\.$`), FailureHostKey, false},
+	{regexp.MustCompile(`^The fingerprint for the (RSA|DSA|ECDSA|ED25519) key sent by the remote host is$`), FailureHostKey, false},
+	{regexp.MustCompile(`^(SHA256:[A-Za-z0-9+/]{43}|MD5:([0-9a-f]{2}:){15}[0-9a-f]{2})\.$`), FailureHostKey, false},
+	{regexp.MustCompile(`^Please contact your system administrator\.$`), FailureHostKey, false},
+	{regexp.MustCompile(`^Add correct host key in [^\r\n]{1,100} to get rid of this message\.$`), FailureHostKey, false},
+	{regexp.MustCompile(`^Offending (RSA|DSA|ECDSA|ED25519) key in [^\r\n]+:[0-9]+$`), FailureHostKey, false},
+	{regexp.MustCompile(`^Host key for ` + transportHost + ` has changed and you have requested strict checking\.$`), FailureHostKey, false},
+
 	// Missing or moved refs (fail closed).
 	{regexp.MustCompile(`(?i)^fatal: couldn't find remote ref [A-Za-z0-9_./-]+\.?$`), FailureRef, false},
 	{regexp.MustCompile(`^fatal: (remote error: upload-pack: not our ref|git upload-pack: not our ref) [0-9a-f]{40}([0-9a-f]{24})?$`), FailureRef, false},
@@ -891,7 +905,7 @@ type TransportTrace func(AttemptRecord)
 // refuses exactly what the lane refuses. Every SSH attempt additionally
 // binds its endpoint and its selected credentials into a real wrapper
 // policy; the fetch then runs behind a per-attempt wrapper pinned to
-// that policy instead of the tool's static wrapper.
+// that policy, just as default acquisition binds its own per-fetch policy.
 //
 // Success returns the proved snapshot: full locked object, exact tag
 // when declared, objects, and snapshot, verified independently of which

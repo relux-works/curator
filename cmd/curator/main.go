@@ -2075,7 +2075,7 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 func productionGitTool() buildrepo.GitTool {
 	gitPath, err := buildrepo.SelectTrustedExecutable("git", os.Getenv("CURATOR_BUILD_GIT_EXECUTABLE"), buildrepo.OperatorManagedExecutableRoots()...)
 	if err != nil {
-		return buildrepo.GitTool{}
+		return buildrepo.GitTool{SelectionError: buildrepo.TrustedExecutableSelectionError(err)}
 	}
 	run := func(args ...string) string {
 		command := exec.Command(gitPath, args...) // #nosec G204 G702 -- SelectTrustedExecutable rejects relative and managed paths; fixed discovery arguments, no shell.

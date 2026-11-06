@@ -1,5 +1,5 @@
 // The hosted-only control fetches through the product wrapper using OpenSSH 8.9.
-// A correct key and pinned host succeed; wrong-key and unknown-host attempts
+// A correct key and pinned host succeed; wrong-key, unknown-host and changed-key attempts
 // must report distinct static policy reasons and return no snapshot.
 package main
 
@@ -40,7 +40,7 @@ func main() {
 	must(err)
 	tool := buildrepo.GitTool{Executable: git, Fingerprint: fingerprint, ExecPath: probe("--exec-path"), AllowedVersions: []string{probe("--version")}, SSHWrapper: manager,
 		SSHBase: buildrepo.SSHWrapperBase{SSH: ssh, EmptyConfig: filepath.Join(root, "empty-config"), EmptyKnownHosts: filepath.Join(root, "empty-hosts"), ConnectTimeout: 10}}
-	for _, c := range []struct{ name, key, hosts, reason string }{{"key-fetch", "identity", "known-hosts", ""}, {"wrong-key", "wrong-identity", "known-hosts", "authentication_failed"}, {"unknown-host", "identity", "empty-hosts", "host_key_verification_failed"}} {
+	for _, c := range []struct{ name, key, hosts, reason string }{{"key-fetch", "identity", "known-hosts", ""}, {"wrong-key", "wrong-identity", "known-hosts", "authentication_failed"}, {"unknown-host", "identity", "empty-hosts", "host_key_verification_failed"}, {"changed-key", "identity", "changed-hosts", "host_key_verification_failed"}} {
 		tool.SSHCredentials = buildrepo.OperatorSSHCredentials{Identity: filepath.Join(root, c.key), KnownHosts: filepath.Join(root, c.hosts)}
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		snapshot, err := buildrepo.AcquireNetwork(ctx, buildrepo.NetworkRequest{Source: source, Lock: buildrepo.LockedCommit{ObjectFormat: "sha1", Hex: commit}, Tool: tool})

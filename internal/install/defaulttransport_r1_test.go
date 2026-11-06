@@ -34,8 +34,14 @@ func TestR1ProjectBinSSHSelected(t *testing.T) {
 	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", foreign)
 	base, cleanup, err := draftSSHWrapperBase()
 	defer cleanup()
-	if err != nil || base.SSH != "" {
+	if buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), "managed command root") || base.SSH != "" {
 		t.Fatalf("project SSH selected: %+v %v", base, err)
+	}
+	t.Setenv("CURATOR_BUILD_SSH_EXECUTABLE", "relative-ssh")
+	_, releaseRelative, relativeErr := draftSSHWrapperBase()
+	releaseRelative()
+	if buildrepo.ErrorCode(relativeErr) != buildrepo.CodeCredentialPolicyInvalid || !strings.Contains(relativeErr.Error(), "must be absolute") {
+		t.Fatalf("relative reason: %v", relativeErr)
 	}
 	trusted := filepath.Join(t.TempDir(), "ssh")
 	if err := os.WriteFile(trusted, []byte("operator fixture"), 0755); err != nil {

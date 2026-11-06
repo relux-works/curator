@@ -671,6 +671,13 @@ Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-pro
 
 Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
 
+Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
+controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
+real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`
+from the OpenSSH 8.9 CI fixture; never run it on an operator host. Ordinary
+capture controls run with `go test ./internal/install -run
+'^TestDefaultTransportInstallScopes$'`; their logs go to the CI job output.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workflow, discrete signed commits, and spec-first rules.
@@ -678,10 +685,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workf
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
-controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
-real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`
-from the OpenSSH 8.9 CI fixture; never run it on an operator host. Ordinary
-capture controls run with `go test ./internal/install -run
-'^TestDefaultTransportInstallScopes$'`; their logs go to the CI job output.

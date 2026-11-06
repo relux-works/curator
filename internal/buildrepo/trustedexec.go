@@ -101,3 +101,9 @@ func DiscoveryEnvironment(environment []string) []string {
 // OperatorManagedExecutableRoots includes configurable manager command roots.
 // The value comes from operator state, never package or repository data.
 func OperatorManagedExecutableRoots() []string { return []string{os.Getenv("CURATOR_GLOBAL_USER_BIN")} }
+
+// TrustedExecutableSelectionError retains the static reason returned by
+// SelectTrustedExecutable, without including operator paths or OS error text.
+func TrustedExecutableSelectionError(err error) error {
+	return admissionError(CodeCredentialPolicyInvalid, "%s", err)
+}

@@ -94,6 +94,8 @@ func DefaultLimits() Limits {
 // must be absolute, ordinary paths; AllowedVersions pins tested release
 // prefixes such as "git version 2.50.".
 type GitTool struct {
+	// SelectionError preserves the static operator tool-selection refusal.
+	SelectionError  error
 	Fingerprint     string
 	Executable      string
 	ExecPath        string
@@ -190,13 +192,20 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 // ValidateGitTool performs trusted discovery/version pinning before any
 // package or substitution path is read.
 func ValidateGitTool(ctx context.Context, tool GitTool) error {
+	if tool.SelectionError != nil {
+		return tool.SelectionError
+	}
+	if tool.Executable == "" {
+		return admissionError(CodeCredentialPolicyInvalid, "no git executable found; configure CURATOR_BUILD_GIT_EXECUTABLE with a trusted absolute Git executable")
+	}
 	if tool.Fingerprint != "" {
 		current, err := ExecutableFingerprint(tool.Executable)
 		if err != nil || current != tool.Fingerprint {
 			return admissionError(CodeCredentialPolicyInvalid, "Git executable fingerprint changed")
 		}
 	}
-	for name, value := range map[string]string{"git": tool.Executable, "git exec path": tool.ExecPath} {
+	for _, field := range []struct{ name, value string }{{"git", tool.Executable}, {"git exec path", tool.ExecPath}} {
+		name, value := field.name, field.value
 		if !filepath.IsAbs(value) {
 			return admissionError(CodeIdentityInvalid, "%s path must be absolute", name)
 		}
@@ -205,7 +214,8 @@ func ValidateGitTool(ctx context.Context, tool GitTool) error {
 			return admissionError(CodeIdentityInvalid, "%s path is not an admitted ordinary object", name)
 		}
 	}
-	for name, value := range map[string]string{"credential broker": tool.AskPass, "SSH wrapper": tool.SSHWrapper} {
+	for _, field := range []struct{ name, value string }{{"credential broker", tool.AskPass}, {"SSH wrapper", tool.SSHWrapper}} {
+		name, value := field.name, field.value
 		if value == "" {
 			continue
 		}
@@ -241,11 +251,9 @@ type NetworkRequest struct {
 	RefValue string
 	Tool     GitTool
 	Limits   Limits
-	// sshPolicy is the bound per-attempt SSH wrapper policy. Only bounded
-	// transport resolution sets it: the fetch then runs behind a
-	// per-attempt wrapper pinned to this endpoint and its credentials
-	// instead of the tool's static wrapper. Direct acquisition leaves it
-	// nil and keeps the legacy static-wrapper behavior.
+	// sshPolicy is the bound per-attempt SSH wrapper policy. Default acquisition and bounded
+	// resolution both bind it before fetching. Every fetch runs behind the
+	// per-attempt wrapper pinned to this endpoint and its credentials.
 	sshPolicy *SSHPolicy
 }
 
@@ -366,7 +374,11 @@ func laneDiagnostic(err error) error {
 				reason, code = ReasonHostKeyFailed, CodeCredentialPolicyInvalid
 			}
 		}
-		return &AdmissionError{Code: code, Reason: reason, err: fmt.Errorf("exact source fetch failed (%s)", reason)}
+		message := fmt.Sprintf("exact source fetch failed (%s)", reason)
+		if reason == ReasonAuthenticationFailed {
+			message += "; a security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE"
+		}
+		return &AdmissionError{Code: code, Reason: reason, err: errors.New(message)}
 	}
 	return err
 }

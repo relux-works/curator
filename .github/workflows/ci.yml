@@ -114,6 +114,8 @@ jobs:
           /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/host-key"
           /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/identity"
           /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/wrong-identity"
+          /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$fixture/obsolete-host-key"
+          printf '127.0.0.1 %s\n' "$(cut -d ' ' -f 1,2 "$fixture/obsolete-host-key.pub")" > "$fixture/changed-hosts"
           cp "$fixture/identity.pub" "$fixture/authorized-keys"
           printf '127.0.0.1 %s\n' "$(cut -d ' ' -f 1,2 "$fixture/host-key.pub")" > "$fixture/known-hosts"
           touch "$fixture/empty-config" "$fixture/empty-hosts"
@@ -176,7 +178,7 @@ jobs:
             GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./internal/buildrepo \
-              -run '^Test(TrustedExecutableSelection|WindowsGitDoesNotForwardPolicyHandle|WindowsSSHPolicyDirectoryIsPrivate|NoSSHExecutableDiagnostic|TrustedGitFingerprintChange)$'
+              -run '^Test(TrustedExecutableSelection|WindowsGitDoesNotForwardPolicyHandle|WindowsSSHPolicyDirectoryIsPrivate|WindowsSSHPolicyRecordReparse|NoSSHExecutableDiagnostic|TrustedGitFingerprintChange)$'
           env -i PATH="$PATH" SystemRoot="$SYSTEMROOT" HOME="$test_home" \
             TEMP="$test_home" TMP="$test_home" USERPROFILE="$test_home" \
             GOCACHE="$test_home/go-cache" GOPATH="$test_home/go" \
@@ -210,7 +212,7 @@ jobs:
           env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=10m -v ./cmd/curator \
-              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportLegacyGolden|ProductionExternalDepsFalseDrivesMirrorFetchToSink|ProductionBinaryDispatchesSSHWrapper)$'
+              -run '^Test(ProductionGitToolRejectsProjectPATH|ProductionGitToolIgnoresInheritedSSHWrapper|DefaultLaneSelectsOwnWrapperWithoutInheritedGitSSH|DraftTransportDefaultGolden|ProductionExternalDepsFalseDrivesMirrorFetchToSink|ProductionBinaryDispatchesSSHWrapper)$'
       - name: Detect a dropped default-lane SSH policy
         shell: bash
         run: |

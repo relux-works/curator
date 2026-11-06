@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildrepo"
@@ -49,8 +51,13 @@ func TestProductionGitToolRejectsProjectPATH(t *testing.T) {
 		t.Fatalf("fixed search failed: %+v", tool)
 	}
 	t.Setenv("CURATOR_BUILD_GIT_EXECUTABLE", fake)
-	if tool := productionGitTool(); tool.Executable != "" {
-		t.Fatalf("project git admitted: %+v", tool)
+	for _, c := range []struct{ path, reason string }{{fake, "managed command root"}, {"relative-git", "must be absolute"}, {fake + "-absent", "no git executable found"}} {
+		t.Setenv("CURATOR_BUILD_GIT_EXECUTABLE", c.path)
+		tool := productionGitTool()
+		err := buildrepo.ValidateGitTool(context.Background(), tool)
+		if tool.Executable != "" || buildrepo.ErrorCode(err) != buildrepo.CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), c.reason) {
+			t.Fatalf("selection reason: %+v %v", tool, err)
+		}
 	}
 	if got, _ := os.ReadFile(fake); string(got) != "foreign program" {
 		t.Fatal("foreign bytes changed")

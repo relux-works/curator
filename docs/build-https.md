@@ -180,3 +180,9 @@ prompts for the selected host. Its state file contains the host and username;
 the secret exists only in that fetch process tree. Other Git subprocesses do
 not receive the broker state or secret. The broker is bound to the resolved
 host, so a credential selected for one host cannot answer a prompt for another.
+
+Trusted Git selection ignores inherited `PATH`, including for HTTPS. Set
+`CURATOR_BUILD_GIT_EXECUTABLE` to a trusted absolute Git executable when Git is
+outside the fixed system list documented in [build-ssh.md](build-ssh.md#trusted-executables-and-openssh-compatibility).
+Invalid configured paths refuse with their selection reason; an absent admitted
+Git reports `build_repository_credential_policy_invalid: no git executable found`.
