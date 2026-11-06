@@ -166,14 +166,32 @@ func TestTrustedGitSelectionDiagnostics(t *testing.T) {
 	if parseErr != nil {
 		t.Fatal(parseErr)
 	}
-	for i := 0; i < 100; i++ {
-		snapshot, err := AcquireNetwork(context.Background(), NetworkRequest{Source: source, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}})
-		if snapshot != nil {
-			t.Fatal("absent Git produced a snapshot")
+	// A zero tool and production discovery errors both reach their policy
+	// diagnostic even when failed discovery also left the broker absent.
+	for _, tool := range []GitTool{
+		{},
+		{SelectionError: TrustedExecutableSelectionError(errors.New("no git executable found"))},
+		{SelectionError: TrustedExecutableSelectionError(errors.New("git executable must be absolute"))},
+	} {
+		want := "no git executable found"
+		if tool.SelectionError != nil {
+			want = tool.SelectionError.Error()
 		}
-		if ErrorCode(err) != CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), "no git executable found") {
-			t.Fatalf("missing Git: %v", err)
+		for i := 0; i < 100; i++ {
+			snapshot, err := AcquireNetwork(context.Background(), NetworkRequest{Source: source, Tool: tool, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}})
+			if snapshot != nil {
+				t.Fatal("failed Git selection produced a snapshot")
+			}
+			if ErrorCode(err) != CodeCredentialPolicyInvalid || !strings.Contains(err.Error(), want) {
+				t.Fatalf("Git selection: %v, want %q", err, want)
+			}
 		}
+	}
+	// With a selected executable, the neighboring missing-broker refusal
+	// remains reachable without executing the ordinary-file fixture.
+	snapshot, brokerErr := AcquireNetwork(context.Background(), NetworkRequest{Source: source, Tool: GitTool{Executable: p}, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)}})
+	if snapshot != nil || ErrorCode(brokerErr) != CodeIdentityInvalid || !strings.Contains(brokerErr.Error(), "HTTPS requires a manager credential broker") {
+		t.Fatalf("missing broker: snapshot=%v error=%v", snapshot, brokerErr)
 	}
 	err := ValidateGitTool(context.Background(), GitTool{Executable: p})
 	if ErrorCode(err) != CodeIdentityInvalid || !strings.Contains(err.Error(), "git exec path path must be absolute") {

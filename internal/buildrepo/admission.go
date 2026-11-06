@@ -189,14 +189,21 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 	return append(result, policy.ExpectedHost, expectedCommand), nil
 }
 
-// ValidateGitTool performs trusted discovery/version pinning before any
-// package or substitution path is read.
-func ValidateGitTool(ctx context.Context, tool GitTool) error {
+func validateGitSelection(tool GitTool) error {
 	if tool.SelectionError != nil {
 		return tool.SelectionError
 	}
 	if tool.Executable == "" {
 		return admissionError(CodeCredentialPolicyInvalid, "no git executable found; configure CURATOR_BUILD_GIT_EXECUTABLE with a trusted absolute Git executable")
+	}
+	return nil
+}
+
+// ValidateGitTool performs trusted discovery/version pinning before any
+// package or substitution path is read.
+func ValidateGitTool(ctx context.Context, tool GitTool) error {
+	if err := validateGitSelection(tool); err != nil {
+		return err
 	}
 	if tool.Fingerprint != "" {
 		current, err := ExecutableFingerprint(tool.Executable)
@@ -311,8 +318,16 @@ func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
 	if request.Source.Transport != "https" && request.Source.Transport != "ssh" {
 		return admissionError(CodeIdentityInvalid, "unsupported transport")
 	}
-	if request.Source.Transport == "https" && request.Tool.AskPass == "" {
-		return admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
+	if request.Source.Transport == "https" {
+		// Discovery failures leave no broker on the production tool. Preserve
+		// the selection diagnostic before checking that secondary field; this
+		// pure check starts no Git probe or credential process.
+		if err := validateGitSelection(request.Tool); err != nil {
+			return err
+		}
+		if request.Tool.AskPass == "" {
+			return admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
+		}
 	}
 	// Selection is checked before wrapper admission and before any Git probe.
 	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
