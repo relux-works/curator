@@ -67,10 +67,13 @@ func profileDomain(t *testing.T, e *env) *profileRuntimeAdmission {
 	return &profileRuntimeAdmission{domain: skillruntime.Domain{Home: e.home, UserHome: user, UserBin: bin, FixedPATH: bin + string(os.PathListSeparator) + os.Getenv("PATH")}}
 }
 
+const profileRuntimeBuildSentinel = "profile-runtime-build-sentinel\n"
+
 func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, build, broken bool, variants ...string) (string, envprofile.Policy) {
 	t.Helper()
 	if build {
 		e.buildSkill(skill, command)
+		e.write(filepath.Join(e.skillsRoot, skill), "src/cmd/"+command+"/main.go", fmt.Sprintf("package main\nimport \"fmt\"\nfunc main() { fmt.Print(%q) }\n", profileRuntimeBuildSentinel))
 	} else {
 		e.skill(skill)
 		repo := filepath.Join(e.skillsRoot, skill)
@@ -186,7 +189,9 @@ func signedRuntimeProfile(t *testing.T, e *env, profile, skill, command string, 
 }
 
 // Actual signed source admission, ordinary script/build staging and both shim
-// hops reach a private final process. Inactive profiles publish no shims and
+// hops reach a private final process with exact fixture output, including the
+// compiled sentinel. A zero-exit shim without it fails the same checker.
+// Inactive profiles publish no shims and
 // report B1. Stale pins, unmanaged roots, companion refusals and failed native
 // compilation leave lock/current/root/declaration preimages unchanged.
 // Scoped directory variants also publish and repeat from v5, then refuse
@@ -288,14 +293,49 @@ func TestProfileRuntimePublication(t *testing.T) {
 						t.Fatal(err)
 					}
 					if runtime.GOOS != "windows" {
-						child := exec.Command(forward.Path())
-						child.Env = append(os.Environ(), "PATH="+admission.domain.FixedPATH)
-						out, err := child.CombinedOutput()
-						if err != nil {
-							t.Fatalf("real private shim child: %v %s", err, out)
+						want := "slice-skill\n"
+						if build {
+							want = profileRuntimeBuildSentinel
 						}
-						if !build && !strings.Contains(string(out), "slice-skill") {
-							t.Fatalf("wrong reached script: %q", out)
+						launch := func() error {
+							child := exec.Command(forward.Path())
+							child.Env = append(os.Environ(), "PATH="+admission.domain.FixedPATH)
+							out, err := child.CombinedOutput()
+							if err != nil {
+								return fmt.Errorf("real private shim child: %w %s", err, out)
+							}
+							if string(out) != want {
+								return fmt.Errorf("runtime command sentinel mismatch: got %q, want %q", out, want)
+							}
+							return nil
+						}
+						if err := launch(); err != nil {
+							t.Fatal(err)
+						}
+						t.Logf("forwarding shim output matched %q", want)
+						if build {
+							// Exit zero alone cannot prove the compiled command ran;
+							// the same launch checker must refuse the missing sentinel.
+							t.Run("zero-exit-without-sentinel", func(t *testing.T) {
+								original, err := os.ReadFile(canonical.Path())
+								if err != nil {
+									t.Fatal(err)
+								}
+								t.Cleanup(func() {
+									if err := os.WriteFile(canonical.Path(), original, 0700); err != nil {
+										t.Fatal(err)
+									}
+								})
+								if err := os.WriteFile(canonical.Path(), []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+									t.Fatal(err)
+								}
+								err = launch()
+								wantError := fmt.Sprintf("runtime command sentinel mismatch: got %q, want %q", []byte(nil), want)
+								if err == nil || err.Error() != wantError {
+									t.Fatalf("zero-exit shim must fail for its missing sentinel: %v", err)
+								}
+								t.Logf("zero-exit shim rejected: %v", err)
+							})
 						}
 					}
 
