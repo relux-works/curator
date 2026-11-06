@@ -511,7 +511,7 @@ Refusals retain the protocol codes and distinguish these sanitized reasons:
 | --- | --- |
 | `build_repository_ssh_credential_missing` | No operator identity/agent selection; no fetch starts. |
 | `build_repository_credential_policy_invalid` | Missing host keys, missing key/known-hosts file, unavailable SSH executable or invalid wrapper policy; no fetch starts. |
-| `build_repository_credential_policy_invalid` | `authentication_failed`: the selected key was not accepted. |
+| `build_repository_credential_policy_invalid` | `authentication_failed`: authentication did not complete; the client may not have offered the selected identity. |
 | `build_repository_credential_policy_invalid` | `host_key_verification_failed`: the host key is unknown or mismatched. |
 | `build_repository_source_unavailable` | `transport_failed`: fetch failed without a proved missing ref. Raw remote output is never printed. |
 | `build_repository_source_unavailable` | `locked_ref_unavailable`: the server reports a missing locked object/ref. This is not a transport failure. |
@@ -608,3 +608,7 @@ fetch environment does not carry it, so those selections may differ. Windows
 `cmd/git.exe` can likewise be a launcher. This change documents that boundary
 without changing discovery behavior. CI has no real fetch through the macOS
 shim, no real Windows SSH fetch and no real security-token control.
+
+The hosted controls qualify source acquisition and native build/publication
+separately. A single Linux install combining real SSH fetch, native build and
+publication end to end has not been witnessed by this change.

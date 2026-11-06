@@ -30,7 +30,7 @@ const (
 // pins, plus the single connection timeout. It carries no endpoint and no
 // credentials; the resolved executor completes it per attempt with the
 // endpoint source and the attempt's operator credential selection. The
-// wiring task populates it beside the per-repository credential selection;
+// install caller populates it beside the per-repository credential selection;
 // a zero base binds no SSH policy and every SSH attempt refuses.
 type SSHWrapperBase struct {
 	SSH             string

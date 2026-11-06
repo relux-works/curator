@@ -69,7 +69,7 @@ bounded. Windows has no process-group equivalent in this lane, so the
 bounded resolved lane refuses there with
 `transport_resolution_unsupported_platform` before any process
 creation (after plan validation, with no attempt recorded) rather than
-run with an unbounded tree; the legacy lane keeps its WaitDelay-bound
+run with an unbounded tree; the default lane keeps its WaitDelay-bound
 behavior there unchanged.
 
 Revision 2 ports, mirrors, and aliases (repository-transport §§5-7)
@@ -130,7 +130,7 @@ manager configuration, resolves the declared URL with
 `alias`, and resolved connection address — and calls
 `AcquireNetworkResolved`. A present policy selects the resolved lane; an
 absent policy file, or the gate disabled, runs `AcquireNetwork` with the
-exact legacy request — the disabled-gate path never opens the policy file.
+exact default-lane request — the disabled-gate path never opens the policy file.
 A present-but-invalid policy fails `repository_policy_invalid` before
 any fetch; an unattested mirror fails `repository_mirror_undeclared`
 and a dangling alias fails `repository_alias_unknown`, both with zero
@@ -160,7 +160,7 @@ its attempt records an auth failure with no fetch traffic. Only an
 explicitly anonymous provider fetches without credentials; a missing
 selection is never anonymity. Attempts without a policy provider keep the
 tool's bound lane credentials, and the providers file is consulted only
-when a planned attempt names a provider — never by the legacy lane. A
+when a planned attempt names a provider — never by the default lane. A
 present-but-invalid providers file fails `repository_policy_invalid`
 before any fetch. Selections never cross providers or repositories.
 
@@ -168,15 +168,16 @@ SSH attempts need two manager-owned inputs beside the per-repository
 credential selection, both populated per fetch: the wrapper base (the
 platform `ssh` executable plus fresh empty configuration files, removed
 after acquisition) and the manager binary itself as the per-attempt wrapper
-copy source. A missing SSH executable yields a zero base and the executor
-refuses each SSH attempt; an unadmittable manager binary refuses SSH
+copy source. A missing or inadmissible SSH executable returns its typed
+selection refusal before any attempt; an unadmittable manager binary refuses SSH
 resolution before any traffic rather than copying a file that would bypass
 the bound policy. The manager binary dispatches the wrapper basename before
 its public CLI, next to the HTTPS broker dispatch; the wrapper tuple, fixed
-argv, and state-file shape are unchanged.
+argv and policy transport follow [build SSH isolation](build-ssh.md#trusted-executables-and-openssh-compatibility):
+a read-only descriptor on Unix and a protected private record on Windows.
 
 The wiring also repairs the declared-URL threading the lane needs to fetch
 at all: the default closure used to pass the repository's configured name
 where the lane requires the URL, so every unfetched acquisition refused in
-admission. `ExternalSource` now carries the declared URL and the legacy lane
-fetches it. The disabled-gate regression test pins the legacy bytes.
+admission. `ExternalSource` now carries the declared URL and the default lane
+fetches it. The disabled-gate regression test pins the default-lane bytes.
