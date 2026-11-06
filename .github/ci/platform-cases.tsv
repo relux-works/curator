@@ -974,3 +974,23 @@ internal/install	TestProfileSkillPlanRealCompileBeforeLock/artifact-tamper	linux
 internal/install	TestProfileRuntimePublication/current-build	linux,darwin,windows	-	-	compiled runtime publication; exact shim output and restored-state launch on POSIX only
 internal/install	TestProfileRuntimePublication/current-build/zero-exit-without-sentinel	linux,darwin	-	-	zero-exit shim is refused for missing compiled fixture sentinel
 internal/install	TestProfileRuntimePublication/compiler-failure	linux,darwin,windows	-	-	real runtime compiler failure preserves the lock and publication surfaces
+internal/projectcontext	TestBindingRecheckDiagnostics	linux,darwin,windows	-	-	binding recheck errors and changed fields report static failure classes and changed fields without exposing paths; direct boundary leaves inputs unchanged; unchanged controls pass
+internal/projectcontext	TestRootReplacementBindingStillRequired/ambiguous-remote-config-change	linux,darwin	-	-	Real ambiguous remote config change refuses; direct verifyBinding preserves checkout and saved binding
+internal/projectcontext	TestRootReplacementBindingStillRequired/changed-remote	linux,darwin	-	-	Real changed remote refuses; direct verifyBinding preserves checkout and saved binding
+internal/projectcontext	TestBindingGitReadFailures	linux,darwin	-	-	real Git read failures retain static classes at all sites and never retry; healthy controls pass
+internal/projectcontext	TestBindingGitReadFailures/rev-parse/spawn	linux,darwin	-	-	spawn at rev-parse refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-parse/exit128	linux,darwin	-	-	exit128 at rev-parse refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-parse/signal	linux,darwin	-	-	signal at rev-parse refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-parse/timeout	linux,darwin	-	-	timeout at rev-parse refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-parse/output	linux,darwin	-	-	output at rev-parse refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-list/spawn	linux,darwin	-	-	spawn at rev-list refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-list/exit128	linux,darwin	-	-	exit128 at rev-list refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-list/signal	linux,darwin	-	-	signal at rev-list refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-list/timeout	linux,darwin	-	-	timeout at rev-list refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/rev-list/output	linux,darwin	-	-	output at rev-list refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/config/spawn	linux,darwin	-	-	spawn at config refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/config/exit128	linux,darwin	-	-	exit128 at config refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/config/signal	linux,darwin	-	-	signal at config refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/config/timeout	linux,darwin	-	-	timeout at config refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitReadFailures/config/output	linux,darwin	-	-	output at config refuses once, preserves inputs, and recovers with healthy Git
+internal/projectcontext	TestBindingGitFailureClasses	linux,darwin,windows	-	-	static execution classes retain their read site and start errno without exposing paths; equal control passes

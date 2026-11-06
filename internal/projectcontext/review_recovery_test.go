@@ -444,11 +444,20 @@ func TestRetainedNativeAuthenticationRefuses(t *testing.T) {
 // cannot reuse authority even with identical Git metadata. A still-bound root
 // and an explicit fresh-ID rebind succeed. This isolates filesystem identity
 // from the persistent lapse gate, so a root-path-only checker is detected.
+// Adjacent real-Git controls distinguish a failed recheck from a changed remote;
+// each refusal preserves the checkout and saved binding. Replacement refusal
+// leaves state.json unchanged, records a separate durable lapse, and names
+// the changed inode.
 func TestRootReplacementBindingStillRequired(t *testing.T) {
 	f := newFixture(t)
 	id := f.registration.CheckoutID
 	if _, err := f.store.Inspect(id); err != nil {
 		t.Fatal("original root control", err)
+	}
+	statePath := filepath.Join(f.store.Home, "project-context", "state.json")
+	before, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
 	}
 	moved := f.root + "-original"
 	if err := os.Rename(f.root, moved); err != nil {
@@ -465,6 +474,17 @@ func TestRootReplacementBindingStillRequired(t *testing.T) {
 		t.Fatal("replacement reused native root identity")
 	} else {
 		required(t, err, "project_registration_mismatch")
+		if !strings.Contains(err.Error(), "checkout binding changed: filesystem.inode") {
+			t.Fatalf("replacement lost inode diagnostic: %v", err)
+		}
+	}
+	after, err := os.ReadFile(statePath)
+	if err != nil || string(after) != string(before) {
+		t.Fatal("replacement refusal rewrote registration ledger", err)
+	}
+	lapses, err := os.ReadFile(filepath.Join(f.store.Home, "project-context", "lapses.json"))
+	if err != nil || !strings.Contains(string(lapses), id) {
+		t.Fatal("replacement refusal did not retain its lapse", err)
 	}
 	r, err := f.store.Rebind(id, f.root)
 	if err != nil || r.CheckoutID == id {
@@ -473,4 +493,5 @@ func TestRootReplacementBindingStillRequired(t *testing.T) {
 	if _, err = f.store.Inspect(r.CheckoutID); err != nil {
 		t.Fatal(err)
 	}
+	bindingRecheckLiveDiagnostics(t, f.root, r)
 }

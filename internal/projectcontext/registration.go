@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -22,20 +23,81 @@ import (
 
 type boundedOutput struct {
 	bytes.Buffer
-	max int
+	max      int
+	exceeded bool
 }
 
 func (b *boundedOutput) Write(p []byte) (int, error) {
 	if len(p) > b.max-b.Len() {
+		b.exceeded = true
 		return 0, fmt.Errorf("bounded local Git output exceeded")
 	}
 	return b.Buffer.Write(p)
 }
 
-type localGitError struct{ code int }
+type localGitError struct {
+	code  int
+	class string
+	errno string
+	site  string
+}
+
+// Only static classes, call-site labels and errno names cross this boundary.
+// In particular, exec errors contain paths and must never be interpolated.
+func (e *localGitError) diagnostic() string {
+	detail := e.class
+	if detail == "" || detail == "exit" {
+		detail = fmt.Sprintf("exit %d", e.code)
+	}
+	if e.class == "start refused" && e.errno != "" {
+		detail += " (" + e.errno + ")"
+	}
+	site := ""
+	switch e.site {
+	case "rev-parse", "rev-list", "config":
+		site = " at " + e.site
+	}
+	return "local Git identity read failed" + site + ": " + detail
+}
+
+func localGitFailure(err error, ctxErr error, bounded bool, site string) *localGitError {
+	e := &localGitError{code: -1, site: site}
+	var exit *exec.ExitError
+	switch {
+	case bounded:
+		e.class = "output bound exceeded"
+	case ctxErr != nil:
+		e.class = "timed out"
+	case errors.As(err, &exit):
+		e.code = exit.ExitCode()
+		e.class = "exit"
+		if e.code < 0 {
+			e.class = "signal"
+		}
+	default:
+		e.class = "start refused"
+		switch {
+		case errors.Is(err, syscall.EACCES):
+			e.errno = "EACCES"
+		case errors.Is(err, syscall.EPERM):
+			e.errno = "EPERM"
+		case errors.Is(err, syscall.ENOENT):
+			e.errno = "ENOENT"
+		case errors.Is(err, syscall.ENOEXEC):
+			e.errno = "ENOEXEC"
+		case errors.Is(err, syscall.EMFILE):
+			e.errno = "EMFILE"
+		case errors.Is(err, syscall.ENFILE):
+			e.errno = "ENFILE"
+		case errors.Is(err, syscall.EAGAIN):
+			e.errno = "EAGAIN"
+		}
+	}
+	return e
+}
 
 func (e *localGitError) Error() string {
-	return "project_registration_mismatch: local Git identity or object is unavailable, ambiguous or exceeds its bound"
+	return "project_registration_mismatch: " + e.diagnostic()
 }
 func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -52,14 +114,14 @@ func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
 	cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1")
 	out := &boundedOutput{max: byteLimit}
 	cmd.Stdout = out
-	cmd.Stderr = &boundedOutput{max: 4096}
+	stderr := &boundedOutput{max: 4096}
+	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		code := -1
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			code = exit.ExitCode()
+		site := ""
+		if len(args) > 0 {
+			site = args[0]
 		}
-		return nil, &localGitError{code}
+		return nil, localGitFailure(err, ctx.Err(), out.exceeded || stderr.exceeded, site)
 	}
 	return out.Bytes(), nil
 }
@@ -68,34 +130,42 @@ func gitLocal(dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(b)), err
 }
 
+// bindingReadError carries only static, path-free detail owned by bind.
+type bindingReadError struct{ detail string }
+
+func (e *bindingReadError) Error() string {
+	return "project_registration_mismatch: " + e.detail
+}
+func bindingFailure(detail string) error { return &bindingReadError{detail} }
+
 func bind(p string) (binding, error) {
 	var b binding
 	abs, err := filepath.Abs(p)
 	if err != nil {
-		return b, fail("project_registration_mismatch", "root path cannot be resolved")
+		return b, bindingFailure("root path cannot be resolved")
 	}
 	canonical, err := filepath.EvalSymlinks(abs)
 	if err != nil {
-		return b, fail("project_registration_mismatch", "root is missing, moved or unreadable; explicitly rebind")
+		return b, bindingFailure("root is missing, moved or unreadable; explicitly rebind")
 	}
 	// Explicit registration canonicalizes an operator path once. Use requires
 	// the saved canonical spelling and the retained filesystem identity.
 	if !validRoot(canonical) {
-		return b, fail("project_registration_mismatch", "root path is invalid or exceeds its bound")
+		return b, bindingFailure("root path is invalid or exceeds its bound")
 	}
 	st, err := os.Lstat(canonical)
 	if err != nil || !st.IsDir() || st.Mode().Perm()&0500 != 0500 {
-		return b, fail("project_registration_mismatch", "root is unreadable or not a directory")
+		return b, bindingFailure("root is unreadable or not a directory")
 	}
 	f, err := os.Open(canonical)
 	if err != nil {
-		return b, fail("project_registration_mismatch", "root cannot be read; explicitly rebind")
+		return b, bindingFailure("root cannot be read; explicitly rebind")
 	}
 	_, readErr := f.Readdirnames(1)
 	opened, statErr := f.Stat()
 	_ = f.Close()
 	if (readErr != nil && readErr != io.EOF) || statErr != nil || !same(st, opened) {
-		return b, fail("project_registration_mismatch", "root cannot be verified; explicitly rebind")
+		return b, bindingFailure("root cannot be verified; explicitly rebind")
 	}
 	fs, err := filesystemIdentity(st)
 	if err != nil {
@@ -107,33 +177,36 @@ func bind(p string) (binding, error) {
 	}
 	resolvedRoot, err := filepath.EvalSymlinks(root)
 	if err != nil || resolvedRoot != canonical {
-		return b, fail("project_registration_mismatch", "registration requires the exact checkout root")
+		return b, bindingFailure("registration requires the exact checkout root")
 	}
 	commit, err := gitLocal(canonical, "rev-list", "--max-parents=0", "HEAD")
-	if err != nil || len(strings.Fields(commit)) != 1 || !contextCommit(commit) {
-		return b, fail("project_registration_mismatch", "repository root commit is unavailable or ambiguous")
+	if err != nil {
+		return b, err
+	}
+	if len(strings.Fields(commit)) != 1 || !contextCommit(commit) {
+		return b, bindingFailure("repository root commit is unavailable or ambiguous")
 	}
 	var remote *string
 	raw, e := gitLocal(canonical, "config", "--get-all", "remote.origin.url")
 	if e == nil {
 		if len(strings.Fields(raw)) != 1 {
-			return b, fail("project_registration_mismatch", "primary remote is ambiguous")
+			return b, bindingFailure("primary remote is ambiguous")
 		}
 		v, err := sourceidentity.Parse(raw)
 		if err != nil || !sourceidentity.ValidCanonical(v) {
-			return b, fail("project_registration_mismatch", "primary remote is not a canonical network identity")
+			return b, bindingFailure("primary remote is not a canonical network identity")
 		}
 		remote = &v
 	} else {
 		var gitErr *localGitError
-		if !errors.As(e, &gitErr) || gitErr.code != 1 {
-			return b, fail("project_registration_mismatch", "primary remote configuration is unreadable")
+		if !errors.As(e, &gitErr) || gitErr.code != 1 || gitErr.class != "exit" {
+			return b, e
 		}
 
 	}
 	after, err := os.Lstat(canonical)
 	if err != nil || !same(st, after) {
-		return b, fail("project_registration_mismatch", "root changed while binding")
+		return b, bindingFailure("root changed while binding")
 	}
 	b = binding{repository{canonical, remote, commit}, fs}
 	return b, nil
@@ -167,10 +240,59 @@ func verifyBinding(r registered) error {
 		return fail("project_registration_mismatch", "checkout moved or is unreadable; explicitly rebind")
 	}
 	b, err := bind(r.Record.ProjectRoot)
-	if err != nil || identity(b) != r.Record.RootIdentity {
-		return fail("project_registration_mismatch", "checkout binding changed; explicitly rebind")
+	return verifyBindingResult(r, b, err)
+}
+
+// Report the failed observation separately from an observed identity change.
+// Keep the digest comparison authoritative; field labels add diagnostics only.
+func verifyBindingResult(r registered, b binding, err error) error {
+	if err != nil {
+		detail := "checkout identity is unavailable"
+		var readErr *bindingReadError
+		var gitErr *localGitError
+		switch {
+		case errors.As(err, &readErr):
+			detail = strings.TrimSuffix(readErr.detail, "; explicitly rebind")
+		case errors.As(err, &gitErr):
+			detail = gitErr.diagnostic()
+		}
+		return fail("project_registration_mismatch", "checkout binding recheck failed: "+detail+"; explicitly rebind")
+	}
+	if identity(b) != r.Record.RootIdentity {
+		return fail("project_registration_mismatch", "checkout binding changed: "+strings.Join(bindingChangedFields(r.Binding, b), ", ")+"; explicitly rebind")
 	}
 	return nil
+}
+
+func bindingChangedFields(saved, live binding) []string {
+	fields := []string{}
+	if saved.Repository.Root != live.Repository.Root {
+		fields = append(fields, "repository.root")
+	}
+	a, b := saved.Repository.PrimaryRemote, live.Repository.PrimaryRemote
+	if (a == nil) != (b == nil) || (a != nil && b != nil && *a != *b) {
+		fields = append(fields, "repository.primary_remote")
+	}
+	if saved.Repository.RootCommit != live.Repository.RootCommit {
+		fields = append(fields, "repository.root_commit")
+	}
+	for _, key := range []string{"device", "inode"} {
+		a, aok := saved.Filesystem[key]
+		b, bok := live.Filesystem[key]
+		if aok != bok || a != b {
+			fields = append(fields, "filesystem."+key)
+		}
+	}
+	// Unknown future filesystem fields and digest-only inconsistencies still
+	// refuse, without echoing arbitrary keys, paths or identity values.
+	if len(fields) == 0 {
+		if identity(saved.Filesystem) != identity(live.Filesystem) {
+			fields = append(fields, "filesystem")
+		} else {
+			fields = append(fields, "root_identity")
+		}
+	}
+	return fields
 }
 
 // verifyRegistration retains observed loss of root authority independently of
