@@ -97,35 +97,47 @@ func TestNoSSHExecutableDiagnostic(t *testing.T) {
 	}
 }
 
-// Static authentication and host verification labels survive the pipeline as
-// typed reasons. An ordinary connection refusal remains a transport failure;
-// unrelated message text cannot promote an untyped error to either category.
-// Only SSH authentication gets the provider remedy; HTTPS 401 must not.
+// Complete Git/OpenSSH authentication and host-verification lines retain typed
+// reasons. Bare or tailed HTTP text remains unknown under the closed grammar.
+// Only SSH authentication gets the provider remedy; recognized HTTPS 401/403
+// controls must not. Every refusal stops before audit/build or artifact output.
 func TestCredentialFailureTypedReasons(t *testing.T) {
 	for _, c := range []struct {
+		name      string
 		stderr    string
 		transport string
 		reason    AcquisitionReason
 		code      string
 	}{
-		{"Permission denied (publickey).", "ssh", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
-		{"The requested URL returned error: 401", "https", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
-		{"Host key verification failed.", "ssh", ReasonHostKeyFailed, CodeCredentialPolicyInvalid},
-		{"Connection refused", "ssh", ReasonTransportFailed, CodeSourceUnavailable},
+		{"ssh-auth", "Permission denied (publickey).", "ssh", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
+		{"https-401", "fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 401", "https", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
+		{"https-403", "fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 403", "https", ReasonAuthenticationFailed, CodeCredentialPolicyInvalid},
+		{"https-bare-401", "The requested URL returned error: 401", "https", ReasonTransportFailed, CodeSourceUnavailable},
+		{"https-tailed-401", "fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 401 unparsed", "https", ReasonTransportFailed, CodeSourceUnavailable},
+		{"ssh-host-key", "Host key verification failed.", "ssh", ReasonHostKeyFailed, CodeCredentialPolicyInvalid},
+		{"ssh-connection", "Connection refused", "ssh", ReasonTransportFailed, CodeSourceUnavailable},
 	} {
-		_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Acquire: func(context.Context) (*Snapshot, error) {
-			return nil, laneDiagnostic(&fetchError{stderr: c.stderr}, c.transport)
-		}})
-		var typed *AdmissionError
-		if !errors.As(err, &typed) || typed.Reason != c.reason || typed.Code != c.code || strings.Contains(err.Error(), c.stderr) {
-			t.Fatalf("typed refusal: %v", err)
-		}
-		if c.reason == ReasonAuthenticationFailed && c.transport == "ssh" && (strings.Count(err.Error(), ";") != 1 || !strings.Contains(err.Error(), "security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE")) {
-			t.Fatalf("static authentication remedy: %v", err)
-		}
-		if c.transport == "https" && strings.Contains(err.Error(), "CURATOR_BUILD_SSH_EXECUTABLE") {
-			t.Fatalf("HTTPS got SSH remedy: %v", err)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			var phases []string
+			result, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Trace: func(phase string) {
+				phases = append(phases, phase)
+			}, Acquire: func(context.Context) (*Snapshot, error) {
+				return nil, laneDiagnostic(&fetchError{stderr: c.stderr}, c.transport)
+			}})
+			var typed *AdmissionError
+			if !errors.As(err, &typed) || typed.Reason != c.reason || typed.Code != c.code || strings.Contains(err.Error(), c.stderr) {
+				t.Fatalf("typed refusal: %v", err)
+			}
+			if c.reason == ReasonAuthenticationFailed && c.transport == "ssh" && (strings.Count(err.Error(), ";") != 1 || !strings.Contains(err.Error(), "security-key identity needs a client with a provider, selected with CURATOR_BUILD_SSH_EXECUTABLE")) {
+				t.Fatalf("static authentication remedy: %v", err)
+			}
+			if c.transport == "https" && (strings.Contains(err.Error(), "CURATOR_BUILD_SSH_EXECUTABLE") || strings.Contains(err.Error(), "security-key identity")) {
+				t.Fatalf("HTTPS got SSH remedy: %v", err)
+			}
+			if len(phases) != 1 || phases[0] != "exact-source-acquisition" || len(result.Artifact) != 0 || len(result.Receipt) != 0 || result.SnapshotKey != "" || result.CacheKey != "" {
+				t.Fatalf("refusal advanced the pipeline or produced output: phases=%v result=%+v", phases, result)
+			}
+		})
 	}
 	untyped := admissionError(CodeIdentityInvalid, "text (authentication_failed)")
 	_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Acquire: func(context.Context) (*Snapshot, error) { return nil, untyped }})
