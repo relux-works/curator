@@ -219,7 +219,8 @@ func bind(p string) (binding, error) {
 	}
 	fs, err := filesystemIdentity(st)
 	if err != nil {
-		return b, bindingUnknown("checkout identity is unavailable")
+		// Preserve admission diagnostics; a failed recheck classifies this as unknown.
+		return b, err
 	}
 	root, err := gitLocal(canonical, "rev-parse", "--show-toplevel")
 	if err != nil {

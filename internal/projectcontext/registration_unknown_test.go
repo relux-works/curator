@@ -3,6 +3,9 @@ package projectcontext
 import (
 	"errors"
 	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -50,5 +53,38 @@ func TestBindingObservationDisposition(t *testing.T) {
 				t.Fatal("observed real change became unknown", err)
 			}
 		})
+	}
+}
+
+// Claim: fresh public registration succeeds on qualified platforms and keeps
+// the existing unsupported-platform refusal before writes elsewhere. The equal
+// binding control is portable; it does not qualify a native filesystem.
+func TestRegistrationFilesystemQualification(t *testing.T) {
+	r := registered{Binding: binding{Filesystem: map[string]string{"inode": "1"}}}
+	r.Record.RootIdentity = identity(r.Binding)
+	if err := verifyBindingResult(r, r.Binding, nil); err != nil {
+		t.Fatal("equal binding control", err)
+	}
+	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+		f := newFixture(t)
+		got, err := f.store.Inspect(f.registration.CheckoutID)
+		if err != nil || got.Registration.CheckoutID != f.registration.CheckoutID {
+			t.Fatal("qualified registration control", err)
+		}
+		return
+	}
+	root := t.TempDir()
+	home := filepath.Join(t.TempDir(), "manager")
+	store := Store{Home: home}
+	got, err := store.Register("fixture", root, "base", "codex_cli")
+	if !isCode(err, "project_context_unsupported") || !reflect.DeepEqual(got, Registration{}) {
+		t.Fatalf("unqualified registration: got %v, want project_context_unsupported and no registration", err)
+	}
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Fatal("unsupported registration wrote manager state", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("unsupported registration changed checkout", err)
 	}
 }
