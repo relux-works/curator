@@ -420,6 +420,13 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
+controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
+real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`
+from the OpenSSH 8.9 CI fixture; never run it on an operator host. Ordinary
+capture controls run with `go test ./internal/install -run
+'^TestDefaultTransportInstallScopes$'`; their logs go to the CI job output.
+
 `.github/ci/required-tests.py LOG TEST [TEST ...]` checks exact named PASS
 records in a `go test -json` log. Filtered cold-repository CI steps keep their
 logs in the job workspace and refuse absent, renamed or skipped witnesses.
@@ -670,13 +677,6 @@ PlantUML renders the agent-login diagrams. Run `plantuml -tsvg -nometadata diagr
 Lychee checks Markdown links. Run `lychee --offline --include-fragments --no-progress README.md docs/environment-config.md docs/agent-logins.md` for local targets and anchors, then `lychee --no-progress --timeout 30 docs/agent-logins.md` for the reference's external links. Store logs under `.temp/`. Run `git diff --check` for whitespace validation.
 
 Managed Muse homes materialize monolithic root context at `config/muse/AGENTS.md`; `referenced` is refused. A profile without a context declaration writes no root file. Curator resolves the environment fragment; its external Muse `exec` consumer must add `--no-foreign-personal-context` exactly when the root target is materialized (environments §10.2). The v4 fragment carries the verified `root_context` fact, effective file agreement and mandatory `TBH_CREDENTIAL_BACKEND=file`; it carries no argv member. `env status` records the remaining discovery, `serve`, and workspace-precedence bounds.
-
-Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
-controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
-real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`
-from the OpenSSH 8.9 CI fixture; never run it on an operator host. Ordinary
-capture controls run with `go test ./internal/install -run
-'^TestDefaultTransportInstallScopes$'`; their logs go to the CI job output.
 
 ## Contributing
 
