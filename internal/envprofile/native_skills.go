@@ -188,14 +188,14 @@ func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (stri
 }
 
 func repairNativeSkills(op *operation, req *ResolveRequest) error {
-	row, err := nativeSkillsState(req.Home, req.Profile, req.EnvID, req.NativeHomeOf)
+	row, err := nativeSkillsState(req.Home, req.Profile, req.EnvID, req.nativeHome)
 	if err != nil {
 		return err
 	}
 	if row == nil || row.State == "current" {
 		return nil
 	}
-	results, err := materializeScopeWithNativeHome(op, req.Home, req.Profile, req.EnvID, req.Policy, req.NativeHomeOf)
+	results, err := materializeScopeWithNativeHome(op, req.Home, req.Profile, req.EnvID, req.Policy, req.nativeHome)
 	if err != nil {
 		return err
 	}

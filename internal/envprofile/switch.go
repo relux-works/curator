@@ -103,24 +103,8 @@ func adapterByID(id string) (Adapter, bool) {
 // specification's mechanism implies but does not spell; every test pins
 // homes through the variables instead.
 func NativeHome(adapter Adapter) (string, error) {
-	if adapter.ID == "opencode" {
-		if value := os.Getenv(adapter.EnvVar); value != "" {
-			return filepath.Join(value, "opencode"), nil
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("no home directory for %s: set %s", adapter.ID, adapter.EnvVar)
-		}
-		return filepath.Join(home, ".config", "opencode"), nil
-	}
-	if value := os.Getenv(adapter.EnvVar); value != "" {
-		return value, nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("no home directory for %s: set %s", adapter.ID, adapter.EnvVar)
-	}
-	return filepath.Join(home, adapter.DefaultDir), nil
+	native, _, err := nativeHomeAt(adapter, nativeManagerHome())
+	return native, err
 }
 
 func resolveNativeHome(adapter Adapter, resolver func(string) (string, error)) (string, error) {
