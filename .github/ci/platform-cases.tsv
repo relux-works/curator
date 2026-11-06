@@ -995,3 +995,9 @@ internal/projectcontext	TestBindingGitReadFailures/config/timeout	linux,darwin	-
 internal/projectcontext	TestBindingGitReadFailures/config/output	linux,darwin	-	-	output at config refuses once, preserves inputs, and recovers with healthy Git
 internal/projectcontext	TestBindingGitFailureClasses	linux,darwin,windows	-	-	static execution classes retain their read site and start errno without exposing paths; equal control passes
 internal/projectcontext	TestBindingGitOutputBound	linux,darwin,windows	-	-	exec copy cannot bypass the output bound through an embedded ReaderFrom; exact-limit control passes
+internal/projectcontext	TestGitObjectOutputBounds/ls-tree	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
+internal/projectcontext	TestGitObjectOutputBounds/cat-file	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
+internal/projectcontext	TestGitObjectOutputBounds/tag-line	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
+internal/projectcontext	TestGitTreeInventoryCaps	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
+internal/projectcontext	TestGitBlobOutputCap	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics
+internal/projectcontext	TestGitTagEnumerationBounds	linux,darwin,windows	-	-	bounded Git object reads admit the protocol caps and refuse overflow without identity diagnostics

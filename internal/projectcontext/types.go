@@ -25,6 +25,7 @@ import (
 const (
 	MaxRecord          = 1 << 20
 	MaxFiles           = 10000
+	maxPathBytes       = 240
 	MaxFileBytes       = 16 << 20
 	MaxTotalBytes      = 64 << 20
 	AppendAfterProfile = "append-after-profile"
@@ -395,7 +396,7 @@ func ParseDeclaration(b []byte) (result Declaration, resultErr error) {
 	return d, nil
 }
 func relative(p string) bool {
-	if !identifiers.PortablePath(p) || len(p) > 240 || strings.ContainsAny(p, "\\:*?[]\x00") || strings.HasPrefix(p, "/") {
+	if !identifiers.PortablePath(p) || len(p) > maxPathBytes || strings.ContainsAny(p, "\\:*?[]\x00") || strings.HasPrefix(p, "/") {
 		return false
 	}
 	for _, c := range strings.Split(p, "/") {

@@ -1,6 +1,7 @@
 package projectcontext
 
 import (
+	"bytes"
 	"os"
 	"path"
 	"path/filepath"
@@ -87,24 +88,60 @@ func (s *offlineSource) Candidates(kind, name, source string) ([]contextresolve.
 	if err != nil {
 		return nil, err
 	}
-	tags, err := gitLocal(dir, "tag", "--list")
-	if err != nil {
+	tags := &versionTagOutput{}
+	if err := gitRead(dir, tags, func() bool { return tags.line.exceeded }, "tag", "--list"); err != nil {
 		return nil, err
 	}
+	if tags.line.buffer.Len() != 0 {
+		return nil, fail("project_context_invalid", "unterminated local Git tag listing")
+	}
 	out := []contextresolve.Candidate{}
-	for _, t := range strings.Split(tags, "\n") {
-		v, ok := pkgversion.ParseTag(t)
-		if !ok {
-			continue
-		}
-		commit, err := s.ResolveTag(kind, name, source, t)
+	for _, tag := range tags.tags {
+		commit, err := s.ResolveTag(kind, name, source, tag.Tag)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, contextresolve.Candidate{Tag: t, Version: v, Commit: commit})
+		tag.Commit = commit
+		out = append(out, tag)
 	}
 	return out, nil
 }
+
+// There is no aggregate tag-count cap in the source protocol. Consume inert
+// names incrementally; only parsed version candidates survive. Each line keeps
+// the existing record/resource bound, and gitRead keeps timeout/stderr limits.
+type versionTagOutput struct {
+	line boundedOutput
+	tags []contextresolve.Candidate
+}
+
+func (o *versionTagOutput) Write(p []byte) (int, error) {
+	n := len(p)
+	o.line.max = MaxRecord
+	for len(p) > 0 {
+		part, rest, newline := bytes.Cut(p, []byte{'\n'})
+		if _, err := o.line.Write(part); err != nil {
+			return 0, err
+		}
+		if !newline {
+			break
+		}
+		tag := o.line.buffer.String()
+		if v, ok := pkgversion.ParseTag(tag); ok {
+			o.tags = append(o.tags, contextresolve.Candidate{Tag: tag, Version: v})
+		}
+		o.line.buffer.Reset()
+		p = rest
+	}
+	return n, nil
+}
+
+// ls-tree -r -l -z emits mode(6), spaces(3), type(4), object ID(up to
+// 64 SHA-256 hex bytes), size(up to 8 decimal bytes for MaxFileBytes), TAB,
+// path(up to maxPathBytes), and NUL. The size column is padded to at least 7.
+// Independent maxima deliberately overestimate the 64 MiB aggregate blob cap.
+const maxGitTreeBytes = MaxFiles * (6 + 3 + 4 + 64 + 8 + 1 + maxPathBytes + 1)
+
 func captureCommit(dir, commit, directory string) (captured, error) {
 	if !contextCommit(commit) {
 		return captured{}, fail("project_context_invalid", "dependency must resolve to an exact commit")
@@ -114,7 +151,7 @@ func captureCommit(dir, commit, directory string) (captured, error) {
 	}
 	// Enumerate before reading any blob. No checkout, hooks, fetch, install or
 	// executable package parser runs in this offline admission path.
-	listing, err := gitLocal(dir, "ls-tree", "-r", "-l", "-z", commit)
+	listingBytes, err := gitBytes(dir, maxGitTreeBytes, "ls-tree", "-r", "-l", "-z", commit)
 	if err != nil {
 		return captured{}, err
 	}
@@ -122,7 +159,7 @@ func captureCommit(dir, commit, directory string) (captured, error) {
 	modes := map[string]string{}
 	total := int64(0)
 	count := 0
-	for _, line := range strings.Split(listing, "\x00") {
+	for _, line := range strings.Split(string(listingBytes), "\x00") {
 		if line == "" {
 			continue
 		}
@@ -151,7 +188,10 @@ func captureCommit(dir, commit, directory string) (captured, error) {
 			selected = strings.TrimPrefix(p, directory+"/")
 		}
 		b, err := gitBytes(dir, MaxFileBytes, "cat-file", "blob", v[2])
-		if err != nil || int64(len(b)) != size {
+		if err != nil {
+			return captured{}, err
+		}
+		if int64(len(b)) != size {
 			return captured{}, fail("project_context_invalid", "malformed Git blob read")
 		}
 		files[selected] = b

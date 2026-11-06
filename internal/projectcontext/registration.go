@@ -57,7 +57,11 @@ func (e *localGitError) diagnostic() string {
 	case "rev-parse", "rev-list", "config":
 		site = " at " + e.site
 	}
-	return "local Git identity read failed" + site + ": " + detail
+	kind := "identity"
+	if e.site == "ls-tree" || e.site == "tag" || e.site == "cat-file" {
+		kind, site = "object", " at "+e.site
+	}
+	return "local Git " + kind + " read failed" + site + ": " + detail
 }
 
 func localGitFailure(err error, ctxErr error, bounded bool, site string) *localGitError {
@@ -97,9 +101,13 @@ func localGitFailure(err error, ctxErr error, bounded bool, site string) *localG
 }
 
 func (e *localGitError) Error() string {
-	return "project_registration_mismatch: " + e.diagnostic()
+	code := "project_registration_mismatch"
+	if e.site == "ls-tree" || e.site == "tag" || e.site == "cat-file" {
+		code = "project_context_invalid"
+	}
+	return code + ": " + e.diagnostic()
 }
-func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
+func gitRead(dir string, out io.Writer, exceeded func() bool, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	prefix := []string{"--no-optional-locks", "--no-replace-objects", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.DevNull, "-c", "core.untrackedCache=false", "-C", dir}
@@ -112,7 +120,6 @@ func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
 		cmd.Env = append(cmd.Env, e)
 	}
 	cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1")
-	out := &boundedOutput{max: byteLimit}
 	cmd.Stdout = out
 	stderr := &boundedOutput{max: 4096}
 	cmd.Stderr = stderr
@@ -121,7 +128,14 @@ func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
 		if len(args) > 0 {
 			site = args[0]
 		}
-		return nil, localGitFailure(err, ctx.Err(), out.exceeded || stderr.exceeded, site)
+		return localGitFailure(err, ctx.Err(), exceeded() || stderr.exceeded, site)
+	}
+	return nil
+}
+func gitBytes(dir string, byteLimit int, args ...string) ([]byte, error) {
+	out := &boundedOutput{max: byteLimit}
+	if err := gitRead(dir, out, func() bool { return out.exceeded }, args...); err != nil {
+		return nil, err
 	}
 	return out.buffer.Bytes(), nil
 }
