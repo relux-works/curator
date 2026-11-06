@@ -77,7 +77,7 @@ func TestMain(m *testing.M) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	lock, err := testtoolchain.AcquireHostGOROOT(ctx, "cmd/curator TestMain")
+	lock, err := experimentBypassHostGOROOT(ctx, "cmd/curator TestMain")
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "acquire package host GOROOT test lock:", err)
 		restorePath()
@@ -2032,4 +2032,10 @@ func marshal(t *testing.T, value any) string {
 		t.Fatal(err)
 	}
 	return string(payload)
+}
+
+// Experiment only: lift the CLI package exclusion to observe root drift while
+// the dry-run test retains its original lock, scope and deadline. Never merge.
+func experimentBypassHostGOROOT(_ context.Context, _ string) (*testtoolchain.HostGOROOTLock, error) {
+	return nil, nil
 }
