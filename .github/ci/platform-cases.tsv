@@ -974,3 +974,8 @@ internal/install	TestProfileSkillPlanRealCompileBeforeLock/artifact-tamper	linux
 internal/install	TestProfileRuntimePublication/current-build	linux,darwin,windows	-	-	compiled runtime publication; exact shim output and restored-state launch on POSIX only
 internal/install	TestProfileRuntimePublication/current-build/zero-exit-without-sentinel	linux,darwin	-	-	zero-exit shim is refused for missing compiled fixture sentinel
 internal/install	TestProfileRuntimePublication/compiler-failure	linux,darwin,windows	-	-	real runtime compiler failure preserves the lock and publication surfaces
+internal/testtoolchain	TestHostGOROOTLockContention/stuck-holder-named-within-bound	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockContention/released-holder-admits-waiter	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockUnknownHolder/missing	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockUnknownHolder/malformed	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/testtoolchain	TestHostGOROOTLockMetadataFailureReleases	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded

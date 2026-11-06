@@ -178,42 +178,151 @@ func TestHostGOROOTLockUnknownHolder(t *testing.T) {
 	}
 }
 
-// A metadata-publication failure refuses without exposing its path or retaining
-// the OS lock; repairing the fixture admits the next named owner.
+// Advisory metadata failures must not turn a passing suite red: OS ownership
+// remains exclusive, release succeeds, and the next acquirer is admitted.
 func TestHostGOROOTLockMetadataFailureReleases(t *testing.T) {
+	for _, nonempty := range []bool{false, true} {
+		t.Run(fmt.Sprint(nonempty), func(t *testing.T) {
+			root := t.TempDir()
+			path := filepath.Join(root, "holder.json")
+			if err := os.Mkdir(path, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if nonempty {
+				if err := os.WriteFile(filepath.Join(path, "blocked"), []byte("x"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			warnings := captureHostWarnings(t, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				lock, err := acquireHostGOROOT(ctx, root, "metadata-failure", t.Logf)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = lock.Close() }()
+				blockedCtx, stop := context.WithTimeout(context.Background(), 50*time.Millisecond)
+				defer stop()
+				other, err := acquireHostGOROOT(blockedCtx, root, "waiter", t.Logf)
+				if other != nil {
+					_ = other.Close()
+					t.Fatal("metadata failure lost OS exclusion")
+				}
+				if !errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "holder=unknown") {
+					t.Fatalf("want unknown deadline: %v", err)
+				}
+				if err := lock.Close(); err != nil {
+					t.Fatalf("advisory cleanup failed suite: %v", err)
+				}
+				next, err := acquireHostGOROOT(ctx, root, "next", t.Logf)
+				if err != nil {
+					t.Fatalf("cleanup lost release: %v", err)
+				}
+				if err := next.Close(); err != nil {
+					t.Fatal(err)
+				}
+			})
+			if !strings.Contains(warnings, "publish host GOROOT holder record failed") {
+				t.Fatal("missing publish warning")
+			}
+			if nonempty && !strings.Contains(warnings, "record may be stale") {
+				t.Fatal("missing stale warning")
+			}
+			if !nonempty {
+				if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("old record survived: %v", err)
+				}
+			}
+		})
+	}
+	// Positive control: valid publication and ordinary release still work.
 	root := t.TempDir()
-	path := filepath.Join(root, "holder.json")
-	if err := os.Mkdir(path, 0700); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	lock, err := acquireHostGOROOT(ctx, root, "metadata-failure", t.Logf)
-	if lock != nil {
-		_ = lock.Close()
-		t.Fatal("metadata failure admitted a holder")
-	}
-	if err == nil || err.Error() != "record host GOROOT test lock holder failed" {
-		t.Fatalf("metadata refusal = %v", err)
-	}
-	entries, err := os.ReadDir(root)
+	lock, err := acquireHostGOROOT(context.Background(), root, "valid", t.Logf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".holder-") {
-			t.Fatal("failed publication leaked its staging file")
-		}
+	if readHostGOROOTOwner(filepath.Join(root, "holder.json")) == nil {
+		t.Fatal("valid owner missing")
 	}
+	// Plant an independently failing removal after successful publication.
+	path := filepath.Join(root, "holder.json")
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	lock, err = acquireHostGOROOT(ctx, root, "after-repair", t.Logf)
-	if err != nil {
-		t.Fatalf("failed publication retained the OS lock: %v", err)
-	}
-	if err := lock.Close(); err != nil {
+	if err := os.Mkdir(path, 0700); err != nil {
 		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "blocked"), []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	warnings := captureHostWarnings(t, func() {
+		if err := lock.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(warnings, "record may be stale") {
+		t.Fatal("missing release warning")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	captureHostWarnings(t, func() {
+		next, err := acquireHostGOROOT(ctx, root, "next", t.Logf)
+		if err != nil {
+			t.Fatalf("remove failure lost release: %v", err)
+		}
+		if err := next.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func captureHostWarnings(t *testing.T, run func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = old; _ = w.Close(); _ = r.Close() }()
+	run()
+	_ = w.Close()
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// Oversized valid JSON must be unknown, while the same record within the bound
+// names only an unverified record, never proof that its recorded PID is alive.
+func TestHostGOROOTLockRecordBound(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "holder.json")
+	record := hostGOROOTOwner{Name: "dead-holder", PID: 123, Process: "old", AcquiredAt: time.Now().Add(-time.Minute)}
+	if err := writeHostGOROOTOwner(path, record); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readHostGOROOTOwner(path) == nil {
+		t.Fatal("valid record refused")
+	}
+	message := (&hostGOROOTWaitError{cause: context.DeadlineExceeded, holder: &record}).Error()
+	if !strings.Contains(message, "unverified record; current holder may differ") {
+		t.Fatal("stale record presented as live holder")
+	}
+	if err := os.WriteFile(path, append(data, bytes.Repeat([]byte(" "), 4097)...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if readHostGOROOTOwner(path) != nil {
+		t.Fatal("oversized record accepted")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(after, append(data, bytes.Repeat([]byte(" "), 4097)...)) {
+		t.Fatal("reader changed oversized record")
 	}
 }
 
