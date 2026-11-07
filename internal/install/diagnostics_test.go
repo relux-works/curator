@@ -177,7 +177,7 @@ func TestBuildFailuresAreRedactedInTheResult(t *testing.T) {
 // case fails if either side of the boundary changes without the other.
 func TestGoToolchainRemedyReachesTheOperatorIntact(t *testing.T) {
 	t.Parallel()
-	const remedy = `; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+	const remedy = `; set CURATOR_GO to the absolute path of the real GOROOT/bin/go (bin/go.exe on Windows)`
 
 	launcher := "go"
 	if runtime.GOOS == "windows" {

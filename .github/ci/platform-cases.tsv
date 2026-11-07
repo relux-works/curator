@@ -1113,3 +1113,12 @@ internal/testtoolchain	TestHostGOROOTLockContention/released-holder-admits-waite
 internal/testtoolchain	TestHostGOROOTLockUnknownHolder/missing	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
 internal/testtoolchain	TestHostGOROOTLockUnknownHolder/malformed	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
 internal/testtoolchain	TestHostGOROOTLockMetadataFailureReleases	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
+internal/buildcache	TestLinuxUnprivilegedSweep	linux	-	-	non-root native write probes retain running builds while unreadable same-user processes permit unused collection
+internal/buildcache	TestLinuxProcessUIDControls	linux	-	-	four UID values preserve readable same-user proc signals including saved and filesystem identities
+internal/buildcache	TestLinuxForeignImagePermissions	linux	-	-	non-root mode guard retains shared and special-mode executable candidates even with no visible foreign PID
+internal/buildcache	TestLinuxExecutionProbeErrors	linux	-	-	actual write-open EACCES retains and names the build without changing bytes; restored permissions collect
+internal/buildcache	TestLinuxRetiredNativeSnapshot	linux	-	-	native snapshot finishes partial retired trees and retains busy or probe-error executable remnants
+internal/buildcache	TestLinuxHSMExceptionContract	linux	-	-	declaration only: HSM and post-probe exec are the bounded per-kernel exceptions; no HSM or NFS runtime qualification
+internal/buildcache	TestLinuxProbeRemovalCandidates	linux	-	-	inotify observes no write-open for retained candidates and actual close-write for an aged removal control
+internal/buildcache	TestLinuxRetiredReprobe	linux	-	-	late exec and probe errors retain the retired tree; stopping or repairing permits native cleanup
+internal/godriver	TestDistroToolchainLayoutRemedy	linux,darwin	-	-	closed upstream toolchain admitted; escaping distro src links refuse without mutation and name CURATOR_GO remedy

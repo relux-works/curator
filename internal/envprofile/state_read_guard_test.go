@@ -184,8 +184,10 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/yarnmodernsource/capture.go:reconcileCapturedAuthorities",
 		"internal/yarnmodernsource/materialize.go:cleanAbsentAbsolute",
 	)
-	allow("Reads the OS-owned Linux process table, not manager state; a missing exe requires stat evidence of exit, zombie or kernel thread, and unreadable or malformed observations fail safe by retaining builds.",
-		"internal/buildcache/process_linux.go:linuxExecutablePaths",
+	allow("Reads kernel-owned /proc, not manager state; status, stat or exe can disappear between enumeration and read when a process exits. "+
+		"Strict scans skip vanished PIDs or stat-proven zombies/kernel threads and reject unexplained missing images; native scans preserve readable paths/inodes and independently probe removal candidates, "+
+		"so ENOENT alone never authorizes collection or supplies a manager-state default.",
+		"internal/buildcache/process_linux.go:linuxProcessSnapshot",
 	)
 	return exceptions
 }

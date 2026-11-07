@@ -649,11 +649,24 @@ deleting old records. All effective capability fields participate in cache
 equality; representation differences conservatively cause a miss. Keep
 local validation logs under `.temp/`.
 
+See [Linux build-cache process evidence](docs/linux-build-cache-sweep.md) for the non-root sweep controls, permission and hard-link safety argument, and the hosted qualification command.
+
 The 40 network-contact vectors from curator-spec `c1a2bb25` are pinned in `internal/audit/testdata/network-contacts.json`; run `go test ./internal/audit ./internal/envprofile -run 'Test(NetworkContact|ProfileNetworkContact)'` for classification, cache, member-install and migration coverage. Fixture paths are placed under `scripts/`, the existing detector surface; save execution logs under `.temp/`.
 
 For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./internal/envprofile ./cmd/curator -run TestMuse`; this includes synthetic fixtures and narrowing controls, not runtime qualification. For the credential-store configuration slice, run `go test ./internal/config ./internal/envregistry ./internal/envprofile ./cmd/curator -run 'TestCredential(Store|Projection)'`. See [machine credential-store configuration](docs/environment-config.md#machine-credential-store-selector-rc7-configuration-slice) for CLI commands and the currently disabled runtime mappings. Keep validation output under `.temp/`.
 
 The [Codex 0.164.0 permission grammar record](docs/qualification/codex-0.164.0.md) preserves sanitized native observations and admission limits.
+
+The [Claude Code 2.1.317 / 2.1.319 permission grammar handoff](docs/qualification/claude-permission-grammar-handoff.md)
+links the macOS arm64 records, exact sanitized command output, upstream gate
+ownership and V3 evidence gaps. No row is proposed. Python 3 performs npm SHA-512 integrity checks,
+binary hashing and evidence comparison; `sandbox-exec` denies network during
+isolated `claude --version` and `claude --help` probes. Exact command forms and
+published artifacts are under `docs/qualification/`. These observations do not
+admit Linux or change the permission gate. Reproduce evidence controls with
+`python3 docs/qualification/claude-permission-grammar-controls.py selector docs/qualification/claude-2.1.317-observations.json`
+(and `--plant` for the intended exit-1 negative); captured results are in
+`docs/qualification/claude-permission-grammar-controls.json`.
 
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
 separates passing exec loader rows from failed interactive skill exclusion.

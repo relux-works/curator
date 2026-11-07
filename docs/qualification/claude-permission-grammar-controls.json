@@ -1,0 +1,73 @@
+{
+  "scope": "Checker and isolation controls only; no vendor execution or runtime acceptance.",
+  "checker_sha256": "5f1ff82c2bbeea1cfabba71f158c9059923091f29a6fc111ff1724aa91bc7c54",
+  "controls": [
+    {
+      "name": "selector-317-positive",
+      "exit": 0,
+      "stdout": "INVALID_SELECTOR_REFUSAL_CONFIRMED\n",
+      "stderr": ""
+    },
+    {
+      "name": "selector-317-false-success",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "INVALID_SELECTOR_EXIT_MISMATCH: expected 1, observed 0\n"
+    },
+    {
+      "name": "selector-319-positive",
+      "exit": 0,
+      "stdout": "INVALID_SELECTOR_REFUSAL_CONFIRMED\n",
+      "stderr": ""
+    },
+    {
+      "name": "selector-319-false-success",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "INVALID_SELECTOR_EXIT_MISMATCH: expected 1, observed 0\n"
+    },
+    {
+      "name": "claude-code-integrity-positive",
+      "exit": 0,
+      "stdout": "RECORDED_PUBLISHED_INTEGRITY_CONFIRMED\n",
+      "stderr": ""
+    },
+    {
+      "name": "claude-code-wrong-integrity",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "PUBLISHED_SHA512_INTEGRITY_MISMATCH\n"
+    },
+    {
+      "name": "claude-code-darwin-arm64-integrity-positive",
+      "exit": 0,
+      "stdout": "RECORDED_PUBLISHED_INTEGRITY_CONFIRMED\n",
+      "stderr": ""
+    },
+    {
+      "name": "claude-code-darwin-arm64-wrong-integrity",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "PUBLISHED_SHA512_INTEGRITY_MISMATCH\n"
+    },
+    {
+      "name": "network-positive",
+      "exit": 0,
+      "stdout": "LOOPBACK_BIND_OK\n",
+      "stderr": ""
+    },
+    {
+      "name": "network-denial",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import socket; s=socket.socket(); s.bind((\"127.0.0.1\",0)); print(\"LOOPBACK_BIND_OK\"); s.close()\n                                      ~~~~~~^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 1] Operation not permitted\n"
+    }
+  ],
+  "sanitizer": {
+    "real_home_plant_detected": true,
+    "sanitized_plant": "$REAL_HOME/.claude/CONTROL_ONLY",
+    "sanitized_positive_accepted": true,
+    "clean_positive_accepted": true
+  },
+  "integrity_source": "Published npm metadata captured with the original intake; no new registry fetch during these controls."
+}

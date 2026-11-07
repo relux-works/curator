@@ -47,13 +47,12 @@ func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
 	// remedy behind the string a reader matches on.
 	const want = "go-v1 toolchain_executable_mismatch: " +
 		"selected Go executable is not the regular executable under the derived GOROOT" +
-		`; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+		`; set CURATOR_GO to the absolute path of the real GOROOT/bin/go (bin/go.exe on Windows)`
 	if !strings.Contains(stderr, want) {
 		t.Fatalf("install did not print the remedied diagnostic:\nwant to contain: %s\ngot:\n%s", want, stderr)
 	}
-	// The remedy is advice about the operator's own shell, so it must not cost
-	// the operator the rule that says the manager never reads that shell to
-	// choose a toolchain.
+	// Naming the explicit selector must preserve the closed selection rule:
+	// the manager still never searches PATH or downloads a toolchain.
 	if !strings.Contains(stderr, "Curator never searches PATH and never downloads a toolchain") {
 		t.Fatalf("the remedy displaced the closed selection rule:\n%s", stderr)
 	}
