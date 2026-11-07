@@ -58,23 +58,10 @@ const (
 	SelectionGOROOT = "GOROOT"
 )
 
-// toolchainSelectionRemedy is the operator remedy every
-// toolchain_executable_mismatch carries. It answers the one host condition that
-// produces the code in practice: a version-manager launcher was selected — a
-// goenv, asdf, or mise wrapper that lives outside a real GOROOT/bin, or one
-// that answers go env with a root other than the one selected. The verdict
-// alone does not tell an operator that, and the fix is a single host fact, so
-// the diagnostic names it.
-//
-// It is advice about the operator's own shell, which is where the trusted
-// selection variables are derived from. The driver itself still never searches
-// PATH and never downloads a toolchain, and the CLI guidance that the code
-// earns still says exactly that.
-//
-// The text is short deliberately: the install boundary bounds a rendered
-// diagnostic, and a longer remedy would be truncated away precisely where an
-// operator reads it.
-const toolchainSelectionRemedy = `put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+// toolchainSelectionRemedy names the actual operator selector. PATH cannot
+// repair a configured wrapper: the driver never consults it. Keep the advice
+// static and short enough to survive the install diagnostic boundary.
+const toolchainSelectionRemedy = `set CURATOR_GO to the absolute path of the real GOROOT/bin/go (bin/go.exe on Windows)`
 
 // TestedFamilies lists the Go release families this manager has tested against
 // the go-v1 conformance vectors, in ascending order. A release outside the list
