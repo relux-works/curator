@@ -1118,4 +1118,6 @@ internal/buildcache	TestLinuxProcessUIDControls	linux	-	-	four UID values preser
 internal/buildcache	TestLinuxForeignImagePermissions	linux	-	-	non-root mode guard retains shared and special-mode executable candidates even with no visible foreign PID
 internal/buildcache	TestLinuxExecutionProbeErrors	linux	-	-	actual write-open EACCES retains and names the build without changing bytes; restored permissions collect
 internal/buildcache	TestLinuxRetiredNativeSnapshot	linux	-	-	native snapshot finishes partial retired trees and retains busy or probe-error executable remnants
-internal/buildcache	TestLinuxHSMExceptionContract	linux	-	-	declaration only: fanotify pre-content/HSM opens are the stated exception; this row does not qualify HSM behavior
+internal/buildcache	TestLinuxHSMExceptionContract	linux	-	-	declaration only: HSM and post-probe exec are the bounded per-kernel exceptions; no HSM or NFS runtime qualification
+internal/buildcache	TestLinuxProbeRemovalCandidates	linux	-	-	inotify observes no write-open for retained candidates and actual close-write for an aged removal control
+internal/buildcache	TestLinuxRetiredReprobe	linux	-	-	late exec and probe errors retain the retired tree; stopping or repairing permits native cleanup

@@ -37,7 +37,7 @@ jobs:
             GOCACHE="$test_root/build" GOPATH="$test_root/go" \
             GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=600s -v ./internal/buildcache \
-              -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract)$'
+              -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract|ProbeRemovalCandidates|RetiredReprobe)$'
           sudo -u "$qualification_user" env -i PATH="$go_bin:/usr/bin:/bin" \
             HOME="$test_root/home" TMPDIR="$test_root/tmp" \
             GOCACHE="$test_root/build" GOPATH="$test_root/go" \

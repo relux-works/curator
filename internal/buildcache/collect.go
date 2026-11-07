@@ -244,16 +244,9 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot exe
 			"build cache sweep: retained %s (%s): %s", key, inspected.Status, inspected.Reason))
 		return nil
 	}
-	if snapshot.linuxProbe {
-		inUse, probeErr := entryExecutionInUse(root, name, snapshot)
-		if probeErr != nil {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep: retained %s: %v", key, probeErr))
-			return nil
-		}
-		if inUse || buildInUse(filepath.Join(root.path, name), filepath.Join(root.path, name), snapshot.paths) {
-			return nil
-		}
-	} else if snapshot.retains(inspected.artifactInfo) {
+	// Exhaust non-probing retention checks before taking a writable descriptor:
+	// even an immediate-close probe briefly prevents a concurrent exec.
+	if snapshot.retains(inspected.artifactInfo) || snapshot.linuxProbe && buildInUse(filepath.Join(root.path, name), filepath.Join(root.path, name), snapshot.paths) {
 		return nil
 	}
 	if published.After(now) {
@@ -271,7 +264,30 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot exe
 	if err := requireHomeLock(lock); err != nil {
 		return err
 	}
-	if err := retireEntryChecked(root, name, func() error { return requireHomeLock(lock) }); err != nil {
+	var recheck func(string) error
+	if snapshot.linuxProbe {
+		inUse, probeErr := entryExecutionInUse(root, name, snapshot)
+		if probeErr != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep: retained %s: %v", key, probeErr))
+			return nil
+		}
+		if inUse {
+			return nil
+		}
+		// Renaming closes the ordinary key-path launch window. Check the
+		// retired name again just before deletion for an exec in that window.
+		recheck = func(retired string) error {
+			inUse, err := entryExecutionInUse(root, retired, snapshot)
+			if err != nil {
+				return fmt.Errorf("retained retired entry %q: %w", retired, err)
+			}
+			if inUse {
+				return fmt.Errorf("retained retired entry %q: executable in use", retired)
+			}
+			return nil
+		}
+	}
+	if err := retireEntryGuarded(root, name, func() error { return requireHomeLock(lock) }, recheck); err != nil {
 		if lockErr := requireHomeLock(lock); lockErr != nil {
 			return lockErr
 		}
@@ -363,6 +379,13 @@ func retireEntry(root *sweepRoot, name string) error {
 }
 
 func retireEntryChecked(root *sweepRoot, name string, check func() error) error {
+	return retireEntryGuarded(root, name, check, nil)
+}
+
+// A non-nil removal guard rechecks the already-retired tree immediately before
+// deletion. Refusal leaves a named remnant for the next sweep; it never rolls
+// the tree back into the live namespace.
+func retireEntryGuarded(root *sweepRoot, name string, check func() error, beforeRemove func(string) error) error {
 	if root == nil || root.mutator == nil {
 		return fmt.Errorf("the protected cache root is not open for mutation")
 	}
@@ -384,6 +407,11 @@ func retireEntryChecked(root *sweepRoot, name string, check func() error) error 
 	}
 	if err := check(); err != nil {
 		return err
+	}
+	if beforeRemove != nil {
+		if err := beforeRemove(retired); err != nil {
+			return err
+		}
 	}
 	if err := root.mutator.RemoveAll(retired); err != nil {
 		// The entry is already unreachable by key. The leftover is named for

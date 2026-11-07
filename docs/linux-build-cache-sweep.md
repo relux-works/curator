@@ -1,15 +1,30 @@
 # Linux process evidence during build-cache collection
 
-The guarantee is: never remove a build that any process is executing, with
-one stated exception: an executable opened under a fanotify pre-content
-(HSM) watch, which Linux exempts from write denial. The exception can remove
-the path without stopping an already-running process. A later exec of that
-path then fails until the build is rebuilt. The HSM declaration row records
-this limit; it does not test or qualify HSM execution.
+The guarantee is per kernel: retain builds that any process on this kernel
+is executing, with two bounded exceptions. Linux exempts executables opened
+under a fanotify pre-content (HSM) watch from write denial. Also, a new exec
+can begin after the final immediate-close probe and before removal. Either
+exception can remove the path without stopping the already-running process;
+a later exec of that path fails until the build is rebuilt. The HSM declaration
+row records that limit; it does not test or qualify HSM execution.
+
+A home shared over NFS and executed from another host is outside this
+guarantee: write denial is local kernel state. Removing the executable there
+can give the remote process `ESTALE` or `SIGBUS`, rather than merely denying
+a later exec. This design does not qualify cross-host shared-home collection.
 
 ## In-use evidence
 
-For every executable remaining in a Linux collection candidate, the sweep
+Only after all other retention checks pass (including references, readable
+process evidence, permissions, future publication time, grace and lock
+ownership) does the sweep probe a live removal candidate. Builds still in
+grace are never write-opened. A successful writable open briefly prevents
+a concurrent exec of that inode with `ETXTBSY`, so its lifetime is kept to the
+inode check and immediate close. Inotify observes no close-write event for
+in-grace, future, referenced or shared-mode rows; an aged removal row is the
+positive control.
+
+For every executable remaining in a Linux removal candidate, the sweep
 pins its regular inode without following links through the proven cache
 directory handles, then reopens its own descriptor for writing through the
 kernel `/proc/self/fd` link. This prevents basename replacement from
@@ -47,11 +62,16 @@ Missing receipts, artifacts or `bin` directories do not permanently orphan
 an otherwise unused retired tree. Busy or probe-error remnants are retained;
 external symlink targets are never traversed or removed.
 
+After renaming a live candidate into the retired namespace, the sweep probes
+the retired tree again immediately before `RemoveAll`. A busy or uncertain
+remnant stays retired for a later sweep. This narrows the key-path exec window.
+An exec through an already-open descriptor, bind mount or the retired name
+between the final probe and deletion remains the bounded race exception
+named above; the snapshot and probes are not a global exec barrier.
+
 The manager-home mutation lock and entry-boundary checks remain in place.
-The process snapshot and immediate-close probe are observations, not a global
-barrier against arbitrary new execs after those observations. macOS and
-Windows keep their existing native enumeration and path matching; the Linux
-probe and unreadable-image treatment do not apply there.
+macOS and Windows keep their existing native enumeration and path matching;
+the Linux probe and unreadable-image treatment do not apply there.
 
 ## Kernel history and qualification boundary
 
@@ -85,9 +105,16 @@ OpenSSH invocation.
 A real `EACCES` write-open row retains and names a read-only executable;
 restoring its write permission is the collection control. Native snapshot
 rows finish partial retired trees, retain running retired aliases and probe
-errors, then finish after the cause is removed. An empty process-table fixture
-models hidden foreign PIDs for the non-root mode guard; it does not mount a
-`hidepid` filesystem. The HSM row states only the accepted exception.
+errors, then finish after the cause is removed.
+
+An inotify watch observes close-write events rather than inferring probe
+placement from source. A late-exec row starts a real non-dumpable image after
+rename: the re-probe retains its retired tree, and stopping it permits cleanup.
+A late probe-error sibling retains and names its retired tree until repaired.
+
+An empty process-table fixture models hidden foreign PIDs for the non-root
+mode guard; it does not mount a `hidepid` filesystem. The declaration row names the exceptions and per-kernel
+boundary without qualifying HSM or cross-host execution.
 
 `python3 .github/ci/linux-sweep-control.py` plants two defects separately:
 a compile-valid UID misclassification and an ignored `ETXTBSY`. Each must
@@ -103,5 +130,5 @@ and XDG selectors cleared:
 
 ```sh
 go test -count=1 -timeout=600s ./internal/buildcache \
-  -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract)$'
+  -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract|ProbeRemovalCandidates|RetiredReprobe)$'
 ```

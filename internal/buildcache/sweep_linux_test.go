@@ -3,6 +3,7 @@ package buildcache
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -496,11 +497,210 @@ func TestLinuxRetiredNativeSnapshot(t *testing.T) {
 }
 
 // Contract row, not an HSM experiment: executables opened under fanotify
-// pre-content/HSM watches are the accepted exception to the any-process
-// guarantee. Kernel 0357ef03c94e exempts them from write denial. Path removal
+// pre-content/HSM watches are one accepted exception to the per-kernel
+// guarantee; a new exec after the final probe is the other. Kernel 0357ef03c94e exempts them from write denial. Path removal
 // does not stop execution, but later exec fails until rebuilt. This declaration
 // row records the accepted limit only; it supplies no HSM execution evidence.
 func TestLinuxHSMExceptionContract(t *testing.T) {
-	const exception = "fanotify pre-content/HSM watch: write denial exempt; later exec can fail until rebuilt"
+	const exception = "per-kernel limit: fanotify pre-content/HSM write-denial exemption or exec after final probe; later exec can fail until rebuilt; cross-host NFS outside guarantee"
 	t.Log(exception)
+}
+
+// Claim: native inotify observes no successful write-open of retained, writable
+// artifacts. The identical aged artifact emits close-write and collects, so an
+// inert watch cannot satisfy the grace/future/reference/mode controls.
+func TestLinuxProbeRemovalCandidates(t *testing.T) {
+	for _, row := range []string{"in-grace", "grace-boundary", "future", "referenced", "shared-mode"} {
+		t.Run(row, func(t *testing.T) {
+			store := newSweepStore(t)
+			store.ExecutablePaths = nil
+			key := publishTestEntry(t, store, "runner", "unchanged executable")
+			dir := entryPathOf(store, key)
+			artifact := filepath.Join(dir, "bin", "runner")
+			now := time.Now()
+			published := now.Add(-time.Hour)
+			switch row {
+			case "grace-boundary":
+				published = now.Add(-DefaultGrace)
+			case "future":
+				published = now.Add(time.Hour)
+			case "referenced", "shared-mode":
+				published = now.Add(-30 * 24 * time.Hour)
+			}
+			if err := os.Chtimes(dir, published, published); err != nil {
+				t.Fatal(err)
+			}
+			request := SweepRequest{Now: now}
+			switch row {
+			case "referenced":
+				request.Referenced = []string{string(key)}
+			case "shared-mode":
+				if err := os.Chmod(artifact, 0o710); err != nil {
+					t.Fatal(err)
+				}
+			}
+			writes := watchLinuxWriteCloses(t, artifact)
+			result, err := store.Sweep(request, testHomeLock{})
+			if err != nil || len(result.Removed) != 0 || !entryExists(t, store, key) {
+				t.Fatalf("retained candidate changed: %+v %v", result, err)
+			}
+			if row == "future" {
+				if !warningsContaining(result, "is in the future") {
+					t.Fatalf("future-time refusal missing: %+v", result)
+				}
+			} else if len(result.Warnings) != 0 {
+				t.Fatalf("retained candidate mislabeled: %+v", result)
+			}
+			if got := writes(); got != 0 {
+				t.Fatalf("retained candidate was write-opened: %d close-write events", got)
+			}
+			content, err := os.ReadFile(artifact)
+			if err != nil || string(content) != "unchanged executable" {
+				t.Fatalf("retained bytes changed: %q %v", content, err)
+			}
+			// Nearby control clears only the retention condition. The same
+			// watch must observe the real write-open and the build must collect.
+			if err := os.Chmod(artifact, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			backdate(t, dir, 30*24*time.Hour)
+			result, err = store.Sweep(SweepRequest{}, testHomeLock{})
+			assertLinuxUnusedControl(t, store, key, result, err)
+			if got := writes(); got == 0 {
+				t.Fatal("aged removal control emitted no close-write event")
+			}
+		})
+	}
+}
+
+// Observe actual kernel close-write events on this inode, including after its
+// directory is renamed. The probe always closes its writable fd before return.
+func watchLinuxWriteCloses(t *testing.T, artifact string) func() int {
+	t.Helper()
+	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC | unix.IN_NONBLOCK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = unix.Close(fd) })
+	if _, err := unix.InotifyAddWatch(fd, artifact, unix.IN_CLOSE_WRITE); err != nil {
+		t.Fatal(err)
+	}
+	return func() int {
+		count := 0
+		var buffer [4096]byte
+		for {
+			n, err := unix.Read(fd, buffer[:])
+			if errors.Is(err, unix.EAGAIN) {
+				return count
+			}
+			if errors.Is(err, unix.EINTR) {
+				continue
+			}
+			if err != nil || n < unix.SizeofInotifyEvent {
+				t.Fatalf("read inotify observation: n=%d err=%v", n, err)
+			}
+			for offset := 0; offset < n; {
+				if n-offset < unix.SizeofInotifyEvent {
+					t.Fatal("truncated inotify event")
+				}
+				mask := binary.NativeEndian.Uint32(buffer[offset+4:])
+				length := binary.NativeEndian.Uint32(buffer[offset+12:])
+				if mask&unix.IN_Q_OVERFLOW != 0 {
+					t.Fatal("inotify observation overflow")
+				}
+				if mask&unix.IN_CLOSE_WRITE != 0 {
+					count++
+				}
+				offset += unix.SizeofInotifyEvent + int(length)
+			}
+		}
+	}
+}
+
+type linuxSweepObserveLock func() error
+
+func (observe linuxSweepObserveLock) AssertHeld() error { return observe() }
+
+// Claim: a real exec or permission loss after rename is caught by the final
+// retired-name probe. Refusal keeps bytes in the retired tree; stopping/repairing
+// permits cleanup. An unchanged sibling removes normally. This cannot prove
+// absence of a new exec after the last immediate-close probe.
+func TestLinuxRetiredReprobe(t *testing.T) {
+	image, err := os.ReadFile(testExecutable(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []string{"late-exec", "late-probe-error", "unused"} {
+		t.Run(row, func(t *testing.T) {
+			store := newSweepStore(t)
+			store.ExecutablePaths = nil
+			publication, _ := testPublication(t, store.Home(), testInput("runner"), image)
+			hit, err := store.Publish(publication, testHomeLock{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := entryPathOf(store, hit.CacheKey)
+			backdate(t, dir, 30*24*time.Hour)
+			retired := ""
+			var child linuxImageProcess
+			// The existing lock validation after rename observes the real
+			// retired namespace; no production sleep or exec hook is added.
+			lock := linuxSweepObserveLock(func() error {
+				if retired != "" {
+					return nil
+				}
+				matches, err := filepath.Glob(filepath.Join(filepath.Dir(dir), sweepPrefix+"*"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(matches) == 1 {
+					retired = matches[0]
+					artifact := filepath.Join(retired, "bin", "runner")
+					switch row {
+					case "late-exec":
+						child = startLinuxImage(t, artifact, true)
+					case "late-probe-error":
+						if err := os.Chmod(artifact, 0o500); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				return nil
+			})
+			result, err := store.Sweep(SweepRequest{}, lock)
+			if err != nil || retired == "" || entryExists(t, store, hit.CacheKey) {
+				t.Fatalf("retirement not reached: %+v %v", result, err)
+			}
+			if row == "unused" {
+				if _, err := os.Lstat(retired); !os.IsNotExist(err) || len(result.Removed) != 1 || len(result.Warnings) != 0 {
+					t.Fatalf("unused retired control not removed: %+v %v", result, err)
+				}
+				return
+			}
+			if len(result.Removed) != 0 || !warningsContaining(result, filepath.Base(retired)) {
+				t.Fatalf("late retired retention missing: %+v", result)
+			}
+			if row == "late-exec" {
+				if !warningsContaining(result, "executable in use") {
+					t.Fatalf("late execution not named: %+v", result)
+				}
+				child.close()
+			} else {
+				if !warningsContaining(result, `write-open execution probe "bin/runner": permission denied`) {
+					t.Fatalf("late probe error not named: %+v", result)
+				}
+				if err := os.Chmod(filepath.Join(retired, "bin", "runner"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			content, err := os.ReadFile(filepath.Join(retired, "bin", "runner"))
+			if err != nil || !bytes.Equal(content, image) {
+				t.Fatalf("retired artifact changed after refusal: %v", err)
+			}
+			result, err = store.Sweep(SweepRequest{}, testHomeLock{})
+			if _, statErr := os.Lstat(retired); err != nil || !os.IsNotExist(statErr) || len(result.Warnings) != 0 {
+				t.Fatalf("retired recovery failed: %+v %v %v", result, err, statErr)
+			}
+		})
+	}
 }

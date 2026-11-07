@@ -11,12 +11,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Linux never removes a build any process is executing, with the accepted
-// exception of an executable opened under a fanotify pre-content/HSM watch.
-// Linux deliberately exempts those opens from write denial (0357ef03c94e,
+// Linux retains builds executing on this kernel, with two bounded exceptions:
+// an executable opened under a fanotify pre-content/HSM watch, and a new exec
+// after the final immediate-close probe but before removal. A retired-name
+// re-probe narrows the latter window; it cannot close it for an open descriptor
+// or bind mount. Other kernels executing a shared home are outside this claim;
+// NFS removal can give those remote processes ESTALE or SIGBUS.
+// Linux deliberately exempts HSM opens from write denial (0357ef03c94e,
 // following removal 2a010c412853 and revert 3b832035387f). Readable /proc paths
 // and inodes remain extra signals: successful write-open alone is not unused.
-// The exception can remove the path without stopping the running process; a
+// Either bounded exception can remove the path without stopping the process; a
 // later exec fails until rebuilt. See docs/linux-build-cache-sweep.md.
 // Probes never truncate, create, chmod or write bytes, and close immediately.
 func entryExecutionInUse(root *sweepRoot, name string, snapshot executableSnapshot) (bool, error) {
@@ -71,16 +75,17 @@ func probeLinuxTree(dir *os.File, rel string, snapshot executableSnapshot) (bool
 			if !strings.HasPrefix(child, "bin/") && stat.Mode&0o111 == 0 {
 				continue
 			}
+			// Readable inode and sweep-time mode evidence can retain even
+			// a partial retired tree without interfering with a new exec.
+			if linuxSnapshotRetains(snapshot, &stat) {
+				return true, nil
+			}
 			probeErr := probeLinuxExecutable(int(dir.Fd()), name, &stat)
 			if errors.Is(probeErr, unix.ETXTBSY) {
 				return true, nil
 			}
 			if probeErr != nil {
 				return false, fmt.Errorf("write-open execution probe %q: %w", child, probeErr)
-			}
-			// Independently preserve readable inode and sweep-time mode evidence.
-			if linuxSnapshotRetains(snapshot, &stat) {
-				return true, nil
 			}
 		}
 	}
