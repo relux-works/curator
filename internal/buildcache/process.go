@@ -46,21 +46,23 @@ func buildInUse(path, canonical string, executables []string) bool {
 	return false
 }
 
-// A native Linux snapshot additionally records inode identities and whether an
-// foreign-user image was omitted. Such omissions are safe only for
-// independently protected, owner-only executable candidates. Test overrides
-// and other platforms retain their existing path-only contract.
+// Linux adds readable inode evidence, mandatory write-open probes and a
+// non-root mode guard, even when hidepid hides every foreign process. Overrides
+// and other platforms keep the existing path-only enumeration contract.
 type executableSnapshot struct {
-	paths           []string
-	images          []os.FileInfo
-	foreignExcluded bool
+	paths       []string
+	images      []os.FileInfo
+	privateOnly bool
+	linuxProbe  bool
 }
 
 func (snapshot executableSnapshot) retains(info os.FileInfo) bool {
 	if info == nil {
 		return true
 	}
-	if snapshot.foreignExcluded && (info.Mode().Perm()&0o077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid) != 0) {
+	// Read at sweep time, not exec time; a probe additionally catches a running
+	// inode whose owner has since changed its mode to owner-only.
+	if snapshot.privateOnly && (info.Mode().Perm()&0o077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid) != 0) {
 		return true
 	}
 	for _, image := range snapshot.images {

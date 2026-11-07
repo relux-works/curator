@@ -1113,6 +1113,9 @@ internal/testtoolchain	TestHostGOROOTLockContention/released-holder-admits-waite
 internal/testtoolchain	TestHostGOROOTLockUnknownHolder/missing	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
 internal/testtoolchain	TestHostGOROOTLockUnknownHolder/malformed	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
 internal/testtoolchain	TestHostGOROOTLockMetadataFailureReleases	linux,darwin,windows	-	-	Host toolchain OS lock diagnostics remain advisory and bounded
-internal/buildcache	TestLinuxUnprivilegedSweep	linux	-	-	non-root native sweep retains running and unreadable same-user images; foreign UID cannot block owner-only builds
-internal/buildcache	TestLinuxProcessUIDControls	linux	-	-	four UID values preserve same-user uncertainty including saved and filesystem identities
-internal/buildcache	TestLinuxForeignImagePermissions	linux	-	-	foreign-image omission cannot remove shared or special-mode executable candidates
+internal/buildcache	TestLinuxUnprivilegedSweep	linux	-	-	non-root native write probes retain running builds while unreadable same-user processes permit unused collection
+internal/buildcache	TestLinuxProcessUIDControls	linux	-	-	four UID values preserve readable same-user proc signals including saved and filesystem identities
+internal/buildcache	TestLinuxForeignImagePermissions	linux	-	-	non-root mode guard retains shared and special-mode executable candidates even with no visible foreign PID
+internal/buildcache	TestLinuxExecutionProbeErrors	linux	-	-	actual write-open EACCES retains and names the build without changing bytes; restored permissions collect
+internal/buildcache	TestLinuxRetiredNativeSnapshot	linux	-	-	native snapshot finishes partial retired trees and retains busy or probe-error executable remnants
+internal/buildcache	TestLinuxHSMExceptionContract	linux	-	-	declaration only: fanotify pre-content/HSM opens are the stated exception; this row does not qualify HSM behavior

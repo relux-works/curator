@@ -23,7 +23,7 @@ func linuxProcessSnapshot(proc string, uid int, identities bool) (executableSnap
 	if err != nil {
 		return executableSnapshot{}, err
 	}
-	var snapshot executableSnapshot
+	snapshot := executableSnapshot{privateOnly: uid > 0, linuxProbe: identities}
 	for _, entry := range entries {
 		pid, err := strconv.Atoi(entry.Name())
 		if err != nil || pid <= 0 {
@@ -36,14 +36,19 @@ func linuxProcessSnapshot(proc string, uid int, identities bool) (executableSnap
 				continue
 			}
 			if statusErr != nil {
+				if identities {
+					continue
+				} // Mandatory inode write probes cover unreadable images.
 				return executableSnapshot{}, fmt.Errorf("read credentials of process %d: %w", pid, statusErr)
 			}
 			foreign, statusErr := linuxForeignUID(string(status), uid)
 			if statusErr != nil {
+				if identities {
+					continue
+				} // Mandatory inode write probes cover unreadable images.
 				return executableSnapshot{}, fmt.Errorf("read credentials of process %d: %w", pid, statusErr)
 			}
 			if foreign {
-				snapshot.foreignExcluded = true
 				continue
 			}
 		}
@@ -55,7 +60,9 @@ func linuxProcessSnapshot(proc string, uid int, identities bool) (executableSnap
 				if imageErr == nil {
 					snapshot.images = append(snapshot.images, image)
 				} else if !errors.Is(imageErr, os.ErrNotExist) {
-					return executableSnapshot{}, fmt.Errorf("stat executable of process %d: %w", pid, imageErr)
+					// The reported path remains an extra signal. The mandatory
+					// write probe covers the unreadable inode independently.
+					continue
 				}
 			}
 			continue
@@ -68,10 +75,16 @@ func linuxProcessSnapshot(proc string, uid int, identities bool) (executableSnap
 				continue
 			}
 			if statErr != nil {
+				if identities {
+					continue
+				}
 				return executableSnapshot{}, statErr
 			}
 			noImage, statErr := linuxProcessHasNoImage(string(stat))
 			if statErr != nil {
+				if identities {
+					continue
+				}
 				return executableSnapshot{}, statErr
 			}
 			if noImage {
@@ -79,6 +92,9 @@ func linuxProcessSnapshot(proc string, uid int, identities bool) (executableSnap
 			}
 		}
 
+		if identities {
+			continue
+		} // Including non-dumpable same-user processes.
 		return executableSnapshot{}, fmt.Errorf("read executable of process %d: %w", pid, err)
 	}
 	return snapshot, nil

@@ -1,76 +1,107 @@
 # Linux process evidence during build-cache collection
 
-A non-root sweep reads the four `Uid` fields of each visible process's
-`/proc/<pid>/status`: real, effective, saved-set and filesystem UID. If any
-matches the manager's effective UID, that process stays in the evidence set.
-Unreadable or malformed credentials are uncertainty, not a foreign-user match.
-An unreadable live same-user executable retains every build and reports why.
-Exited processes and proven no-image processes retain the existing treatment.
+The guarantee is: never remove a build that any process is executing, with
+one stated exception: an executable opened under a fanotify pre-content
+(HSM) watch, which Linux exempts from write denial. The exception can remove
+the path without stopping an already-running process. A later exec of that
+path then fails until the build is rebuilt. The HSM declaration row records
+this limit; it does not test or qualify HSM execution.
 
-Other-UID processes do not make an owner-only publication uncollectable just
-because Linux denies access to their executable links. When any foreign
-process was excluded, a candidate must additionally have no group/other
-permission bits and no setuid/setgid bits. The existing descriptor-based
-inspection still proves the complete cache boundary, artifact owner, regular
-file type, single hard link, receipts, contents and publication age. Shared
-or special-mode candidates are retained. The same proof is required before
-finishing removal of a retired entry; unprovable wreckage is retained.
+## In-use evidence
 
-This is discretionary protection for an unprivileged user's store, not a
-claim against root or another privileged actor bypassing file permissions.
-An ordinary foreign UID cannot execute the owner-only inode. A setuid
-process whose real, saved or filesystem UID is still this user remains in
-scope even if its effective UID or its proc-directory owner is root. Special
-artifact modes never earn the foreign-process exception. An actor capable of
-arbitrary credential replacement or privileged filesystem mutation is outside
-this unprivileged-store argument. A root manager keeps the previous strict
-all-process enumeration instead of applying the exception.
+For every executable remaining in a Linux collection candidate, the sweep
+pins its regular inode without following links through the proven cache
+directory handles, then reopens its own descriptor for writing through the
+kernel `/proc/self/fd` link. This prevents basename replacement from
+redirecting the write-open onto another inode or a device.
+It does not create, truncate, chmod or write the file, and closes a successful
+open immediately after checking that it names the expected regular inode.
+`ETXTBSY` retains the build. Every other probe failure retains it too, with
+the build or retired member, executable name and error in the warning.
 
-Linux snapshots also retain executable device/inode identities obtained
-through `/proc/<pid>/exe`. Path spelling alone cannot prove that a build is
-unused: a process may execute an external hard-link alias. A still-linked
-alias is already refused by the single-link check; an alias unlinked after
-launch can leave one link in the cache, so the live inode match still retains
-that build. No extra process is executed by the collector.
+Write denial belongs to the executing inode, regardless of the executor's
+UID, capabilities, container or dumpability. It therefore covers ordinary
+root and capability-bearing execution as well as an unreadable same-user
+process. It is not a claim that privileged filesystem mutation is harmless.
+A successful open alone never proves absence: readable `/proc` paths and
+inode identities remain additional retention signals, including an external
+hard-link alias unlinked after launch. Existing single-link, owner, regular
+file, receipt, hash and size validation remains mandatory for a live entry.
 
-The collector still uses a process snapshot under the manager-home mutation
-lock. This change does not create a global barrier against arbitrary new
-executions after that snapshot, change process visibility outside the current
-procfs view, or weaken entry validation. macOS and Windows keep their existing
-native enumeration and path matching.
+The scan reads real, effective, saved-set and filesystem UIDs. Any match
+keeps readable process evidence in scope. Foreign or unreadable images,
+including a non-dumpable same-user `ssh-agent`-like process, no longer block
+the entire sweep: mandatory per-candidate probes independently protect their
+running executables. Failure to list the process table still refuses the pass.
 
-The kernel's [process status documentation](https://man7.org/linux/man-pages/man5/proc_pid_status.5.html)
-defines the UID tuple; [executable-link documentation](https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html)
-defines ptrace-controlled access and deleted-link spelling;
-[execve](https://man7.org/linux/man-pages/man2/execve.2.html) describes credential
-transitions at execution.
+For every non-root sweep, the mode guard also retains group/other-accessible
+or setuid/setgid executables. It applies even when `hidepid=2` exposes no
+foreign PID. Mode is read at sweep time, not exec time. A process that started
+before its owner changed the mode to owner-only is independently protected by
+the write probe and any readable inode evidence.
 
-## Qualification
+Interrupted `.sweep-*` removal does not need intact receipts. The sweep walks
+remaining files relative to the protected directory, without following
+symlinks, and checks each remaining executable before finishing deletion.
+Missing receipts, artifacts or `bin` directories do not permanently orphan
+an otherwise unused retired tree. Busy or probe-error remnants are retained;
+external symlink targets are never traversed or removed.
 
-`Linux unprivileged process sweep` runs on hosted Ubuntu and fails immediately
-if the qualification account is root. The job creates a dedicated unprivileged
-UID, so non-dumpable processes belonging to the runner account cannot prevent
-the collection controls. It requires a complete baseline. Ordinary suite runs
-still exercise these rows: an existing unreadable same-user process must retain
-all entries, including the unused control, rather than make a false collection
-claim. No skip substitutes for that assertion.
+The manager-home mutation lock and entry-boundary checks remain in place.
+The process snapshot and immediate-close probe are observations, not a global
+barrier against arbitrary new execs after those observations. macOS and
+Windows keep their existing native enumeration and path matching; the Linux
+probe and unreadable-image treatment do not apply there.
 
-The isolated job runs real cached copies of the test binary,
-checks a real other-UID PID, and makes its own child non-dumpable to obtain a
-real same-user permission refusal. Each retained publication has a nearby
-positive control: after stopping the child, the same entry is collected.
-UID parser and permission-boundary controls cover mixed setuid credentials,
-malformed metadata and shared/special artifact modes. No root-only fixture or
-new skip class substitutes for these controls. The same hosted step runs
-`python3 .github/ci/linux-sweep-control.py`: it temporarily omits the owner
-UID and requires the real running-build assertion to fail by name, then
-restores the exact source bytes. A compilation error or unrelated timeout is
-not a detected plant.
+## Kernel history and qualification boundary
 
-Run the focused Linux controls with a private HOME and cleared Git, SSH and
-agent selectors:
+[2a010c412853](https://github.com/torvalds/linux/commit/2a010c41285345da60cece35575b4e0af7e7bf44)
+removed exec write denial during the Linux 6.11 cycle.
+[3b832035387f](https://kernel.googlesource.com/pub/scm/linux/kernel/git/vfs/vfs/+/3b832035387ff508fdcf0fba66701afc78f79e3d)
+reverted it on 2024-11-27 after a userspace regression.
+[0357ef03c94e](https://kernel.googlesource.com/pub/scm/linux/kernel/git/jack/linux-fs/+/0357ef03c94ef835bd44a0658b8edb672a9dbf51)
+then deliberately exempted pre-content-watched executables. The flag is fixed
+for that open file's lifetime; removing a watch later does not restore denial
+for that existing execution. The exception remains in
+[upstream Linux 7.0](https://github.com/torvalds/linux/blob/v7.0/include/linux/fs.h#L2809-L2821)
+and the [upstream revision inspected for this work](https://github.com/torvalds/linux/blob/d48723711bae9b8cdc56719c448ba42fef28cbee/include/linux/fs.h#L2861-L2873).
+
+This design assumes the restored write-denial behavior; it does not qualify
+the unreverted Linux 6.11-era regression or arbitrary vendor patches. The
+hosted job records `uname -r` and checks actual `ETXTBSY` behavior on its
+kernel. That result must not be transferred to an untested downstream kernel.
+The accepted HSM exception applies even on otherwise qualified kernels.
+
+## Controls
+
+`Linux unprivileged process sweep` creates a dedicated non-root UID on hosted
+Ubuntu. Real cached test binaries exercise ordinary, linked-alias, unlinked
+alias and non-dumpable images. Each busy probe must return `ETXTBSY`, retain
+the build without changing its bytes, and allow collection after the process
+stops. An unrelated unused build must collect while the non-dumpable child
+is still running. This is an `ssh-agent`-like dumpability witness, not a real
+OpenSSH invocation.
+
+A real `EACCES` write-open row retains and names a read-only executable;
+restoring its write permission is the collection control. Native snapshot
+rows finish partial retired trees, retain running retired aliases and probe
+errors, then finish after the cause is removed. An empty process-table fixture
+models hidden foreign PIDs for the non-root mode guard; it does not mount a
+`hidepid` filesystem. The HSM row states only the accepted exception.
+
+`python3 .github/ci/linux-sweep-control.py` plants two defects separately:
+a compile-valid UID misclassification and an ignored `ETXTBSY`. Each must
+fail at its intended assertion, and exact source bytes are restored in a
+`finally` block. UID omission alone cannot defeat the independent probe, so
+its own classification row kills it. A compile failure or unrelated timeout
+is never a successful kill. No native root/container/capability or HSM
+execution is claimed by these controls; the executor-independent mechanism
+and HSM boundary above are derived from the kernel sources.
+
+Run the focused controls under a private absolute HOME with Git, SSH, agent
+and XDG selectors cleared:
 
 ```sh
 go test -count=1 -timeout=600s ./internal/buildcache \
-  -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths)$'
+  -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract)$'
 ```

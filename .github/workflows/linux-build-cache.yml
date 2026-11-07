@@ -19,6 +19,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          uname -r
           test "$(id -u)" -ne 0
           qualification_user=curator-sweep-control
           sudo useradd --user-group --no-create-home "$qualification_user"
@@ -34,11 +35,11 @@ jobs:
           sudo -u "$qualification_user" env -i PATH="$go_bin:/usr/bin:/bin" \
             HOME="$test_root/home" TMPDIR="$test_root/tmp" \
             GOCACHE="$test_root/build" GOPATH="$test_root/go" \
-            GOTOOLCHAIN=local GOENV=off CURATOR_SWEEP_REQUIRE_COMPLETE=1 \
+            GOTOOLCHAIN=local GOENV=off \
             go test -count=1 -timeout=600s -v ./internal/buildcache \
-              -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths)$'
+              -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract)$'
           sudo -u "$qualification_user" env -i PATH="$go_bin:/usr/bin:/bin" \
             HOME="$test_root/home" TMPDIR="$test_root/tmp" \
             GOCACHE="$test_root/build" GOPATH="$test_root/go" \
-            GOTOOLCHAIN=local GOENV=off CURATOR_SWEEP_REQUIRE_COMPLETE=1 \
+            GOTOOLCHAIN=local GOENV=off \
             python3 .github/ci/linux-sweep-control.py

@@ -106,7 +106,22 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		return result, lockErr
 	}
 	if err == nil {
-		snapshot.paths, err = normalizeExecutablePaths(snapshot.paths)
+		if snapshot.linuxProbe {
+			// An inaccessible canonical spelling does not invalidate readable
+			// proc paths: candidate write probes supply independent evidence.
+			var paths []string
+			for _, path := range snapshot.paths {
+				normalized, pathErr := normalizeExecutablePaths([]string{path})
+				if pathErr == nil {
+					paths = append(paths, normalized...)
+				} else if filepath.IsAbs(path) {
+					paths = append(paths, filepath.Clean(path))
+				}
+			}
+			snapshot.paths = paths
+		} else {
+			snapshot.paths, err = normalizeExecutablePaths(snapshot.paths)
+		}
 	}
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
@@ -177,7 +192,7 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, snap
 	for _, name := range names {
 		switch {
 		case entryNameRE.MatchString(name):
-			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
+			if referenced[name] || !snapshot.linuxProbe && buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
 			}
 			if err := store.sweepUnreferenced(root, name, snapshot, now, grace, result, lock); err != nil {
@@ -187,20 +202,13 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, snap
 			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
 			}
-			// Linux inode evidence also protects retired images reached through
-			// an alias; foreign-user omissions require the same private-file proof.
-			if len(snapshot.images) > 0 || snapshot.foreignExcluded {
-				keyName := strings.TrimPrefix(name, sweepPrefix)
-				if len(keyName) < 64 || !entryNameRE.MatchString(keyName[:64]) {
-					result.Warnings = append(result.Warnings, "build cache sweep: retained unproven retired entry")
+			if snapshot.linuxProbe {
+				inUse, probeErr := entryExecutionInUse(root, name, snapshot)
+				if probeErr != nil {
+					result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep: retained retired entry %q: %v", name, probeErr))
 					continue
 				}
-				_, inspected, inspectErr := store.inspectUnexpected(root, name, buildmeta.CacheKey("sha256:"+keyName[:64]))
-				if inspectErr != nil || inspected.Status != Hit {
-					result.Warnings = append(result.Warnings, "build cache sweep: retained unproven retired entry")
-					continue
-				}
-				if snapshot.retains(inspected.artifactInfo) {
+				if inUse {
 					continue
 				}
 			}
@@ -236,7 +244,16 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot exe
 			"build cache sweep: retained %s (%s): %s", key, inspected.Status, inspected.Reason))
 		return nil
 	}
-	if snapshot.retains(inspected.artifactInfo) {
+	if snapshot.linuxProbe {
+		inUse, probeErr := entryExecutionInUse(root, name, snapshot)
+		if probeErr != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep: retained %s: %v", key, probeErr))
+			return nil
+		}
+		if inUse || buildInUse(filepath.Join(root.path, name), filepath.Join(root.path, name), snapshot.paths) {
+			return nil
+		}
+	} else if snapshot.retains(inspected.artifactInfo) {
 		return nil
 	}
 	if published.After(now) {
