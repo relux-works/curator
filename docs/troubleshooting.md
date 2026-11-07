@@ -266,20 +266,36 @@ The command validates the toolchain executable and proceeds with planning.
 
 ### toolchain_executable_mismatch
 
-Symptom: error `go-v1 toolchain_executable_mismatch: selected Go executable is not the regular executable under the derived GOROOT; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`.
+The configured Go executable resolves outside the selected `GOROOT/bin`, or
+`go env GOROOT` disagrees with that root. A version-manager launcher is a
+common cause. The driver does not search `PATH`, so changing `PATH` cannot
+repair this selection.
 
-Cause: selected Go executable on `PATH` is a shim or environment wrapper (such as goenv, asdf, or mise) rather than the standard binary under `GOROOT/bin`. Source location: `internal/godriver/session.go:521` and `cmd/curator/toolchain_remedy_test.go:51`.
-
-Remedy: prepend the actual `GOROOT/bin` directory to `PATH`.
-
-Set PATH to standard Go toolchain binary:
+Set `CURATOR_GO` to an absolute path naming the actual upstream executable,
+`GOROOT/bin/go` (`GOROOT/bin/go.exe` on Windows). Use the installation root
+you verified, rather than asking a possibly selected wrapper to derive it:
 
 ```bash
-export PATH="$(go env GOROOT)/bin:$PATH"
-curator status
+export CURATOR_GO=/opt/go/bin/go
+curator status app --check
 ```
 
-The command verifies the regular Go binary location and resumes execution.
+An explicit `GOROOT` must agree with that tree; otherwise unset the stale
+selector. Curator never downloads a replacement toolchain.
+
+### toolchain_link_escape and toolchain_link_absolute
+
+The toolchain fingerprint requires a closed tree. A distro layout whose
+`src` symlink points outside `GOROOT` (for example, into a separately
+packaged source directory) fails `toolchain_link_escape` for a relative
+escape or `toolchain_link_absolute` for an absolute link. This is an
+intentional refusal, not an invitation to relax the boundary or copy an
+arbitrary target into place.
+
+Select a clean upstream Go distribution tree and set `CURATOR_GO` to its
+real `GOROOT/bin/go` (`bin/go.exe` on Windows). The selected Go family must
+still be one Curator supports. A self-contained upstream tree is the
+positive control; the escaping distro-shaped tree remains refused.
 
 ### Untrusted or non-operator-pinned Git executable
 

@@ -1,0 +1,45 @@
+name: Linux unprivileged build cache
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  linux-unprivileged-sweep:
+    name: Linux unprivileged process sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Real non-root process and unreadable-image controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -r
+          test "$(id -u)" -ne 0
+          qualification_user=curator-sweep-control
+          sudo useradd --user-group --no-create-home "$qualification_user"
+          test_root="$(mktemp -d)"
+          trap 'sudo rm -rf "$test_root"; sudo userdel "$qualification_user"' EXIT
+          sudo mkdir -p "$test_root/source" "$test_root/home" "$test_root/tmp"
+          git archive HEAD | sudo tar -x -C "$test_root/source"
+          sudo chown -R "$qualification_user:$qualification_user" "$test_root"
+          sudo chmod 755 "$test_root"
+          sudo chmod 700 "$test_root/home" "$test_root/tmp"
+          go_bin="$(dirname "$(command -v go)")"
+          cd "$test_root/source"
+          sudo -u "$qualification_user" env -i PATH="$go_bin:/usr/bin:/bin" \
+            HOME="$test_root/home" TMPDIR="$test_root/tmp" \
+            GOCACHE="$test_root/build" GOPATH="$test_root/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=600s -v ./internal/buildcache \
+              -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths|ExecutionProbeErrors|RetiredNativeSnapshot|HSMExceptionContract|ProbeRemovalCandidates|RetiredReprobe)$'
+          sudo -u "$qualification_user" env -i PATH="$go_bin:/usr/bin:/bin" \
+            HOME="$test_root/home" TMPDIR="$test_root/tmp" \
+            GOCACHE="$test_root/build" GOPATH="$test_root/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            python3 .github/ci/linux-sweep-control.py

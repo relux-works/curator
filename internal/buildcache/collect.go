@@ -95,16 +95,33 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 	}
 
 	result := SweepResult{}
-	enumerate := store.ExecutablePaths
-	if enumerate == nil {
-		enumerate = liveExecutablePaths
+	var snapshot executableSnapshot
+	var err error
+	if store.ExecutablePaths != nil {
+		snapshot.paths, err = store.ExecutablePaths()
+	} else {
+		snapshot, err = nativeExecutableSnapshot()
 	}
-	executables, err := enumerate()
 	if lockErr := requireHomeLock(lock); lockErr != nil {
 		return result, lockErr
 	}
 	if err == nil {
-		executables, err = normalizeExecutablePaths(executables)
+		if snapshot.linuxProbe {
+			// An inaccessible canonical spelling does not invalidate readable
+			// proc paths: candidate write probes supply independent evidence.
+			var paths []string
+			for _, path := range snapshot.paths {
+				normalized, pathErr := normalizeExecutablePaths([]string{path})
+				if pathErr == nil {
+					paths = append(paths, normalized...)
+				} else if filepath.IsAbs(path) {
+					paths = append(paths, filepath.Clean(path))
+				}
+			}
+			snapshot.paths = paths
+		} else {
+			snapshot.paths, err = normalizeExecutablePaths(snapshot.paths)
+		}
 	}
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
@@ -130,7 +147,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		if err != nil {
 			return result, err
 		}
-		proceed, err := store.sweepNamespace(base, referenced, executables, now, grace, &result, lock)
+		proceed, err := store.sweepNamespace(base, referenced, snapshot, now, grace, &result, lock)
 		if err != nil {
 			return result, err
 		}
@@ -146,7 +163,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 // sweepNamespace sweeps one protected cache root. It reports false only when
 // the root's boundary was refused (an absent root is simply empty); every
 // refusal is recorded as a warning on the result.
-func (store *Store) sweepNamespace(base string, referenced map[string]bool, executables []string, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) (bool, error) {
+func (store *Store) sweepNamespace(base string, referenced map[string]bool, snapshot executableSnapshot, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) (bool, error) {
 	root, err := openSweepRoot(store.home, base)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -175,15 +192,25 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 	for _, name := range names {
 		switch {
 		case entryNameRE.MatchString(name):
-			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
+			if referenced[name] || !snapshot.linuxProbe && buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
 			}
-			if err := store.sweepUnreferenced(root, name, now, grace, result, lock); err != nil {
+			if err := store.sweepUnreferenced(root, name, snapshot, now, grace, result, lock); err != nil {
 				return false, err
 			}
 		case strings.HasPrefix(name, sweepPrefix):
-			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
+			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
+			}
+			if snapshot.linuxProbe {
+				inUse, probeErr := entryExecutionInUse(root, name, snapshot)
+				if probeErr != nil {
+					result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep: retained retired entry %q: %v", name, probeErr))
+					continue
+				}
+				if inUse {
+					continue
+				}
 			}
 			// Manager-private wreckage of an interrupted removal: the entry is
 			// already unreachable by key, so finishing the deletion is safe.
@@ -204,7 +231,7 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 
 // sweepUnreferenced classifies one unreferenced candidate and removes it only
 // when every safety property holds.
-func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) error {
+func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot executableSnapshot, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) error {
 	key := buildmeta.CacheKey("sha256:" + name)
 	published, inspected, err := store.inspectUnexpected(root, name, key)
 	if err != nil {
@@ -215,6 +242,11 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Tim
 	if inspected.Status != Hit {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep: retained %s (%s): %s", key, inspected.Status, inspected.Reason))
+		return nil
+	}
+	// Exhaust non-probing retention checks before taking a writable descriptor:
+	// even an immediate-close probe briefly prevents a concurrent exec.
+	if snapshot.retains(inspected.artifactInfo) || snapshot.linuxProbe && buildInUse(filepath.Join(root.path, name), filepath.Join(root.path, name), snapshot.paths) {
 		return nil
 	}
 	if published.After(now) {
@@ -232,7 +264,30 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Tim
 	if err := requireHomeLock(lock); err != nil {
 		return err
 	}
-	if err := retireEntryChecked(root, name, func() error { return requireHomeLock(lock) }); err != nil {
+	var recheck func(string) error
+	if snapshot.linuxProbe {
+		inUse, probeErr := entryExecutionInUse(root, name, snapshot)
+		if probeErr != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("build cache sweep: retained %s: %v", key, probeErr))
+			return nil
+		}
+		if inUse {
+			return nil
+		}
+		// Renaming closes the ordinary key-path launch window. Check the
+		// retired name again just before deletion for an exec in that window.
+		recheck = func(retired string) error {
+			inUse, err := entryExecutionInUse(root, retired, snapshot)
+			if err != nil {
+				return fmt.Errorf("retained retired entry %q: %w", retired, err)
+			}
+			if inUse {
+				return fmt.Errorf("retained retired entry %q: executable in use", retired)
+			}
+			return nil
+		}
+	}
+	if err := retireEntryGuarded(root, name, func() error { return requireHomeLock(lock) }, recheck); err != nil {
 		if lockErr := requireHomeLock(lock); lockErr != nil {
 			return lockErr
 		}
@@ -324,6 +379,13 @@ func retireEntry(root *sweepRoot, name string) error {
 }
 
 func retireEntryChecked(root *sweepRoot, name string, check func() error) error {
+	return retireEntryGuarded(root, name, check, nil)
+}
+
+// A non-nil removal guard rechecks the already-retired tree immediately before
+// deletion. Refusal leaves a named remnant for the next sweep; it never rolls
+// the tree back into the live namespace.
+func retireEntryGuarded(root *sweepRoot, name string, check func() error, beforeRemove func(string) error) error {
 	if root == nil || root.mutator == nil {
 		return fmt.Errorf("the protected cache root is not open for mutation")
 	}
@@ -345,6 +407,11 @@ func retireEntryChecked(root *sweepRoot, name string, check func() error) error 
 	}
 	if err := check(); err != nil {
 		return err
+	}
+	if beforeRemove != nil {
+		if err := beforeRemove(retired); err != nil {
+			return err
+		}
 	}
 	if err := root.mutator.RemoveAll(retired); err != nil {
 		// The entry is already unreachable by key. The leftover is named for

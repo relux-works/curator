@@ -37,11 +37,11 @@ func (err *Diagnostic) Error() string {
 func (err *Diagnostic) Unwrap() error { return err.Err }
 
 func diagnostic(code, format string, args ...any) error {
-	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...)}
+	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Remedy: toolchainLayoutRemedy(code)}
 }
 
 func diagnosticErr(code string, err error, format string, args ...any) error {
-	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Err: err}
+	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Err: err, Remedy: toolchainLayoutRemedy(code)}
 }
 
 // diagnosticRemedy is diagnostic for a boundary that carries an operator
@@ -64,4 +64,15 @@ func DiagnosticCode(err error) string {
 		return failure.Code
 	}
 	return ""
+}
+
+// Escaping/absolute distro links cannot satisfy the existing closed-tree
+// fingerprint. Advice changes neither the stable code nor the protocol detail.
+func toolchainLayoutRemedy(code string) string {
+	switch code {
+	case "toolchain_link_escape", "toolchain_link_absolute":
+		return "select a clean upstream Go tree; set CURATOR_GO to its real GOROOT/bin/go"
+	default:
+		return ""
+	}
 }
