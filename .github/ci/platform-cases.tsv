@@ -1121,3 +1121,4 @@ internal/buildcache	TestLinuxRetiredNativeSnapshot	linux	-	-	native snapshot fin
 internal/buildcache	TestLinuxHSMExceptionContract	linux	-	-	declaration only: HSM and post-probe exec are the bounded per-kernel exceptions; no HSM or NFS runtime qualification
 internal/buildcache	TestLinuxProbeRemovalCandidates	linux	-	-	inotify observes no write-open for retained candidates and actual close-write for an aged removal control
 internal/buildcache	TestLinuxRetiredReprobe	linux	-	-	late exec and probe errors retain the retired tree; stopping or repairing permits native cleanup
+internal/godriver	TestDistroToolchainLayoutRemedy	linux,darwin	-	-	closed upstream toolchain admitted; escaping distro src links refuse without mutation and name CURATOR_GO remedy

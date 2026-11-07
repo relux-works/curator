@@ -17,7 +17,7 @@ import (
 const (
 	mismatchSelectionDetail = "selected Go executable is not the regular executable under the derived GOROOT"
 	mismatchProbeDetail     = "go env GOROOT does not match the selected toolchain"
-	mismatchRemedy          = `put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+	mismatchRemedy          = `set CURATOR_GO to the absolute path of the real GOROOT/bin/go (bin/go.exe on Windows)`
 )
 
 // TestToolchainExecutableMismatchCarriesTheOperatorRemedy pins both halves of
@@ -33,6 +33,23 @@ func TestToolchainExecutableMismatchCarriesTheOperatorRemedy(t *testing.T) {
 	// A version-manager layout in the small: the selected launcher sits under
 	// one root and resolves to the real launcher under another, which is what a
 	// goenv, asdf, or mise tree looks like to the boundary.
+	// Nearby positive control: the exact real executable is admitted unchanged.
+	t.Run("real executable", func(t *testing.T) {
+		root := testToolchain(t)
+		before, err := os.ReadFile(filepath.Join(root, "bin", platformGoName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _, _, err = selectToolchain(Config{CuratorGo: filepath.Join(root, "bin", platformGoName)}, root)
+		if err != nil {
+			t.Fatalf("real executable refused: %v", err)
+		}
+		after, err := os.ReadFile(filepath.Join(root, "bin", platformGoName))
+		if err != nil || string(after) != string(before) {
+			t.Fatalf("selection changed executable: %v", err)
+		}
+	})
+
 	t.Run("selection resolves outside the derived GOROOT", func(t *testing.T) {
 		inside, outside := t.TempDir(), testToolchain(t)
 		if err := os.MkdirAll(filepath.Join(inside, "bin"), 0o755); err != nil {
@@ -44,6 +61,20 @@ func TestToolchainExecutableMismatchCarriesTheOperatorRemedy(t *testing.T) {
 
 		_, _, _, err := selectToolchain(Config{CuratorGo: filepath.Join(inside, "bin", platformGoName)}, outside)
 		assertMismatchDiagnostic(t, err, mismatchSelectionDetail)
+		target, readErr := os.Readlink(filepath.Join(inside, "bin", platformGoName))
+		if readErr != nil || target != filepath.Join(outside, "bin", platformGoName) {
+			t.Fatalf("refusal rewrote selection: %q %v", target, readErr)
+		}
+	})
+
+	t.Run("matching probe", func(t *testing.T) {
+		root := testToolchain(t)
+		host := hostFacts{runtimeGOROOT: root, goos: runtime.GOOS, goarch: runtime.GOARCH}
+		executor := validProbeExecutor(t, root, host)
+		_, err := establish(context.Background(), Config{PrivateBase: t.TempDir(), CuratorGo: filepath.Join(root, "bin", platformGoName), Executor: executor}, host)
+		if err != nil {
+			t.Fatalf("matching probe refused: %v", err)
+		}
 	})
 
 	t.Run("go env reports another root", func(t *testing.T) {
