@@ -61,6 +61,7 @@ type Result struct {
 	ArtifactPath     string
 	CacheKey         buildmeta.CacheKey
 	ExecutionReceipt closureexec.BuildSessionReceipt
+	artifactInfo     os.FileInfo // From the validated open artifact, never a pathname re-read.
 }
 
 // DryRunOutcome maps a read-only inspection to the stable planner vocabulary.
@@ -243,7 +244,12 @@ func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Ex
 	if err := execution.ValidateFor(expect.Assurance, expect.Input, receipt.Artifact); err != nil {
 		return Result{Status: Corrupt, Reason: "execution receipt mismatch: " + err.Error()}
 	}
+	artifactInfo, err := opened.artifact.Stat()
+	if err != nil {
+		return Result{Status: Corrupt, Reason: "stat artifact: " + err.Error()}
+	}
 	return Result{
+		artifactInfo: artifactInfo,
 		Status:       Hit,
 		Receipt:      receipt,
 		ReceiptBytes: append([]byte(nil), receiptBytes...),
