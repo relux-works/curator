@@ -11,22 +11,20 @@ import (
 	"testing"
 )
 
-// Admission rejects shared temporary ancestors, so these real syscall fixtures
-// live in a caller-owned repository scratch allocation, outside protected roots.
+// Admission rejects shared temporary ancestors. Allocate these real syscall
+// fixtures below the physical caller home, independently of the checkout and
+// the system temporary directory, which may both have shared ancestors.
 func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
 	t.Helper()
-	base, err := filepath.Abs("../../.temp")
+	base, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(base, 0700); err != nil {
 		t.Fatal(err)
 	}
 	base, err = filepath.EvalSymlinks(base)
 	if err != nil {
 		t.Fatal(err)
 	}
-	allocation, err := os.MkdirTemp(base, "destination-test-")
+	allocation, err := os.MkdirTemp(base, ".curator-destination-test-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,6 +43,60 @@ func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
 		t.Fatal(err)
 	}
 	return root, DestinationPolicy{ProtectedRoots: []string{protected}}
+}
+
+// A checkout under a sticky ancestor must not move the valid destination
+// fixtures there. Actual destinations under that same ancestor still refuse.
+func TestDestinationSandboxCheckoutIndependence(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err = filepath.EvalSymlinks(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixtureHome, err := os.MkdirTemp(home, ".curator-destination-home-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(fixtureHome); err != nil {
+			t.Error(err)
+		}
+	})
+	t.Setenv("HOME", fixtureHome)
+	shared := filepath.Join(t.TempDir(), "shared")
+	checkout := filepath.Join(shared, "checkout")
+	packageDir := filepath.Join(checkout, "internal", "envsnapshot")
+	if err := os.MkdirAll(packageDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(shared, os.ModeSticky|0777); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(packageDir)
+	root, policy := destinationSandbox(t)
+	relative, err := filepath.Rel(fixtureHome, root)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
+		t.Fatalf("destination fixture is outside the private home: %q, %v", relative, err)
+	}
+	admitDestination(t, filepath.Join(root, "control"), policy, DestinationAbsent)
+	assertAbsent(t, filepath.Join(checkout, ".temp"))
+	fromCheckout, err := filepath.Rel(packageDir, filepath.Join(root, "control"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = OpenDestination(fromCheckout, policy)
+	requireDestinationError(t, err, DestinationInvalid, "directory-permissions")
+	parent := filepath.Join(shared, "private")
+	if err := os.Mkdir(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(parent, "target")
+	_, err = OpenDestination(path, policy)
+	requireDestinationError(t, err, DestinationInvalid, "directory-permissions")
+	assertAbsent(t, path)
 }
 
 func admitDestination(t *testing.T, path string, policy DestinationPolicy, kind DestinationKind) *Destination {
@@ -111,16 +163,13 @@ func TestDestinationReadOnlyAdmission(t *testing.T) {
 		t.Fatal("absent target reported prior snapshot", yes, err)
 	}
 	assertAbsent(t, absent)
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	relative, err := filepath.Rel(cwd, root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	admitDestination(t, relative+"/relative", policy, DestinationAbsent)
-	assertAbsent(t, filepath.Join(root, "relative"))
+	t.Run("relative", func(t *testing.T) {
+		// Relative admission must start from a private directory too: the
+		// checkout cwd may itself have a shared temporary ancestor.
+		t.Chdir(root)
+		admitDestination(t, "relative", policy, DestinationAbsent)
+		assertAbsent(t, filepath.Join(root, "relative"))
+	})
 	for _, invalid := range []string{"", "/", "\x00", root + "/.", root + "/.."} {
 		_, err := OpenDestination(invalid, policy)
 		requireDestinationError(t, err, DestinationInvalid, "path-invalid")
