@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/relux-works/curator/internal/buildmeta"
 )
 
 // Claim: a real non-root sweep ignores inaccessible foreign credentials, keeps
@@ -32,6 +34,13 @@ func TestLinuxUnprivilegedSweep(t *testing.T) {
 	}
 	_, foreignErr := os.Readlink("/proc/1/exe")
 	t.Logf("non-root uid=%d, other-UID PID 1 exe readable=%v", os.Geteuid(), foreignErr == nil)
+	_, baselineErr := nativeExecutableSnapshot()
+	if baselineErr != nil {
+		if os.Getenv("CURATOR_SWEEP_REQUIRE_COMPLETE") == "1" {
+			t.Fatalf("isolated qualification has incomplete baseline: %v", baselineErr)
+		}
+		t.Logf("pre-existing same-user uncertainty must keep every build: %v", baselineErr)
+	}
 	image, err := os.ReadFile(testExecutable(t))
 	if err != nil {
 		t.Fatal(err)
@@ -83,10 +92,10 @@ func TestLinuxUnprivilegedSweep(t *testing.T) {
 			if err != nil || len(result.Removed) != 0 || !entryExists(t, store, hit.CacheKey) {
 				t.Fatalf("running/unknown image removed: %+v %v", result, err)
 			}
-			if row.unreadable && !warningsContaining(result, "read executable of process "+strconv.Itoa(stop.pid)) {
+			if baselineErr == nil && row.unreadable && !warningsContaining(result, "read executable of process "+strconv.Itoa(stop.pid)) {
 				t.Fatalf("same-user refusal missing: %+v", result)
 			}
-			if !row.unreadable && warningsContaining(result, "build cache sweep skipped") {
+			if baselineErr == nil && !row.unreadable && warningsContaining(result, "build cache sweep skipped") {
 				t.Fatalf("foreign process blocked sweep: %+v", result)
 			}
 			stop.close()
@@ -97,9 +106,7 @@ func TestLinuxUnprivilegedSweep(t *testing.T) {
 			}
 			// Nearby positive control: the identical, now-unused publication is swept.
 			result, err = store.Sweep(SweepRequest{}, testHomeLock{})
-			if err != nil || entryExists(t, store, hit.CacheKey) || len(result.Removed) != 1 || len(result.Warnings) != 0 {
-				t.Fatalf("unused positive control not swept: %+v %v", result, err)
-			}
+			assertLinuxUnusedControl(t, store, hit.CacheKey, result, err, baselineErr)
 		})
 	}
 	// An otherwise unused candidate must not borrow the foreign-UID exception
@@ -136,12 +143,26 @@ func TestLinuxUnprivilegedSweep(t *testing.T) {
 				t.Fatal(err)
 			}
 			result, err = store.Sweep(SweepRequest{}, testHomeLock{})
-			if err != nil || entryExists(t, store, hit.CacheKey) || len(result.Removed) != 1 || len(result.Warnings) != 0 {
-				t.Fatalf("private positive control not swept: %+v %v", result, err)
-			}
+			assertLinuxUnusedControl(t, store, hit.CacheKey, result, err, baselineErr)
 		})
 	}
 
+}
+
+// A known ambient unreadable same-user process must also block the unused
+// control. The isolated hosted UID requires a complete baseline and therefore
+// proves actual collection; ordinary suites prove safe retention when unknown.
+func assertLinuxUnusedControl(t *testing.T, store *Store, key buildmeta.CacheKey, result SweepResult, err, baselineErr error) {
+	t.Helper()
+	if baselineErr != nil {
+		if err != nil || !entryExists(t, store, key) || len(result.Removed) != 0 || !warningsContaining(result, "build cache sweep skipped") {
+			t.Fatalf("ambient uncertainty did not retain unused entry: %+v %v", result, err)
+		}
+		return
+	}
+	if err != nil || entryExists(t, store, key) || len(result.Removed) != 1 || len(result.Warnings) != 0 {
+		t.Fatalf("unused positive control not swept: %+v %v", result, err)
+	}
 }
 
 func testExecutable(t *testing.T) string {

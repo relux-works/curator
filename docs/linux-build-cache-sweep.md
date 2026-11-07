@@ -48,7 +48,14 @@ transitions at execution.
 ## Qualification
 
 `Linux unprivileged process sweep` runs on hosted Ubuntu and fails immediately
-if the runner account is root. It runs real cached copies of the test binary,
+if the qualification account is root. The job creates a dedicated unprivileged
+UID, so non-dumpable processes belonging to the runner account cannot prevent
+the collection controls. It requires a complete baseline. Ordinary suite runs
+still exercise these rows: an existing unreadable same-user process must retain
+all entries, including the unused control, rather than make a false collection
+claim. No skip substitutes for that assertion.
+
+The isolated job runs real cached copies of the test binary,
 checks a real other-UID PID, and makes its own child non-dumpable to obtain a
 real same-user permission refusal. Each retained publication has a nearby
 positive control: after stopping the child, the same entry is collected.
