@@ -168,7 +168,7 @@ type Execution struct {
 // Config is the effective machine configuration.
 type Config struct {
 	Path string
-	// Schema is the effective schema_version: 1, 2, 3, 5, or 7.
+	// Schema is the effective schema_version: 1, 2, 3, 5, 7, or 8.
 	Schema     int
 	Extensions *LauncherExtensions
 	// Env is the effective environments §12.1 machine configuration with
@@ -580,16 +580,16 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	if !ok {
 		return nil, verr.New("schema_version", "must be an integer")
 	}
-	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 {
+	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8 {
 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
 	}
 	var extensions *LauncherExtensions
 	if raw, present := data["extensions"]; present {
-		if schema != SchemaVersion7 {
-			return nil, fmt.Errorf("extensions: requires manager-config schema_version 7")
+		if schema != SchemaVersion7 && schema != SchemaVersion8 {
+			return nil, fmt.Errorf("extensions: requires manager-config schema_version 7 or 8")
 		}
 		var err error
-		extensions, err = parseLauncherExtensions(raw)
+		extensions, err = parseLauncherExtensions(raw, schema)
 		if err != nil {
 			return nil, err
 		}
