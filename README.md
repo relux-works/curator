@@ -655,6 +655,14 @@ For the rc.7 Muse policy and v4 slice, run `go test ./internal/envfragment ./int
 
 The [Codex 0.164.0 permission grammar record](docs/qualification/codex-0.164.0.md) preserves sanitized native observations and admission limits.
 
+The [Claude Code 2.1.317 / 2.1.319 permission grammar handoff](docs/qualification/claude-permission-grammar-handoff.md)
+links the macOS arm64 records, exact sanitized command output, upstream gate
+ownership and proposed rows. Python 3 performs npm SHA-512 integrity checks,
+binary hashing and evidence comparison; `sandbox-exec` denies network during
+isolated `claude --version` and `claude --help` probes. Exact command forms and
+published artifacts are under `docs/qualification/`. These observations do not
+admit Linux or change the permission gate.
+
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
 separates passing exec loader rows from failed interactive skill exclusion.
 The [opt-in replay](.research/muse148/README.md) documents Go/tmux/sandbox-exec
