@@ -6,3 +6,4 @@ This repository is public, and so is its task board (`.task-board/`). Everything
 
 - **tb-R163.** Another operator's product material never becomes a resource in a public board. Store it privately and link to it with a neutral note.
 - Never commit secrets, credentials, personal paths or addresses, or the names of clients or employers.
+- Task and outcome handoffs must use the [board-bound handoff template](docs/task-handoff.md), including the canonical board root and exact outcome resource binding. Keep private operational values in the authorized coordination channel, outside public source.
