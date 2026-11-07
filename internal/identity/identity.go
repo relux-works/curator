@@ -34,6 +34,28 @@ var hostRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]*$`)
 // no network identity on any platform.
 var driveRE = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
+// ValidHost reports whether host matches the portable host grammar of a
+// network source, [A-Za-z0-9][A-Za-z0-9.-]*; a single character is a host.
+func ValidHost(host string) bool { return hostRE.MatchString(host) }
+
+// IsDrivePath reports whether value is a Windows drive-letter path in either
+// spelling (`C:/x` or `C:\x`), which carries no network identity.
+func IsDrivePath(value string) bool { return driveRE.MatchString(value) }
+
+// SCPUserHost returns the user (without its '@') and host the identity parser
+// reads from a scp-like address, [user@]host:path. ok is false when value is
+// not a scp-like address it accepts.
+func SCPUserHost(value string) (user, host string, ok bool) {
+	match := scpRE.FindStringSubmatch(value)
+	if match == nil || strings.Contains(value, "://") {
+		return "", "", false
+	}
+	// The match spans the whole value, so whatever precedes host:path is the
+	// optional user group, "user@" or empty.
+	prefix := value[:len(value)-len(match[1])-1-len(match[2])]
+	return strings.TrimSuffix(prefix, "@"), match[1], true
+}
+
 // Canonical returns the canonical "host/path" identity, or "" for local
 // sources and unrecognized forms.
 func Canonical(rawURL string) string {

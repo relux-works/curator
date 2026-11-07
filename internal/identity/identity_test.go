@@ -136,3 +136,27 @@ func TestAllowed(t *testing.T) {
 		t.Fatal("empty allowlist allows everything")
 	}
 }
+
+// SCPUserHost reports the user and host the identity parser itself reads from
+// a scp-like address, including a user that holds a ':' (which git would read
+// as a host), and reports false for spellings the parser does not accept as
+// scp-like: URLs, local paths and bracketed hosts.
+func TestSCPUserHost(t *testing.T) {
+	for _, c := range []struct{ value, user, host string }{
+		{"git@example.com:org/repo.git", "git", "example.com"},
+		{"example.com:org/repo.git", "", "example.com"},
+		{"user:secret@example.com:org/repo.git", "user:secret", "example.com"},
+		{"foo[bar]@example.com:org/repo.git", "foo[bar]", "example.com"},
+		{"c:org/repo.git", "", "c"},
+	} {
+		user, host, ok := SCPUserHost(c.value)
+		if !ok || user != c.user || host != c.host {
+			t.Errorf("SCPUserHost(%q) = %q, %q, %v; want %q, %q", c.value, user, host, ok, c.user, c.host)
+		}
+	}
+	for _, value := range []string{"https://example.com/org/repo.git", "/srv/repo.git", "git@[::1]:org/repo.git", "a@b@example.com:org/repo.git"} {
+		if _, _, ok := SCPUserHost(value); ok {
+			t.Errorf("SCPUserHost(%q) accepted a spelling the parser does not read as scp-like", value)
+		}
+	}
+}

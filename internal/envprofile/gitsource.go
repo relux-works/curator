@@ -237,14 +237,50 @@ func safeGitDeclaration(raw string) string {
 	return parsed.String()
 }
 
-// fetch updates the cached clone.
+// fetch updates the cached clone. When this operation recorded the
+// operator's own spelling of the identity (the requested descriptor), the
+// refresh fetches from that URL rather than from the cache's stored origin.
+// The stored origin is whichever spelling first created the cache; it can be
+// stale or use a transport this machine cannot authenticate. The cache must
+// still be bound to the same repository identity, its configuration is left
+// untouched, and an identity with no recorded spelling refreshes through its
+// stored remotes as before.
 func (m *gitManager) fetch(canonical string) error {
 	dir, err := m.ensureRepo(canonical)
 	if err != nil {
 		return err
 	}
+	if raw, ok := m.fetchRaw[canonical]; ok {
+		if err := cacheOriginBound(dir, canonical); err != nil {
+			return err
+		}
+		if err := gitops.FetchURL(dir, raw); err != nil {
+			return fmt.Errorf("fetch %s: %v", canonical, err)
+		}
+		return nil
+	}
 	if err := gitops.Fetch(dir); err != nil {
 		return fmt.Errorf("fetch %s: %v", canonical, err)
+	}
+	return nil
+}
+
+// cacheOriginBound refuses a profile cache whose stored origin does not name
+// the identity the cache path was derived from, compared after
+// normalization (host, owner and repository), before the cache is fetched
+// from another spelling of that identity. The stored values are read
+// NUL-delimited, with repository-local includes expanded and before any
+// insteadOf rewrite, so a missing, repeated (including an empty, blank or
+// included extra value) or foreign origin refuses; nothing is rewritten.
+func cacheOriginBound(dir, canonical string) error {
+	output, err := exec.Command("git", "-C", dir, "config", "--local", "--includes", "--null", "--get-all", "remote.origin.url").Output() // #nosec G204 -- fixed Git argv reads local metadata from the manager cache without a shell.
+	urls := strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00")
+	if err != nil || len(urls) != 1 || strings.TrimSpace(urls[0]) == "" {
+		return fmt.Errorf("%s: profile source cache %s has no single stored origin", DiagSourceInvalid, canonical)
+	}
+	origin, err := identity.Parse(urls[0])
+	if err != nil || origin != canonical {
+		return fmt.Errorf("%s: profile source cache origin differs from the requested source %s", DiagSourceInvalid, canonical)
 	}
 	return nil
 }
