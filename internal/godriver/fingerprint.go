@@ -33,6 +33,12 @@ type treeRecord struct {
 }
 
 func fingerprintToolchain(ctx context.Context, rootPath, version string) (string, []toolchainState, error) {
+	return fingerprintToolchainBeforeDigest(ctx, rootPath, version, nil)
+}
+
+// fingerprintToolchainBeforeDigest permits an operation-local test to force a
+// filesystem change between collection and the real digest reads.
+func fingerprintToolchainBeforeDigest(ctx context.Context, rootPath, version string, beforeDigest func()) (string, []toolchainState, error) {
 	root, err := os.OpenRoot(rootPath)
 	if err != nil {
 		return "", nil, diagnosticErr("toolchain_unreadable", err, "cannot open GOROOT")
@@ -42,6 +48,9 @@ func fingerprintToolchain(ctx context.Context, rootPath, version string) (string
 	records, err := collectToolchainRecords(ctx, root)
 	if err != nil {
 		return "", nil, err
+	}
+	if beforeDigest != nil {
+		beforeDigest()
 	}
 	return digestToolchainRecords(ctx, root, records, version)
 }

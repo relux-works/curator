@@ -121,6 +121,8 @@ type Session struct {
 	// observePhase is an internal measurement hook; it selects no build input.
 	observePhase     func(string, time.Duration)
 	beforeAcceptance func(context.Context)
+	// beforeToolchainDigest is an operation-local traversal fault-injection hook.
+	beforeToolchainDigest func()
 
 	executable         string
 	goroot             string
@@ -355,7 +357,7 @@ func (session *Session) VerifyToolchain(ctx context.Context) error {
 	if err := verifySelectedRoot(session.goroot, session.rootInfo, session.executable); err != nil {
 		return err
 	}
-	digest, state, err := fingerprintToolchain(ctx, session.goroot, session.toolchain.GoVersion)
+	digest, state, err := fingerprintToolchainBeforeDigest(ctx, session.goroot, session.toolchain.GoVersion, session.beforeToolchainDigest)
 	if err != nil {
 		var failure *Diagnostic
 		if errors.As(err, &failure) {
