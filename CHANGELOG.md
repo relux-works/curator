@@ -4,6 +4,13 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- Claude settings exclude the operator's native `.claude/CLAUDE.md` from
+  parent-memory discovery while retaining project and profile instructions.
+  Managed-home repair preserves existing exclusions and unrelated settings,
+  refuses malformed input, and leaves satisfied settings untouched.
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed
