@@ -5,7 +5,8 @@ Task: TASK-261107-oe1ki9 — qualify-claude-permission-grammar-2-1-317-and-319.
 This is a sanitized real-binary help/parser record following the
 [Codex precedent](codex-0.164.0.md). It does not admit a runtime or Linux tuple.
 The [gate analysis and producer handoff](claude-permission-grammar-handoff.md)
-contains the baseline comparison, proposed rows, isolation controls and gaps.
+contains the current V3 gate requirements, historical comparison, isolation
+controls and gaps. No admission row is proposed.
 
 ## Exact binary
 
@@ -224,4 +225,94 @@ on the help path. They do not qualify model availability or a real launch.
 No model turn, authentication, credential access, provider traffic, session,
 MCP process or shared daemon was requested. Linux, other architectures,
 consumer activation and independent acceptance remain unqualified. See the
-handoff for proposed upstream V2 rows and the exact agents2 evidence request.
+handoff for current V3 requirements and the Linux evidence boundary.
+
+
+## Review supplement: current V3 concerns
+
+The following 39 observations supplement, rather than replace, P01–P57.
+The executable digest above was checked again before and after this supplement
+and remained identical. Every invocation used the same isolation prefix,
+a fresh HOME and cwd, closed stdin, OS network denial and a 25-second bound;
+all completed within the bound. No inherited selectors or credentials were
+provided. H01 and H02 repeat identity and root help as positive controls.
+
+`$FIXTURE_ROOT` is an absolute directory in this invocation's disposable cwd.
+`$SETTINGS_FILE` contains `{"env":{},"permissions":{"allow":[],"deny":[]}}`;
+`$DISABLE_FILE` contains
+`{"permissions":{"disableBypassPermissionsMode":"disable"}}`.
+Both are newly written fixture files beneath that directory, with a trailing
+newline. Nothing was copied from real configuration.
+
+| Probe | Sanitized command | Observed output | Exit |
+| --- | --- | --- | ---: |
+| H01 | `probe --version` | `2.1.319 (Claude Code)`; stderr empty | 0 |
+| H02 | `probe --help` | Root help; stderr empty | 0 |
+| H03 | `probe --inherit-permission-mode plan --help` | Root help; stderr empty | 0 |
+| H04 | `probe --inherit-permission-mode=bypassPermissions --help` | Root help; stderr empty | 0 |
+| H05 | `probe --inherit-permission-mode invalid-mode --help` | stderr `O12`; stdout empty | 1 |
+| H06 | `probe --inherit-permission-mode=invalid-mode --help` | stderr `O12`; stdout empty | 1 |
+| H07 | `probe --plan-mode-required --help` | Root help; stderr empty | 0 |
+| H08 | `probe --enable-auto-mode --help` | Root help; stderr empty | 0 |
+| H09 | `probe --managed-settings '{}' --help` | Root help; stderr empty | 0 |
+| H10 | `probe '--managed-settings={}' --help` | Root help; stderr empty | 0 |
+| H11 | `probe --project-config-root '$FIXTURE_ROOT' --help` | Root help; stderr empty | 0 |
+| H12 | `probe --fast-mode on --help` | Root help; stderr empty | 0 |
+| H13 | `probe --fast-mode=off --help` | Root help; stderr empty | 0 |
+| H14 | `probe --fast-mode invalid-fast-mode --help` | Root help; stderr empty | 0 |
+| H15 | `probe --runner-declares grammar-control --help` | Root help; stderr empty | 0 |
+| H16 | `probe --runner-declares=grammar-control --help` | Root help; stderr empty | 0 |
+| H17 | `probe --inherit-permission-mode=invalid-mode --help` | stderr `O12`; stdout empty | 1 |
+| H18 | `probe --runner-declares --inherit-permission-mode=invalid-mode --help` | Root help; stderr empty | 0 |
+| H19 | `probe --runner-declares grammar-control --inherit-permission-mode=invalid-mode --help` | stderr `O12`; stdout empty | 1 |
+| H20 | `probe --settings '{"env":{}}' --help` | Root help; stderr empty | 0 |
+| H21 | `probe --settings '{"env":{"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB":"1"}}' --help` | Root help; stderr empty | 0 |
+| H22 | `probe '--settings={"env":{"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB":"1"}}' --help` | Root help; stderr empty | 0 |
+| H23 | `probe --settings '{"env":"invalid-shape"}' --help` | Root help; stderr empty | 0 |
+| H24 | `probe --settings '{"hooks":{}}' --help` | Root help; stderr empty | 0 |
+| H25 | `probe --settings '{"permissions":{"disableBypassPermissionsMode":"disable"}}' --help` | Root help; stderr empty | 0 |
+| H26 | `probe --settings '{"permissions":{"defaultMode":"plan"}}' --help` | Root help; stderr empty | 0 |
+| H27 | `probe --settings '{"permissions":{"allow":["Read"],"deny":[],"ask":[],"additionalDirectories":[]}}' --help` | Root help; stderr empty | 0 |
+| H28 | `probe --settings '{"permissions":{"deny":null}}' --help` | Root help; stderr empty | 0 |
+| H29 | `probe --settings '{"model":1}' --help` | Root help; stderr empty | 0 |
+| H30 | `probe --settings '{"futureSetting":1}' --help` | Root help; stderr empty | 0 |
+| H31 | `probe --settings '$SETTINGS_FILE' --help` | Root help; stderr empty | 0 |
+| H32 | `probe --settings '$DISABLE_FILE' --help` | Root help; stderr empty | 0 |
+| H33 | `probe --settings '{"permissions":{"disableBypassPermissionsMode":"disable"}}' --settings '{}' --help` | Root help; stderr empty | 0 |
+| H34 | `probe --settings '{}' --settings '{"permissions":{"disableBypassPermissionsMode":"disable"}}' --help` | Root help; stderr empty | 0 |
+| H35 | `probe --runner-declares --settings '{}' --help` | Root help; stderr empty | 0 |
+| H36 | `probe --fast-mode --settings '{}' --help` | Root help; stderr empty | 0 |
+| H37 | `probe --help -- --inherit-permission-mode=invalid-mode` | Root help; stderr empty | 0 |
+| H38 | `probe --fast-mode --inherit-permission-mode=invalid-mode --help` | Root help; stderr empty | 0 |
+| H39 | `probe --fast-mode on --inherit-permission-mode=invalid-mode --help` | stderr `O12`; stdout empty | 1 |
+
+`O12` (exact stderr):
+
+```text
+error: option '--inherit-permission-mode <mode>' argument 'invalid-mode' is invalid. Allowed choices are acceptEdits, auto, bypassPermissions, manual, dontAsk, plan.
+```
+
+H05/H06/H17 refuse an invalid inherited mode. H03/H04 reach help with known
+modes; this establishes parsing of `--inherit-permission-mode`, including on
+2.1.319. It does not establish how inheritance interacts with the bypass.
+H18 versus H17/H19, and H38 versus H17/H39, show that `--runner-declares` and
+`--fast-mode` consume the next flag-looking token in these concrete cases.
+Their values are supplied without consuming the final help flag. H35/H36
+alone cannot establish effective settings selection.
+
+H20–H34 reach help even for settings that current V3 would refuse under yolo:
+nonempty `env`, `hooks`, permission defaults, bypass disabling, unknown keys
+and malformed member shapes. These are native help-path observations, not
+SAM refusal measurements. They do not demonstrate settings application,
+last-source precedence, or the eager scanner's agreement with Commander.
+The known permission-prompts choice refusal is already in P43/P44/P57.
+
+No unknown hidden-option enumeration or missing-value hidden scalar probes
+were run: a required scalar could consume the only help flag and start a
+session. Runtime bypass interaction, hook execution, managed configuration
+loading, effective permissions and session-based settings checks are
+**NOT_RUN** under the no-session constraint; work stops at the recorded help
+or parser boundary for those rows. No session was attempted to fill them.
+The pinned parser/list/eager comparisons used for 2.1.312 remain **NOT_RUN**.
+Help can mask unknown options, so success alone does not prove that every
+hidden selector shown here is recognized or has the assumed arity.

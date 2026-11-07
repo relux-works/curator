@@ -657,11 +657,14 @@ The [Codex 0.164.0 permission grammar record](docs/qualification/codex-0.164.0.m
 
 The [Claude Code 2.1.317 / 2.1.319 permission grammar handoff](docs/qualification/claude-permission-grammar-handoff.md)
 links the macOS arm64 records, exact sanitized command output, upstream gate
-ownership and proposed rows. Python 3 performs npm SHA-512 integrity checks,
+ownership and V3 evidence gaps. No row is proposed. Python 3 performs npm SHA-512 integrity checks,
 binary hashing and evidence comparison; `sandbox-exec` denies network during
 isolated `claude --version` and `claude --help` probes. Exact command forms and
 published artifacts are under `docs/qualification/`. These observations do not
-admit Linux or change the permission gate.
+admit Linux or change the permission gate. Reproduce evidence controls with
+`python3 docs/qualification/claude-permission-grammar-controls.py selector docs/qualification/claude-2.1.317-observations.json`
+(and `--plant` for the intended exit-1 negative); captured results are in
+`docs/qualification/claude-permission-grammar-controls.json`.
 
 The [Muse 1.4.8 qualification record](docs/qualification/muse-1.4.8-R6256.1.md)
 separates passing exec loader rows from failed interactive skill exclusion.

@@ -24,7 +24,8 @@
     "O08": "Error processing --setting-sources: Invalid setting source: invalid-source. Valid options are: user, project, local\n",
     "O09": "error: option '--permission-prompts <target>' argument 'invalid-target' is invalid. Allowed choices are host, none.\n",
     "O10": "error: option '--output-format <format>' argument 'invalid-format' is invalid. Allowed choices are text, json, stream-json.\n",
-    "O11": "Error: Settings file not found: $SCRATCH/317/cwd-102/{\n"
+    "O11": "Error: Settings file not found: $SCRATCH/317/cwd-102/{\n",
+    "O12": "error: option '--inherit-permission-mode <mode>' argument 'invalid-mode' is invalid. Allowed choices are acceptEdits, auto, bypassPermissions, manual, dontAsk, plan.\n"
   },
   "probes": [
     {
@@ -729,5 +730,515 @@
       "version": "2.1.317",
       "tarball_sha256": "d572e006fecf09f14c544f2995906d332272647470472f2c8b7158686d90b4f7"
     }
-  ]
+  ],
+  "supplemental_probes": [
+    {
+      "id": "H01",
+      "name": "identity",
+      "argv": [
+        "claude",
+        "--version"
+      ],
+      "exit": 0,
+      "stdout_ref": "O01",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H02",
+      "name": "root-help",
+      "argv": [
+        "claude",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H03",
+      "name": "inherit-valid",
+      "argv": [
+        "claude",
+        "--inherit-permission-mode",
+        "plan",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H04",
+      "name": "inherit-valid-equals",
+      "argv": [
+        "claude",
+        "--inherit-permission-mode=bypassPermissions",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H05",
+      "name": "inherit-invalid",
+      "argv": [
+        "claude",
+        "--inherit-permission-mode",
+        "invalid-mode",
+        "--help"
+      ],
+      "exit": 1,
+      "stdout_ref": "O02",
+      "stderr_ref": "O12"
+    },
+    {
+      "id": "H06",
+      "name": "inherit-invalid-equals",
+      "argv": [
+        "claude",
+        "--inherit-permission-mode=invalid-mode",
+        "--help"
+      ],
+      "exit": 1,
+      "stdout_ref": "O02",
+      "stderr_ref": "O12"
+    },
+    {
+      "id": "H07",
+      "name": "plan-required",
+      "argv": [
+        "claude",
+        "--plan-mode-required",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H08",
+      "name": "auto-selector",
+      "argv": [
+        "claude",
+        "--enable-auto-mode",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H09",
+      "name": "managed-settings",
+      "argv": [
+        "claude",
+        "--managed-settings",
+        "{}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H10",
+      "name": "managed-settings-equals",
+      "argv": [
+        "claude",
+        "--managed-settings={}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H11",
+      "name": "project-root",
+      "argv": [
+        "claude",
+        "--project-config-root",
+        "$FIXTURE_ROOT",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H12",
+      "name": "fast-on",
+      "argv": [
+        "claude",
+        "--fast-mode",
+        "on",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H13",
+      "name": "fast-off-equals",
+      "argv": [
+        "claude",
+        "--fast-mode=off",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H14",
+      "name": "fast-invalid",
+      "argv": [
+        "claude",
+        "--fast-mode",
+        "invalid-fast-mode",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H15",
+      "name": "runner-value",
+      "argv": [
+        "claude",
+        "--runner-declares",
+        "grammar-control",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H16",
+      "name": "runner-equals",
+      "argv": [
+        "claude",
+        "--runner-declares=grammar-control",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H17",
+      "name": "scalar-positive-control",
+      "argv": [
+        "claude",
+        "--inherit-permission-mode=invalid-mode",
+        "--help"
+      ],
+      "exit": 1,
+      "stdout_ref": "O02",
+      "stderr_ref": "O12"
+    },
+    {
+      "id": "H18",
+      "name": "runner-owns-dash-value",
+      "argv": [
+        "claude",
+        "--runner-declares",
+        "--inherit-permission-mode=invalid-mode",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H19",
+      "name": "runner-next-real-selector",
+      "argv": [
+        "claude",
+        "--runner-declares",
+        "grammar-control",
+        "--inherit-permission-mode=invalid-mode",
+        "--help"
+      ],
+      "exit": 1,
+      "stdout_ref": "O02",
+      "stderr_ref": "O12"
+    },
+    {
+      "id": "H20",
+      "name": "env-empty",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"env\":{}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H21",
+      "name": "env-scrub",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"env\":{\"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB\":\"1\"}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H22",
+      "name": "env-scrub-equals",
+      "argv": [
+        "claude",
+        "--settings={\"env\":{\"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB\":\"1\"}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H23",
+      "name": "env-shape",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"env\":\"invalid-shape\"}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H24",
+      "name": "hooks-empty",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"hooks\":{}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H25",
+      "name": "disable-bypass",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"permissions\":{\"disableBypassPermissionsMode\":\"disable\"}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H26",
+      "name": "default-plan",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"permissions\":{\"defaultMode\":\"plan\"}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H27",
+      "name": "permission-lists",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"permissions\":{\"allow\":[\"Read\"],\"deny\":[],\"ask\":[],\"additionalDirectories\":[]}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H28",
+      "name": "permission-list-shape",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"permissions\":{\"deny\":null}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H29",
+      "name": "annotation-shape",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"model\":1}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H30",
+      "name": "unknown-setting",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"futureSetting\":1}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H31",
+      "name": "settings-file-positive",
+      "argv": [
+        "claude",
+        "--settings",
+        "$SETTINGS_FILE",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H32",
+      "name": "settings-file-disable",
+      "argv": [
+        "claude",
+        "--settings",
+        "$DISABLE_FILE",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H33",
+      "name": "repeated-last-empty",
+      "argv": [
+        "claude",
+        "--settings",
+        "{\"permissions\":{\"disableBypassPermissionsMode\":\"disable\"}}",
+        "--settings",
+        "{}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H34",
+      "name": "repeated-last-disable",
+      "argv": [
+        "claude",
+        "--settings",
+        "{}",
+        "--settings",
+        "{\"permissions\":{\"disableBypassPermissionsMode\":\"disable\"}}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H35",
+      "name": "runner-settings-ownership",
+      "argv": [
+        "claude",
+        "--runner-declares",
+        "--settings",
+        "{}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H36",
+      "name": "fast-settings-ownership",
+      "argv": [
+        "claude",
+        "--fast-mode",
+        "--settings",
+        "{}",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H37",
+      "name": "terminator-data",
+      "argv": [
+        "claude",
+        "--help",
+        "--",
+        "--inherit-permission-mode=invalid-mode"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H38",
+      "name": "fast-owns-dash-value",
+      "argv": [
+        "claude",
+        "--fast-mode",
+        "--inherit-permission-mode=invalid-mode",
+        "--help"
+      ],
+      "exit": 0,
+      "stdout_ref": "O03",
+      "stderr_ref": "O02"
+    },
+    {
+      "id": "H39",
+      "name": "fast-next-real-selector",
+      "argv": [
+        "claude",
+        "--fast-mode",
+        "on",
+        "--inherit-permission-mode=invalid-mode",
+        "--help"
+      ],
+      "exit": 1,
+      "stdout_ref": "O02",
+      "stderr_ref": "O12"
+    }
+  ],
+  "supplemental_identity": {
+    "observed": "2026-11-07",
+    "sha256_before": "09f153b46b5df9e8b3454716d682a91901de020cbca630f61dec1a015b32b5e9",
+    "sha256_after": "09f153b46b5df9e8b3454716d682a91901de020cbca630f61dec1a015b32b5e9",
+    "scope": "39 bounded help/parser probes for current V3 concerns; no pinned native-function comparison or settings enforcement."
+  }
 }
