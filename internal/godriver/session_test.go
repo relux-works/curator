@@ -12,7 +12,9 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
@@ -602,5 +604,99 @@ func TestToolchainMutationNamesRelativePath(t *testing.T) {
 				t.Fatalf("drift retained private operation: %v", err)
 			}
 		})
+	}
+}
+
+// Traversal refusals observed during temporary-file churn must expose the
+// relative failing path. An unchanged tree is admitted before and after churn;
+// this does not claim that every read detects a transient write.
+func TestToolchainTraversalRefusalNamesRelativePath(t *testing.T) {
+	root := testToolchain(t)
+	for i := 0; i < 1500; i++ {
+		writeTestFile(t, filepath.Join(root, "src", fmt.Sprintf("d%02d", i%40), fmt.Sprintf("f%04d", i)), []byte(strings.Repeat("x", 2048)), 0644)
+	}
+	host := hostFacts{runtimeGOROOT: root, goos: runtime.GOOS, goarch: runtime.GOARCH}
+	session, err := establish(context.Background(), Config{PrivateBase: t.TempDir(), CuratorGo: filepath.Join(root, "bin", platformGoName), Executor: validProbeExecutor(t, root, host)}, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = session.Release() }()
+	if err := session.VerifyToolchain(context.Background()); err != nil {
+		t.Fatalf("unchanged tree refused: %v", err)
+	}
+
+	stop, done, started := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var writerErr error
+	go func() {
+		defer close(done)
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			path := filepath.Join(root, "src", fmt.Sprintf("d%02d", i%40), fmt.Sprintf("tmp%d", i))
+			if writerErr = os.WriteFile(path, []byte("temporary"), 0644); writerErr != nil {
+				return
+			}
+			if writerErr = os.Remove(path); writerErr != nil {
+				return
+			}
+			if i == 0 {
+				close(started)
+			}
+		}
+	}()
+	stopWriter := sync.OnceFunc(func() {
+		close(stop)
+		<-done
+		if writerErr != nil {
+			t.Errorf("temporary writer failed: %v", writerErr)
+		}
+	})
+	defer stopWriter()
+	select {
+	case <-started:
+	case <-done:
+		t.Fatalf("temporary writer did not start: %v", writerErr)
+	}
+
+	observed := false
+	deadline := time.Now().Add(20 * time.Second)
+	for reads := 0; reads < 60 && time.Now().Before(deadline); reads++ {
+		err := session.VerifyToolchain(context.Background())
+		if err == nil {
+			continue
+		}
+		var outer, cause *Diagnostic
+		if !errors.As(err, &outer) || outer.Code != "toolchain_mutated" {
+			t.Fatalf("concurrent drift lost refusal: %v", err)
+		}
+		if !errors.As(outer.Err, &cause) || !strings.Contains(cause.Detail, "src/d") || !strings.Contains(cause.Detail, "/tmp") {
+			continue
+		}
+		if !strings.HasPrefix(outer.Detail, "cannot revalidate toolchain: ") || !strings.Contains(outer.Detail, cause.Detail) {
+			t.Fatalf("traversal refusal lost relative path: %v (cause: %s)", err, cause.Detail)
+		}
+		for _, layer := range []error{err, cause, cause.Err} {
+			if layer != nil && strings.Contains(layer.Error(), root) {
+				t.Fatalf("traversal refusal exposed toolchain root: %v", layer)
+			}
+		}
+		observed = true
+		break
+	}
+	stopWriter()
+	if !observed {
+		t.Fatal("temporary writer produced no traversal refusal")
+	}
+	if err := session.VerifyToolchain(context.Background()); err != nil {
+		t.Fatalf("restored tree refused: %v", err)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(session.operation); !os.IsNotExist(err) {
+		t.Fatalf("restored session retained private operation: %v", err)
 	}
 }

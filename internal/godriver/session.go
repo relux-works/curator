@@ -357,6 +357,10 @@ func (session *Session) VerifyToolchain(ctx context.Context) error {
 	}
 	digest, state, err := fingerprintToolchain(ctx, session.goroot, session.toolchain.GoVersion)
 	if err != nil {
+		var failure *Diagnostic
+		if errors.As(err, &failure) {
+			return errors.Join(contextFailure(ctx), diagnosticErr("toolchain_mutated", err, "cannot revalidate toolchain: %s", failure.Detail))
+		}
 		return errors.Join(contextFailure(ctx), diagnosticErr("toolchain_mutated", err, "cannot revalidate toolchain"))
 	}
 	if digest != session.toolchain.ContentSHA256 || !reflect.DeepEqual(state, session.state) {
