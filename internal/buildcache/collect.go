@@ -95,16 +95,18 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 	}
 
 	result := SweepResult{}
-	enumerate := store.ExecutablePaths
-	if enumerate == nil {
-		enumerate = liveExecutablePaths
+	var snapshot executableSnapshot
+	var err error
+	if store.ExecutablePaths != nil {
+		snapshot.paths, err = store.ExecutablePaths()
+	} else {
+		snapshot, err = nativeExecutableSnapshot()
 	}
-	executables, err := enumerate()
 	if lockErr := requireHomeLock(lock); lockErr != nil {
 		return result, lockErr
 	}
 	if err == nil {
-		executables, err = normalizeExecutablePaths(executables)
+		snapshot.paths, err = normalizeExecutablePaths(snapshot.paths)
 	}
 	if err != nil {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
@@ -130,7 +132,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		if err != nil {
 			return result, err
 		}
-		proceed, err := store.sweepNamespace(base, referenced, executables, now, grace, &result, lock)
+		proceed, err := store.sweepNamespace(base, referenced, snapshot, now, grace, &result, lock)
 		if err != nil {
 			return result, err
 		}
@@ -146,7 +148,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 // sweepNamespace sweeps one protected cache root. It reports false only when
 // the root's boundary was refused (an absent root is simply empty); every
 // refusal is recorded as a warning on the result.
-func (store *Store) sweepNamespace(base string, referenced map[string]bool, executables []string, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) (bool, error) {
+func (store *Store) sweepNamespace(base string, referenced map[string]bool, snapshot executableSnapshot, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) (bool, error) {
 	root, err := openSweepRoot(store.home, base)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -175,15 +177,32 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 	for _, name := range names {
 		switch {
 		case entryNameRE.MatchString(name):
-			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
+			if referenced[name] || buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
 			}
-			if err := store.sweepUnreferenced(root, name, now, grace, result, lock); err != nil {
+			if err := store.sweepUnreferenced(root, name, snapshot, now, grace, result, lock); err != nil {
 				return false, err
 			}
 		case strings.HasPrefix(name, sweepPrefix):
-			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), executables) {
+			if buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
+			}
+			// Linux inode evidence also protects retired images reached through
+			// an alias; foreign-user omissions require the same private-file proof.
+			if len(snapshot.images) > 0 || snapshot.foreignExcluded {
+				keyName := strings.TrimPrefix(name, sweepPrefix)
+				if len(keyName) < 64 || !entryNameRE.MatchString(keyName[:64]) {
+					result.Warnings = append(result.Warnings, "build cache sweep: retained unproven retired entry")
+					continue
+				}
+				_, inspected, inspectErr := store.inspectUnexpected(root, name, buildmeta.CacheKey("sha256:"+keyName[:64]))
+				if inspectErr != nil || inspected.Status != Hit {
+					result.Warnings = append(result.Warnings, "build cache sweep: retained unproven retired entry")
+					continue
+				}
+				if snapshot.retains(inspected.artifactInfo) {
+					continue
+				}
 			}
 			// Manager-private wreckage of an interrupted removal: the entry is
 			// already unreachable by key, so finishing the deletion is safe.
@@ -204,7 +223,7 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, exec
 
 // sweepUnreferenced classifies one unreferenced candidate and removes it only
 // when every safety property holds.
-func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) error {
+func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot executableSnapshot, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) error {
 	key := buildmeta.CacheKey("sha256:" + name)
 	published, inspected, err := store.inspectUnexpected(root, name, key)
 	if err != nil {
@@ -215,6 +234,9 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, now time.Tim
 	if inspected.Status != Hit {
 		result.Warnings = append(result.Warnings, fmt.Sprintf(
 			"build cache sweep: retained %s (%s): %s", key, inspected.Status, inspected.Reason))
+		return nil
+	}
+	if snapshot.retains(inspected.artifactInfo) {
 		return nil
 	}
 	if published.After(now) {

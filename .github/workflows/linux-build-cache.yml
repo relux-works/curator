@@ -1,0 +1,33 @@
+name: Linux unprivileged build cache
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  linux-unprivileged-sweep:
+    name: Linux unprivileged process sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Real non-root process and unreadable-image controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          test_home="$(mktemp -d)"
+          trap 'chmod -R u+w "$test_home"; rm -rf "$test_home"' EXIT
+          env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
+            GOCACHE="$test_home/build" GOPATH="$test_home/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            go test -count=1 -timeout=600s -v ./internal/buildcache \
+              -run '^TestLinux(UnprivilegedSweep|ProcessUIDControls|ForeignImagePermissions|ExecutablePaths)$'
+          env -i PATH="$PATH" HOME="$test_home" TMPDIR="$test_home" \
+            GOCACHE="$test_home/build" GOPATH="$test_home/go" \
+            GOTOOLCHAIN=local GOENV=off \
+            python3 .github/ci/linux-sweep-control.py

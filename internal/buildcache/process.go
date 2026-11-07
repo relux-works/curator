@@ -45,3 +45,28 @@ func buildInUse(path, canonical string, executables []string) bool {
 	}
 	return false
 }
+
+// A native Linux snapshot additionally records inode identities and whether an
+// foreign-user image was omitted. Such omissions are safe only for
+// independently protected, owner-only executable candidates. Test overrides
+// and other platforms retain their existing path-only contract.
+type executableSnapshot struct {
+	paths           []string
+	images          []os.FileInfo
+	foreignExcluded bool
+}
+
+func (snapshot executableSnapshot) retains(info os.FileInfo) bool {
+	if info == nil {
+		return true
+	}
+	if snapshot.foreignExcluded && (info.Mode().Perm()&0o077 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid) != 0) {
+		return true
+	}
+	for _, image := range snapshot.images {
+		if os.SameFile(info, image) {
+			return true
+		}
+	}
+	return false
+}
