@@ -15,12 +15,16 @@ const SchemaVersion7 = 7
 // SchemaVersion8 adds the optional Host notification metadata carrier.
 const SchemaVersion8 = 8
 
-// LauncherExtensions contains only metadata references. Reading, editing and
-// exporting these values never reads a secret store or starts a runtime.
+// SchemaVersion9 adds the closed, machine-owned Claude child environment selection.
+const SchemaVersion9 = 9
+
+// LauncherExtensions contains closed machine launcher selections. Reading,
+// editing and exporting them never reads a secret store or starts a runtime.
 type LauncherExtensions struct {
 	Proxy        *LauncherProxy        `json:"proxy,omitempty"`
 	ClaudeAuth   *LauncherClaudeAuth   `json:"claude_auth,omitempty"`
 	Notification *LauncherNotification `json:"notification,omitempty"`
+	ClaudeEnv    *LauncherClaudeEnv    `json:"claude_env,omitempty"`
 }
 
 // LauncherNotification selects an immutable workflow through the admitted Host
@@ -66,7 +70,14 @@ func (c *Config) LauncherProjection() LauncherConfigProjection {
 	if c.Schema == SchemaVersion8 {
 		p.Schema = "curator.launcher-config/2"
 	}
+	if c.Schema == SchemaVersion9 {
+		p.Schema = "curator.launcher-config/3"
+	}
 	if c.Extensions != nil {
+		if c.Extensions.ClaudeEnv != nil {
+			value := *c.Extensions.ClaudeEnv
+			p.Extensions.ClaudeEnv = &value
+		}
 		if c.Extensions.Proxy != nil {
 			value := *c.Extensions.Proxy
 			p.Extensions.Proxy = &value
@@ -103,6 +114,9 @@ func launcherMembers(raw any, names ...string) (map[string]any, bool) {
 
 func parseLauncherExtensions(raw any, schema int) (*LauncherExtensions, error) {
 	fail := func() (*LauncherExtensions, error) {
+		if schema == SchemaVersion9 {
+			return nil, claudeEnvError(ClaudeEnvInvalid)
+		}
 		return nil, configDiagnostic("launcher_selection_invalid", "extensions", fmt.Errorf("extensions: invalid launcher selection"))
 	}
 	object, ok := raw.(map[string]any)
@@ -110,11 +124,18 @@ func parseLauncherExtensions(raw any, schema int) (*LauncherExtensions, error) {
 		return fail()
 	}
 	for key := range object {
-		if key != "proxy" && key != "claude_auth" && (schema != SchemaVersion8 || key != "notification") {
+		if key != "proxy" && key != "claude_auth" && ((schema != SchemaVersion8 && schema != SchemaVersion9) || key != "notification") && (schema != SchemaVersion9 || key != "claude_env") {
 			return fail()
 		}
 	}
 	result := &LauncherExtensions{}
+	if rawEnv, present := object["claude_env"]; present {
+		selection, err := parseLauncherClaudeEnv(rawEnv)
+		if err != nil {
+			return nil, err
+		}
+		result.ClaudeEnv = selection
+	}
 	if rawNotification, present := object["notification"]; present {
 		selection, ok := rawNotification.(map[string]any)
 		if !ok {

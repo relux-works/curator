@@ -1,0 +1,13 @@
+# Machine Claude environment vectors
+
+The four JSON files are unmodified copies from curator-spec commit
+`bd2e8252990872612cf76a358a1f874281a4711b`:
+
+- `conformance/machine-claude-env-v1/cases.json`
+- `conformance/machine-claude-env-v1/plants.json`
+- `schemas/machine-claude-env-v1/claude-env.schema.json`
+- `schemas/machine-claude-env-v1/projection.schema.json`
+
+The declaration driver uses the selected machine-file loader. Contribution
+vectors use the strict contribution transport parser. These tests do not start
+Claude, exercise a launcher consumer, or qualify native output-limit behavior.
