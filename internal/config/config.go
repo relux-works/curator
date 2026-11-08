@@ -324,7 +324,7 @@ func Load(path string, warn func(string)) (*Config, error) {
 // transaction can validate its in-memory candidate without publishing a file.
 func loadObject(path string, userData map[string]any, warn func(string)) (result *Config, resultErr error) {
 	if hasMachineClaudeEnv(userData) {
-		defer func() { resultErr = normalizeClaudeEnvError(resultErr) }()
+		defer func() { resultErr = markLauncherSelectionRefusal(resultErr) }()
 	}
 	defer func() {
 		if resultErr != nil {
@@ -583,7 +583,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
 
 func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (result *Config, resultErr error) {
 	if hasMachineClaudeEnv(data) {
-		defer func() { resultErr = normalizeClaudeEnvError(resultErr) }()
+		defer func() { resultErr = markLauncherSelectionRefusal(resultErr) }()
 	}
 	defer func() {
 		if resultErr != nil {
@@ -1308,9 +1308,14 @@ func readObject(path string) (map[string]any, error) {
 		return nil, err
 	}
 	if err := protocoljson.Validate(payload); err != nil {
-		return nil, configDiagnostic("config_json_invalid", "$", configJSONError{path: path})
+		return nil, configDiagnostic("config_json_invalid", "$", malformedConfigError(payload, path))
 	}
-	return decodeConfigObject(payload, path)
+	object, err := decodeConfigObject(payload, path)
+	var diagnostic *Diagnostic
+	if errors.As(err, &diagnostic) && diagnostic.Code == "config_json_invalid" {
+		return nil, configDiagnostic("config_json_invalid", "$", malformedConfigError(payload, path))
+	}
+	return object, err
 }
 
 func stringList(raw any, field string) ([]string, error) {

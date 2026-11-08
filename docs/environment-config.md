@@ -546,15 +546,20 @@ The contribution reader rejects attempted non-Claude injection with
 value. This query is data, not an alternate process-launch route or a fallback
 around an incompatible selected-projection reader.
 
-Invalid explicit schema-9 input and malformed configuration refuse before
-Core dispatches a provider. Refusals contain a fixed `extensions.claude_env`
-path and a stable `claude_env_*` code, without input values, unknown names,
-parser details or an environment dump. Metadata queries do not change the
+Invalid explicit Claude environment selections refuse before Core dispatches
+a provider. Errors from that member contain the fixed `extensions.claude_env`
+path and a stable `claude_env_*` code. Whole-file malformed JSON reports only
+`malformed JSON in config <path>`, without input values or parser details;
+unrelated validation errors retain their own paths and missing-file hints.
+Discovery refusal is separate from diagnostic rendering. Malformed legacy
+files without an identifiable explicit member retain optional-config provider
+discovery, as do unrelated semantic legacy errors. Metadata queries do not change the
 parent environment, native settings, hooks, permissions, profiles or locks.
 
 This Core candidate does **not** implement delivery in the separately installed
 launcher or qualify native Claude behavior. Complete containing-schema
-publication, final predecessor acceptance, a strict `/3` consumer and real
+publication, source clarification of file-level corpus diagnostic mapping,
+final predecessor acceptance, a strict `/3` consumer and real
 child launch/resume observations remain acceptance gates. The consumer must
 reselect the machine source for each launch or resume, override an inherited
 value only in the Claude child's environment, preserve other runtimes' ambient

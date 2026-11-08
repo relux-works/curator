@@ -114,9 +114,6 @@ func launcherMembers(raw any, names ...string) (map[string]any, bool) {
 
 func parseLauncherExtensions(raw any, schema int) (*LauncherExtensions, error) {
 	fail := func() (*LauncherExtensions, error) {
-		if schema == SchemaVersion9 {
-			return nil, claudeEnvError(ClaudeEnvInvalid)
-		}
 		return nil, configDiagnostic("launcher_selection_invalid", "extensions", fmt.Errorf("extensions: invalid launcher selection"))
 	}
 	object, ok := raw.(map[string]any)
@@ -124,6 +121,9 @@ func parseLauncherExtensions(raw any, schema int) (*LauncherExtensions, error) {
 		return fail()
 	}
 	for key := range object {
+		if key == "claude_env" && schema != SchemaVersion9 {
+			return nil, claudeEnvError(ClaudeEnvInvalid)
+		}
 		if key != "proxy" && key != "claude_auth" && ((schema != SchemaVersion8 && schema != SchemaVersion9) || key != "notification") && (schema != SchemaVersion9 || key != "claude_env") {
 			return fail()
 		}

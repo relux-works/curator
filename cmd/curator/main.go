@@ -338,8 +338,8 @@ func (c cli) runProvider(args []string) int {
 	// subcommand always wins and discovery runs only for unknown names.
 	// The name must match the identifier grammar; anything else is a
 	// usage error, not a lookup. Discovery can work without configuration,
-	// but invalid explicit launcher selections and malformed input refuse
-	// before any provider. Optional-config lookup otherwise retains its
+	// but invalid explicit Claude environment selections refuse before any
+	// provider. Unrelated malformed legacy input retains optional-config
 	// existing trust-root behavior.
 	if identifiers.Valid(args[0]) {
 		home := filepath.Dir(c.config.Path())

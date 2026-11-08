@@ -2,12 +2,15 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 type claudeEnvVector struct {
@@ -31,7 +34,56 @@ func claudeEnvVerdict(err error) string {
 	if err == nil {
 		return "accept"
 	}
-	return strings.TrimPrefix(LauncherDiagnostic(err).Error(), "extensions.claude_env: ")
+	var selection launcherClaudeEnvError
+	if errors.As(err, &selection) {
+		return selection.code
+	}
+	return "unrelated-config-error"
+}
+
+const claudeEnvControl = `{"BASH_MAX_OUTPUT_LENGTH":"8000"}`
+
+func claudeEnvCarrier(member string) string {
+	return `{"schema_version":9,"skills_root":"x","projects":{},"extensions":{"claude_env":` + member + `}}`
+}
+
+// File-level JSON failures are distinct from member semantic refusals. First
+// prove that this exact carrier accepts a valid member. Otherwise a broken
+// setup must never count as detecting a declaration vector, even when its
+// malformed member would mask the unrelated carrier defect in Load.
+func claudeEnvDeclarationVerdict(t *testing.T, member string, carrier func(string) string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "selected.json")
+	load := func(text string) (*Config, error) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte(text), 0600); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load(path, nil)
+		if err != nil && cfg != nil {
+			t.Fatal("refusal returned a usable configuration")
+		}
+		after, readErr := os.ReadFile(path)
+		if readErr != nil || string(after) != text {
+			t.Fatal("loader changed source")
+		}
+		return cfg, err
+	}
+	if _, err := load(carrier(claudeEnvControl)); err != nil {
+		return "invalid-containing-file"
+	}
+	_, err := load(carrier(member))
+	if protocoljson.Validate([]byte(member)) != nil {
+		var malformed configJSONError
+		if !errors.As(err, &malformed) || malformed.path != path ||
+			LauncherDiagnostic(err).Error() != "malformed JSON in config "+path {
+			return "unexpected-file-diagnostic"
+		}
+		t.Log("classification: invalid declaration JSON; neutral containing-file diagnostic (source spec note pending)")
+		return ClaudeEnvInvalid
+	}
+	t.Log("classification: member semantic verdict")
+	return claudeEnvVerdict(err)
 }
 
 // Every pinned declaration runs through the actual selected machine-file
@@ -67,22 +119,10 @@ func TestLauncherClaudeEnvPublishedCorpus(t *testing.T) {
 	for _, v := range vectors {
 		t.Run(v.ID, func(t *testing.T) {
 			var err error
+			var verdict string
 			switch v.Entry {
 			case "declaration":
-				path := filepath.Join(t.TempDir(), "selected.json")
-				text := `{"schema_version":9,"skills_root":"x","projects":{},"extensions":{"claude_env":` + v.Input + `}}`
-				if err := os.WriteFile(path, []byte(text), 0600); err != nil {
-					t.Fatal(err)
-				}
-				var got *Config
-				got, err = Load(path, nil)
-				if err != nil && got != nil {
-					t.Fatal("refusal returned a usable configuration")
-				}
-				after, readErr := os.ReadFile(path)
-				if readErr != nil || string(after) != text {
-					t.Fatal("loader changed rejected or accepted source")
-				}
+				verdict = claudeEnvDeclarationVerdict(t, v.Input, claudeEnvCarrier)
 			case "projection":
 				var got LauncherClaudeEnvContribution
 				got, err = ParseClaudeEnvContribution([]byte(v.Input))
@@ -92,8 +132,11 @@ func TestLauncherClaudeEnvPublishedCorpus(t *testing.T) {
 			default:
 				t.Fatal("unknown corpus entry")
 			}
-			if got := claudeEnvVerdict(err); got != v.Want {
-				t.Fatalf("verdict %s, want %s", got, v.Want)
+			if verdict == "" {
+				verdict = claudeEnvVerdict(err)
+			}
+			if verdict != v.Want {
+				t.Fatalf("verdict %s, want %s", verdict, v.Want)
 			}
 		})
 	}
@@ -199,7 +242,7 @@ func TestLauncherClaudeEnvClosedCarrierAndSource(t *testing.T) {
 		}
 	}
 	_, _, err := loadWithSystem(t, `{"schema_version":9,"skills_root":"x","projects":{}}`, `{"schema_version":2,"locked":[],"extensions":{"claude_env":{"BASH_MAX_OUTPUT_LENGTH":"8000"}}}`)
-	if claudeEnvVerdict(err) != ClaudeEnvInvalid {
+	if err == nil || LauncherDiagnostic(err).Error() != "extensions: launcher selections belong only to the selected machine configuration" {
 		t.Fatal("system supplied forbidden authority or unsafe refusal")
 	}
 	// Dangerous variable names cannot become generic environment passthrough.

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,38 +36,33 @@ type launcherClaudeEnvError struct{ code string }
 func (e launcherClaudeEnvError) Error() string { return "extensions.claude_env: " + e.code }
 func claudeEnvError(code string) error         { return launcherClaudeEnvError{code: code} }
 
-// configJSONError keeps the historical internal decoder context. The CLI
-// normalizes it before rendering: malformed bytes cannot reach a user-visible
-// diagnostic, and a malformed explicit selection cannot become absence.
+// configJSONError renders only the source path, never parser details or input.
 type configJSONError struct{ path string }
 
 func (e configJSONError) Error() string { return fmt.Sprintf("malformed JSON in config %s", e.path) }
 
-// LauncherDiagnostic normalizes decoder errors at the public CLI boundary.
-// It never renders raw parser errors, supplied member names or values.
+// LauncherDiagnostic preserves the loader's input-free diagnostic and identity.
+// Discovery refusal is an independent property, not a rendered member code.
 func LauncherDiagnostic(err error) error {
-	var decode configJSONError
-	if errors.As(err, &decode) {
-		return claudeEnvError(ClaudeEnvInvalid)
-	}
 	return err
 }
+
+type launcherSelectionRefusal struct{ error }
+
+func (e launcherSelectionRefusal) Unwrap() error { return e.error }
 
 // IsLauncherSelectionRefusal identifies invalid explicit input that must not
 // fall through Core's optional-config umbrella-provider discovery route.
 func IsLauncherSelectionRefusal(err error) bool {
 	var selection launcherClaudeEnvError
-	var decode configJSONError
-	return errors.As(err, &selection) || errors.As(err, &decode)
+	var refusal launcherSelectionRefusal
+	return errors.As(err, &selection) || errors.As(err, &refusal)
 }
 
 // A known explicit declaration still belongs to this refusal boundary when
 // its containing version is wrong. It must not fall through optional-config
 // provider discovery merely because version validation runs before members.
 func hasMachineClaudeEnv(data map[string]any) bool {
-	if schema, ok := integerValue(data["schema_version"]); ok && schema == SchemaVersion9 {
-		return true
-	}
 	extensions, ok := data["extensions"].(map[string]any)
 	if !ok {
 		return false
@@ -75,15 +71,82 @@ func hasMachineClaudeEnv(data map[string]any) bool {
 	return present
 }
 
-func normalizeClaudeEnvError(err error) error {
-	if err == nil {
-		return nil
-	}
-	var selection launcherClaudeEnvError
-	if errors.As(err, &selection) {
+func markLauncherSelectionRefusal(err error) error {
+	if err == nil || IsLauncherSelectionRefusal(err) {
 		return err
 	}
-	return claudeEnvError(ClaudeEnvInvalid)
+	return launcherSelectionRefusal{err}
+}
+
+// hasClaudeEnvMemberPrefix recognizes only a decoded key at the actual
+// top-level extensions.claude_env path. It never repairs or accepts input.
+// Stop on an undecodable prefix: unrelated malformed legacy files retain
+// optional-config discovery. Values and nested lookalike keys are not signals.
+func hasClaudeEnvMemberPrefix(payload []byte) bool {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return false
+	}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		if key == "extensions" {
+			token, err := decoder.Token()
+			if err != nil {
+				return false
+			}
+			if token != json.Delim('{') {
+				// A duplicate later extensions object may still declare the
+				// member. Skip this non-object without treating it as absence.
+				if token == json.Delim('[') {
+					for decoder.More() {
+						var ignored json.RawMessage
+						if decoder.Decode(&ignored) != nil {
+							return false
+						}
+					}
+					if _, err := decoder.Token(); err != nil {
+						return false
+					}
+				}
+				continue
+			}
+			for decoder.More() {
+				member, err := decoder.Token()
+				if err != nil {
+					return false
+				}
+				if member == "claude_env" {
+					return true
+				}
+				var ignored json.RawMessage
+				if decoder.Decode(&ignored) != nil {
+					return false
+				}
+			}
+			if _, err := decoder.Token(); err != nil {
+				return false
+			}
+		} else {
+			var ignored json.RawMessage
+			if decoder.Decode(&ignored) != nil {
+				return false
+			}
+		}
+	}
+	return false
+}
+
+func malformedConfigError(payload []byte, path string) error {
+	err := error(configJSONError{path: path})
+	if hasClaudeEnvMemberPrefix(payload) {
+		return markLauncherSelectionRefusal(err)
+	}
+	return err
 }
 
 var claudeEnvInteger = regexp.MustCompile(`^-?(0|[1-9][0-9]*)$`)

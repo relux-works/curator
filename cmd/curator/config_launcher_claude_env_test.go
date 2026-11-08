@@ -122,15 +122,15 @@ func TestConfigLauncherClaudeEnvRefusesBeforeProviderDispatch(t *testing.T) {
 	valid := prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000"}}}`
 	fixtures := []struct{ text, want string }{
 		{valid, ""},
-		{strings.Replace(valid, `"schema_version":9`, `"schema_version":"9"`, 1), config.ClaudeEnvInvalid},
-		{strings.Replace(valid, `"schema_version":9`, `"schema_version":8`, 1), config.ClaudeEnvInvalid},
-		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"0"}}}`, config.ClaudeEnvValueNonpositive},
-		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":8000}}`, config.ClaudeEnvInvalid},
-		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000","BASH_MAX_OUTPUT_LENGTH":"1"}}}`, config.ClaudeEnvInvalid},
-		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000","BASH_ENV":"DO_NOT_ECHO"}}}`, config.ClaudeEnvNameNotAllowed},
-		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"DO_NOT_ECHO"}}}`, config.ClaudeEnvValueNotInteger},
-		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000"},"UNLISTED":"DO_NOT_ECHO"}}`, config.ClaudeEnvInvalid},
-		{strings.Replace(valid, "8000", string([]byte{0xff}), 1), config.ClaudeEnvInvalid},
+		{strings.Replace(valid, `"schema_version":9`, `"schema_version":"9"`, 1), "schema_version: must be an integer"},
+		{strings.Replace(valid, `"schema_version":9`, `"schema_version":8`, 1), "extensions.claude_env: " + config.ClaudeEnvInvalid},
+		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"0"}}}`, "extensions.claude_env: " + config.ClaudeEnvValueNonpositive},
+		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":8000}}`, "malformed JSON in config " + path},
+		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000","BASH_MAX_OUTPUT_LENGTH":"1"}}}`, "malformed JSON in config " + path},
+		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000","BASH_ENV":"DO_NOT_ECHO"}}}`, "extensions.claude_env: " + config.ClaudeEnvNameNotAllowed},
+		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"DO_NOT_ECHO"}}}`, "extensions.claude_env: " + config.ClaudeEnvValueNotInteger},
+		{prefix + `{"BASH_MAX_OUTPUT_LENGTH":"8000"},"UNLISTED":"DO_NOT_ECHO"}}`, "extensions: invalid launcher selection"},
+		{strings.Replace(valid, "8000", string([]byte{0xff}), 1), "malformed JSON in config " + path},
 	}
 	for i, fx := range fixtures {
 		if err := os.WriteFile(path, []byte(fx.text), 0600); err != nil {
@@ -144,7 +144,7 @@ func TestConfigLauncherClaudeEnvRefusesBeforeProviderDispatch(t *testing.T) {
 				if code != exitOK || out.String() != "PROVIDER_EXECUTED BASH_MAX_OUTPUT_LENGTH=17\n" {
 					t.Fatalf("valid provider control %d did not execute", i)
 				}
-			} else if code != exitFail || out.Len() != 0 || errs.String() != "curator: extensions.claude_env: "+fx.want+"\n" {
+			} else if code != exitFail || out.Len() != 0 || errs.String() != "curator: "+fx.want+"\n" {
 				t.Fatalf("fixture %d failed refusal, redaction or no-child check", i)
 			}
 			after, err := os.ReadFile(path)

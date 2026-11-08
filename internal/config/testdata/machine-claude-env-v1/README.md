@@ -11,3 +11,11 @@ The four JSON files are unmodified copies from curator-spec commit
 The declaration driver uses the selected machine-file loader. Contribution
 vectors use the strict contribution transport parser. These tests do not start
 Claude, exercise a launcher consumer, or qualify native output-limit behavior.
+
+The driver validates each containing file with a valid replacement member
+before exercising the vector. An unrelated carrier defect is classified as
+`invalid-containing-file`, never as a detected member refusal. Malformed and
+duplicate declaration JSON is classified separately from semantic member
+errors: the file loader must report a neutral, path-bearing malformed-JSON
+diagnostic. Mapping that file-level result to the pinned member verdict is
+pending source specification clarification; no fixture bytes are changed.
