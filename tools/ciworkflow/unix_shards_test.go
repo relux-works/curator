@@ -39,15 +39,11 @@ func checkUnixShards(data []byte) error {
 		jobs[name] = job
 	}
 	producer := jobs["unix-test-shards"]
-	want := []any{
-		map[string]any{"os": "ubuntu-latest", "shard": 0},
-		map[string]any{"os": "ubuntu-latest", "shard": 1},
-		map[string]any{"os": "ubuntu-latest", "shard": 2},
-		map[string]any{"os": "macos-latest", "shard": 0},
-		map[string]any{"os": "macos-latest", "shard": 1},
-	}
-	if producer.If != "" || producer.Strategy.FailFast || len(producer.Strategy.Matrix) != 1 || !reflect.DeepEqual(producer.Strategy.Matrix["include"], want) {
-		return fmt.Errorf("require exactly three Linux and two macOS jobs on main and PRs, with no package cross product")
+	if producer.If != "" || producer.Strategy.FailFast || len(producer.Strategy.Matrix) != 3 ||
+		!reflect.DeepEqual(producer.Strategy.Matrix["os"], []any{"ubuntu-latest", "macos-latest"}) ||
+		!reflect.DeepEqual(producer.Strategy.Matrix["shard"], []any{0, 1, 2}) ||
+		producer.Strategy.Matrix["exclude"] != unixMacOSExclude {
+		return fmt.Errorf("require three Linux shards and two macOS shards selected by landing policy")
 	}
 	if producer.RunsOn != jobs["test"].RunsOn {
 		return fmt.Errorf("native shard runner routing differs from Test")
@@ -98,7 +94,7 @@ func checkUnixShards(data []byte) error {
 	return nil
 }
 
-// The real workflow preserves every native shard on main/PR, original deadlines,
+// The real workflow preserves Linux shards on every run and macOS on landing candidates, original deadlines,
 // pinned prerequisites, absolute isolated HOME and full final gate. Each bounded
 // plant must trigger rejection; fixture controls do not measure native runtime.
 func TestUnixShardsWiring(t *testing.T) {
@@ -107,9 +103,9 @@ func TestUnixShardsWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pair := range map[string][2]string{
-		"lost-linux-shard":         {"          - {os: ubuntu-latest, shard: 2}\n", ""},
-		"lost-macos-shard":         {"          - {os: macos-latest, shard: 1}\n", ""},
-		"package-cross-product":    {"          - {os: ubuntu-latest, shard: 2}\n", "          - {os: ubuntu-latest, shard: 2}\n        package: [envprofile, install]\n"},
+		"lost-linux-shard":         {"shard: [0, 1, 2]", "shard: [0, 1]"},
+		"lost-macos-shard":         {"os: [ubuntu-latest, macos-latest]", "os: [ubuntu-latest]"},
+		"package-cross-product":    {"shard: [0, 1, 2]", "shard: [0, 1, 2]\n        package: [envprofile, install]"},
 		"only-main":                {"  unix-test-shards:\n", "  unix-test-shards:\n    if: github.event_name == 'push'\n"},
 		"lost-admission":           {"CI_UNIX_TEST_SHARDS: .temp/unix-test-shards", "CI_OTHER: .temp/unix-test-shards"},
 		"lost-upload":              {"name: unix-test-shard-${{ matrix.os }}-${{ matrix.shard }}", "name: unix-test-shard-fixed"},
