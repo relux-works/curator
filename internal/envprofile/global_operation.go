@@ -588,6 +588,9 @@ func (op *operation) captureManaged(plan *homePlan, seeds *seedBundle, recorded 
 		}
 	}
 	names := map[string]bool{}
+	for path := range plan.claudeSettings {
+		names[path] = true
+	}
 	for path := range recorded {
 		names[path] = true
 	}

@@ -163,6 +163,7 @@ The file mode table is defined beside `EnvRootName` in
 | --- | --- |
 | Native copy seeds, including transformed Codex `config.toml` | Source permission bits, unchanged; a `0600` source stays `0600` |
 | Manager-authored home files, including Claude `.claude.json` trust state, copied context and MCP configuration | `0600` |
+| Opted-in managed Claude settings (`claude_settings_mode.<profile>=read-only`) | `0400`; existing regular files with no write bits already satisfy the invariant |
 | Single-file symlink fallback | `0600` |
 | Files in a directory symlink fallback | Source permission bits masked with `0700`, preserving owner execution |
 | Environment marker (transaction writer) | `0600` |
@@ -450,3 +451,66 @@ backend. `curator config launcher` exports the narrow typed projection, includin
 the selected source path. Consumers must independently enforce the selected
 launch policy. Older binaries reject schema 7 with a newer-tool requirement;
 there is no silent downgrade or fallback to an older envelope.
+
+## Read-only Claude settings (admission contract A)
+
+`claude_settings_mode` is a machine-owned profile map. Its values are exactly
+`native` (the default when absent) or `read-only`. It applies only to managed
+`claude_code` homes; it has no effect on other adapters, native homes, credentials
+or launcher configuration. A system configuration cannot carry or lock it.
+
+```sh
+curator env config set claude_settings_mode.example read-only
+curator env resolve claude_code --profile example --repair
+curator env config show claude_settings_mode.example
+curator env config unset claude_settings_mode.example
+```
+
+With `read-only`, repair/provisioning creates an absent `settings.json` containing
+`{}\n`. Existing `settings.json`, `cowork_settings.json` and legacy `.config.json`
+retain their exact bytes and become regular files with mode `0400` on Unix.
+Absent optional files are not created. Owner-only read access fits the home's
+existing `0700`, single-owner boundary; no group/other access is added. Present
+symlinks, directories and special files refuse with
+`environment_claude_settings_invalid` before home publication. Windows refuses
+this opt-in with `environment_settings_mode_unsupported`; POSIX no-write-bit
+semantics are not claimed through the Windows DACL backend.
+
+These settings are permission-managed, not marker-owned context surfaces. Every
+repair and re-materialisation reapplies this rule, independently of profile-lock
+changes. The files are not seeded from native settings. Unset or `native` stops
+enforcement and leaves existing settings bytes and modes in place; it does not
+make previously read-only settings writable. With the default, the existing
+manager-authored mode remains `0600`, and no empty settings file is added.
+
+Read-only `env resolve` refuses `environment_home_stale` when the required file
+is absent or a settings file has any owner, group or other write bit. `env status`
+reports the same non-current home and finding (its existing status exit policy
+is unchanged). A writable file reports, for example:
+
+```text
+Claude settings settings.json has write bits (0600); claude_settings_mode=read-only requires no write bits
+```
+
+Dry-run repair also leaves modes unchanged. A readable regular file with mode
+`0444` already meets the invariant. Invalid values are refused without editing
+the machine file, with the exact field diagnostic:
+
+```text
+environments.claude_settings_mode.example: must be one of native, read-only
+```
+
+Publication always stages a same-directory temporary file, sets its final
+`0400` mode before writing through its already-open descriptor, syncs and closes
+it, then renames it over the destination. Content updates use the same atomic
+replacement rule: never chmod-write-chmod the live file. This is per-file atomic
+publication, not a transaction across all three settings files or an atomic
+compare-and-swap with external writers. Stop settings writers while repairing;
+concurrent external edits can race the preserved-byte read and rename.
+
+The opt-in never adds a write to `.claude.json`, credentials,
+`policy-limits.json`, `remote-settings.json` or any policy-cache companions.
+Existing `.claude.json` project-trust provisioning remains independent. This
+prepares only the settings-files part of the launcher's
+[admission contract A](https://github.com/relux-works/curator-agent-launcher#readme);
+it does not qualify a build, gateway, policy cache or launch.

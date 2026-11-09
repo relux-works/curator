@@ -1172,6 +1172,31 @@ The command displays interactive status dashboards for project skills.
 
 ## Operator configuration
 
+### Claude settings permissions
+
+The `env config` knob table adds this machine-owned profile setting:
+
+| Knob | Values | Default | Scope |
+| --- | --- | --- | --- |
+| `claude_settings_mode.<profile>` | `native`, `read-only` | `native` | Managed `claude_code` homes on Unix; not system-lockable |
+
+```sh
+curator env config set claude_settings_mode.example read-only
+curator env resolve claude_code --profile example --repair
+curator env config show claude_settings_mode.example
+curator env config unset claude_settings_mode.example
+```
+
+`read-only` creates missing `settings.json` as `{}` and publishes it, and any
+present `cowork_settings.json` / legacy `.config.json`, as regular `0400` files.
+Existing bytes are preserved. Status and resolve without repair report write-bit
+drift as non-current; repair atomically replaces the entry with its final mode,
+without a writable interval on the live inode. Unset stops enforcement and
+preserves existing files. Invalid values report
+`environments.claude_settings_mode.<profile>: must be one of native, read-only`.
+See the [environments contract](environment-config.md#read-only-claude-settings-admission-contract-a)
+for platform limits, refusal diagnostics, ownership and atomic update rules.
+
 ### curator env config show
 
 ```bash

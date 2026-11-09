@@ -19,6 +19,7 @@ func machineFromConfig(cfg *config.Config) envregistry.MachineConfig {
 	if cfg == nil {
 		return machine
 	}
+	machine.ClaudeSettingsMode = cfg.Env.ClaudeSettingsMode
 	machine.Forms = cfg.Env.Forms
 	machine.PassableEnvNames = cfg.Env.PassableEnvNames
 	machine.PassableEnvNamesSet = cfg.Env.PassableEnvNamesSet

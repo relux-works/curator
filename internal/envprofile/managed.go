@@ -313,9 +313,10 @@ func storeDocPath(home, profile, envID, rel string) string {
 	return filepath.Join(ProfilesDir(home), profile, "rendered", envID, filepath.FromSlash(rel))
 }
 
-// homePlan is the fully assembled managed home: every write, link, and
-// removal, with the marker recording them.
+// homePlan is the fully assembled managed home: marker-owned surfaces
+// plus the explicitly selected Claude settings permission invariant.
 type homePlan struct {
+	claudeSettings   map[string][]byte
 	skillProjections []skillOf
 	credentialPolicy *effectiveCredentialPolicy
 	adapter          envregistry.Adapter
@@ -387,6 +388,9 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 		links:            map[string]string{},
 		docs:             map[string][]byte{},
 		fileHashes:       map[string][]byte{},
+	}
+	if err := plan.prepareClaudeSettings(req); err != nil {
+		return nil, err
 	}
 	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative {
 		plan.warnings = append(plan.warnings, "managed Muse maps configured native (including unset) to effective file storage; the stored selector is unchanged; refresh remains unqualified")
@@ -1358,7 +1362,8 @@ func sameStoreTree(target, storeRoot string) bool {
 // applyPlan writes the plan into the home under the held mutation lock:
 // store documents, copies, links (with copy fallback for files), seed
 // files, and the marker. Managed paths the plan no longer wants are
-// removed; files the marker does not record are never touched.
+// removed; unrecorded files are preserved except the explicitly opted-in
+// Claude settings files, whose bytes survive permission repair.
 func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) (resultErr error) {
 	root := EnvRoot(req.Home)
 	homeRel, err := managedRelative(root, plan.homeDir)
@@ -1383,6 +1388,9 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 		}
 	}
 	want := map[string]bool{}
+	for path := range plan.claudeSettings {
+		want[path] = true
+	}
 	for path := range plan.copies {
 		want[path] = true
 	}
@@ -1479,6 +1487,11 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// (§8.1) is deterministic even though the plan accumulates maps. Each
 	// destination is replaced from a private same-directory entry, so the
 	// existing surface path is never opened through a symlink.
+	for _, path := range sortedKeysBytes(plan.claudeSettings) {
+		if err := atomicManagedFile(root, managedJoin(homeRel, path), plan.claudeSettings[path], claudeReadOnlySettingsMode); err != nil {
+			return err
+		}
+	}
 	for _, path := range sortedKeysBytes(plan.copies) {
 		document := plan.copies[path]
 		if err := atomicManagedFile(root, managedJoin(homeRel, path), document, managedAuthoredFileMode); err != nil {
@@ -2129,6 +2142,7 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 			}
 		}
 	}
+	verdict.checkClaudeSettings(plan)
 	verdict.checkSurfaces(req, plan, marker)
 	verdict.checkPassthrough(req, plan, marker)
 	verdict.checkClaudeProject(req, plan)
@@ -3154,6 +3168,9 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		return nil, err
 	}
 	writePaths := map[string]bool{}
+	for path := range plan.claudeSettings {
+		writePaths[path] = true
+	}
 	for path := range plan.copies {
 		writePaths[path] = true
 	}

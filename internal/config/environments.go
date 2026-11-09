@@ -19,6 +19,8 @@ import (
 // name, value grammar, and default the §12.1 table declares. Parse applies
 // the defaults before use; a knob that is absent takes the table default.
 type Environments struct {
+	// ClaudeSettingsMode maps profile names to native or read-only.
+	ClaudeSettingsMode   map[string]string
 	CredentialStore      map[string]map[string]envregistry.CredentialStoreSelection
 	CurrentProfile       *string
 	ScopedCurrent        map[string]string
@@ -175,6 +177,7 @@ var (
 // defaultEnvironments returns the §12.1 defaults.
 func defaultEnvironments() Environments {
 	return Environments{
+		ClaudeSettingsMode:      map[string]string{},
 		ScopedCurrent:           map[string]string{},
 		Overlays:                map[string][]OverlayDeclaration{},
 		OverlayDefaultWeight:    DefaultOverlayWeight,
@@ -268,6 +271,9 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
 			return Environments{}, err
 		}
 		env.Precedence = precedence
+	}
+	if err := parseEnumMap(obj, "claude_settings_mode", map[string]bool{"native": true, "read-only": true}, env.ClaudeSettingsMode); err != nil {
+		return Environments{}, err
 	}
 	if err := parseEnumMap(obj, "forms", map[string]bool{"monolithic": true, "referenced": true}, env.Forms); err != nil {
 		return Environments{}, err
@@ -405,7 +411,7 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
 // from, so a knob added to the reader without test coverage — or to the
 // test without the reader — fails instead of widening a gate silently.
 var EnvKnobNames = []string{
-	"credential_store",
+	"credential_store", "claude_settings_mode",
 	"current_profile", "scoped_current", "overlays", "overlay_default_weight",
 	"overlays_allowed", "precedence", "forms", "system_prompt_files",
 	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
@@ -1317,6 +1323,10 @@ func (e Environments) render() map[string]any {
 	if e.RequireCurrent != nil {
 		require = *e.RequireCurrent
 	}
+	claudeSettings := map[string]any{}
+	for profile, mode := range e.ClaudeSettingsMode {
+		claudeSettings[profile] = mode
+	}
 	permissions := map[string]any{}
 	for profile, mode := range e.Permissions {
 		permissions[profile] = mode
@@ -1324,8 +1334,9 @@ func (e Environments) render() map[string]any {
 	return map[string]any{
 		"current_profile": current, "scoped_current": scoped, "overlays": overlays,
 		"overlay_default_weight": e.OverlayDefaultWeight, "overlays_allowed": e.OverlaysAllowed,
-		"precedence": map[string]any{"winner": e.Precedence.Winner, "placement": e.Precedence.Placement},
-		"forms":      forms, "system_prompt_files": spf, "targets": targets,
+		"precedence":           map[string]any{"winner": e.Precedence.Winner, "placement": e.Precedence.Placement},
+		"claude_settings_mode": claudeSettings,
+		"forms":                forms, "system_prompt_files": spf, "targets": targets,
 		"isolation": isolation, "xdg_seed_allowlist": xdg, "passable_env_names": passable,
 		"mcp_package_allowlist": mcp, "shadow_acknowledged": shadow,
 		"secret_material_waivers":   waivers,
@@ -1366,6 +1377,9 @@ func SplitEnvKnob(knob string) ([]string, error) {
 		return nil, verr.New("knob", "requires a section 12.1 knob name")
 	}
 	if envKnob(segments[0]) {
+		if segments[0] == "claude_settings_mode" && len(segments) >= 2 {
+			segments = []string{segments[0], strings.Join(segments[1:], ".")}
+		}
 		if segments[0] == "credential_store" && len(segments) >= 3 {
 			// The final operand is the environment; dots inside the profile
 			// belong to its identifier, not to additional object levels.

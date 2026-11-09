@@ -11,6 +11,12 @@ All notable implementation changes are recorded here.
   directory stay fixed; update gates and scope rematerialization still apply.
   Refusals preserve source, requirement, lock and homes. A same-lock repin
   reports unchanged and preserves the stored requirement.
+- Opt-in `claude_settings_mode.<profile>=read-only` prepares managed Claude
+  settings for the launcher's gateway admission contract: required
+  `settings.json` and present optional settings are regular Unix `0400` files.
+  Status detects writable drift; repair preserves bytes through atomic
+  replacement. Default behavior and tool-owned trust, credentials and policy
+  caches remain unchanged.
 
 ## v0.15.0-rc.9 — 2026-10-24
 

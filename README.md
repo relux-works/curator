@@ -421,6 +421,15 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+For managed Claude gateway settings, configure
+`curator env config set claude_settings_mode.<profile> read-only`, then run
+`curator env resolve claude_code --profile <profile> --repair`. The managed-home
+outputs, mode diagnostics and atomic replacement contract are documented in
+[environment configuration](docs/environment-config.md#read-only-claude-settings-admission-contract-a).
+Focused checks are `go test ./internal/envprofile -run '^TestClaudeReadOnlySettings'`
+and `go test ./cmd/curator -run '^TestEnv(ConfigClaudeSettingsMode|ClaudeReadOnlySettings)$'`;
+keep local test logs under `.temp/`.
+
 Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
 controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
 real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`
