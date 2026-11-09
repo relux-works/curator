@@ -311,7 +311,7 @@ selections. Exporting the selection does not launch or enroll a session; see
 
 </details>
 
-`config claude-auth` validates a schema-2, schema-7 or schema-8 machine file, creates a
+`config claude-auth` validates a schema-2, schema-7, schema-8 or schema-9 machine file, creates a
 private candidate, and applies inspected bytes with source, result and system
 policy digest guards. It retains an exact private backup for guarded restore.
 Restore refuses later unrelated extension changes, including proxy and notification selections.

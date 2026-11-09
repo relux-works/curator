@@ -246,7 +246,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 		return nil, err
 	}
 	version, ok := integerValue(before["schema_version"])
-	if !ok || (version != 2 && version != SchemaVersion7 && version != SchemaVersion8) {
+	if !ok || (version != 2 && version != SchemaVersion7 && version != SchemaVersion8 && version != SchemaVersion9) {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	if _, err := loadObject(path, before, nil); err != nil {
@@ -278,7 +278,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 		targetSchema = SchemaVersion7
 	}
 	after["schema_version"] = float64(targetSchema)
-	// Defense in depth: for currently valid schema-2/7/8 sources this constructor
+	// Defense in depth: for currently valid schema-2/7/8/9 sources this constructor
 	// changes only schema/auth, so no valid input currently reaches the refusal.
 	// Restore independently needs this check for later unrelated edits.
 	if !claudeAuthEquivalent(path, before, after) {
@@ -551,7 +551,7 @@ func restoreClaudeAuth(ctx context.Context, req ClaudeAuthRestoreRequest, ops cl
 	}
 	for _, obj := range []map[string]any{before, after} {
 		v, ok := integerValue(obj["schema_version"])
-		if !ok || (v != 2 && v != SchemaVersion7 && v != SchemaVersion8) {
+		if !ok || (v != 2 && v != SchemaVersion7 && v != SchemaVersion8 && v != SchemaVersion9) {
 			return nil, ErrClaudeAuthEditRefused
 		}
 	}

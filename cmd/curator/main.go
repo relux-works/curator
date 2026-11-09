@@ -288,13 +288,19 @@ func (c cli) run(args []string) int {
 		return exitUsage
 	}
 	if rejectsTakeover(args) {
-		if len(args) > 1 && args[0] == "skill" && args[1] == "validate-codex" && !hasHelpFlag(args[2:]) {
-			for _, arg := range args[2:] {
+		if len(args) > 1 && args[0] == "skill" && args[1] == "validate-codex" {
+			var commandArgs []string
+			for index, arg := range args {
+				if index >= 2 {
+					commandArgs = append(commandArgs, arg)
+				}
+			}
+			for _, arg := range commandArgs {
 				if arg == "--" {
 					break
 				}
-				if arg == "--json" {
-					return c.cmdSkillValidateCodex(args[2:])
+				if arg == "--json" && !hasHelpFlag(commandArgs) {
+					return c.cmdSkillValidateCodex(commandArgs)
 				}
 			}
 		}
@@ -337,13 +343,18 @@ func (c cli) runProvider(args []string) int {
 	// Umbrella subcommand discovery (environments §11): an implemented
 	// subcommand always wins and discovery runs only for unknown names.
 	// The name must match the identifier grammar; anything else is a
-	// usage error, not a lookup. Discovery works without a loadable
-	// config: the trust check then assumes the source path's home, which
-	// is the root a future config there would own.
+	// usage error, not a lookup. Discovery can work without configuration,
+	// but invalid explicit Claude environment selections refuse before any
+	// provider. Unrelated malformed legacy input retains optional-config
+	// existing trust-root behavior.
 	if identifiers.Valid(args[0]) {
 		home := filepath.Dir(c.config.Path())
 		var cfg *config.Config
-		if loaded, code := c.loadConfig(); code == exitOK {
+		loaded, code, loadErr := c.loadConfigAttempt()
+		if code != exitOK && config.IsLauncherSelectionRefusal(loadErr) {
+			return code
+		}
+		if code == exitOK {
 			cfg = loaded
 			home = cfg.Home()
 		}
@@ -354,15 +365,20 @@ func (c cli) runProvider(args []string) int {
 }
 
 func (c cli) loadConfig() (*config.Config, int) {
+	cfg, code, _ := c.loadConfigAttempt()
+	return cfg, code
+}
+
+func (c cli) loadConfigAttempt() (*config.Config, int, error) {
 	cfg, err := c.config.Load(func(message string) {
 		_, _ = fmt.Fprintln(c.stderr, "warning: "+message)
 	})
 	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", config.LauncherDiagnostic(err))
 		if errors.Is(err, config.ErrConfigNotFound) {
 			_, _ = fmt.Fprintln(c.stderr, "curator: "+configNotFoundHint)
 		}
-		return nil, exitFail
+		return nil, exitFail, err
 	}
 	if warning := cfg.SecurityPostureWarning(); warning != "" {
 		parentWarned := os.Getppid() > 1 && os.Getenv(postureWarnedEnv) == strconv.Itoa(os.Getppid())
@@ -370,14 +386,14 @@ func (c cli) loadConfig() (*config.Config, int) {
 			if c.posture != nil {
 				c.posture.warned = true
 			}
-			return cfg, exitOK
+			return cfg, exitOK, nil
 		}
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
 		if c.posture != nil {
 			c.posture.warned = true
 		}
 	}
-	return cfg, exitOK
+	return cfg, exitOK, nil
 }
 
 // configNotFoundHint tells a first-run operator how to create the global
@@ -2517,6 +2533,9 @@ Usage:
   curator config launcher              print selected launcher metadata as JSON
   curator config claude-auth <plan|apply|restore>
                                        safely edit OAuth metadata references
+
+  curator config launcher --status     print Claude environment selection status as JSON
+  curator config launcher --runtime ID print only the Claude extension contribution
   curator config build-ssh <subcommand>
                                        operator SSH credentials for external
                                        build repositories (add | list | remove)
@@ -2571,6 +2590,12 @@ func (c cli) cmdConfig(args []string) int {
 	case "claude-auth":
 		return c.cmdConfigClaudeAuth(args[1:])
 	case "launcher":
+		if len(args) == 3 && args[1] == "--runtime" {
+			return c.cmdConfigLauncherContribution(args[2])
+		}
+		if len(args) == 2 && args[1] == "--status" {
+			return c.cmdConfigLauncherStatus()
+		}
 		if len(args) != 1 {
 			_, _ = fmt.Fprintln(c.stderr, "curator: config launcher takes no arguments")
 			return exitUsage

@@ -168,7 +168,7 @@ type Execution struct {
 // Config is the effective machine configuration.
 type Config struct {
 	Path string
-	// Schema is the effective schema_version: 1, 2, 3, 5, 7, or 8.
+	// Schema is the effective schema_version: 1, 2, 3, 5, 7, 8, or 9.
 	Schema     int
 	Extensions *LauncherExtensions
 	// Env is the effective environments §12.1 machine configuration with
@@ -322,7 +322,10 @@ func Load(path string, warn func(string)) (*Config, error) {
 
 // loadObject is the ordinary loader's shared overlay/parser path. A metadata
 // transaction can validate its in-memory candidate without publishing a file.
-func loadObject(path string, userData map[string]any, warn func(string)) (*Config, error) {
+func loadObject(path string, userData map[string]any, warn func(string)) (result *Config, resultErr error) {
+	if hasMachineClaudeEnv(userData) {
+		defer func() { resultErr = markLauncherSelectionRefusal(resultErr) }()
+	}
 	machineData := userData
 	userIsolation := userIsolationFromConfig(userData)
 	locked := map[string]bool{}
@@ -579,10 +582,13 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	return parseConfig(data, path, nil, data, nil)
 }
 
-func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (result *Config, failure error) {
+func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (result *Config, resultErr error) {
+	if hasMachineClaudeEnv(data) {
+		defer func() { resultErr = markLauncherSelectionRefusal(resultErr) }()
+	}
 	defer func() {
-		if failure != nil {
-			failure = configDiagnostic("config_shape_invalid", "$", failure)
+		if resultErr != nil {
+			resultErr = configDiagnostic("config_shape_invalid", "$", resultErr)
 		}
 	}()
 	for key := range data {
@@ -594,13 +600,13 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	if !ok {
 		return nil, configDiagnostic("config_schema_unsupported", "schema_version", verr.New("schema_version", "must be an integer"))
 	}
-	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8 {
+	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8 && schema != SchemaVersion9 {
 		return nil, configDiagnostic("config_schema_unsupported", "schema_version", verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema))
 	}
 	var extensions *LauncherExtensions
 	if raw, present := data["extensions"]; present {
-		if schema != SchemaVersion7 && schema != SchemaVersion8 {
-			return nil, configDiagnostic("launcher_extensions_schema", "extensions", fmt.Errorf("extensions: requires manager-config schema_version 7 or 8"))
+		if schema != SchemaVersion7 && schema != SchemaVersion8 && schema != SchemaVersion9 {
+			return nil, configDiagnostic("launcher_extensions_schema", "extensions", fmt.Errorf("extensions: requires manager-config schema_version 7, 8 or 9"))
 		}
 		var err error
 		extensions, err = parseLauncherExtensions(raw, schema)
@@ -1303,9 +1309,14 @@ func readObject(path string) (map[string]any, error) {
 		return nil, err
 	}
 	if err := protocoljson.Validate(payload); err != nil {
-		return nil, configDiagnostic("config_json_invalid", "$", fmt.Errorf("malformed JSON in config %s", path))
+		return nil, configDiagnostic("config_json_invalid", "$", malformedConfigError(payload, path))
 	}
-	return decodeConfigObject(payload, path)
+	object, err := decodeConfigObject(payload, path)
+	var diagnostic *Diagnostic
+	if errors.As(err, &diagnostic) && diagnostic.Code == "config_json_invalid" {
+		return nil, configDiagnostic("config_json_invalid", "$", malformedConfigError(payload, path))
+	}
+	return object, err
 }
 
 func stringList(raw any, field string) ([]string, error) {

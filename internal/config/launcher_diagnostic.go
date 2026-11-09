@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -26,8 +27,9 @@ func configDiagnostic(code, path string, err error) error {
 	return &Diagnostic{Code: code, Path: path, cause: err}
 }
 
-// Keep predecessor numeric decoding unchanged. Only the new schema-8 raw-file
-// version retains its token, so 8.0/8e0 cannot become the integer token 8.
+// Keep predecessor numeric decoding unchanged. The schema-8 and schema-9
+// raw-file versions retain their tokens, so decimal/exponent spellings cannot
+// become the required integer tokens.
 // Programmatic Parse callers have no raw-file token to validate.
 func decodeConfigObject(payload []byte, path string) (map[string]any, error) {
 	var raw any
@@ -38,13 +40,13 @@ func decodeConfigObject(payload []byte, path string) (map[string]any, error) {
 	if !ok {
 		return nil, configDiagnostic("config_shape_invalid", "$", fmt.Errorf("config %s must be a JSON object", path))
 	}
-	if version, ok := object["schema_version"].(float64); ok && version == SchemaVersion8 {
+	if version, ok := object["schema_version"].(float64); ok && (version == SchemaVersion8 || version == SchemaVersion9) {
 		var tokens map[string]json.RawMessage
 		if err := json.Unmarshal(payload, &tokens); err != nil {
 			return nil, err
 		}
 		token := strings.TrimSpace(string(tokens["schema_version"]))
-		if token != "8" {
+		if token != strconv.Itoa(int(version)) {
 			object["schema_version"] = json.Number(token)
 		}
 	}

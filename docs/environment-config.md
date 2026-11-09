@@ -504,3 +504,68 @@ System selection and selection locks cannot supply notification authority.
 These are metadata admission rules, not receiver activation or enrollment.
 The capability/lifecycle publisher and its relationship to CIP-0023 remain an
 owner decision in the specification; this carrier does not resolve it.
+
+### Machine Claude environment selection (schema 9 candidate)
+
+Schema 9 preserves the schema-8 carrier and adds the optional closed
+`extensions.claude_env` member. Its metadata projection is
+`curator.launcher-config/3`, including when no override is selected. Earlier
+configuration schemas retain their previous projection versions and reject
+this new member. Ordinary project and environment edits retain schema 9,
+unrelated fields, and all proxy, authentication and notification selections.
+Claude-auth plan/apply/restore admits and preserves schema 9 and includes
+`claude_env` in its guarded non-auth comparison.
+
+```json
+{
+  "schema_version": 9,
+  "skills_root": "/srv/curator/skills",
+  "projects": {},
+  "extensions": {
+    "claude_env": {"BASH_MAX_OUTPUT_LENGTH": "8000"}
+  }
+}
+```
+
+The selected per-account machine file is the only authority. System files,
+packages, profiles, locks, overlays, project files and `launcher.json` cannot
+supply this selection. Absence or `{}` selects no override. A present value
+must be a canonical ASCII decimal **JSON string** from `"1"` to `"65536"`.
+Null, unknown names, case variants, duplicate JSON members, invalid UTF-8,
+numeric coercion, signs, leading zeros, whitespace and out-of-bound values
+refuse. The limit is a manager policy cap, not a vendor maximum or measured
+output unit. There is no generic environment map or permission extension.
+
+`curator config launcher` exports the complete selected metadata projection.
+`curator config launcher --status` reports the selected source and one of
+`absent`, `configured` or `runtime-ineligible` for each admitted environment.
+These are selection states, never a claim that a running process received or
+honored the value. A valid shared declaration leaves non-Claude launches usable.
+`curator config launcher --runtime claude_code` exports only this extension's
+contribution; the other admitted environment IDs export an empty contribution.
+The contribution reader rejects attempted non-Claude injection with
+`claude_env_runtime_ineligible` after validating its shape, runtime, names and
+value. This query is data, not an alternate process-launch route or a fallback
+around an incompatible selected-projection reader.
+
+Invalid explicit Claude environment selections refuse before Core dispatches
+a provider. Errors from that member contain the fixed `extensions.claude_env`
+path and a stable `claude_env_*` code. Whole-file malformed JSON reports only
+`malformed JSON in config <path>`, without input values or parser details;
+unrelated validation errors retain their own paths and missing-file hints.
+Discovery refusal is separate from diagnostic rendering. Malformed legacy
+files without an identifiable explicit member retain optional-config provider
+discovery, as do unrelated semantic legacy errors. Metadata queries do not change the
+parent environment, native settings, hooks, permissions, profiles or locks.
+
+This Core candidate does **not** implement delivery in the separately installed
+launcher or qualify native Claude behavior. Complete containing-schema
+publication, source clarification of file-level corpus diagnostic mapping,
+final predecessor acceptance, a strict `/3` consumer and real
+child launch/resume observations remain acceptance gates. The consumer must
+reselect the machine source for each launch or resume, override an inherited
+value only in the Claude child's environment, preserve other runtimes' ambient
+policy, and retain existing authentication, network and session custody gates.
+Usable support additionally requires real-runtime output-budget and native
+settings precedence evidence; passing Core metadata or synthetic-provider tests
+is insufficient.
