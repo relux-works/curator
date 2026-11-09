@@ -120,10 +120,11 @@ func parseLauncherExtensions(raw any, schema int) (*LauncherExtensions, error) {
 	if !ok {
 		return fail()
 	}
+	// The forbidden member has a fixed refusal before unknown-name iteration.
+	if _, present := object["claude_env"]; present && schema != SchemaVersion9 {
+		return nil, claudeEnvError(ClaudeEnvInvalid)
+	}
 	for key := range object {
-		if key == "claude_env" && schema != SchemaVersion9 {
-			return nil, claudeEnvError(ClaudeEnvInvalid)
-		}
 		if key != "proxy" && key != "claude_auth" && ((schema != SchemaVersion8 && schema != SchemaVersion9) || key != "notification") && (schema != SchemaVersion9 || key != "claude_env") {
 			return fail()
 		}

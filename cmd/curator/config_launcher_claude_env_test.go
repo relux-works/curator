@@ -13,10 +13,17 @@ import (
 	"github.com/relux-works/curator/internal/config"
 )
 
+// Selected schema9 edits and metadata queries preserve all launcher selections
+// on every target OS without opening the platform-absolute credential reference.
 func TestConfigLauncherClaudeEnvSelectedEditsAndStatus(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "selected.json")
-	text := `{"schema_version":9,"skills_root":"x","projects":{},"preferred_locale":"en","extensions":{"claude_env":{"BASH_MAX_OUTPUT_LENGTH":"8000"},"notification":{"backend":"off"},"proxy":{"profile":"private"},"claude_auth":{"type":"oauth","store":{"type":"file","path":"/nonexistent/credential-reference"}}}}`
+	credentialPath := filepath.Join(root, "credential-reference")
+	encodedPath, err := json.Marshal(credentialPath)
+	if err != nil || !filepath.IsAbs(credentialPath) {
+		t.Fatalf("fixture credential path must be target-absolute: %v", err)
+	}
+	text := `{"schema_version":9,"skills_root":"x","projects":{},"preferred_locale":"en","extensions":{"claude_env":{"BASH_MAX_OUTPUT_LENGTH":"8000"},"notification":{"backend":"off"},"proxy":{"profile":"private"},"claude_auth":{"type":"oauth","store":{"type":"file","path":` + string(encodedPath) + `}}}}`
 	if err := os.WriteFile(path, []byte(text), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +54,7 @@ func TestConfigLauncherClaudeEnvSelectedEditsAndStatus(t *testing.T) {
 	} {
 		var out, errs bytes.Buffer
 		if code := run(args, fileConfigSource(path), &out, &errs); code != exitOK || errs.Len() != 0 {
-			t.Fatalf("command %v failed: code=%d", args, code)
+			t.Fatalf("command %v failed: code=%d stderr=%q", args, code, errs.String())
 		}
 		if len(args) == 2 && args[0] == "config" {
 			var got map[string]any
@@ -80,6 +87,9 @@ func TestConfigLauncherClaudeEnvSelectedEditsAndStatus(t *testing.T) {
 				t.Fatal("wrong runtime contribution")
 			}
 		}
+	}
+	if _, err := os.Stat(credentialPath); !os.IsNotExist(err) {
+		t.Fatal("metadata query created the absent credential reference")
 	}
 	if os.Getenv(config.ClaudeEnvSetting) != "17" {
 		t.Fatal("manager environment was mutated")

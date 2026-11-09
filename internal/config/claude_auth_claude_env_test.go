@@ -71,3 +71,46 @@ func TestClaudeAuthClaudeEnvRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// Absent notification and Claude selections make the otherwise equivalent
+// backups depend on the schema9 guard alone; schema9 restore remains valid.
+func TestClaudeAuthClaudeEnvRestoreCarrierGuard(t *testing.T) {
+	assertClaudeAuthRestoreCarrierGuard(t, 9, []int{9, 8, 7})
+}
+
+// The auth editor shares raw-token admission with Load, and may not normalize
+// invalid schema9 spellings into a valid carrier or create recovery state.
+func TestClaudeAuthClaudeEnvVersionTokens(t *testing.T) {
+	for _, token := range []string{"9", "9.0", "9e0"} {
+		t.Run(token, func(t *testing.T) {
+			original := `{"schema_version":` + token + `,"skills_root":"x","projects":{}}`
+			path := authEditFixture(t, original)
+			plan, err := PlanClaudeAuth(path, authEditSelection())
+			if token == "9" {
+				if err != nil || plan == nil || plan.SchemaFrom != 9 || plan.SchemaTo != 9 {
+					t.Fatalf("integer positive plan: %v", err)
+				}
+				if _, err := ApplyClaudeAuth(context.Background(), authEditRequest(t, path)); err != nil {
+					t.Fatal(err)
+				}
+				cfg, err := Load(path, nil)
+				if err != nil || cfg == nil || cfg.Schema != 9 {
+					t.Fatalf("integer positive apply: %v", err)
+				}
+				return
+			}
+			if plan != nil || !errors.Is(err, ErrClaudeAuthEditRefused) {
+				t.Fatalf("integer-token edit refusal: %v", err)
+			}
+			policy, err := claudeAuthPolicy()
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := ApplyClaudeAuth(context.Background(), ClaudeAuthEditRequest{Path: path, Selection: authEditSelection(), ExpectSourceSHA256: claudeAuthSHA([]byte(original)), ExpectResultSHA256: claudeAuthSHA([]byte(original)), ExpectPolicySHA256: policy})
+			actual, readErr := os.ReadFile(path)
+			if result != nil || !errors.Is(err, ErrClaudeAuthEditRefused) || readErr != nil || string(actual) != original || len(authEditBackups(t, path)) != 0 {
+				t.Fatalf("integer-token apply refusal changed state: %v", err)
+			}
+		})
+	}
+}

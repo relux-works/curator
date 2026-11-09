@@ -288,13 +288,19 @@ func (c cli) run(args []string) int {
 		return exitUsage
 	}
 	if rejectsTakeover(args) {
-		if len(args) > 1 && args[0] == "skill" && args[1] == "validate-codex" && !hasHelpFlag(args[2:]) {
-			for _, arg := range args[2:] {
+		if len(args) > 1 && args[0] == "skill" && args[1] == "validate-codex" {
+			var commandArgs []string
+			for index, arg := range args {
+				if index >= 2 {
+					commandArgs = append(commandArgs, arg)
+				}
+			}
+			for _, arg := range commandArgs {
 				if arg == "--" {
 					break
 				}
-				if arg == "--json" {
-					return c.cmdSkillValidateCodex(args[2:])
+				if arg == "--json" && !hasHelpFlag(commandArgs) {
+					return c.cmdSkillValidateCodex(commandArgs)
 				}
 			}
 		}

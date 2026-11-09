@@ -1131,3 +1131,7 @@ internal/config	TestClaudeAuthClaudeEnvRoundTrip	linux,darwin	-	-	schema9 auth r
 internal/config	TestLauncherClaudeEnvSharedLoader	linux,darwin,windows	-	-	transactional common loader preserves explicit Claude selection refusal and missing-policy identity beside valid policy control
 internal/config	TestLauncherSystemPolicyDiagnosticBoundary	linux,darwin,windows	-	-	unspecified system-policy errors remain untyped with unchanged source and policy beside valid policy and defined lock controls
 internal/config	TestClaudeAuthNotificationRestoreCarrierGuard	linux,darwin	-	-	absent notification equivalent backup cannot downgrade schema8; same-carrier restore preserves recovery bytes
+internal/config	TestClaudeAuthClaudeEnvRestoreCarrierGuard	linux,darwin	-	-	equivalent absent-selection backups cannot downgrade schema9 to schema8 or schema7; same-carrier restore remains valid
+internal/config	TestClaudeAuthClaudeEnvVersionTokens	linux,darwin	-	-	auth editor admits integer9 but refuses decimal and exponent tokens without source or recovery writes
+internal/config	TestLauncherClaudeEnvVersionTokens	linux,darwin,windows	-	-	raw schema9 integer token required with fixed integer diagnostic and unchanged selected bytes
+internal/config	TestLauncherClaudeEnvDiagnosticOrder	linux,darwin,windows	-	-	forbidden schema8 Claude member diagnostic is deterministic beside unknown name over repeated loads with valid schema8 and schema9 neighbours
