@@ -151,3 +151,48 @@ func TestLauncherClaudeEnvInvalidCorpusControls(t *testing.T) {
 		t.Fatalf("expected exactly eight declaration-invalid vectors, got %d", count)
 	}
 }
+
+// Transactional editors use loadObject directly: it must retain the same
+// explicit-selection discovery marker and wrapped missing-policy identity as
+// Load. A valid policy is the nearby control; failed reads create no policy.
+func TestLauncherClaudeEnvSharedLoader(t *testing.T) {
+	for _, explicit := range []bool{false, true} {
+		t.Run(fmt.Sprint(explicit), func(t *testing.T) {
+			dir := t.TempDir()
+			policy := filepath.Join(dir, "policy.json")
+			bytes := []byte(`{"schema_version":2,"locked":[]}`)
+			if err := os.WriteFile(policy, bytes, 0600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("CURATOR_SYSTEM_CONFIG", policy)
+			text := `{"schema_version":9,"skills_root":"x","projects":{}}`
+			if explicit {
+				text = claudeEnvCarrier(claudeEnvControl)
+			}
+			var object map[string]any
+			if err := json.Unmarshal([]byte(text), &object); err != nil {
+				t.Fatal(err)
+			}
+			if cfg, err := loadObject(filepath.Join(dir, "machine.json"), object, nil); err != nil || cfg == nil {
+				t.Fatalf("positive common-loader control: %v", err)
+			}
+			actual, err := os.ReadFile(policy)
+			if err != nil || string(actual) != string(bytes) {
+				t.Fatal("common loader changed policy")
+			}
+			missing := filepath.Join(dir, "missing.json")
+			t.Setenv("CURATOR_SYSTEM_CONFIG", missing)
+			cfg, err := loadObject(filepath.Join(dir, "machine.json"), object, nil)
+			if cfg != nil || !errors.Is(err, ErrConfigNotFound) || IsLauncherSelectionRefusal(err) != explicit {
+				t.Fatalf("shared loader lost error identity or signal: %v", err)
+			}
+			if _, err := os.Lstat(missing); !os.IsNotExist(err) {
+				t.Fatal("failed read created policy")
+			}
+			actual, err = os.ReadFile(policy)
+			if err != nil || string(actual) != string(bytes) {
+				t.Fatal("failed read changed policy")
+			}
+		})
+	}
+}

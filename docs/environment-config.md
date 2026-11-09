@@ -513,6 +513,8 @@ Schema 9 preserves the schema-8 carrier and adds the optional closed
 configuration schemas retain their previous projection versions and reject
 this new member. Ordinary project and environment edits retain schema 9,
 unrelated fields, and all proxy, authentication and notification selections.
+Claude-auth plan/apply/restore admits and preserves schema 9 and includes
+`claude_env` in its guarded non-auth comparison.
 
 ```json
 {

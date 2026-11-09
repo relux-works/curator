@@ -1225,9 +1225,10 @@ machine path follows ordinary discovery, including `CURATOR_CONFIG`. The
 writer supports Unix owner/mode and no-follow semantics; other platforms
 refuse this operation.
 
-Plan supports schema 2 to 7, schema 7 to 7 and schema 8 to 8, preserving
+Plan supports schema 2 to 7, schema 7 to 7, schema 8 to 8 and schema 9 to 9, preserving
 existing proxy, notification and unrelated declarations. Apply and restore
-preserve the schema-8 carrier and reject a notification change or downgrade. It refuses other schemas, including newer carriers,
+preserve schema-8/9 carriers and reject notification or Claude environment
+selection changes and carrier downgrades. It refuses other schemas, including newer carriers,
 and allocates no new schema version. A missing, nonregular, linked,
 non-private, differently owned or system configuration source refuses. JSON
 grammar and reference validation reject unknown/duplicate fields, inline
