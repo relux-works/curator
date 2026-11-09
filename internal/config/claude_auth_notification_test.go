@@ -107,3 +107,55 @@ func TestClaudeAuthNotificationRefusals(t *testing.T) {
 		})
 	}
 }
+
+// With no non-auth selections to mask the schema guard, an equivalent older
+// backup must not downgrade the admitted carrier. Same-carrier restore works.
+func TestClaudeAuthNotificationRestoreCarrierGuard(t *testing.T) {
+	assertClaudeAuthRestoreCarrierGuard(t, 8, []int{8, 7})
+}
+
+func assertClaudeAuthRestoreCarrierGuard(t *testing.T, currentSchema int, backupSchemas []int) {
+	t.Helper()
+	for _, savedSchema := range backupSchemas {
+		t.Run(fmt.Sprintf("schema%d/backup%d", currentSchema, savedSchema), func(t *testing.T) {
+			original := fmt.Sprintf(`{"schema_version":%d,"skills_root":"x","projects":{}}`, currentSchema)
+			path := authEditFixture(t, original)
+			result, err := ApplyClaudeAuth(context.Background(), authEditRequest(t, path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			current, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			saved := []byte(fmt.Sprintf(`{"schema_version":%d,"skills_root":"x","projects":{}}`, savedSchema))
+			if err := os.WriteFile(result.BackupPath, saved, 0600); err != nil {
+				t.Fatal(err)
+			}
+			before, err := claudeAuthObject(current)
+			if err != nil {
+				t.Fatal(err)
+			}
+			after, err := claudeAuthObject(saved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !claudeAuthEquivalent(path, before, after) {
+				t.Fatal("fixture must reach the carrier guard with equivalent non-auth state")
+			}
+			restored, err := RestoreClaudeAuth(context.Background(), ClaudeAuthRestoreRequest{Path: path, BackupPath: result.BackupPath, ExpectCurrentSHA256: claudeAuthSHA(current), ExpectBackupSHA256: claudeAuthSHA(saved)})
+			actual, readErr := os.ReadFile(path)
+			backup, backupErr := os.ReadFile(result.BackupPath)
+			if savedSchema == currentSchema {
+				if err != nil || restored == nil || string(actual) != original {
+					t.Fatalf("same-carrier positive restore: %v", err)
+				}
+			} else if !errors.Is(err, ErrClaudeAuthEditRefused) || restored != nil || !bytes.Equal(actual, current) {
+				t.Fatalf("carrier downgrade must refuse without writes: %v", err)
+			}
+			if readErr != nil || backupErr != nil || !bytes.Equal(backup, saved) || len(authEditBackups(t, path)) != 1 {
+				t.Fatal("restore changed recovery state")
+			}
+		})
+	}
+}

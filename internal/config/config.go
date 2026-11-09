@@ -322,12 +322,7 @@ func Load(path string, warn func(string)) (*Config, error) {
 
 // loadObject is the ordinary loader's shared overlay/parser path. A metadata
 // transaction can validate its in-memory candidate without publishing a file.
-func loadObject(path string, userData map[string]any, warn func(string)) (result *Config, failure error) {
-	defer func() {
-		if failure != nil {
-			failure = configDiagnostic("config_shape_invalid", "$", failure)
-		}
-	}()
+func loadObject(path string, userData map[string]any, warn func(string)) (*Config, error) {
 	machineData := userData
 	userIsolation := userIsolationFromConfig(userData)
 	locked := map[string]bool{}
@@ -337,6 +332,12 @@ func loadObject(path string, userData map[string]any, warn func(string)) (result
 		systemPath = resolved
 		systemData, err := readObject(systemPath)
 		if err != nil {
+			// Corpus file diagnostics describe the selected machine file, not
+			// system-policy reads. Preserve the policy error text and cause.
+			var diagnostic *Diagnostic
+			if errors.As(err, &diagnostic) {
+				err = diagnostic.Unwrap()
+			}
 			return nil, err
 		}
 		systemDataForSources = systemData
