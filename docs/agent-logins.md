@@ -188,6 +188,10 @@ mapping warning, with no credential link or placeholder. Explicit file
 and all other adapters are unchanged. Refresh and concurrent refresh
 remain unqualified. This draft revises the earlier D10 mapping locally;
 external specification/consumer adoption and landing await owner acceptance.
+The frozen file-only v4 schema still rejects this proposed native form; its
+published fixtures remain unchanged. Tests assert that incompatibility and
+check native emission against the revised producer boundary. They do not
+claim conformance to an adopted successor schema or external consumer.
 
 Changing the selector never migrates or deletes a login. Inspect and
 explicitly migrate a recorded backend or link conflict before launching.

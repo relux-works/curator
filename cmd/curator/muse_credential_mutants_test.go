@@ -14,7 +14,8 @@ import (
 
 // Narrow one forbidden class at a time while retaining the surrounding gate.
 // Only a named behavioral failure with go test exit 1 counts as a kill.
-// The renderer plant drops only the mandatory backend; it is producer evidence,
+// The renderer plant drops the backend mandatory under explicit file policy;
+// the boundary plant now targets that policy's presence check. This is producer evidence,
 // not the separately required real hosted-consumer override plant.
 func TestMuseCredentialPolicyNarrowingMutants(t *testing.T) {
 	mutants := []struct{ name, file, before, after, pkg, test string }{
@@ -25,7 +26,7 @@ func TestMuseCredentialPolicyNarrowingMutants(t *testing.T) {
 		{"renderer-drops-only-backend", "internal/envfragment/envfragment.go", "for name := range f.Env {", "for name := range f.Env {\nif name == \"TBH_CREDENTIAL_BACKEND\" { continue }", "./cmd/curator", "TestMuseCLIStorePolicy"},
 		{"header-only-root-fact-dropped", "internal/envprofile/managed.go", "fragment.RootContext = &envfragment.RootContext{Exclusive: true}", "fragment.RootContext = &envfragment.RootContext{Exclusive: true}\nif raw, e := os.ReadFile(filepath.Join(plan.homeDir,\"config/muse/AGENTS.md\")); e == nil && !strings.Contains(string(raw), \"## Context:\") { fragment.RootContext = nil }", "./cmd/curator", "TestMuseRootContextVectors/zero-applicable"},
 		{"boundary-admits-HOME", "internal/envfragment/envfragment.go", "if !allowed[name] {", "if !allowed[name] && !(adapter.ID == envregistry.Muse && name == \"HOME\") {", "./internal/envfragment", "TestMuseFragmentBoundary/HOME"},
-		{"boundary-admits-missing-literal", "internal/envfragment/envfragment.go", "fragment.Env[\"TBH_CREDENTIAL_BACKEND\"] != \"file\"", "(fragment.Env[\"TBH_CREDENTIAL_BACKEND\"] != \"file\" && fragment.Env[\"TBH_CREDENTIAL_BACKEND\"] != \"\")", "./internal/envfragment", "TestMuseFragmentBoundary/missing-literal"},
+		{"boundary-admits-missing-literal", "internal/envfragment/envfragment.go", "if !forced || backend != \"file\" {", "if forced && backend != \"file\" {", "./internal/envfragment", "TestMuseFragmentBoundary/missing-literal"},
 		{"boundary-admits-false-root", "internal/envfragment/envfragment.go", "adapter.ID != envregistry.Muse || !fragment.RootContext.Exclusive", "adapter.ID != envregistry.Muse", "./internal/envfragment", "TestMuseFragmentBoundary/false-root"},
 		{"unrelated-root-mints-fact", "internal/envprofile/managed.go", "if _, ok := plan.marker.Surfaces[envmarker.SurfaceRootContext]; ok {", "_, ok := plan.marker.Surfaces[envmarker.SurfaceRootContext]; if !ok { _, e := os.Stat(filepath.Join(req.Home, \"AGENTS.md\")); ok = e == nil }; if ok {", "./cmd/curator", "TestMuseRootContextVectors/no-context"},
 		{"linked-root-fact-dropped", "internal/envprofile/managed.go", "fragment.RootContext = &envfragment.RootContext{Exclusive: true}", "fragment.RootContext = &envfragment.RootContext{Exclusive: true}\nif info, e := os.Lstat(filepath.Join(plan.homeDir, \"config/muse/AGENTS.md\")); e == nil && info.Mode()&os.ModeSymlink != 0 { fragment.RootContext = nil }", "./cmd/curator", "TestMuseRootContextVectors/monolithic"},

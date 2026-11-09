@@ -91,6 +91,8 @@ qualified Codex v5 delivery and adopted external sources remain separate work.
 Muse v4 carries `root_context: {"exclusive": true}` exactly when resolve
 verifies a declared root surface, including header-only output. Old v1–v3
 readers reject the successor; consumers must support v4 before managed launch.
+A file-only v4 consumer also rejects the proposed shared-native form; external
+schema and consumer adoption remain pending owner acceptance.
 This producer change does not qualify an external launcher or refresh behavior.
 `env status` reports each verified Muse policy's effective `native` or `file` backend and
 shared/isolated mode without reading credential payloads. Its standing note
