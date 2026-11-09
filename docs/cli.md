@@ -1200,6 +1200,12 @@ The closed transport is `curator.launcher-config/1`, with `config_schema`,
 `config_path` (the actual selected source) and `extensions`. Older supported
 schemas export an empty `extensions` object. Schema 7 may export typed `proxy`
 and `claude_auth` references; see [machine configuration](environment-config.md).
+Schema 8 exports `curator.launcher-config/2` and may additionally carry the closed
+`notification` selection. Absent or explicit `off` selection enables no
+notification backend. A `host` selection supplies only the supported contract
+and immutable workflow reference/digest; it does not prove runtime capability,
+workflow authorization, enrollment or attachment readiness. Consumers must
+validate the version and their actual selected capability before using it.
 The output contains references, never credential material. Do not use it as an
 authentication or proxy qualification result.
 
@@ -1219,8 +1225,9 @@ machine path follows ordinary discovery, including `CURATOR_CONFIG`. The
 writer supports Unix owner/mode and no-follow semantics; other platforms
 refuse this operation.
 
-Plan supports schema 2 to 7 and schema 7 to 7, preserving existing proxy and
-unrelated declarations. It refuses other schemas, including newer carriers,
+Plan supports schema 2 to 7, schema 7 to 7 and schema 8 to 8, preserving
+existing proxy, notification and unrelated declarations. Apply and restore
+preserve the schema-8 carrier and reject a notification change or downgrade. It refuses other schemas, including newer carriers,
 and allocates no new schema version. A missing, nonregular, linked,
 non-private, differently owned or system configuration source refuses. JSON
 grammar and reference validation reject unknown/duplicate fields, inline

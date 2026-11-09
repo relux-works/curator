@@ -168,7 +168,7 @@ type Execution struct {
 // Config is the effective machine configuration.
 type Config struct {
 	Path string
-	// Schema is the effective schema_version: 1, 2, 3, 5, or 7.
+	// Schema is the effective schema_version: 1, 2, 3, 5, 7, or 8.
 	Schema     int
 	Extensions *LauncherExtensions
 	// Env is the effective environments §12.1 machine configuration with
@@ -332,6 +332,12 @@ func loadObject(path string, userData map[string]any, warn func(string)) (*Confi
 		systemPath = resolved
 		systemData, err := readObject(systemPath)
 		if err != nil {
+			// Corpus file diagnostics describe the selected machine file, not
+			// system-policy reads. Preserve the policy error text and cause.
+			var diagnostic *Diagnostic
+			if errors.As(err, &diagnostic) {
+				err = diagnostic.Unwrap()
+			}
 			return nil, err
 		}
 		systemDataForSources = systemData
@@ -380,7 +386,7 @@ func userIsolationFromConfig(data map[string]any) map[string]map[string]string {
 // and the locked set the caller records on the effective configuration.
 func applySystem(systemData, userData map[string]any, systemPath string, warn func(string)) (map[string]any, map[string]bool, error) {
 	if _, present := systemData["extensions"]; present {
-		return nil, nil, fmt.Errorf("extensions: launcher selections belong only to the selected machine configuration")
+		return nil, nil, configDiagnostic("launcher_selection_machine_only", "extensions", fmt.Errorf("extensions: launcher selections belong only to the selected machine configuration"))
 	}
 	systemSchema, ok := integerValue(systemData["schema_version"])
 	if !ok || (systemSchema != SchemaVersion && systemSchema != SchemaVersion2) {
@@ -408,6 +414,9 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		key, ok := item.(string)
 		if !ok {
 			return nil, nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
+		}
+		if key == "extensions" || strings.HasPrefix(key, "extensions.") {
+			return nil, nil, configDiagnostic("launcher_selection_machine_only", "extensions", fmt.Errorf("extensions: launcher selections belong only to the selected machine configuration"))
 		}
 		if strings.HasPrefix(key, "environments.") {
 			if systemSchema != SchemaVersion2 {
@@ -570,7 +579,12 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	return parseConfig(data, path, nil, data, nil)
 }
 
-func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (*Config, error) {
+func parseConfig(data map[string]any, path string, locked map[string]bool, machineData, systemData map[string]any) (result *Config, failure error) {
+	defer func() {
+		if failure != nil {
+			failure = configDiagnostic("config_shape_invalid", "$", failure)
+		}
+	}()
 	for key := range data {
 		if !managerKeys[key] {
 			return nil, verr.New("config", "unsupported top-level configuration field")
@@ -578,18 +592,18 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	}
 	schema, ok := integerValue(data["schema_version"])
 	if !ok {
-		return nil, verr.New("schema_version", "must be an integer")
+		return nil, configDiagnostic("config_schema_unsupported", "schema_version", verr.New("schema_version", "must be an integer"))
 	}
-	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 {
-		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
+	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8 {
+		return nil, configDiagnostic("config_schema_unsupported", "schema_version", verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema))
 	}
 	var extensions *LauncherExtensions
 	if raw, present := data["extensions"]; present {
-		if schema != SchemaVersion7 {
-			return nil, fmt.Errorf("extensions: requires manager-config schema_version 7")
+		if schema != SchemaVersion7 && schema != SchemaVersion8 {
+			return nil, configDiagnostic("launcher_extensions_schema", "extensions", fmt.Errorf("extensions: requires manager-config schema_version 7 or 8"))
 		}
 		var err error
-		extensions, err = parseLauncherExtensions(raw)
+		extensions, err = parseLauncherExtensions(raw, schema)
 		if err != nil {
 			return nil, err
 		}
@@ -1289,17 +1303,9 @@ func readObject(path string) (map[string]any, error) {
 		return nil, err
 	}
 	if err := protocoljson.Validate(payload); err != nil {
-		return nil, fmt.Errorf("malformed JSON in config %s", path)
+		return nil, configDiagnostic("config_json_invalid", "$", fmt.Errorf("malformed JSON in config %s", path))
 	}
-	var raw any
-	if err := json.Unmarshal(payload, &raw); err != nil {
-		return nil, fmt.Errorf("malformed JSON in config %s: %w", path, err)
-	}
-	obj, ok := raw.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("config %s must be a JSON object", path)
-	}
-	return obj, nil
+	return decodeConfigObject(payload, path)
 }
 
 func stringList(raw any, field string) ([]string, error) {

@@ -129,7 +129,8 @@ func TestClaudeAuthEditPreflightRefusals(t *testing.T) {
 	for _, text := range []string{
 		`{"schema_version":1,"skills_root":"x","projects":{}}`, `{"schema_version":3,"skills_root":"x","projects":{}}`,
 		`{"schema_version":5,"skills_root":"x","projects":{}}`, `{"schema_version":6,"skills_root":"x","projects":{}}`,
-		`{"schema_version":8,"skills_root":"x","projects":{}}`, `{"schema_version":2,"schema_version":7,"skills_root":"x","projects":{}}`,
+		`{"schema_version":8,"skills_root":"x","projects":{},"extensions":{"notification":null}}`,
+		`{"schema_version":8.0,"skills_root":"x","projects":{}}`, `{"schema_version":8e0,"skills_root":"x","projects":{}}`, `{"schema_version":2,"schema_version":7,"skills_root":"x","projects":{}}`,
 		`{"schema_version":2,"skills_root":"x","projects":{},"HOSTILE_SECRET_KEY":"HOSTILE_SECRET_VALUE"}`,
 		`{"schema_version":7,"skills_root":"x","projects":{},"extensions":{"claude_auth":{"type":"oauth","token":"HOSTILE_SECRET_VALUE","store":{"type":"keychain","service":"s","account":"a"}}}}`,
 	} {

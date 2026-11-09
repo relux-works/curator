@@ -129,8 +129,8 @@ func claudeAuthObject(raw []byte) (map[string]any, error) {
 	if protocoljson.Validate(raw) != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
-	var object map[string]any
-	if json.Unmarshal(raw, &object) != nil || object == nil {
+	object, err := decodeConfigObject(raw, "")
+	if err != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	return object, nil
@@ -246,7 +246,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 		return nil, err
 	}
 	version, ok := integerValue(before["schema_version"])
-	if !ok || (version != 2 && version != 7) {
+	if !ok || (version != 2 && version != SchemaVersion7 && version != SchemaVersion8) {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	if _, err := loadObject(path, before, nil); err != nil {
@@ -260,7 +260,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 	if json.Unmarshal(selectedBytes, &selected) != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
-	if _, err := parseLauncherExtensions(map[string]any{"claude_auth": selected}); err != nil {
+	if _, err := parseLauncherExtensions(map[string]any{"claude_auth": selected}, SchemaVersion7); err != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	after, err := claudeAuthObject(source.raw)
@@ -273,8 +273,12 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 	}
 	extensions["claude_auth"] = selected
 	after["extensions"] = extensions
-	after["schema_version"] = float64(7)
-	// Defense in depth: for currently valid schema-2/7 sources this constructor
+	targetSchema := version
+	if targetSchema == 2 {
+		targetSchema = SchemaVersion7
+	}
+	after["schema_version"] = float64(targetSchema)
+	// Defense in depth: for currently valid schema-2/7/8 sources this constructor
 	// changes only schema/auth, so no valid input currently reaches the refusal.
 	// Restore independently needs this check for later unrelated edits.
 	if !claudeAuthEquivalent(path, before, after) {
@@ -296,7 +300,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 		}
 	}
 	sort.Strings(keys)
-	return &ClaudeAuthEditPlan{ConfigPath: path, SourceSHA256: source.sha, CandidateSHA256: claudeAuthSHA(raw), PolicySHA256: policy, SchemaFrom: version, SchemaTo: 7, ClaudeAuth: selection, PreservedTopLevelKeys: keys, candidate: raw, source: source}, nil
+	return &ClaudeAuthEditPlan{ConfigPath: path, SourceSHA256: source.sha, CandidateSHA256: claudeAuthSHA(raw), PolicySHA256: policy, SchemaFrom: version, SchemaTo: targetSchema, ClaudeAuth: selection, PreservedTopLevelKeys: keys, candidate: raw, source: source}, nil
 }
 
 func syncClaudeAuthDirectory(path string) error {
@@ -547,9 +551,14 @@ func restoreClaudeAuth(ctx context.Context, req ClaudeAuthRestoreRequest, ops cl
 	}
 	for _, obj := range []map[string]any{before, after} {
 		v, ok := integerValue(obj["schema_version"])
-		if !ok || (v != 2 && v != 7) {
+		if !ok || (v != 2 && v != SchemaVersion7 && v != SchemaVersion8) {
 			return nil, ErrClaudeAuthEditRefused
 		}
+	}
+	currentSchema, _ := integerValue(before["schema_version"])
+	savedSchema, _ := integerValue(after["schema_version"])
+	if currentSchema >= SchemaVersion8 && savedSchema != currentSchema {
+		return nil, ErrClaudeAuthEditRefused
 	}
 	if !claudeAuthEquivalent(path, before, after) {
 		return nil, ErrClaudeAuthEditRefused

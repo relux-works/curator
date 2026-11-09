@@ -304,12 +304,17 @@ curator config build-ssh    # configure SSH credentials for external build repos
 curator config build-https  # configure HTTPS credentials for external build repos
 ```
 
+Machine configuration schema 8 adds optional Host notification workflow
+references to the metadata export. It preserves existing proxy and OAuth
+selections. Exporting the selection does not launch or enroll a session; see
+[selected launcher metadata](docs/environment-config.md#selected-launcher-metadata-schema-7).
+
 </details>
 
-`config claude-auth` validates a schema-2 or schema-7 machine file, creates a
+`config claude-auth` validates a schema-2, schema-7 or schema-8 machine file, creates a
 private candidate, and applies inspected bytes with source, result and system
 policy digest guards. It retains an exact private backup for guarded restore.
-Restore refuses later unrelated extension changes, including proxy selection.
+Restore refuses later unrelated extension changes, including proxy and notification selections.
 It never resolves credentials. See the [command contract](docs/cli.md#curator-config-claude-auth)
 for phase outcomes and the exclusive-custody requirement.
 
