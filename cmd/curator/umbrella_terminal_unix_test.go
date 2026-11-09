@@ -38,7 +38,8 @@ func TestUmbrellaProviderTerminal(t *testing.T) {
 	_, providerDir := buildUmbrellaSignalFixture(t)
 	master, slave := openUmbrellaPTY(t)
 	child := exec.Command(os.Args[0], "-test.run=^TestUmbrellaProviderTerminal$")
-	child.Env = append(os.Environ(), cliHelperProcess+"=1", "UMBRELLA_PTY_PROVIDER="+providerDir+"/curator-run")
+	// TERM=dumb prevents termenv's startup OSC queries from consuming the PTY ready timeout.
+	child.Env = append(os.Environ(), cliHelperProcess+"=1", "UMBRELLA_PTY_PROVIDER="+providerDir+"/curator-run", "TERM=dumb")
 	child.Stdin, child.Stdout, child.Stderr = slave, slave, slave
 	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
 	if err := child.Start(); err != nil {
