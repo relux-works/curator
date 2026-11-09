@@ -11,10 +11,10 @@ evidence out of public source and PR metadata.
 
 ```text
 Task: <title and element ID>
-Board root: <canonical absolute project root used by the board tool>
+Board directory: <canonical absolute board directory from local.board_dir, for --board-dir>
 Board access: <authorized host/tool context, or receiver-side mapping to this same board>
-Outcome resource: <resource ID or supported resource locator on that board>
-Resource binding: <same board root, owning element ID, outcome resource ID>
+Outcome resource: <resource name or supported resource locator on that board>
+Resource binding: <same board directory, owning element ID, outcome resource name>
 Outcome SHA-256: <digest of the exact resource bytes>
 Read-back evidence: <supported tool, explicit board binding, actual result and time>
 Source: <repository and full candidate commit, when applicable>
@@ -32,6 +32,19 @@ the stated board binding to read the element and its outcome resource. Record
 the actual read result and verify the resource digest. If the receiver uses a
 different host, agree the mapping to the same board rather than reusing a
 sender-local path as though it existed there.
+
+For a local board, `Board directory` names the configured `local.board_dir`,
+resolved against the owning project root, rather than the project root itself.
+Set `BOARD_DIR` to that directory, `TASK_ID` to the owning element ID and
+`RESOURCE_NAME` to the outcome resource name. Read both with the explicit binding:
+
+```sh
+task-board --board-dir "$BOARD_DIR" q "get($TASK_ID)"
+task-board --board-dir "$BOARD_DIR" resource get "$TASK_ID" "$RESOURCE_NAME" -o -
+```
+
+Both reads must resolve on the named board; compare the returned resource bytes
+with the supplied digest.
 
 The receiver must use that explicit board binding for the supported element
 and resource reads, then compare the owning element and exact resource digest.
