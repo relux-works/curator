@@ -338,7 +338,8 @@ curator env login codex_cli --profile P
 
 Resolve or repair the home explicitly before `env login` when needed.
 For Muse, isolated mode and explicit file retain the rc.7 file contract;
-shared native leaves the vendor backend unset. Linux behavior still needs
+shared native/unset on Linux and every non-darwin OS retains effective file,
+`TBH_CREDENTIAL_BACKEND=file`, and the operator-file link. Linux behavior still needs
 a versioned vendor probe. On a qualified file backend, prepare a shared
 native Muse login before applying managed XDG exports:
 
