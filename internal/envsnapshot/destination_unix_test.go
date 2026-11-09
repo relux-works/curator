@@ -66,7 +66,12 @@ func TestDestinationSandboxCheckoutIndependence(t *testing.T) {
 		}
 	})
 	t.Setenv("HOME", fixtureHome)
-	shared := filepath.Join(t.TempDir(), "shared")
+	// Resolve the scratch prefix so the walk reaches the sticky ancestor on macOS.
+	scratch, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared := filepath.Join(scratch, "shared")
 	checkout := filepath.Join(shared, "checkout")
 	packageDir := filepath.Join(checkout, "internal", "envsnapshot")
 	if err := os.MkdirAll(packageDir, 0700); err != nil {
