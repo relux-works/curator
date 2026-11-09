@@ -260,7 +260,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 	if json.Unmarshal(selectedBytes, &selected) != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
-	if _, err := parseLauncherExtensions(map[string]any{"claude_auth": selected}); err != nil {
+	if _, err := parseLauncherExtensions(map[string]any{"claude_auth": selected}, SchemaVersion7); err != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	after, err := claudeAuthObject(source.raw)
