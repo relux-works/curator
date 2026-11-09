@@ -103,6 +103,97 @@ func TestUnixTestHomeCleanup(t *testing.T) {
 	}
 }
 
+// An unremovable home turns child success into failure without hiding a child
+// failure. Writable-parent neighbours prove that ordinary cleanup still succeeds.
+func TestUnixTestHomeCleanupFailure(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("requires unprivileged Unix directory permissions")
+	}
+	wrapper, err := filepath.Abs("../../.github/ci/isolated-test.cjs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name                    string
+		blocked                 bool
+		childStatus, wantStatus int
+	}{
+		{"success", false, 0, 0},
+		{"cleanup-failure", true, 0, 1},
+		{"child-failure", false, 7, 7},
+		{"cleanup-and-child-failure", true, 7, 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, marker := t.TempDir(), filepath.Join(t.TempDir(), "home")
+			t.Cleanup(func() {
+				if err := os.Chmod(root, 0o700); err != nil {
+					t.Error(err)
+				}
+			})
+			program := `const fs=require('node:fs'); fs.writeFileSync(process.env.MARKER,process.env.HOME);`
+			if tc.blocked {
+				program += `fs.chmodSync(process.env.TMPDIR,0o500);`
+			}
+			if tc.childStatus != 0 {
+				program += `process.exit(7);`
+			}
+			cmd := exec.Command(node, wrapper, node, "-e", program)
+			cmd.Env = wrapperFixtureEnv(root, marker, "")
+			out, runErr := cmd.CombinedOutput()
+			status := 0
+			if runErr != nil {
+				exit, ok := runErr.(*exec.ExitError)
+				if !ok {
+					t.Fatalf("wrapper launch: %v: %s", runErr, out)
+				}
+				status = exit.ExitCode()
+			}
+			if status != tc.wantStatus {
+				t.Errorf("wrapper exit %d, want %d: %s", status, tc.wantStatus, out)
+			}
+			const diagnostic = "isolated-test: temporary home cleanup failed"
+			if strings.Contains(string(out), diagnostic) != tc.blocked {
+				t.Errorf("cleanup failure diagnostic: got %q, blocked=%v", out, tc.blocked)
+			}
+			home, err := os.ReadFile(marker)
+			if err != nil {
+				t.Fatal(err)
+			}
+			physicalRoot, err := filepath.EvalSymlinks(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if filepath.Dir(string(home)) != physicalRoot || !strings.HasPrefix(filepath.Base(string(home)), "curator-test-home-") {
+				t.Fatalf("unexpected fixture home: %q", home)
+			}
+			info, err := os.Lstat(string(home))
+			if tc.blocked {
+				if err != nil || !info.IsDir() {
+					t.Fatalf("unremovable home not retained for recovery: %v", err)
+				}
+				parent, err := os.Stat(root)
+				if err != nil || parent.Mode().Perm() != 0o500 {
+					t.Fatalf("cleanup changed denied parent permissions: %v", err)
+				}
+				// Only the fixture owner restores access after observing the refusal.
+				if err := os.Chmod(root, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.RemoveAll(string(home)); err != nil {
+					t.Fatal(err)
+				}
+			} else if !os.IsNotExist(err) {
+				t.Fatalf("child home retained after successful cleanup: %v", err)
+			}
+			assertNoWrapperHomes(t, root)
+		})
+	}
+}
+
 func wrapperFixtureEnv(root, marker, outside string) []string {
 	var env []string
 	for _, entry := range os.Environ() {
