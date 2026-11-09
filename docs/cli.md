@@ -25,6 +25,46 @@ Arguments after `--` are operands; `curator run codex -- -h` forwards the litera
 - `--tag string`: set git tag for skill repositories.
 - `--source string`: set source directory under `skills_root`.
 
+## Environment profiles
+
+### curator profile update
+
+```bash
+curator profile update [<name>|--all] [--revision <ref>|--tag <tag>|--range <range>] [--takeover] [--confirm-system-delta]
+```
+
+Without a requirement flag, re-resolve the declared requirements of the named
+profile, the current machine profile when no name is given, or every installed
+non-builtin profile with `--all`. Exact revision roots stay pinned.
+
+With one requirement flag, repin one explicitly named Git profile in place.
+Only the root requirement changes; the installed Git URL and package directory
+stay fixed. Resolution, strict audit, system-module admission, overlay
+resolution, missing-pin rules and scope rematerialization use the ordinary
+update pipeline. Existing running seats can retain their homes; removing the
+profile is unnecessary.
+
+- `--revision <ref>`: replace the root requirement with an exact Git revision.
+- `--tag <tag>`: replace it with a Git tag.
+- `--range <range>`: replace it with a version range over tags.
+- `--confirm-system-delta`: acknowledge system-module or MCP declaration changes
+  for this operation, as on ordinary update.
+- `--takeover`: consent to replacing unmanaged files that rematerialization
+  would write, with the ordinary backups.
+
+At most one requirement flag is allowed. Requirement flags on a path or builtin
+profile, with `--all`, without an explicit name, or with an empty value are usage
+errors (`profile_install_ref_conflict`, exit 2). Update accepts no URL or directory
+replacement. Installing a different URL, directory or requirement under an
+existing name still refuses `profile_name_taken`; use update to change only the
+requirement.
+
+A refused repin preserves the stored source/requirement, lock and homes. Source
+and successor lock are published together under the manager mutation lock.
+Acquisition and audit caches may refresh while checking a candidate. If the
+candidate resolves to the existing lock, print `<name>: unchanged` and leave the
+stored requirement and homes unchanged, even if the flag uses another form.
+
 ## Environment initialization and skill lifecycle
 
 <a id="bootstrap"></a>

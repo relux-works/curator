@@ -67,7 +67,7 @@ var commandRegistry = []commandSpec{
 	{"profile import", "[--as <name>] [--allow-lossy] [--use]", "Import the managed home as an environment profile.", "", nil},
 	{"profile list", "", "List installed environment profiles.", "", nil},
 	{"profile use", "<name> [--env <env-id>] [--target <target-id>] [--clear] [--takeover]", "Activate or clear an environment profile.", envAliasUsage + "\n", nil},
-	{"profile update", "[<name>] [--all] [--takeover] [--confirm-system-delta]", "Update installed environment profiles.", "", nil},
+	{"profile update", "[<name>|--all] [--range <range>|--tag <tag>|--revision <ref>] [--takeover] [--confirm-system-delta]", "Update installed environment profiles.", "Requirement flags repin one named Git root, preserving its source and directory. Path profiles and --all refuse requirement flags. Without flags, exact revisions stay pinned.\n", nil},
 	{"profile remove", "<name> [--purge]", "Remove an installed environment profile.", "", nil},
 	{"profile mcp", "<install|status|repair|restore|replace|remove|release> <profile> [flags]", "Inspect or first-install profile package MCP records.", "Ownership actions refuse until the separate authority capability is available.\n", nil},
 	{"profile mcp install", "<profile> [--env <id,id>] [--scope profile] [--dry-run] [--takeover]", "First-install absent records or refuse unavailable ownership actions.", "", nil},

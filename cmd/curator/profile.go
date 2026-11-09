@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"sort"
 	"strings"
@@ -279,13 +280,30 @@ func printEntryResult(c cli, result envprofile.EntryResult) {
 
 func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 	flags := c.newFlagSet("profile update")
+	rng := flags.String("range", "", "replace the Git root requirement with a version range")
+	tag := flags.String("tag", "", "replace the Git root requirement with a tag")
+	revision := flags.String("revision", "", "replace the Git root requirement with a revision")
 	all := flags.Bool("all", false, "update every installed profile")
 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the update would write")
 	confirmSystemDelta := flags.Bool("confirm-system-delta", false, "confirm system-module or MCP declaration changes")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || (*all && len(positional) != 0) || (!*all && len(positional) > 1) {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--takeover] [--confirm-system-delta]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--range <range>|--tag <tag>|--revision <ref>] [--takeover] [--confirm-system-delta]")
 		return exitUsage
+	}
+	var requirement *envprofile.Requirement
+	forms := 0
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "range" || f.Name == "tag" || f.Name == "revision" {
+			forms++
+		}
+	})
+	if forms > 0 {
+		if forms != 1 || (*rng == "" && *tag == "" && *revision == "") || *all || len(positional) != 1 {
+			_, _ = fmt.Fprintf(c.stderr, "curator: %s: requirement flags need one named Git profile and at most one of --range, --tag, --revision; --all is not allowed\n", envprofile.DiagRefConflict)
+			return exitUsage
+		}
+		requirement = &envprofile.Requirement{Range: *rng, Tag: *tag, Revision: *revision}
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
@@ -324,10 +342,13 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 		// nothing prints twice. The closed columns carry no per-profile
 		// prefix.
 		info, moved, err := envprofile.UpdateWithOptions(cfg.Home(), name, envprofile.UpdateOptions{
-			Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta,
+			Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta, RootRequirement: requirement,
 		})
 		if err != nil {
 			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", name, err)
+			if strings.Contains(err.Error(), envprofile.DiagRefConflict) {
+				return exitUsage
+			}
 			failed = true
 			if strings.Contains(err.Error(), envprofile.DiagSystemDeltaConfirmationRequired) {
 				break

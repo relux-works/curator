@@ -243,6 +243,7 @@ curator profile install <git-url|path> [--range|--tag|--revision] [--as <name>] 
 curator profile list    # installed profiles with locks and current markers
 curator profile use <name> [--env <env-id>]  # linked switch with backups and marker
 curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
+curator profile update myprofile --revision <commit>  # repin the same Git URL/directory in place
 curator profile remove <name> [--purge]  # refuse while current in any scope
 curator profile sync    # re-materialize current profiles across adapters
 curator env resolve <env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]

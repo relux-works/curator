@@ -852,7 +852,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			if isPath {
 				return reinstallPathLocked(op, home, name, source, input, options)
 			}
-			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil)
+			info, _, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, nil, nil)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -1179,6 +1179,9 @@ func Update(home, name string) (Info, bool, error) {
 
 // UpdateOptions selects one profile update.
 type UpdateOptions struct {
+	// RootRequirement replaces only the installed Git root's requirement.
+	// Nil preserves the declared requirement; source and directory never change.
+	RootRequirement *Requirement
 	// Policy carries the machine gates (§9.1).
 	Policy Policy
 	// ConfirmSystemDelta is the per-run §9.2 acknowledgement for a delta
@@ -1209,7 +1212,18 @@ func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
 
 // UpdateWithOptions re-resolves like UpdateWithPolicy and prints the §2.3
 // declaration rows to the options' sink at the required emission point.
-func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, error) {
+func UpdateWithOptions(home, name string, options UpdateOptions) (info Info, moved bool, resultErr error) {
+	if options.RootRequirement != nil {
+		forms := 0
+		for _, value := range []string{options.RootRequirement.Range, options.RootRequirement.Tag, options.RootRequirement.Revision} {
+			if value != "" {
+				forms++
+			}
+		}
+		if name == "" || forms != 1 {
+			return Info{}, false, fmt.Errorf("%s: a named Git profile requires exactly one of --range, --tag, --revision", DiagRefConflict)
+		}
+	}
 	if err := refusePreparedSkillPlanAdoption(home, name); err != nil {
 		return Info{}, false, err
 	}
@@ -1221,15 +1235,28 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (Info, bool, er
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile)
+	// Repin refusals also compensate a later surface conflict, using the same
+	// postimage-checked capture as paired profile publication.
+	if options.RootRequirement != nil {
+		op.undo = &globalUndo{entries: map[string]*globalImage{}, managerHome: home}
+		defer func() {
+			if resultErr != nil {
+				resultErr = errors.Join(resultErr, op.undo.restore())
+			}
+		}()
+	}
+	return updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile, options.RootRequirement)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error)) (Info, bool, error) {
+func updateLocked(op *operation, home, name string, policy Policy, sink, warningSink io.Writer, confirmSystemDelta bool, readRegularFile func(string) (stateread.File, error), requirement *Requirement) (Info, bool, error) {
 	if readRegularFile == nil {
 		readRegularFile = stateread.ReadRegularFile
 	}
 	defaultProfile := name == DefaultProfile
+	if requirement != nil && defaultProfile {
+		return Info{}, false, fmt.Errorf("%s: requirement flags apply only to a Git profile", DiagRefConflict)
+	}
 	if defaultProfile {
 		// Preserve the builtin profile's established refusal ordering. The
 		// default profile is local and has no source record until created;
@@ -1248,6 +1275,14 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 			return Info{}, false, fmt.Errorf("%s: profile %q is the builtin local profile and does not move", DiagUpdateBlocked, name)
 		}
 		return Info{}, false, err
+	}
+	storedSource := source
+	if requirement != nil {
+		if source.Kind != KindGit {
+			return Info{}, false, fmt.Errorf("%s: requirement flags apply only to a Git profile", DiagRefConflict)
+		}
+		// Work on a candidate record; refusals never persist the requirement.
+		source.Req = *requirement
 	}
 	if !defaultProfile {
 		if err := validateProfilePathSources(name, source, policy); err != nil {
@@ -1340,6 +1375,7 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		return Info{}, false, err
 	}
 	if result.LockHash == oldHash {
+		source = storedSource
 		machine, err := Current(home)
 		if err != nil {
 			return Info{}, false, err
@@ -1356,8 +1392,10 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 		// the rows still print exactly once.
 		surfacing = carrySurfacing(sink, surfacing)
 		writeUpdateWarnings(warningSink, name, warnings)
-		if err := syncCurrentNativeSkills(op, home, name, policy); err != nil {
-			return Info{}, false, err
+		if requirement == nil {
+			if err := syncCurrentNativeSkills(op, home, name, policy); err != nil {
+				return Info{}, false, err
+			}
 		}
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name, Warnings: warnings, Surfacing: surfacing}, false, nil
 	}
@@ -1408,7 +1446,15 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	// The old lock is retained beside the new one until the next garbage
 	// collection so that a stale managed home can still be identified
 	// (environments §9.2).
-	if err := op.publish(map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}); err != nil {
+	records := map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}
+	if requirement != nil {
+		payload, err := marshalSource(source)
+		if err != nil {
+			return Info{}, false, err
+		}
+		records[sourcePath(home, name)] = payload
+	}
+	if err := op.publish(records); err != nil {
 		return Info{}, false, err
 	}
 	hash := contextlock.HashBytes(canonical)

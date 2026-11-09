@@ -4,6 +4,14 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Repin an installed Git profile root in place with `profile update <name>
+  --revision <ref>`, `--tag <tag>` or `--range <range>`. The Git source and
+  directory stay fixed; update gates and scope rematerialization still apply.
+  Refusals preserve source, requirement, lock and homes. A same-lock repin
+  reports unchanged and preserves the stored requirement.
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed

@@ -86,7 +86,7 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
 		return contextresolve.Overlay{}, err
 	}
 	dir := manager.repoDir(canonical)
-	commit, _, err := manager.commitFor(dir, Requirement{Range: decl.Range, Tag: decl.Tag, Revision: decl.Revision})
+	commit, _, err := manager.commitFor(dir, decl.Directory, Requirement{Range: decl.Range, Tag: decl.Tag, Revision: decl.Revision})
 	if err != nil {
 		return contextresolve.Overlay{}, err
 	}

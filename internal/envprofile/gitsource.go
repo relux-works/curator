@@ -673,7 +673,7 @@ func (m *gitManager) rootInput(gitURL, directory string, requirement Requirement
 		return contextresolve.Input{}, "", err
 	}
 	dir := m.repoDir(identity)
-	commit, tag, err := m.commitFor(dir, requirement)
+	commit, tag, err := m.commitFor(dir, directory, requirement)
 	if err != nil {
 		return contextresolve.Input{}, "", err
 	}
@@ -699,7 +699,7 @@ func (m *gitManager) inputFor(source Source) (contextresolve.Input, error) {
 
 // commitFor maps a declared requirement onto its commit. A range takes the
 // highest satisfying version tag; latest spells *.
-func (m *gitManager) commitFor(dir string, requirement Requirement) (string, string, error) {
+func (m *gitManager) commitFor(dir, directory string, requirement Requirement) (string, string, error) {
 	switch {
 	case requirement.Revision != "":
 		resolved, err := gitops.Resolve(dir, "revision", requirement.Revision)
@@ -712,7 +712,7 @@ func (m *gitManager) commitFor(dir string, requirement Requirement) (string, str
 		if err != nil {
 			return "", "", &contextresolve.Error{Diagnostic: contextresolve.DiagVersionMismatch, Tag: requirement.Tag}
 		}
-		manifest, err := m.contextManifestAt(dir, resolved.Commit, "")
+		manifest, err := m.contextManifestAt(dir, resolved.Commit, directory)
 		if err != nil {
 			return "", "", err
 		}

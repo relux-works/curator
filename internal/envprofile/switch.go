@@ -894,6 +894,9 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 			}
 			copies = append(copies, envmarker.Copy{Path: adapter.Target, Reason: envmarker.ReasonClaudeCodeRootContext})
 		} else {
+			if err := op.capture(storeDocPath(home, profile, adapter.ID, adapter.Target)); err != nil {
+				return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+			}
 			storeFile, err := writeStoreDocument(home, profile, adapter, document)
 			if err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
