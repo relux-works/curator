@@ -63,12 +63,23 @@ credential policy: selection admission, native Codex store, isolation admission,
 links and marker records. Resolve (including repair), status verification and
 credential migration use this projection. Each new operation observes native
 configuration again. The one-time provisioning seed is a separate read; this
-projection is not an atomic snapshot of vendor-owned state. Muse native/unset/file now resolves to effective file and emits v4 with the
-mandatory `TBH_CREDENTIAL_BACKEND=file` literal and all four managed XDG paths.
-The selector remains unchanged. Shared requires a native file-backed login
-under the original XDG config home; if absent, run
-`TBH_CREDENTIAL_BACKEND=file muse login` in that native environment first.
-Isolated creates neither a credential link nor an auth placeholder.
+projection is not an atomic snapshot of vendor-owned state. Muse emits v4
+with all four managed XDG paths. Shared + native/unset reports effective
+`native` and omits `TBH_CREDENTIAL_BACKEND`, allowing Muse's default store
+(global macOS Keychain on the measured releases). No native-to-file mapping
+warning is emitted for that case. Isolated + native/unset and explicit `file`
+retain effective file with `TBH_CREDENTIAL_BACKEND=file`; isolated native
+retains its mapping warning. The stored selector remains unchanged.
+Shared keeps the `config/muse/auth.json` link to the captured native fallback
+file, including the existing readable-regular-target requirement. A missing
+target still refuses; this change neither creates a placeholder nor migrates
+credentials. Explicit file requires a native file login prepared with
+`TBH_CREDENTIAL_BACKEND=file muse login` before applying managed XDG exports.
+Isolated creates neither a credential link nor an auth placeholder. A global
+Keychain item cannot be isolated by changing XDG paths, so isolated mode
+continues to force file. This shared-native change revises the earlier D10
+mapping, pending owner acceptance; see the dated
+[decision and measurement rationale](agent-logins.md#decision-revise-d10-for-shared-native-muse--2026-11-09).
 Other explicit file/keychain application remains disabled: Codex file
 returns `codex_settings_unsupported` pending supported-release
 login/app-server/refresh qualification and strict successor consumers;
@@ -81,7 +92,7 @@ Muse v4 carries `root_context: {"exclusive": true}` exactly when resolve
 verifies a declared root surface, including header-only output. Old v1–v3
 readers reject the successor; consumers must support v4 before managed launch.
 This producer change does not qualify an external launcher or refresh behavior.
-`env status` reports each verified Muse policy's effective file backend and
+`env status` reports each verified Muse policy's effective `native` or `file` backend and
 shared/isolated mode without reading credential payloads. Its standing note
 separates 1.4.7 loader evidence from 1.4.8 file-backend evidence. Exact-build
 1.4.8 P1–P4 replay on both forms, linked and regular-file roots, remains a
@@ -199,8 +210,8 @@ Curator never copies, stores, or reads login tokens. A managed home gets its
 login in one of two ways, chosen per profile × environment with
 `curator env config set isolation.<profile>.<env-id> shared|isolated`:
 
-- **`shared`**: the home reuses your native login through a link that Curator
-  re-checks on every resolve. You log in once, natively.
+- **`shared`**: the home reuses your native login through the vendor default
+  store or a link that Curator re-checks on every resolve. You log in once, natively.
 - **`isolated`**: the home has no link and logs in by itself. You log in once
   **per home**, that is once per profile × environment, and every later launch
   into that home, including spawned agents, reuses that login.
@@ -211,7 +222,7 @@ login in one of two ways, chosen per profile × environment with
 | `claude_code` on Linux | `shared` | `.credentials.json` links to the native file | one login per home |
 | `codex_cli` | `shared` | `auth.json` links to the native file under `file` storage (the default when `cli_auth_credentials_store` is absent); under `keyring` or `auto` the login is ambient | admitted only under `file` storage; otherwise `environment_isolated_unsupported` |
 | `pi` | `shared` | `auth.json` links to the native `~/.pi/agent/auth.json` | one login per home |
-| `muse` | `shared` | file backend; `config/muse/auth.json` links to the captured native file | file backend; no passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
+| `muse` | `shared` | native/unset: no backend override, vendor default (macOS Keychain); explicit file: forces file. `config/muse/auth.json` fallback link and target checks unchanged. D10 revision pending owner acceptance. | file backend, including native/unset; global Keychain cannot be isolated. No passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
 | `opencode` | `shared` (ambient) | its login lives outside the swapped config home, so nothing is linked | not applicable: refused, since the login is outside the home |
 
 For `codex_cli`, sharing follows the storage selected by your **native**

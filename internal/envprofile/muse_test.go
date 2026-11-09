@@ -531,10 +531,11 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	parent := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
-	// Historical vectors describe four home paths. The successor adds exactly
-	// the effective file literal while preserving every published layout path.
-	if len(fragment.Env) != len(vector.Registry.Variables)+1 || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
-		t.Fatal("XDG variable set or successor file literal changed")
+	// Shared native again emits only the four historical home paths, leaving
+	// the default store available and preserving every published layout path.
+	_, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
+	if len(fragment.Env) != len(vector.Registry.Variables) || forced {
+		t.Fatal("shared native XDG variable set changed or backend forced")
 	}
 	for name, expected := range vector.Registry.Variables {
 		if fragment.Env[name] != filepath.Join(parent, filepath.Base(expected)) {

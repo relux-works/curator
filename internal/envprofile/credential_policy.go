@@ -25,14 +25,15 @@ func admitCredentialStore(adapter envregistry.Adapter, profile string, selection
 	case envregistry.ClaudeCode:
 		guidance = "Claude has no established force-file or force-Keychain interface; log in from the same kind of session as the launcher, or explicitly enroll an environment-token source for inference"
 	case envregistry.Muse:
-		guidance = "managed Muse requires file storage; select native or file, then use TBH_CREDENTIAL_BACKEND=file for native file login"
+		guidance = "select native or file; managed Muse has no qualified force-Keychain interface"
 	}
 	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, profile, adapter.ID, selection, guidance)
 }
 
 // effectiveCredentialPolicy is the operation-local projection for the existing
 // managed-home credential contract. It is not a runtime qualification or a
-// readiness verdict. Muse maps native to file here; other forced mappings
+// readiness verdict. Isolated Muse maps native to file; shared native Muse
+// retains the vendor default store. Other forced mappings
 // retain activation refusals until qualification and strict consumers land.
 type effectiveCredentialPolicy struct {
 	selection      envregistry.CredentialStoreSelection
@@ -106,10 +107,6 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
 		return nil, err
 	}
-	if adapter.ID == envregistry.Muse {
-		p.effectiveStore = envregistry.CredentialStoreFile
-		p.launchEnv["TBH_CREDENTIAL_BACKEND"] = "file"
-	}
 	atAbove := true
 	if ok, known := adapter.AtOrAbovePinned(release); known {
 		atAbove = ok
@@ -117,6 +114,10 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	p.isolation, err = req.Machine.EffectiveIsolation(req.Profile, adapter, atAbove)
 	if err != nil {
 		return nil, err
+	}
+	if adapter.ID == envregistry.Muse && (selection == envregistry.CredentialStoreFile || p.isolation == envregistry.IsolationIsolated) {
+		p.effectiveStore = envregistry.CredentialStoreFile
+		p.launchEnv["TBH_CREDENTIAL_BACKEND"] = "file"
 	}
 	if adapter.ID == envregistry.CodexCLI && p.isolation == envregistry.IsolationIsolated && p.nativeStore != "file" {
 		return nil, fmt.Errorf("%s: isolated is unsupported for codex_cli under native %s storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported, p.nativeStore)

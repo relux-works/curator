@@ -11,7 +11,47 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
-// Resolve projects native/unset/file to file without mutating the selector.
+// Shared native/unset must leave Muse's default store available (the global
+// Keychain on the measured macOS release), retaining the auth.json fallback
+// link. Fixtures prove projection only; they never access a real Keychain.
+func TestMuseSharedNativeKeepsDefaultBackend(t *testing.T) {
+	for _, selection := range []envregistry.CredentialStoreSelection{"native", ""} {
+		t.Run(string(selection), func(t *testing.T) {
+			fx, auth, native := museFixture(t)
+			req := fx.request(envregistry.Muse)
+			if selection != "" {
+				req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.Muse: selection}}
+			}
+			result, err := Resolve(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var fragment struct {
+				Env             map[string]string
+				CredentialStore struct{ Selection string } `json:"credential_store"`
+			}
+			if err := json.Unmarshal(result.Document, &fragment); err != nil {
+				t.Fatal(err)
+			}
+			if backend, present := fragment.Env["TBH_CREDENTIAL_BACKEND"]; present {
+				t.Fatalf("shared native must not force a backend, got %q", backend)
+			}
+			if fragment.CredentialStore.Selection != "native" {
+				t.Fatalf("effective selection=%q, want native", fragment.CredentialStore.Selection)
+			}
+			if strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") {
+				t.Fatal("shared native still reports a file mapping")
+			}
+			if got, err := os.Readlink(auth); err != nil || got != native {
+				t.Fatalf("fallback link=%q, %v; want %q", got, err, native)
+			}
+		})
+	}
+}
+
+// Shared native/unset preserves the vendor default; explicit file still forces
+// file. Isolated native/unset still maps to file and warns, preventing access
+// to a global Keychain login. Selectors and fallback link rules stay unchanged.
 // Isolated never imports a native credential; shared requires a live native file.
 // Keychain refuses before any home, marker, link or credential mutation.
 func TestMuseCredentialPolicyMatrix(t *testing.T) {
@@ -61,11 +101,17 @@ func TestMuseCredentialPolicyMatrix(t *testing.T) {
 				if err := json.Unmarshal(result.Document, &fragment); err != nil {
 					t.Fatal(err)
 				}
-				if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != 5 || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" || fragment.CredentialStore.Selection != "file" || fragment.RootContext == nil {
+				wantStore, wantBackend, wantEnvCount := "file", "file", 5
+				if isolation == "shared" && selection != "file" {
+					wantStore, wantBackend, wantEnvCount = "native", "", 4
+				}
+				backend, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
+				if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != wantEnvCount || backend != wantBackend || forced != (wantStore == "file") || fragment.CredentialStore.Selection != wantStore || fragment.RootContext == nil {
 					t.Fatalf("projection: %s", result.Document)
 				}
-				if selection != "file" && !strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") {
-					t.Fatal("mapping not reported")
+				wantWarning := isolation == "isolated" && selection != "file"
+				if strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") != wantWarning {
+					t.Fatalf("mapping warning: %v, want warning=%v", result.Warnings, wantWarning)
 				}
 				auth := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.Muse), "config", "muse", "auth.json")
 				if isolation == "shared" {
@@ -79,7 +125,10 @@ func TestMuseCredentialPolicyMatrix(t *testing.T) {
 					req.Format = format
 					req.Repair = false
 					r, err := Resolve(req)
-					if err != nil || !strings.Contains(string(r.Document), "TBH_CREDENTIAL_BACKEND") || !strings.Contains(string(r.Document), "file") {
+					if err != nil {
+						t.Fatal(err)
+					}
+					if strings.Contains(string(r.Document), "TBH_CREDENTIAL_BACKEND") != (wantStore == "file") {
 						t.Fatalf("%s: %v %v", format, r, err)
 					}
 				}
@@ -185,5 +234,28 @@ func TestMusePolicyExplicitMigration(t *testing.T) {
 	resolve.Machine = req.Machine
 	if _, err := Resolve(resolve); err != nil {
 		t.Fatalf("migrated isolated home not current: %v", err)
+	}
+}
+
+// The Muse-only change leaves every other adapter's native selection and
+// launch environment untouched; explicit unsupported mappings remain covered
+// by TestCredentialStorePolicyActivation and its no-provisioning assertions.
+func TestMusePolicyLeavesOtherAdaptersNative(t *testing.T) {
+	for _, id := range []string{envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Pi, envregistry.OpenCode} {
+		t.Run(id, func(t *testing.T) {
+			fx := writeManagedFixture(t, "other-native")
+			req := fx.request(id)
+			adapter, err := envregistry.ByID(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy, err := req.computeCredentialPolicy(adapter, "unknown")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if policy.effectiveStore != envregistry.CredentialStoreNative || len(policy.launchEnv) != 0 {
+				t.Fatalf("native policy changed: %+v", policy)
+			}
+		})
 	}
 }

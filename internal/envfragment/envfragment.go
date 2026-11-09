@@ -6,7 +6,7 @@
 // fragment is data about channels. The §10.3 profile-influence boundary is
 // enforced at build: variable names come only from the closed adapter
 // registry. Paths stay below the manager-owned environments root; managed
-// Muse additionally carries the single policy-owned file-backend literal.
+// Muse carries a policy-owned file-backend literal only under file policy.
 package envfragment
 
 import (
@@ -382,8 +382,21 @@ func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragme
 		allowed[variable[0]] = true
 	}
 	if adapter.ID == envregistry.Muse {
-		if fragment.CredentialStore == nil || fragment.CredentialStore.Selection != envregistry.CredentialStoreFile || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
-			return fmt.Errorf("%s: managed Muse requires effective file policy and TBH_CREDENTIAL_BACKEND=file", envregistry.DiagCredentialStoreUnsupported)
+		if fragment.CredentialStore == nil {
+			return fmt.Errorf("%s: managed Muse requires an effective credential policy", envregistry.DiagCredentialStoreUnsupported)
+		}
+		backend, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
+		switch fragment.CredentialStore.Selection {
+		case envregistry.CredentialStoreNative:
+			if forced {
+				return fmt.Errorf("%s: native Muse policy must not force TBH_CREDENTIAL_BACKEND", envregistry.DiagCredentialStoreUnsupported)
+			}
+		case envregistry.CredentialStoreFile:
+			if !forced || backend != "file" {
+				return fmt.Errorf("%s: Muse file policy requires TBH_CREDENTIAL_BACKEND=file", envregistry.DiagCredentialStoreUnsupported)
+			}
+		default:
+			return fmt.Errorf("%s: unsupported managed Muse credential policy", envregistry.DiagCredentialStoreUnsupported)
 		}
 		allowed["TBH_CREDENTIAL_BACKEND"] = true
 		if fragment.SystemPrompt != nil || fragment.MCP != nil {

@@ -388,7 +388,7 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 		docs:             map[string][]byte{},
 		fileHashes:       map[string][]byte{},
 	}
-	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative {
+	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative && credentialPolicy.effectiveStore == envregistry.CredentialStoreFile {
 		plan.warnings = append(plan.warnings, "managed Muse maps configured native (including unset) to effective file storage; the stored selector is unchanged; refresh remains unqualified")
 	}
 	if form == envregistry.FormReferenced && adapter.ID == envregistry.OpenCode {

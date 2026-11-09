@@ -467,7 +467,8 @@ func TestMaterializeCaptureSameFragmentDrift(t *testing.T) {
 
 // Real executable discovery is planted on PATH; capture and metadata status
 // succeed without executing it when Detect is nil. Muse native/file and both
-// isolation modes retain the v4 file projection and leave source state unchanged.
+// isolation modes retain v4 and leave source state unchanged. Shared native
+// now preserves the default backend; the other rows retain forced file.
 func TestMaterializeCaptureAndStatusNeverProbeVendor(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell sentinel is Unix-only")
@@ -539,8 +540,13 @@ func TestMaterializeCaptureAndStatusNeverProbeVendor(t *testing.T) {
 						if err := json.Unmarshal(captured.Fragment, &fragment); err != nil {
 							t.Fatal(err)
 						}
-						if fragment.Fragment != "launch-env-fragment-v4" || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" || fragment.CredentialStore.Selection != "file" {
-							t.Fatalf("capture lost Muse file projection: %s", captured.Fragment)
+						wantStore, wantBackend := "file", "file"
+						if tc.name == "muse-native-shared" {
+							wantStore, wantBackend = "native", ""
+						}
+						backend, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
+						if fragment.Fragment != "launch-env-fragment-v4" || backend != wantBackend || forced != (wantStore == "file") || fragment.CredentialStore.Selection != wantStore {
+							t.Fatalf("capture lost Muse effective policy: %s", captured.Fragment)
 						}
 					}
 				})

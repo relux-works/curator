@@ -4,6 +4,14 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- Shared managed Muse homes with native or unset credential selection retain
+  the vendor default backend instead of forcing file storage, preserving the
+  native Keychain login and the existing `auth.json` fallback link. Isolated
+  homes and explicit file selection retain the file backend. This D10 revision
+  is pending owner acceptance.
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed
