@@ -326,11 +326,6 @@ func loadObject(path string, userData map[string]any, warn func(string)) (result
 	if hasMachineClaudeEnv(userData) {
 		defer func() { resultErr = markLauncherSelectionRefusal(resultErr) }()
 	}
-	defer func() {
-		if resultErr != nil {
-			resultErr = configDiagnostic("config_shape_invalid", "$", resultErr)
-		}
-	}()
 	machineData := userData
 	userIsolation := userIsolationFromConfig(userData)
 	locked := map[string]bool{}
@@ -340,6 +335,12 @@ func loadObject(path string, userData map[string]any, warn func(string)) (result
 		systemPath = resolved
 		systemData, err := readObject(systemPath)
 		if err != nil {
+			// Corpus file diagnostics describe the selected machine file, not
+			// system-policy reads. Preserve the policy error text and cause.
+			var diagnostic *Diagnostic
+			if errors.As(err, &diagnostic) {
+				err = diagnostic.Unwrap()
+			}
 			return nil, err
 		}
 		systemDataForSources = systemData

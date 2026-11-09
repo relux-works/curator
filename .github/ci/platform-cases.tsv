@@ -1129,3 +1129,5 @@ internal/config	TestLauncherNotificationDiagnosticContract	linux,darwin,windows	
 internal/config	TestLauncherNotificationSystemLockDiagnostic	linux,darwin,windows	-	-	system metadata and extension locks refuse with input-free machine-only diagnostic beside valid policy control
 internal/config	TestClaudeAuthClaudeEnvRoundTrip	linux,darwin	-	-	schema9 auth roundtrip retains proxy notification and Claude environment; invalid input and changed recovery selection refuse without mutation
 internal/config	TestLauncherClaudeEnvSharedLoader	linux,darwin,windows	-	-	transactional common loader preserves explicit Claude selection refusal and missing-policy identity beside valid policy control
+internal/config	TestLauncherSystemPolicyDiagnosticBoundary	linux,darwin,windows	-	-	unspecified system-policy errors remain untyped with unchanged source and policy beside valid policy and defined lock controls
+internal/config	TestClaudeAuthNotificationRestoreCarrierGuard	linux,darwin	-	-	absent notification equivalent backup cannot downgrade schema8; same-carrier restore preserves recovery bytes

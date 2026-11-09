@@ -92,3 +92,60 @@ func TestLauncherNotificationSystemLockDiagnostic(t *testing.T) {
 		})
 	}
 }
+
+// Unspecified system-policy failures retain their text/cause without borrowing
+// selected-file corpus codes. Valid policy and typed machine-only locks above
+// remain positive and independently specified controls. Reads change no bytes.
+func TestLauncherSystemPolicyDiagnosticBoundary(t *testing.T) {
+	for _, row := range []struct{ name, policy, want string }{
+		{"valid", `{"schema_version":2,"locked":[]}`, ""},
+		{"missing", "", "global config not found: %s"},
+		{"malformed", "{", "malformed JSON in config %s"},
+		{"non-object", "[]", "config %s must be a JSON object"},
+		{"unsupported", `{"schema_version":9,"locked":[]}`, "schema_version: system config %s requires schema_version 1 or 2"},
+		{"locked-shape", `{"schema_version":2,"locked":"wrong"}`, "locked: system config %s field 'locked' must be a list of strings"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			root := t.TempDir()
+			machine := filepath.Join(root, "machine.json")
+			policy := filepath.Join(root, "system.json")
+			text := `{"schema_version":8,"skills_root":"x","projects":{}}`
+			if err := os.WriteFile(machine, []byte(text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if row.policy != "" {
+				if err := os.WriteFile(policy, []byte(row.policy), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv("CURATOR_SYSTEM_CONFIG", policy)
+			cfg, err := Load(machine, nil)
+			if row.want == "" {
+				if cfg == nil || err != nil {
+					t.Fatalf("valid policy: %v", err)
+				}
+			} else {
+				want := row.want
+				if strings.Contains(want, "%s") {
+					want = fmt.Sprintf(want, policy)
+				}
+				var diagnostic *Diagnostic
+				if cfg != nil || err == nil || err.Error() != want || errors.As(err, &diagnostic) || errors.Is(err, ErrConfigNotFound) != (row.name == "missing") {
+					t.Fatalf("untyped system-policy failure: %v", err)
+				}
+			}
+			actual, readErr := os.ReadFile(machine)
+			if readErr != nil || string(actual) != text {
+				t.Fatal("policy read changed machine bytes")
+			}
+			actual, readErr = os.ReadFile(policy)
+			if row.name == "missing" {
+				if !os.IsNotExist(readErr) {
+					t.Fatal("policy read created missing policy")
+				}
+			} else if readErr != nil || string(actual) != row.policy {
+				t.Fatal("policy read changed policy bytes")
+			}
+		})
+	}
+}
