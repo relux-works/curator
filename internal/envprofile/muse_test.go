@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -531,10 +532,16 @@ func TestMusePublishedRegistryLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	parent := ManagedHomeDir(fx.home, fx.profile, envregistry.Muse)
-	// Historical vectors describe four home paths. The successor adds exactly
-	// the effective file literal while preserving every published layout path.
-	if len(fragment.Env) != len(vector.Registry.Variables)+1 || fragment.Env["TBH_CREDENTIAL_BACKEND"] != "file" {
-		t.Fatal("XDG variable set or successor file literal changed")
+	// Darwin shared native emits the four historical home paths; other OSes
+	// retain the file override. Every published layout path stays unchanged.
+	_, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
+	wantCount := len(vector.Registry.Variables)
+	wantForced := runtime.GOOS != "darwin"
+	if wantForced {
+		wantCount++
+	}
+	if len(fragment.Env) != wantCount || forced != wantForced {
+		t.Fatal("shared native XDG variable set or platform backend changed")
 	}
 	for name, expected := range vector.Registry.Variables {
 		if fragment.Env[name] != filepath.Join(parent, filepath.Base(expected)) {

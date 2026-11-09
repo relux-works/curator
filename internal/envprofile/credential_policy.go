@@ -25,14 +25,15 @@ func admitCredentialStore(adapter envregistry.Adapter, profile string, selection
 	case envregistry.ClaudeCode:
 		guidance = "Claude has no established force-file or force-Keychain interface; log in from the same kind of session as the launcher, or explicitly enroll an environment-token source for inference"
 	case envregistry.Muse:
-		guidance = "managed Muse requires file storage; select native or file, then use TBH_CREDENTIAL_BACKEND=file for native file login"
+		guidance = "select native or file; managed Muse has no qualified force-Keychain interface"
 	}
 	return fmt.Errorf("%s: %s/%s selection %s: %s", envregistry.DiagCredentialStoreUnsupported, profile, adapter.ID, selection, guidance)
 }
 
 // effectiveCredentialPolicy is the operation-local projection for the existing
 // managed-home credential contract. It is not a runtime qualification or a
-// readiness verdict. Muse maps native to file here; other forced mappings
+// readiness verdict. Muse maps native to file except for shared native on
+// darwin, which retains the vendor default store. Other forced mappings
 // retain activation refusals until qualification and strict consumers land.
 type effectiveCredentialPolicy struct {
 	selection      envregistry.CredentialStoreSelection
@@ -52,6 +53,7 @@ type credentialPolicyResolution struct {
 	profile     string
 	environment string
 	release     string
+	platform    string
 	policy      *effectiveCredentialPolicy
 	err         error
 }
@@ -73,15 +75,23 @@ func (req *ResolveRequest) resolveCredentialPolicy(adapter envregistry.Adapter) 
 // resolveCredentialPolicyObserved uses supplied evidence, including unknown,
 // without discovering a tool. Cache entries never cross release observations.
 func (req *ResolveRequest) resolveCredentialPolicyObserved(adapter envregistry.Adapter, release string) (*effectiveCredentialPolicy, error) {
-	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release {
+	if cached := req.credentialPolicy; cached != nil && cached.profile == req.Profile && cached.environment == adapter.ID && cached.release == release && cached.platform == req.credentialPlatform {
 		return cached.policy, cached.err
 	}
 	policy, err := req.computeCredentialPolicy(adapter, release)
-	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, policy: policy, err: err}
+	req.credentialPolicy = &credentialPolicyResolution{profile: req.Profile, environment: adapter.ID, release: release, platform: req.credentialPlatform, policy: policy, err: err}
 	return policy, err
 }
 
+func (req *ResolveRequest) credentialPolicyPlatform() string {
+	if req.credentialPlatform != "" {
+		return req.credentialPlatform
+	}
+	return runtime.GOOS
+}
+
 func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, release string) (*effectiveCredentialPolicy, error) {
+	platform := req.credentialPolicyPlatform()
 	selection, err := req.Machine.CredentialStoreFor(req.Profile, adapter.ID)
 	if err != nil {
 		return nil, err
@@ -106,10 +116,6 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	if err := admitCredentialStore(adapter, req.Profile, selection); err != nil {
 		return nil, err
 	}
-	if adapter.ID == envregistry.Muse {
-		p.effectiveStore = envregistry.CredentialStoreFile
-		p.launchEnv["TBH_CREDENTIAL_BACKEND"] = "file"
-	}
 	atAbove := true
 	if ok, known := adapter.AtOrAbovePinned(release); known {
 		atAbove = ok
@@ -118,18 +124,22 @@ func (req *ResolveRequest) computeCredentialPolicy(adapter envregistry.Adapter, 
 	if err != nil {
 		return nil, err
 	}
+	if adapter.ID == envregistry.Muse && (platform != "darwin" || selection == envregistry.CredentialStoreFile || p.isolation == envregistry.IsolationIsolated) {
+		p.effectiveStore = envregistry.CredentialStoreFile
+		p.launchEnv["TBH_CREDENTIAL_BACKEND"] = "file"
+	}
 	if adapter.ID == envregistry.CodexCLI && p.isolation == envregistry.IsolationIsolated && p.nativeStore != "file" {
 		return nil, fmt.Errorf("%s: isolated is unsupported for codex_cli under native %s storage: the keyring identity is operator-global, independent of CODEX_HOME", envregistry.DiagIsolatedUnsupported, p.nativeStore)
 	}
 	if p.isolation == envregistry.IsolationIsolated {
-		if adapter.ID == envregistry.ClaudeCode && runtime.GOOS == "darwin" {
+		if adapter.ID == envregistry.ClaudeCode && platform == "darwin" {
 			p.records = append(p.records, envmarker.Passthrough{
 				Isolation: p.isolation, Strategy: envregistry.StrategyPerHomeKeychain,
 				SourceRole: "managed", Backend: "keychain", BackendVersion: adapter.VerifiedRelease,
 			})
 		}
 	} else {
-		entries := adapter.PassthroughFor(runtime.GOOS)
+		entries := adapter.PassthroughFor(platform)
 		if len(entries) > 0 && adapter.VerifiedRelease == "" {
 			return nil, fmt.Errorf("%s: %s has no verified credential backend release", envregistry.DiagCredentialUnsupported, adapter.ID)
 		}

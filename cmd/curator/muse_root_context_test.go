@@ -362,7 +362,8 @@ func TestMuseRootContextRefusals(t *testing.T) {
 }
 
 // Shared and isolated status reuse the verified policy, report effective
-// file/mode, preserve config bytes and never print synthetic credential bytes.
+// native/shared or file/isolated, preserve config bytes and never print
+// synthetic credential bytes. Shared no longer claims the old file mapping.
 func TestMuseCredentialPolicyStatus(t *testing.T) {
 	for _, mode := range []string{"shared", "isolated"} {
 		t.Run(mode, func(t *testing.T) {
@@ -376,14 +377,18 @@ func TestMuseCredentialPolicyStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 			status := readMuseRootStatus(t, source)
+			store := "native"
+			if mode == "isolated" || runtime.GOOS != "darwin" {
+				store = "file"
+			}
 			found := false
 			for _, row := range status.Homes {
 				if row.Profile == "acme" && row.Environment == envregistry.Muse {
-					found = row.Current && strings.Contains(strings.Join(row.Warnings, "\n"), "effective backend=file; isolation="+mode)
+					found = row.Current && strings.Contains(strings.Join(row.Warnings, "\n"), "effective backend="+store+"; isolation="+mode)
 				}
 			}
 			if !found {
-				t.Fatalf("status omitted verified %s file policy", mode)
+				t.Fatalf("status omitted verified %s %s policy", mode, store)
 			}
 			if raw, _ := json.Marshal(status); strings.Contains(string(raw), "synthetic-native") {
 				t.Fatal("status leaked credential bytes")

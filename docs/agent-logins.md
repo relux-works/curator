@@ -22,7 +22,7 @@ behave identically.
 | `curator env login` and `curator profile prepare` | rc.7 | Interactive login requires a real terminal. |
 | `login: present \| absent \| unknown` readiness row | rc.7 | Metadata only; presence does not prove successful authentication. |
 | Codex typed `-c` settings and store overrides | rc.7 | The launcher applies overrides without rewriting `config.toml`. |
-| Managed Muse file selection and explicit `root_context` fragment | rc.7 | File mode admits shared and isolated homes; refresh writes remain unmeasured. |
+| Managed Muse credential selection and explicit `root_context` fragment | rc.7; shared-native D10 revision pending owner acceptance | macOS shared native uses the Keychain login; Linux shared uses the operator's file store through the auth link. Isolated and explicit file use file everywhere. Refresh writes remain unmeasured. |
 | Managed-home snapshots through `env materialize` | rc.7 | Readiness never authorizes copying credentials into an archive. |
 | Protected Claude `setup-token` source and executor injection | planned | Inference only; Remote Control refuses this token. |
 
@@ -98,7 +98,9 @@ An `auth.json` link alone cannot select the file backend.
 | macOS, no Keychain | OAuth succeeds but saving fails with "keychain write failed (os status -60006)"; login exits `1`. The measured failure has no file fallback. | works today |
 | macOS, `TBH_CREDENTIAL_BACKEND=file` | `$XDG_CONFIG_HOME/muse/auth.json`, mode `0600`; later runs use `file` with zero Keychain access. Hiding the file yields missing credentials. A linked `auth.json` also works. | works today |
 | Linux | The file contract uses `$XDG_CONFIG_HOME/muse/auth.json`. The source pack contains no Muse `1.4.8` Linux login probe or measured error message; backend behavior remains unqualified there. | rc.7 (Curator contract; Linux vendor measurement absent) |
-| Managed Muse, file backend applied at login and launch | Both shared and isolated homes are admitted through `TBH_CREDENTIAL_BACKEND=file`. | rc.7 |
+| Managed Muse, macOS shared + native/unset | No `TBH_CREDENTIAL_BACKEND` in the fragment; Muse uses the global Keychain login. The `config/muse/auth.json` fallback link is unchanged. | D10 revision pending owner acceptance |
+| Managed Muse, Linux and other non-macOS shared + native/unset | Effective file with `TBH_CREDENTIAL_BACKEND=file`; the managed `config/muse/auth.json` links to the operator's native file store. Existing mapping warning retained; no per-home login. | rc.7 (unchanged file mapping) |
+| Managed Muse, isolated or explicit `file` on every platform | `TBH_CREDENTIAL_BACKEND=file` remains required. A global Keychain login cannot be isolated by changing XDG homes. | rc.7 |
 
 Muse `1.4.8` accepts a minted API key through `exec --api-key-stdin`;
 the measured request bills the subscription. `META_API_KEY` leaves the
@@ -123,7 +125,8 @@ is the reference for current defaults and admission. It covers each
 environment without duplicating the table here. In particular, macOS
 Claude defaults to isolated and refuses shared with
 `environment_shared_unsupported`. Muse isolated remains refused on the
-current baseline; the rc.7 file contract changes that admission.
+historical baseline; the rc.7 file contract changes that admission. The
+shared-native revision below preserves this isolated file contract.
 
 The layout below applies to file-backed logins. Claude's macOS Keychain
 login instead belongs to the managed home's exact config-directory identity:
@@ -153,14 +156,60 @@ tokens go to disk.
 | Adapter | `native` | `file` | `keychain` | Status |
 |---|---|---|---|---|
 | Codex | Follow native `config.toml`; absent means file; no override. | `-c 'cli_auth_credentials_store="file"'` at login and launch. | `-c 'cli_auth_credentials_store="keyring"'` only on a qualified macOS backend; otherwise refuse. Isolated remains refused. | rc.7 |
-| Muse | For managed Muse, resolve to effective file under CIP-0017. Preserve the stored `native` default. | `TBH_CREDENTIAL_BACKEND=file` at login and launch. | Refuse; no qualified force-Keychain interface. | rc.7 |
+| Muse | macOS shared: effective `native`, no backend override; use the Keychain login. Linux and other non-macOS shared: effective file with the existing warning, using the operator's file store through the auth link. Isolated: retain effective file under D10 everywhere. The stored selector is unchanged. | `TBH_CREDENTIAL_BACKEND=file` at login and launch, in either isolation mode. | Refuse; no qualified force-Keychain interface. | rc.7; shared-native revision pending owner acceptance |
 | Claude | Use the session-qualified native choice. | Refuse; no established force-file interface. | Refuse; no established force-Keychain interface. | rc.7 |
 
-CIP-0017 explicitly changes CIP-0015's generic Muse native mapping.
-An unset or `native` selector becomes effective `file` for managed Muse
-in rc.7. The vendor's ordinary native login remains Keychain-backed on
-the measured macOS release. Shared Muse therefore requires a native
-**file-backed** login; a Keychain-only login is insufficient.
+CIP-0017 D10 originally changed CIP-0015's generic Muse native mapping
+by projecting unset/`native` to effective `file` in every managed home.
+The proposed revision below exempts only macOS shared homes. There, shared
+unset/`native` reports effective `native` and emits no
+`TBH_CREDENTIAL_BACKEND` or native-to-file warning. Linux and every other
+non-darwin OS retain effective file, `TBH_CREDENTIAL_BACKEND=file`, the
+operator-file link and the existing warning. Isolated homes are unchanged
+everywhere. Explicit `file` still forces file; explicit `keychain` still refuses.
+
+### Decision: revise D10 for shared native Muse — 2026-11-09
+
+**Pending the owner's acceptance.** On Muse `1.4.14-R7309.1`, the reported
+operator measurement found that `muse usage --json` succeeded with the
+default backend and failed with `TBH_CREDENTIAL_BACKEND=file`, without a
+model turn or token output. The operator login was in the global macOS
+Keychain. Forcing file made shared managed homes unusable despite a valid
+native login.
+
+On macOS, shared means reusing that native login. Leave the backend unset so Muse
+can use its default Keychain store, retaining the existing `auth.json`
+fallback link and its metadata/liveness checks. Keeping credentials in
+Keychain provides stronger storage protection than moving them to a plain
+`0600` file. This is a policy revision, not new Keychain qualification:
+Curator never accesses Keychain or reads, copies, or writes credential bytes.
+Only Muse accesses its chosen store.
+
+On Linux and every non-darwin OS, shared native/unset keeps the existing
+file mapping: effective file, `TBH_CREDENTIAL_BACKEND=file`, the managed
+`auth.json` linked to the operator's native file, and the existing warning.
+This reuses the file store the operator already uses, with no manual login
+per managed home. Linux's default backend remains unqualified; this revision
+does not depend on it or on a Keychain being available there.
+
+A global Keychain item cannot be isolated by changing managed home paths.
+On every platform, isolated native/unset retains D10's effective file backend and
+mapping warning, with no credential link or placeholder. Explicit file
+and all other adapters are unchanged. Refresh and concurrent refresh
+remain unqualified. This draft revises the earlier D10 mapping locally;
+external specification/consumer adoption and landing await owner acceptance.
+The frozen file-only v4 schema still rejects this proposed native form; its
+published fixtures remain unchanged. Tests assert that incompatibility and
+check native emission against the revised producer boundary. They do not
+claim conformance to an adopted successor schema or external consumer.
+
+### Login approval flow (proposal, not implemented)
+
+When a login is needed, the proposed flow is for Muse to print a device-approval
+link and code, which an operator approves in a browser that already holds the
+session. Curator never handles the token. Shared homes reuse the operator's
+login, with no per-home manual login. This is a proposal only; no approval-flow
+code is implemented by this change.
 
 Changing the selector never migrates or deletes a login. Inspect and
 explicitly migrate a recorded backend or link conflict before launching.
@@ -257,9 +306,12 @@ route. No Curator enrollment command is available on the checked baseline.
 Use the resolve-and-login Claude recipe above in a desktop terminal.
 Start subsequent launches from a session with the same Keychain capability.
 For Codex CLI `0.153.2` with native file storage, log in natively;
-Curator's default shared home links `auth.json`. For Muse `1.4.8`, a native
-Keychain login alone does not establish file-backed sharing. The managed
-file selector and isolated Muse preparation arrive in rc.7.
+Curator's default shared home links `auth.json`. For managed Muse, the
+`config/muse/auth.json` fallback link still requires a
+readable regular native target, even when it serves only as a fallback.
+This revision does not relax that existing link-liveness gate or migrate
+credentials. Shared native uses the default store rather than requiring
+file authentication; explicit file still requires a native file login.
 
 ### macOS over ssh (works today; planned alternative)
 
@@ -285,8 +337,10 @@ curator env login codex_cli --profile P
 ```
 
 Resolve or repair the home explicitly before `env login` when needed.
-For Muse, rc.7 selects the file contract; Linux behavior still needs a
-versioned vendor probe. On a qualified file backend, prepare a shared
+For Muse, isolated mode and explicit file retain the rc.7 file contract;
+shared native/unset on Linux and every non-darwin OS retains effective file,
+`TBH_CREDENTIAL_BACKEND=file`, and the operator-file link. Linux behavior still needs
+a versioned vendor probe. On a qualified file backend, prepare a shared
 native Muse login before applying managed XDG exports:
 
 ```bash
@@ -318,5 +372,5 @@ The specification describes the contracts separately from shipment:
 | [Environments](https://github.com/relux-works/curator-spec/blob/main/protocol/environments.md) | Managed homes, isolation, links, and launch fragments. |
 | [CIP-0010](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md) | Planned setup-token and inherited authentication. |
 | [CIP-0015](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0015-login-readiness-and-profile-preparation.md) | Login readiness and preparation rationale. |
-| [CIP-0017](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0017-muse-root-context-and-credential-store.md) | Managed Muse file mapping and explicit root context. |
+| [CIP-0017](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0017-muse-root-context-and-credential-store.md) | Original managed Muse file mapping (D10, revision proposed above) and explicit root context. |
 | [CIP-0018](https://github.com/relux-works/curator-spec/blob/main/cips/CIP-0018-profile-level-codex-settings.md) | Typed Codex launch settings; machine ownership of credential selection. |

@@ -1,5 +1,14 @@
 # Unresolved questions
 
+- BUG-261109-0e7xhn — shared managed Muse native credentials: owner acceptance
+  is pending for the proposed D10 revision that leaves the default backend
+  available in macOS shared mode. Linux and other non-darwin shared homes
+  retain the operator's file store through the auth link and the existing warning;
+  isolated mode and explicit file selection retain file everywhere.
+  External specification and consumer adoption are not
+  established by this draft.
+  [Dated decision and measurement rationale](docs/agent-logins.md#decision-revise-d10-for-shared-native-muse--2026-11-09).
+
 - TASK-261026-6b5ioc: Profile skill runtime needs a successor lock allocation
   and an explicit reconciliation boundary that preserves unrelated machine
   declarations. Enrollment readiness needs a skill-owned probe/report contract

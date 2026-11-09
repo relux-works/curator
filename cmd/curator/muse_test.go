@@ -72,7 +72,13 @@ func provisionRegisteredEnvironments(t *testing.T, source stubConfigSource, prof
 	}
 }
 
+// Shared native uses four XDG paths on darwin and adds forced file elsewhere.
+// The inert child verifies delivery without a real Keychain or Muse.
 func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
+	store, backend, envCount := "native", "", 4
+	if runtime.GOOS != "darwin" {
+		store, backend, envCount = "file", "file", 5
+	}
 	source, _ := profileHome(t)
 	operatorHome := t.TempDir()
 	binary := fakeMuse(t)
@@ -103,7 +109,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("resolve: %d %s", code, stderr)
 	}
-	validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
+	validateMuseEffectiveFragment(t, source.cfg.Home(), []byte(stdout), store)
 	resolved, err := envprofile.Resolve(envprofile.ResolveRequest{
 		Home: source.cfg.Home(), Profile: "acme", EnvID: envregistry.Muse,
 		Machine: envregistry.DefaultMachineConfig(), Format: "json",
@@ -111,7 +117,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validateMuseFragmentV3(t, museFragmentV4Schema(t), resolved.Document)
+	validateMuseEffectiveFragment(t, source.cfg.Home(), resolved.Document, store)
 	var fragment struct {
 		Fragment string            `json:"fragment"`
 		Env      map[string]string `json:"env"`
@@ -119,7 +125,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
 		t.Fatal(err)
 	}
-	if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != 5 {
+	if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != envCount {
 		t.Fatalf("fragment %s", stdout)
 	}
 	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", "muse")
@@ -156,6 +162,9 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	}
 	if err := json.Unmarshal(output, &observed); err != nil {
 		t.Fatal(err)
+	}
+	if observed.Env["TBH_CREDENTIAL_BACKEND"] != backend {
+		t.Fatalf("shared native child received the wrong platform backend: %s", output)
 	}
 	if observed.Env["HOME"] != operatorHome {
 		t.Fatalf("HOME replaced: %s", output)
@@ -384,11 +393,14 @@ func museCLIProfile(t *testing.T) stubConfigSource {
 func driveMuseFragmentPolicy(t *testing.T, schema *jsonschema.Schema, source stubConfigSource, fixture map[string]any) {
 	t.Helper()
 	permission := fixture["permissions"].(map[string]any)
+	// Historical file-only schema rows remain production-reachable through
+	// explicit file selection; they do not qualify the proposed native form.
 	machine := envregistry.DefaultMachineConfig()
-	configObject := map[string]any{"schema_version": 2, "security_posture": "permissive", "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}}
+	machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{"acme": {envregistry.Muse: envregistry.CredentialStoreFile}}
+	configObject := map[string]any{"schema_version": 2, "security_posture": "permissive", "skills_root": filepath.Join(source.cfg.Home(), "skills"), "projects": map[string]any{}, "environments": map[string]any{"credential_store": machine.CredentialStore}}
 	if permission["source"] == "profile" {
 		machine.Permissions["acme"] = permission["mode"].(string)
-		configObject["environments"] = map[string]any{"permissions": machine.Permissions}
+		configObject["environments"].(map[string]any)["permissions"] = machine.Permissions
 	}
 	machine.PermissionsLocked = permission["locked"].(bool)
 	system := map[string]any{"schema_version": 2, "locked": []string{}}
@@ -542,7 +554,8 @@ func TestMuseFragmentV4PublishedCases(t *testing.T) {
 // The public config/resolve chain preserves selectors, native auth, marker and
 // link identity; explicit keychain emits no fragment, even with repair.
 // Public config/resolve preserves the stored selector and both stores. All
-// five parsed renderer values agree, in independent XDG-then-backend order.
+// renderers agree: darwin native/unset has four XDG values; other platforms
+// and explicit file retain five values in XDG-then-backend order.
 func TestMuseCLIStorePolicy(t *testing.T) {
 	source := credentialStoreCLIHome(t)
 	prepareNativeMuse(t)
@@ -586,7 +599,11 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 					t.Fatalf("%s %s: %d %s", selector, format, code, stderr)
 				}
 				if format == "json" {
-					validateMuseFragmentV3(t, museFragmentV4Schema(t), []byte(stdout))
+					store := "native"
+					if selector == "file" || runtime.GOOS != "darwin" {
+						store = "file"
+					}
+					validateMuseEffectiveFragment(t, source.cfg.Home(), []byte(stdout), store)
 					var fragment struct{ Env map[string]string }
 					if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
 						t.Fatal(err)
@@ -594,11 +611,15 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 					jsonEnv = fragment.Env
 				} else {
 					lines := strings.Split(strings.TrimSpace(stdout), "\n")
-					if len(lines) != 5 {
+					names := []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"}
+					if selector == "file" || runtime.GOOS != "darwin" {
+						names = append(names, "TBH_CREDENTIAL_BACKEND")
+					}
+					if len(lines) != len(names) {
 						t.Fatalf("%s projection: %q", format, stdout)
 					}
 					parsed := map[string]string{}
-					for i, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "TBH_CREDENTIAL_BACKEND"} {
+					for i, name := range names {
 						line := lines[i]
 						if format == "shell" {
 							if !strings.HasPrefix(line, "export ") {
@@ -633,5 +654,40 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 		if got, err := os.Readlink(auth); err != nil || got != native {
 			t.Fatal("credential link changed")
 		}
+	}
+}
+
+// The proposed shared-native contract deliberately differs from the frozen
+// file-only v4 schema. Assert that incompatibility, then validate actual emitted
+// paths/policy against the producer boundary. File still must pass the exact
+// pinned schema. This is local producer evidence, not consumer/spec adoption.
+func validateMuseEffectiveFragment(t *testing.T, home string, payload []byte, selection string) {
+	t.Helper()
+	if selection == "file" {
+		validateMuseFragmentV3(t, museFragmentV4Schema(t), payload)
+		return
+	}
+	var object map[string]any
+	if err := json.Unmarshal(payload, &object); err != nil {
+		t.Fatal(err)
+	}
+	if err := museFragmentV4Schema(t).Validate(object); err == nil || !strings.Contains(err.Error(), "/credential_store/selection") {
+		t.Fatalf("native must remain incompatible with the frozen file-only schema: %v", err)
+	}
+	var fragment struct {
+		Fragment        string
+		Env             map[string]string
+		CredentialStore *envfragment.CredentialStore `json:"credential_store"`
+		RootContext     *envfragment.RootContext     `json:"root_context"`
+	}
+	if err := json.Unmarshal(payload, &fragment); err != nil {
+		t.Fatal(err)
+	}
+	if fragment.Fragment != "launch-env-fragment-v4" || fragment.CredentialStore == nil || string(fragment.CredentialStore.Selection) != selection || len(fragment.Env) != 4 {
+		t.Fatalf("shared native projection: %s", payload)
+	}
+	adapter, _ := envregistry.ByID(envregistry.Muse)
+	if err := envfragment.CheckBoundary(adapter, envprofile.EnvRoot(home), &envfragment.Fragment{Environment: envregistry.Muse, Env: fragment.Env, CredentialStore: fragment.CredentialStore, RootContext: fragment.RootContext}); err != nil {
+		t.Fatalf("shared native boundary: %v", err)
 	}
 }

@@ -144,8 +144,10 @@ type ResolveRequest struct {
 	// credentialRelease scopes policy derivation to caller-supplied evidence.
 	// Nil permits vendor observation; content verification supplies unknown.
 	credentialRelease *string
-	credentialPolicy  *credentialPolicyResolution
-	preserveLockHash  string
+	// credentialPlatform injects the policy target OS; empty uses runtime.GOOS.
+	credentialPlatform string
+	credentialPolicy   *credentialPolicyResolution
+	preserveLockHash   string
 	// beforeRepairLock is a race-injection seam; production leaves it nil.
 	beforeRepairLock func()
 }
@@ -388,7 +390,7 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 		docs:             map[string][]byte{},
 		fileHashes:       map[string][]byte{},
 	}
-	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative {
+	if adapter.ID == envregistry.Muse && credentialPolicy.selection == envregistry.CredentialStoreNative && credentialPolicy.effectiveStore == envregistry.CredentialStoreFile {
 		plan.warnings = append(plan.warnings, "managed Muse maps configured native (including unset) to effective file storage; the stored selector is unchanged; refresh remains unqualified")
 	}
 	if form == envregistry.FormReferenced && adapter.ID == envregistry.OpenCode {
