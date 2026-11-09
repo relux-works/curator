@@ -11,30 +11,63 @@ import (
 	"testing"
 )
 
-// Admission rejects shared temporary ancestors. Allocate these real syscall
-// fixtures below the physical caller home, independently of the checkout and
-// the system temporary directory, which may both have shared ancestors.
+// Each fixture gets a disposable HOME below a canonical testing allocation.
+// Shared system temp ancestors require a private checkout scratch fallback;
+// neither the inherited HOME nor a sticky checkout decides fixture admission.
+func destinationTestHome(t *testing.T) string {
+	t.Helper()
+	base, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !destinationPrivateTempBase(base) {
+		base, err = filepath.Abs("../../.temp")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(base, 0700); err != nil {
+			t.Fatal(err)
+		}
+		base, err = filepath.EvalSymlinks(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !destinationPrivateTempBase(base) {
+			t.Fatal("destination fixtures need a temporary base without shared ancestors")
+		}
+	}
+	t.Setenv("TMPDIR", base)
+	allocation, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(allocation, "home")
+	if err := os.Mkdir(home, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	return home
+}
+
+func destinationPrivateTempBase(path string) bool {
+	for {
+		info, err := os.Stat(path)
+		if err != nil || !info.IsDir() || info.Mode().Perm()&0022 != 0 || info.Mode()&os.ModeSticky != 0 {
+			return false
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return true
+		}
+		path = parent
+	}
+}
+
 func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
 	t.Helper()
-	base, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	base, err = filepath.EvalSymlinks(base)
-	if err != nil {
-		t.Fatal(err)
-	}
-	allocation, err := os.MkdirTemp(base, ".curator-destination-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(allocation); err != nil {
-			t.Error(err)
-		}
-	})
+	home := destinationTestHome(t)
 	// The target containing a protected root also needs a private parent.
-	root := filepath.Join(allocation, "fixture")
+	root := filepath.Join(home, "fixture")
 	if err := os.Mkdir(root, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -45,27 +78,44 @@ func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
 	return root, DestinationPolicy{ProtectedRoots: []string{protected}}
 }
 
+// A sticky inherited HOME and TMPDIR must not receive destination fixtures.
+// The private control admits; an actual destination below the sticky root
+// still refuses without writes, and the inherited HOME stays empty.
+func TestDestinationSandboxHomeIndependence(t *testing.T) {
+	shared, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(shared, os.ModeSticky|0777); err != nil {
+		t.Fatal(err)
+	}
+	inheritedHome := filepath.Join(shared, "inherited-home")
+	if err := os.Mkdir(inheritedHome, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", inheritedHome)
+	t.Setenv("TMPDIR", shared)
+	t.Run("private-fixtures", func(t *testing.T) {
+		root, policy := destinationSandbox(t)
+		admitDestination(t, filepath.Join(root, "control"), policy, DestinationAbsent)
+		if home := os.Getenv("HOME"); home == inheritedHome || !destinationPrivateTempBase(home) {
+			t.Fatal("fixture HOME retained shared ancestors")
+		}
+		path := filepath.Join(inheritedHome, "target")
+		_, err := OpenDestination(path, policy)
+		requireDestinationError(t, err, DestinationInvalid, "directory-permissions")
+		assertAbsent(t, path)
+		entries, err := os.ReadDir(inheritedHome)
+		if err != nil || len(entries) != 0 {
+			t.Fatal("fixtures changed inherited HOME", entries, err)
+		}
+	})
+}
+
 // A checkout under a sticky ancestor must not move the valid destination
 // fixtures there. Actual destinations under that same ancestor still refuse.
 func TestDestinationSandboxCheckoutIndependence(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	home, err = filepath.EvalSymlinks(home)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fixtureHome, err := os.MkdirTemp(home, ".curator-destination-home-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(fixtureHome); err != nil {
-			t.Error(err)
-		}
-	})
-	t.Setenv("HOME", fixtureHome)
+	destinationTestHome(t)
 	// Resolve the scratch prefix so the walk reaches the sticky ancestor on macOS.
 	scratch, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -82,7 +132,7 @@ func TestDestinationSandboxCheckoutIndependence(t *testing.T) {
 	}
 	t.Chdir(packageDir)
 	root, policy := destinationSandbox(t)
-	relative, err := filepath.Rel(fixtureHome, root)
+	relative, err := filepath.Rel(os.Getenv("HOME"), root)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
 		t.Fatalf("destination fixture is outside the private home: %q, %v", relative, err)
 	}
