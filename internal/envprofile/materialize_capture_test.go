@@ -541,7 +541,7 @@ func TestMaterializeCaptureAndStatusNeverProbeVendor(t *testing.T) {
 							t.Fatal(err)
 						}
 						wantStore, wantBackend := "file", "file"
-						if tc.name == "muse-native-shared" {
+						if tc.name == "muse-native-shared" && runtime.GOOS == "darwin" {
 							wantStore, wantBackend = "native", ""
 						}
 						backend, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]

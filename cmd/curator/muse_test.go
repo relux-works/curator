@@ -72,9 +72,13 @@ func provisionRegisteredEnvironments(t *testing.T, source stubConfigSource, prof
 	}
 }
 
-// Shared native launches with the four XDG paths and no forced backend. The
-// inert child verifies environment delivery without a real Keychain or Muse.
+// Shared native uses four XDG paths on darwin and adds forced file elsewhere.
+// The inert child verifies delivery without a real Keychain or Muse.
 func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
+	store, backend, envCount := "native", "", 4
+	if runtime.GOOS != "darwin" {
+		store, backend, envCount = "file", "file", 5
+	}
 	source, _ := profileHome(t)
 	operatorHome := t.TempDir()
 	binary := fakeMuse(t)
@@ -105,7 +109,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("resolve: %d %s", code, stderr)
 	}
-	validateMuseEffectiveFragment(t, source.cfg.Home(), []byte(stdout), "native")
+	validateMuseEffectiveFragment(t, source.cfg.Home(), []byte(stdout), store)
 	resolved, err := envprofile.Resolve(envprofile.ResolveRequest{
 		Home: source.cfg.Home(), Profile: "acme", EnvID: envregistry.Muse,
 		Machine: envregistry.DefaultMachineConfig(), Format: "json",
@@ -113,7 +117,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validateMuseEffectiveFragment(t, source.cfg.Home(), resolved.Document, "native")
+	validateMuseEffectiveFragment(t, source.cfg.Home(), resolved.Document, store)
 	var fragment struct {
 		Fragment string            `json:"fragment"`
 		Env      map[string]string `json:"env"`
@@ -121,7 +125,7 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
 		t.Fatal(err)
 	}
-	if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != 4 {
+	if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != envCount {
 		t.Fatalf("fragment %s", stdout)
 	}
 	home := envprofile.ManagedHomeDir(source.cfg.Home(), "acme", "muse")
@@ -159,8 +163,8 @@ func TestMuseCLIFragmentAndFakeLaunch(t *testing.T) {
 	if err := json.Unmarshal(output, &observed); err != nil {
 		t.Fatal(err)
 	}
-	if observed.Env["TBH_CREDENTIAL_BACKEND"] != "" {
-		t.Fatalf("shared native child received a forced backend: %s", output)
+	if observed.Env["TBH_CREDENTIAL_BACKEND"] != backend {
+		t.Fatalf("shared native child received the wrong platform backend: %s", output)
 	}
 	if observed.Env["HOME"] != operatorHome {
 		t.Fatalf("HOME replaced: %s", output)
@@ -550,8 +554,8 @@ func TestMuseFragmentV4PublishedCases(t *testing.T) {
 // The public config/resolve chain preserves selectors, native auth, marker and
 // link identity; explicit keychain emits no fragment, even with repair.
 // Public config/resolve preserves the stored selector and both stores. All
-// renderers agree: native/unset now have four XDG values, while explicit file
-// retains five values in independent XDG-then-backend order.
+// renderers agree: darwin native/unset has four XDG values; other platforms
+// and explicit file retain five values in XDG-then-backend order.
 func TestMuseCLIStorePolicy(t *testing.T) {
 	source := credentialStoreCLIHome(t)
 	prepareNativeMuse(t)
@@ -596,7 +600,7 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 				}
 				if format == "json" {
 					store := "native"
-					if selector == "file" {
+					if selector == "file" || runtime.GOOS != "darwin" {
 						store = "file"
 					}
 					validateMuseEffectiveFragment(t, source.cfg.Home(), []byte(stdout), store)
@@ -608,7 +612,7 @@ func TestMuseCLIStorePolicy(t *testing.T) {
 				} else {
 					lines := strings.Split(strings.TrimSpace(stdout), "\n")
 					names := []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"}
-					if selector == "file" {
+					if selector == "file" || runtime.GOOS != "darwin" {
 						names = append(names, "TBH_CREDENTIAL_BACKEND")
 					}
 					if len(lines) != len(names) {

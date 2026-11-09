@@ -378,7 +378,7 @@ func TestMuseCredentialPolicyStatus(t *testing.T) {
 			}
 			status := readMuseRootStatus(t, source)
 			store := "native"
-			if mode == "isolated" {
+			if mode == "isolated" || runtime.GOOS != "darwin" {
 				store = "file"
 			}
 			found := false

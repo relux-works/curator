@@ -64,10 +64,14 @@ links and marker records. Resolve (including repair), status verification and
 credential migration use this projection. Each new operation observes native
 configuration again. The one-time provisioning seed is a separate read; this
 projection is not an atomic snapshot of vendor-owned state. Muse emits v4
-with all four managed XDG paths. Shared + native/unset reports effective
+with all four managed XDG paths. On macOS, shared + native/unset reports effective
 `native` and omits `TBH_CREDENTIAL_BACKEND`, allowing Muse's default store
 (global macOS Keychain on the measured releases). No native-to-file mapping
-warning is emitted for that case. Isolated + native/unset and explicit `file`
+warning is emitted for that case. On Linux and every non-darwin OS,
+shared + native/unset retains effective file, `TBH_CREDENTIAL_BACKEND=file` and the
+existing mapping warning, reusing the operator's file store through the
+managed `auth.json` link with no per-home manual login. On every platform,
+isolated + native/unset and explicit `file`
 retain effective file with `TBH_CREDENTIAL_BACKEND=file`; isolated native
 retains its mapping warning. The stored selector remains unchanged.
 Shared keeps the `config/muse/auth.json` link to the captured native fallback
@@ -224,7 +228,7 @@ login in one of two ways, chosen per profile × environment with
 | `claude_code` on Linux | `shared` | `.credentials.json` links to the native file | one login per home |
 | `codex_cli` | `shared` | `auth.json` links to the native file under `file` storage (the default when `cli_auth_credentials_store` is absent); under `keyring` or `auto` the login is ambient | admitted only under `file` storage; otherwise `environment_isolated_unsupported` |
 | `pi` | `shared` | `auth.json` links to the native `~/.pi/agent/auth.json` | one login per home |
-| `muse` | `shared` | native/unset: no backend override, vendor default (macOS Keychain); explicit file: forces file. `config/muse/auth.json` fallback link and target checks unchanged. D10 revision pending owner acceptance. | file backend, including native/unset; global Keychain cannot be isolated. No passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
+| `muse` | `shared` | macOS native/unset: no backend override, reuse the Keychain login. Linux and other non-darwin native/unset: force file with existing warning, reusing the operator's file store through the link, no per-home login. Explicit file: forces file everywhere. `config/muse/auth.json` fallback link and target checks unchanged. D10 revision pending owner acceptance. | Unchanged on every platform: file backend, including native/unset; global Keychain cannot be isolated. No passthrough link or placeholder; optimistic admission under D10, refresh unqualified |
 | `opencode` | `shared` (ambient) | its login lives outside the swapped config home, so nothing is linked | not applicable: refused, since the login is outside the home |
 
 For `codex_cli`, sharing follows the storage selected by your **native**

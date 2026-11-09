@@ -144,8 +144,10 @@ type ResolveRequest struct {
 	// credentialRelease scopes policy derivation to caller-supplied evidence.
 	// Nil permits vendor observation; content verification supplies unknown.
 	credentialRelease *string
-	credentialPolicy  *credentialPolicyResolution
-	preserveLockHash  string
+	// credentialPlatform injects the policy target OS; empty uses runtime.GOOS.
+	credentialPlatform string
+	credentialPolicy   *credentialPolicyResolution
+	preserveLockHash   string
 	// beforeRepairLock is a race-injection seam; production leaves it nil.
 	beforeRepairLock func()
 }

@@ -11,54 +11,93 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
-// Shared native/unset must leave Muse's default store available (the global
-// Keychain on the measured macOS release), retaining the auth.json fallback
-// link. Fixtures prove projection only; they never access a real Keychain.
-func TestMuseSharedNativeKeepsDefaultBackend(t *testing.T) {
-	for _, selection := range []envregistry.CredentialStoreSelection{"native", ""} {
-		t.Run(string(selection), func(t *testing.T) {
-			fx, auth, native := museFixture(t)
-			req := fx.request(envregistry.Muse)
-			if selection != "" {
-				req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.Muse: selection}}
+// Darwin shared native/unset keeps the default backend; Linux and other OSes
+// must keep forced file, the native auth link and the existing mapping warning.
+// These injected-platform fixtures prove projection, without accessing Keychain.
+func TestMuseSharedNativePlatformPolicy(t *testing.T) {
+	for _, platform := range []string{"darwin", "linux", "windows", "freebsd"} {
+		for _, selection := range []envregistry.CredentialStoreSelection{"native", ""} {
+			name := string(selection)
+			if name == "" {
+				name = "unset"
 			}
-			result, err := Resolve(req)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var fragment struct {
-				Env             map[string]string
-				CredentialStore struct{ Selection string } `json:"credential_store"`
-			}
-			if err := json.Unmarshal(result.Document, &fragment); err != nil {
-				t.Fatal(err)
-			}
-			if backend, present := fragment.Env["TBH_CREDENTIAL_BACKEND"]; present {
-				t.Fatalf("shared native must not force a backend, got %q", backend)
-			}
-			if fragment.CredentialStore.Selection != "native" {
-				t.Fatalf("effective selection=%q, want native", fragment.CredentialStore.Selection)
-			}
-			if strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") {
-				t.Fatal("shared native still reports a file mapping")
-			}
-			if got, err := os.Readlink(auth); err != nil || got != native {
-				t.Fatalf("fallback link=%q, %v; want %q", got, err, native)
-			}
-		})
+			t.Run(platform+"/"+name, func(t *testing.T) {
+				fx, auth, native := museFixture(t)
+				req := fx.request(envregistry.Muse)
+				req.credentialPlatform = platform
+				if selection != "" {
+					req.Machine.CredentialStore = map[string]map[string]envregistry.CredentialStoreSelection{fx.profile: {envregistry.Muse: selection}}
+				}
+				result, err := Resolve(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var fragment struct {
+					Env             map[string]string
+					CredentialStore struct{ Selection string } `json:"credential_store"`
+				}
+				if err := json.Unmarshal(result.Document, &fragment); err != nil {
+					t.Fatal(err)
+				}
+				backend, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
+				if platform == "darwin" {
+					if forced || fragment.CredentialStore.Selection != "native" {
+						t.Fatalf("darwin shared native must not force a backend: %s", result.Document)
+					}
+				} else if !forced || backend != "file" || fragment.CredentialStore.Selection != "file" {
+					t.Fatalf("%s shared native must retain TBH_CREDENTIAL_BACKEND=file and effective file: %s", platform, result.Document)
+				}
+				if strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") != (platform != "darwin") {
+					t.Fatalf("%s mapping warning: %v", platform, result.Warnings)
+				}
+				if got, err := os.Readlink(auth); err != nil || got != native {
+					t.Fatalf("native auth link=%q, %v; want %q", got, err, native)
+				}
+			})
+		}
 	}
 }
 
-// Shared native/unset preserves the vendor default; explicit file still forces
-// file. Isolated native/unset still maps to file and warns, preventing access
-// to a global Keychain login. Selectors and fallback link rules stay unchanged.
+// Reusing one request across injected platforms must not reuse the other
+// platform's backend; switching back also restores the darwin positive control.
+func TestMuseCredentialPolicyPlatformCache(t *testing.T) {
+	fx, _, _ := museFixture(t)
+	req := fx.request(envregistry.Muse)
+	adapter, err := envregistry.ByID(envregistry.Muse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, platform := range []string{"darwin", "linux", "darwin"} {
+		req.credentialPlatform = platform
+		policy, err := req.resolveCredentialPolicyObserved(adapter, "unknown")
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantStore, wantBackend := envregistry.CredentialStoreNative, ""
+		if platform == "linux" {
+			wantStore, wantBackend = envregistry.CredentialStoreFile, "file"
+		}
+		backend, forced := policy.launchEnv["TBH_CREDENTIAL_BACKEND"]
+		if policy.effectiveStore != wantStore || backend != wantBackend || forced != (platform == "linux") {
+			t.Fatalf("%s reused the wrong platform policy: %+v", platform, policy)
+		}
+	}
+}
+
+// Only darwin shared native/unset preserves the vendor default; all other
+// platforms, isolated homes and explicit file retain file. Selectors, warning
+// and auth-link rules stay unchanged on each injected platform.
 // Isolated never imports a native credential; shared requires a live native file.
 // Keychain refuses before any home, marker, link or credential mutation.
 func TestMuseCredentialPolicyMatrix(t *testing.T) {
 	requireLinkCapability(t)
 	for _, selection := range []envregistry.CredentialStoreSelection{"", "native", "file", "keychain"} {
-		for _, isolation := range []string{"shared", "isolated"} {
-			t.Run(string(selection)+"/"+isolation, func(t *testing.T) {
+		for _, mode := range []struct{ isolation, platform string }{
+			{"shared", "darwin"}, {"isolated", "darwin"},
+			{"shared", "linux"}, {"isolated", "linux"},
+		} {
+			isolation, platform := mode.isolation, mode.platform
+			t.Run(string(selection)+"/"+isolation+"/"+platform, func(t *testing.T) {
 				fx := writeManagedFixture(t, "muse-policy")
 				fx.native[envregistry.Muse] = t.TempDir()
 				native := filepath.Join(fx.native[envregistry.Muse], "auth.json")
@@ -66,6 +105,7 @@ func TestMuseCredentialPolicyMatrix(t *testing.T) {
 					t.Fatal(err)
 				}
 				req := fx.request(envregistry.Muse)
+				req.credentialPlatform = platform
 				req.Repair = true
 				req.Machine.Isolation[fx.profile] = map[string]string{envregistry.Muse: isolation}
 				if selection != "" {
@@ -102,14 +142,14 @@ func TestMuseCredentialPolicyMatrix(t *testing.T) {
 					t.Fatal(err)
 				}
 				wantStore, wantBackend, wantEnvCount := "file", "file", 5
-				if isolation == "shared" && selection != "file" {
+				if platform == "darwin" && isolation == "shared" && selection != "file" {
 					wantStore, wantBackend, wantEnvCount = "native", "", 4
 				}
 				backend, forced := fragment.Env["TBH_CREDENTIAL_BACKEND"]
 				if fragment.Fragment != "launch-env-fragment-v4" || len(fragment.Env) != wantEnvCount || backend != wantBackend || forced != (wantStore == "file") || fragment.CredentialStore.Selection != wantStore || fragment.RootContext == nil {
 					t.Fatalf("projection: %s", result.Document)
 				}
-				wantWarning := isolation == "isolated" && selection != "file"
+				wantWarning := wantStore == "file" && selection != "file"
 				if strings.Contains(strings.Join(result.Warnings, ";"), "maps configured native") != wantWarning {
 					t.Fatalf("mapping warning: %v, want warning=%v", result.Warnings, wantWarning)
 				}
