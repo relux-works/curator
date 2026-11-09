@@ -102,7 +102,9 @@ func launcherMembers(raw any, names ...string) (map[string]any, bool) {
 }
 
 func parseLauncherExtensions(raw any, schema int) (*LauncherExtensions, error) {
-	fail := func() (*LauncherExtensions, error) { return nil, fmt.Errorf("extensions: invalid launcher selection") }
+	fail := func() (*LauncherExtensions, error) {
+		return nil, configDiagnostic("launcher_selection_invalid", "extensions", fmt.Errorf("extensions: invalid launcher selection"))
+	}
 	object, ok := raw.(map[string]any)
 	if !ok {
 		return fail()

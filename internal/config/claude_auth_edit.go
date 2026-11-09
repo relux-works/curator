@@ -129,8 +129,8 @@ func claudeAuthObject(raw []byte) (map[string]any, error) {
 	if protocoljson.Validate(raw) != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
-	var object map[string]any
-	if json.Unmarshal(raw, &object) != nil || object == nil {
+	object, err := decodeConfigObject(raw, "")
+	if err != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	return object, nil

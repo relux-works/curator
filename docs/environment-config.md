@@ -484,3 +484,23 @@ continuing attachment lifetime. A syntactically valid selection cannot enable a
 legacy fallback. Ordinary environment and credential-store edits preserve
 schema 8 and all existing selections. The machine-only source boundary applies
 equally to this selection; system policy cannot supply or lock it.
+
+### Host notification carrier compatibility
+
+Schema 8 selects `curator.launcher-config/2`; Host metadata uses
+`curator-host-notification/1`. The raw version must be the integer token `8`,
+not `8.0` or `8e0`. Released predecessor numeric forms remain admitted.
+Notification absence and explicit `off` remain distinct metadata selections.
+Claude-auth plan/apply/restore retains schema 8 and all non-auth selections.
+
+The loader exposes fixed `ConfigDiagnostic` code/path pairs matching the
+[Host notification corpus](https://github.com/relux-works/curator-spec/blob/main/protocol/host-notification-proposal.md#4-refusal-diagnostics-and-precedence):
+`config_json_invalid` / `$`, `config_schema_unsupported` / `schema_version`,
+`launcher_selection_machine_only` / `extensions`,
+`launcher_extensions_schema` / `extensions`, `launcher_selection_invalid` /
+`extensions`, and `config_shape_invalid` / `$`. Compatibility message text is
+retained; selection-lock refusals use an input-free machine-only diagnostic.
+System selection and selection locks cannot supply notification authority.
+These are metadata admission rules, not receiver activation or enrollment.
+The capability/lifecycle publisher and its relationship to CIP-0023 remain an
+owner decision in the specification; this carrier does not resolve it.
