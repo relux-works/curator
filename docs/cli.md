@@ -1170,6 +1170,264 @@ curator ui
 
 The command displays interactive status dashboards for project skills.
 
+## Profile graph contract (draft, not implemented)
+
+### curator profile graph
+
+The proposed command accepts these selectors:
+
+```text
+curator profile graph <profile> [--json] [--source <dir>] [--env <id>]
+```
+
+This section reserves a read-only, offline command. The current CLI does not
+implement it. The machine contract is
+[`curator-profile-graph/1`](../internal/profilegraph/schemas/curator-profile-graph-v1.schema.json).
+The small [golden graph](../internal/profilegraph/testdata/small/graph.json)
+is a contract fixture, not captured runtime output. The executable command
+grammar remains in `cmd/curator/command_help.go`; no runnable verb is added in
+this round. This is an implementation-owned proposal for contract review,
+not a change to the separately versioned environment protocol.
+
+`<profile>` selects an installed profile by name. Its stored lock, recorded
+composition and exact local snapshots are authoritative. A newer checkout,
+registry entry or branch tip must never replace a locked input. With
+`--source <dir>`, the positional name labels a preview of that package tree;
+an installed profile with the same name is ignored. Preview uses install's
+manifest, requirement, directory, selector and precedence semantics but a
+read-only local resolver. Only already available Git objects and state
+snapshots may satisfy requirements. A missing revision or an unresolved
+floating requirement refuses; no fetch, clone, update, installation or lock
+publication is permitted. Local Git reads disable lazy fetching and optional
+locks. No hooks, builds, package scripts, runtime launches or subprocess
+credential helpers may execute.
+
+The source preview needs no bootstrap or installed profile. Installed mode
+reads only the admitted profile record and environment projection; it must not
+invoke provisioning or credential checks while obtaining those inputs.
+
+`--env` selects one registered environment; `claude` and `codex` normalize to
+`claude_code` and `codex_cli`. Omission selects all environments in the admitted
+environment catalogue, sorted by canonical id, including environments with
+no emitted surface. An unknown id refuses before reading package content.
+`--json` writes exactly one UTF-8 JSON object and LF to stdout. Without it,
+the text view reports the same graph and per-document totals. Diagnostics go
+to stderr. Success is exit 0, invalid arguments exit 2, and input, safety,
+resolution or resource failures exit 1 with a named diagnostic class. A
+failure emits no partial graph. No output file, temporary file, cache, home,
+lock, ref, index, config, current pointer or telemetry record is written.
+
+### Sources, nodes and relationships
+
+Each node has a stable `id`, an `identity` tuple, a `kind`, source provenance
+when applicable, a nullable owning `layer`, content measurements, per-document
+`emissions` and per-environment `loads`. Source identities preserve the logical
+locator, declared version, package directory selector, exact commit or state digest and relative
+file path. `authoring_source` is a separately declared editing destination;
+a cached snapshot alone cannot prove ownership. Unknown ownership is explicit.
+The output uses logical root labels and relative paths, never absolute home
+paths, credentials or URL userinfo. Root-label bindings are caller-held input
+selectors, not instructions for a consumer to search the filesystem.
+
+| Node kinds | Meaning |
+| --- | --- |
+| `profile`, `root-package` | Final selected composition and its root snapshot |
+| `overlay` | A declaration occurrence, including source, requirement form, directory, resolved revision, effective weight and emitted order |
+| `profile-package`, `context-package` | Nested profile or required context snapshot; one shared dependency can have several incoming edges |
+| `instruction-module`, `section`, `quote-block` | Manifest module occurrence and Markdown source spans; sections retain heading level/text |
+| `skill`, `skill-listing`, `skill-body`, `skill-reference` | Dependency, decoded listing payload, body and referenced resource measured separately |
+| `project-instruction` | Only a project instruction file explicitly admitted by Curator's selected scope |
+| `emitted-document`, `generated` | Environment output and renderer-owned header, marker, separator or wrapper bytes |
+
+Edges are directed: `root`, `overlay`, `requires-profile`, `requires-context`,
+`requires-skill`, `contains`, `section`, `quote`, `lists`, `body`, `references`,
+`project`, `emits`, `contributes`, and `requested-load`. Each carries a zero-based
+order within that relationship, and dependency edges retain the declared
+requirement form/value. Overlay order is the final renderer member position,
+not merely its position in configuration. Its declaration slot is also kept.
+Equal source/revision pairs with different directories, weights or slots remain
+distinct. Shared dependency edges do not create duplicate package nodes; module
+occurrences reached through distinct render slots remain distinct even when
+their content hashes match. Real dependency cycles refuse as `graph_cycle`.
+
+Every selected context/profile package carries its effective weight and renderer order in
+`composition`; version is null when no declared package version is available.
+
+Node ids are `n:` followed by SHA-256 of the identity tuple: concatenate each
+UTF-8 component as its decimal byte length, `:`, then its bytes, without a
+separator. The tuple is `[kind, logical-profile-name, ...coordinates]`.
+Package coordinates are locator, directory, revision kind, revision value.
+An overlay appends its declaration slot and weight. Modules append their
+owning layer id, manifest slot and relative path; sections and quotes append
+the module id and source start/end byte offsets. Skill parts append skill id,
+part kind and relative locator. Documents append environment and relative
+output path; generator nodes append document id, part kind and ordinal.
+The profile has no extra coordinates. A skill package uses package coordinates;
+a project file uses its logical root label and relative path. Generated bytes
+have no source file identity. Structural nodes use null source/content metrics
+where there is no corresponding file. Root labels and all coordinate orderings
+are deterministic. Content hashes identify blobs, never occurrence identities.
+Changing a pin changes its snapshot ids; moving an absolute checkout does not.
+Nodes sort by id, edges by `(from, kind, order, to)`, documents by
+`(environment, path)`. Duplicate ids or tuples, dangling ids and a layer id
+that does not name a package/overlay refuse as `graph_invalid_input`.
+
+### Byte accounting and load evidence
+
+`content` measures exact original bytes, with an unprefixed lowercase SHA-256.
+Text lines equal LF count plus one for a nonempty unterminated final line;
+empty text has zero lines. CRLF is two bytes with one LF line delimiter.
+Binary content has a byte count and hash but null lines. `unread` content has
+null metrics/hash, `absent` has zero bytes/lines and null hash, and structural
+`not-applicable` content has null metrics/hash. These cases never impersonate
+an empty measured file. Source byte ranges are relative to the source file.
+All ranges use zero-based half-open UTF-8 byte offsets, never character indexes.
+
+Every emitted document has exact `bytes`, `lines`, `sha256`, environment,
+logical root/path, form and origin. Installed mode compares existing managed
+documents to rendering from the exact lock; differences refuse as
+`graph_document_drift`. A missing provisioned document may be represented by
+an in-memory render with origin `rendered`; it must never be called installed.
+Source mode always renders in memory. Referenced form includes the root and
+every emitted fragment as separate documents, as does an admitted system prompt.
+No document row means no emitted surface, not a missing zero-byte file.
+
+`documents[].coverage` is the sole additive ledger. Its entries partition
+`[0, bytes)` in order without gaps, overlap or zero-length spans. Each names
+one leaf contributor; the sum of `end-start` must equal the exact file size.
+For empty documents coverage is empty. Header comments, chapter markers,
+separators and generated imports belong to `generated` nodes. Current
+`contextmaterialize.Join` preserves validated module bytes and inserts one LF
+between parts. Neither a final source LF nor generator framing is silently
+charged to another module. A transformed/wrapped part retains source metrics
+and maps only its actual emitted bytes; wrappers are separate contributors.
+
+`nodes[].emissions` provides inclusive projections onto each document. Within
+one projection ranges are ordered, disjoint and merged when adjacent. Its
+bytes/lines/hash measure the concatenation of those slices; its byte count
+equals their union length. Ancestor, section and quote ranges may overlap other
+nodes. Never sum inclusive projections or line counts to obtain document totals.
+An emitted-document node covers the whole document. Module projections include
+their section and quote bytes but exclude renderer framing. Empty emission
+lists explicitly mean no emitted contribution. The renderer, not filename or
+text matching, establishes layer and module attribution.
+
+Section parsing recognizes ATX and setext headings, retains the preamble as
+module-owned bytes, and ignores heading-like content inside backtick or tilde
+fences. A section extends from its heading to the next heading of the same or
+shallower level, or module end. Child sections overlap ancestors. Quote-block
+nodes cover contiguous Markdown blockquote spans including their markers;
+they do not assert that a quotation is an operative instruction. Semantic quote,
+duplicate, conflict, token and trimming analysis belongs to consumers. Consumers
+can read admitted text and Markdown; they need not parse Curator manifests,
+locks or composition headers to reconstruct ownership or costs.
+
+Load classes `always`, `on-demand` and `listed-only` describe only a known
+Curator rendering rule for that environment. Every such claim cites
+`basis: rendering-rule`; otherwise use `UNKNOWN`. State is separate:
+`emitted`, `available`, `conditional`, `excluded` or `UNKNOWN`. Conditional
+claims carry the known selector/trigger; an excluded module has no emission
+and must not be mislabeled on-demand. A `requested-load` edge records an
+explicit declared subsequent read, never proof of runtime injection. There
+are no observed prompt counts or runtime loading claims in this contract.
+
+Skills carry origin `lock`, `managed-inventory`, `runtime-discovered` or
+`UNKNOWN`. Runtime-discovered means a safely admitted Curator-owned inventory
+projection, never session scraping or unrestricted home discovery. A listing's
+canonical content is decoded name, LF, decoded description, LF; raw YAML is
+not that payload. Listing bytes are not charged as emitted instructions unless
+Curator actually emits them. `materialization: listed-only` means only a
+listing is represented; `loaded` means that part is embedded in a Curator
+document, not that a model has read it. Unknown exposure stays `UNKNOWN`.
+Bodies/references need not be opened to report their declared presence. Binary
+references cannot have text lines. No body bytes inflate listing cost.
+Project files are entries already selected by admitted Curator project scope
+metadata. With no such selection, the graph has no project-instruction nodes.
+The fixture explicitly admits one project input. Arbitrary parent chains,
+memory, runtime extras and missing-file discovery are not inferred. Package
+projections include their contained modules, not dependency subtrees. Only
+the final profile projection includes the complete composition.
+
+`inputs` lists every consumed content/projection file by logical root and
+relative path, byte count and SHA-256, sorted by `(root, path)`. The input
+digest hashes this UTF-8 transcript: `curator-profile-graph/1` plus LF, mode
+plus LF, profile name plus LF, then each sorted canonical environment id plus
+LF, then an empty line, then each input as `root NUL path NUL sha256 LF`.
+Fields in this transcript must contain no NUL, CR or LF. Duplicate input keys
+refuse. Include lock bytes and admitted source/composition/environment
+projections, not unrelated configuration. File hashes preserve original bytes;
+projection serialization is UTF-8 JSON with sorted keys, no whitespace and no
+trailing LF. `generator.version` is the actual Curator build version, independent
+of schema version; the example uses an explicitly synthetic version.
+JSON Schema enforces shape. Hashes, reference integrity, identity tuples,
+acyclic dependencies, load evidence and exact accounting are additional
+producer obligations, not properties that JSON Schema alone can prove.
+
+### Safety and bounded reads
+
+Reads use a positive allowlist of manifests, locks, immutable local snapshots,
+declared module files, skill listing metadata, explicit references and selected
+project/output files. The only machine configuration read is a restricted
+composition/environment projection. Do not deserialize unrelated settings.
+No recursive crawl of a home or filesystem root is allowed.
+
+The deny-list wins over declarations and explicit selectors. Under any home,
+never open content in auth, credential, session, history or log directories;
+never open auth/credential files, private keys, token stores, shell histories,
+session transcripts, SQLite/database files (including WAL/SHM sidecars), logs,
+or shell snapshots. Matching is case-insensitive on path components and known
+file families, including `.ssh`, `.gnupg`, `auth*`, `credential*`, `session*`,
+`history*`, `logs`, `*.log`, `*.sqlite*`, `*.db`, `*-wal`, `*-shm`,
+`*_history`, `.env`, `*.pem`, `*.key` and `id_*`. Apply the same payload
+restrictions to source and cache roots so a source selector cannot bypass them.
+Metadata classification may inspect path kind; denied payloads must never be
+opened, hashed, included or echoed in errors. Refuse as `graph_path_denied`.
+Do not inspect auth/keychain state to resolve uncertainty.
+
+Resolve every path component beneath explicitly admitted managed/source/project
+roots before opening. A symlink whose target leaves those roots, including an
+intermediate directory link, refuses as `graph_symlink_escape`. Internal links
+may resolve only to allowlisted files and must be cycle-checked. Enforce the
+boundary during open to prevent symlink replacement races. FIFOs, sockets,
+devices and other non-regular payloads refuse as `graph_invalid_input`.
+
+Version 1 caps serialized stdout at 8 MiB including its final LF, consumed
+input bytes at 32 MiB, each file at 4 MiB, nodes at 20,000, edges and inspected
+directory entries at 50,000 each, environments/documents at 256 each, and
+dependency/link traversal depth at 128. Limits apply to text and JSON alike.
+Check bounded lengths before allocation/read and budget all traversals, not
+just final output. Exceeding any limit refuses as `graph_limit_exceeded`,
+never truncates costs or emits a partial graph. Missing input is
+`graph_missing_input`; malformed or inconsistent input is `graph_invalid_input`.
+`graph_load_unknown` is a nonfatal explanation of uncertainty. All diagnostics
+must avoid secret-bearing paths or values.
+
+### Decisions
+
+| Decision | Reason | Date |
+| --- | --- | --- |
+| Contract only, existing CLI reference and internal schema fixture package | Allow consumer review without advertising an executable command | 2026-11-09 |
+| Closed `curator-profile-graph/1` schema; build version separate | Reject silent shape drift and distinguish generator changes | 2026-11-09 |
+| Length-prefixed tuple hashes identify occurrences; content hashes identify blobs | Stable across checkout locations without collapsing distinct declarations | 2026-11-09 |
+| Package DAG with ordered occurrence edges and explicit owning layer | Preserve shared dependencies, nested profiles and overlay ownership | 2026-11-09 |
+| Half-open byte unions; additive leaf coverage separate from inclusive projections | Exact module cost with overlapping sections and quotations | 2026-11-09 |
+| Generator owns headers, separators and wrappers; source metrics stay separate | Reconcile concatenation and transformation without hidden overhead | 2026-11-09 |
+| Physical LF lines with unterminated tail; binary/unread/null distinct | Avoid character offsets and fabricated text measurements | 2026-11-09 |
+| `UNKNOWN` means Curator has no applicable rendering evidence | Inventory and emission cannot prove actual model injection | 2026-11-09 |
+| Separate load class, conditional/excluded state and skill materialization/origin | Keep selection, listing, embedded content and runtime extras distinct | 2026-11-09 |
+| Structured Markdown spans, no semantic quote verdict or token estimates | Publish composition truth while keeping analysis in consumers | 2026-11-09 |
+| Locked installed inputs versus offline source preview; detect installed drift | Never attribute current source bytes to an older installed lock | 2026-11-09 |
+| Logical relative locators and sorted input transcript digest | Reproduce provenance without exporting home paths or unrelated config | 2026-11-09 |
+| Fixed read/output budgets, deny-list and named symlink refusal | Bound offline work and prevent sensitive or out-of-root reads | 2026-11-09 |
+
+### Open contract questions
+
+1. Confirm the v1 budgets and closed-schema evolution policy with consumers.
+2. Confirm whether declared-but-unread skill references suffice for the first
+   implementation, or require a separately bounded explicit-content selector.
+3. Confirm the safe source of runtime-discovered skill inventory. Until one is
+   admitted, that origin remains representable but unavailable to the producer.
+
 ## Operator configuration
 
 ### Claude settings permissions

@@ -1,0 +1,1123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relux-works.github.io/curator/schemas/curator-profile-graph-v1.schema.json",
+  "title": "Curator profile graph contract, version 1",
+  "description": "Draft contract only. Cross-record identity, hash, reference and exact-coverage invariants are normative in docs/cli.md.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "curator-profile-graph/1"
+    },
+    "generator": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "curator"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "inputs_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "mode": {
+          "enum": [
+            "installed",
+            "source"
+          ]
+        },
+        "environments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "profile",
+        "mode",
+        "environments"
+      ],
+      "additionalProperties": false
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/input"
+      },
+      "maxItems": 50000
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      },
+      "maxItems": 20000,
+      "minItems": 1
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      },
+      "maxItems": 50000
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/document"
+      },
+      "maxItems": 256
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      },
+      "maxItems": 20000
+    }
+  },
+  "required": [
+    "schema_version",
+    "generator",
+    "inputs_digest",
+    "scope",
+    "inputs",
+    "nodes",
+    "edges",
+    "documents",
+    "diagnostics"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^n:[0-9a-f]{64}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "allOf": [
+        {
+          "not": {
+            "pattern": "^/|^[A-Za-z]:|\\\\"
+          }
+        },
+        {
+          "not": {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[\\x00\\r\\n]"
+          }
+        }
+      ]
+    },
+    "range": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "content": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "text",
+            "binary",
+            "unread",
+            "absent",
+            "not-applicable"
+          ]
+        },
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lines": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "bytes",
+        "lines",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lines": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "binary"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lines": {
+                "type": "null"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "unread",
+                  "not-applicable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "null"
+              },
+              "lines": {
+                "type": "null"
+              },
+              "sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "absent"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "const": 0
+              },
+              "lines": {
+                "const": 0
+              },
+              "sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "directory": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "allOf": [
+                {
+                  "not": {
+                    "pattern": "^/|^[A-Za-z]:|\\\\"
+                  }
+                },
+                {
+                  "not": {
+                    "pattern": "(^|/)\\.\\.(/|$)"
+                  }
+                },
+                {
+                  "not": {
+                    "pattern": "[\\x00\\r\\n]"
+                  }
+                }
+              ]
+            },
+            {
+              "const": ""
+            }
+          ]
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "commit",
+                "state-sha256",
+                "UNKNOWN"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "commit"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "state-sha256"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "UNKNOWN"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "const": ""
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "allOf": [
+                {
+                  "not": {
+                    "pattern": "^/|^[A-Za-z]:|\\\\"
+                  }
+                },
+                {
+                  "not": {
+                    "pattern": "(^|/)\\.\\.(/|$)"
+                  }
+                },
+                {
+                  "not": {
+                    "pattern": "[\\x00\\r\\n]"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authoring_source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownership": {
+          "enum": [
+            "declared",
+            "UNKNOWN"
+          ]
+        }
+      },
+      "required": [
+        "locator",
+        "directory",
+        "version",
+        "revision",
+        "path",
+        "authoring_source",
+        "ownership"
+      ],
+      "additionalProperties": false
+    },
+    "requirement": {
+      "type": "object",
+      "properties": {
+        "form": {
+          "enum": [
+            "range",
+            "tag",
+            "revision",
+            "path",
+            "builtin"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "form",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "composition": {
+      "type": "object",
+      "properties": {
+        "requirement": {
+          "$ref": "#/$defs/requirement"
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "declaration": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "requirement",
+        "weight",
+        "order",
+        "declaration"
+      ],
+      "additionalProperties": false
+    },
+    "load": {
+      "type": "object",
+      "properties": {
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "class": {
+          "enum": [
+            "always",
+            "on-demand",
+            "listed-only",
+            "UNKNOWN"
+          ]
+        },
+        "state": {
+          "enum": [
+            "emitted",
+            "available",
+            "conditional",
+            "excluded",
+            "UNKNOWN"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "rendering-rule",
+            "declaration",
+            "UNKNOWN"
+          ]
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "environment",
+        "class",
+        "state",
+        "basis",
+        "condition"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "enum": [
+                  "always",
+                  "on-demand",
+                  "listed-only"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "basis": {
+                "const": "rendering-rule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "emission": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "type": "string",
+          "pattern": "^n:[0-9a-f]{64}$"
+        },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/range"
+          },
+          "maxItems": 50000
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "document",
+        "ranges",
+        "bytes",
+        "lines",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "allOf": [
+            {
+              "not": {
+                "pattern": "^/|^[A-Za-z]:|\\\\"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(^|/)\\.\\.(/|$)"
+              }
+            },
+            {
+              "not": {
+                "pattern": "[\\x00\\r\\n]"
+              }
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "root",
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string",
+          "pattern": "^n:[0-9a-f]{64}$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^n:[0-9a-f]{64}$"
+        },
+        "kind": {
+          "enum": [
+            "root",
+            "overlay",
+            "requires-profile",
+            "requires-context",
+            "requires-skill",
+            "contains",
+            "section",
+            "quote",
+            "lists",
+            "body",
+            "references",
+            "project",
+            "emits",
+            "contributes",
+            "requested-load"
+          ]
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requirement": {
+          "$ref": "#/$defs/requirement"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "kind",
+        "order"
+      ],
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "type": "string",
+          "pattern": "^n:[0-9a-f]{64}$"
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "allOf": [
+            {
+              "not": {
+                "pattern": "^/|^[A-Za-z]:|\\\\"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(^|/)\\.\\.(/|$)"
+              }
+            },
+            {
+              "not": {
+                "pattern": "[\\x00\\r\\n]"
+              }
+            }
+          ]
+        },
+        "form": {
+          "enum": [
+            "monolithic",
+            "referenced",
+            "system-prompt",
+            "project"
+          ]
+        },
+        "origin": {
+          "enum": [
+            "rendered",
+            "installed",
+            "project"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": {
+                "type": "string",
+                "pattern": "^n:[0-9a-f]{64}$"
+              },
+              "range": {
+                "$ref": "#/$defs/range"
+              }
+            },
+            "required": [
+              "node",
+              "range"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 50000
+        }
+      },
+      "required": [
+        "node",
+        "environment",
+        "root",
+        "path",
+        "form",
+        "origin",
+        "bytes",
+        "lines",
+        "sha256",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "class": {
+          "enum": [
+            "graph_missing_input",
+            "graph_invalid_input",
+            "graph_cycle",
+            "graph_path_denied",
+            "graph_symlink_escape",
+            "graph_limit_exceeded",
+            "graph_document_drift",
+            "graph_load_unknown"
+          ]
+        },
+        "node": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^n:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "class",
+        "node",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^n:[0-9a-f]{64}$"
+        },
+        "identity": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 128,
+          "minItems": 2
+        },
+        "kind": {
+          "enum": [
+            "profile",
+            "root-package",
+            "overlay",
+            "profile-package",
+            "context-package",
+            "instruction-module",
+            "section",
+            "quote-block",
+            "skill",
+            "skill-listing",
+            "skill-body",
+            "skill-reference",
+            "project-instruction",
+            "emitted-document",
+            "generated"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^n:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "content": {
+          "$ref": "#/$defs/content"
+        },
+        "emissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/emission"
+          },
+          "maxItems": 256
+        },
+        "loads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/load"
+          },
+          "maxItems": 256
+        },
+        "composition": {
+          "$ref": "#/$defs/composition"
+        },
+        "heading": {
+          "type": "object",
+          "properties": {
+            "level": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "level",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        "source_ranges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/range"
+          },
+          "maxItems": 50000
+        },
+        "skill": {
+          "type": "object",
+          "properties": {
+            "origin": {
+              "enum": [
+                "lock",
+                "managed-inventory",
+                "runtime-discovered",
+                "UNKNOWN"
+              ]
+            },
+            "materialization": {
+              "enum": [
+                "listed-only",
+                "loaded",
+                "UNKNOWN"
+              ]
+            }
+          },
+          "required": [
+            "origin",
+            "materialization"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "identity",
+        "kind",
+        "label",
+        "source",
+        "layer",
+        "content",
+        "emissions",
+        "loads"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "overlay"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "source",
+              "composition"
+            ],
+            "properties": {
+              "source": {
+                "$ref": "#/$defs/source"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "section"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "heading",
+              "source_ranges"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "skill",
+                  "skill-listing",
+                  "skill-body",
+                  "skill-reference"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "skill"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "root-package",
+                  "profile-package",
+                  "context-package"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "composition"
+            ],
+            "properties": {
+              "source": {
+                "$ref": "#/$defs/source"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

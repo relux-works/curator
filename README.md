@@ -430,6 +430,13 @@ Focused checks are `go test ./internal/envprofile -run '^TestClaudeReadOnlySetti
 and `go test ./cmd/curator -run '^TestEnv(ConfigClaudeSettingsMode|ClaudeReadOnlySettings)$'`;
 keep local test logs under `.temp/`.
 
+The proposed [`curator profile graph` contract](docs/cli.md#profile-graph-contract-draft-not-implemented)
+has a versioned JSON Schema and synthetic golden under `internal/profilegraph/`.
+The command is not implemented. Run
+`GOFLAGS= go test ./internal/profilegraph -count=1` to validate the local schema,
+exact byte coverage, input digest and fixture renderings. Tests use the existing
+Go JSON Schema dependency offline; save execution logs under `.temp/`.
+
 Build SSH executable selection, fixed wrapper policy, prerequisites and hosted
 controls are documented in [build-ssh.md](docs/build-ssh.md). The hosted-only
 real-client control is `go run ./.github/ci/openssh89 <fixture> <commit> <user>`

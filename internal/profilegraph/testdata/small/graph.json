@@ -1,0 +1,1850 @@
+{
+  "schema_version": "curator-profile-graph/1",
+  "generator": {
+    "name": "curator",
+    "version": "0.0.0-contract-fixture"
+  },
+  "inputs_digest": "ef928867f533d663cf4297a2a22d8a952e224ad7f3c2480c7e97997e26a13547",
+  "scope": {
+    "profile": "sample",
+    "mode": "source",
+    "environments": [
+      "claude_code",
+      "codex_cli"
+    ]
+  },
+  "inputs": [
+    {
+      "root": "fixture",
+      "path": "composition.json",
+      "sha256": "66302c147eb47600a3211607add41f27e6ddef2823398b42fe2baf31eb6910e1",
+      "bytes": 311
+    },
+    {
+      "root": "fixture",
+      "path": "context-lock.json",
+      "sha256": "b975a4c745d4e4a432ca489bcd2371363284bc654e139c7118e8b348b3196344",
+      "bytes": 1013
+    },
+    {
+      "root": "fixture",
+      "path": "nested/agent-context.json",
+      "sha256": "f70f7f7967a4449ae4ca83a7a6944dfe930af0ec74063f5248018bfb95d5fbe5",
+      "bytes": 222
+    },
+    {
+      "root": "fixture",
+      "path": "nested/context/guide.md",
+      "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502",
+      "bytes": 67
+    },
+    {
+      "root": "fixture",
+      "path": "overlay/agent-context.json",
+      "sha256": "a103e91939be66ed61039ab38825f8059be1db76d44e3a0d87929099bbe77268",
+      "bytes": 76
+    },
+    {
+      "root": "fixture",
+      "path": "project/AGENTS.md",
+      "sha256": "fd3844105c32da339e340131ab830f866e4a5947a9000cdb2c5360b6cc799736",
+      "bytes": 35
+    },
+    {
+      "root": "fixture",
+      "path": "root/agent-context.json",
+      "sha256": "1e89d3bf7dac8d606c081eda0217fd22adc5037e21913565ca02eeeca51c63cd",
+      "bytes": 514
+    },
+    {
+      "root": "fixture",
+      "path": "root/context/base.md",
+      "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015",
+      "bytes": 59
+    },
+    {
+      "root": "fixture",
+      "path": "skill/SKILL.md",
+      "sha256": "c836d0e07f4c9617ff73403aa085458ede529e79b779dd4a0a3de6f6fcd8d0b6",
+      "bytes": 112
+    },
+    {
+      "root": "fixture",
+      "path": "skill/references/note.md",
+      "sha256": "fcef57c02d3a7896b225b0280dbc90bf50553871670bbc447c9ac7937e8dfbcc",
+      "bytes": 16
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n:067c786a2ff891154c26f2409334d4f65fb265c826dbfd2439d9f3d0815d904e",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "separator",
+        "3"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 3",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 787,
+              "end": 788
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:0a28652886065815c9e6d9a85b5b44b0ae8317faccf798ac6f0bf5b40bb9a267",
+      "identity": [
+        "skill-listing",
+        "sample",
+        "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+        "skill-listing",
+        "SKILL.md"
+      ],
+      "kind": "skill-listing",
+      "label": "skill listing",
+      "source": {
+        "locator": "https://example.invalid/skill",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "commit",
+          "value": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "path": "SKILL.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "text",
+        "bytes": 37,
+        "lines": 2,
+        "sha256": "a8e4e7b4c87e60eec48f5ff3ad07a11e15be12c25e0ec4e98ff7baf8bdbdb51a"
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "skill": {
+        "origin": "lock",
+        "materialization": "listed-only"
+      }
+    },
+    {
+      "id": "n:0fe848ec348a2d01654c48998c3fe7a90c4c745cfa4d79818cd5c1d44e98c735",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "separator",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+      "identity": [
+        "instruction-module",
+        "sample",
+        "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+        "0",
+        "context/guide.md"
+      ],
+      "kind": "instruction-module",
+      "label": "guide.md",
+      "source": {
+        "locator": "https://example.invalid/nested",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "path": "context/guide.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "content": {
+        "status": "text",
+        "bytes": 67,
+        "lines": 7,
+        "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 788,
+              "end": 855
+            }
+          ],
+          "bytes": 67,
+          "lines": 7,
+          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": "environment selector: claude_code"
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": "environment selector excludes codex_cli"
+        }
+      ]
+    },
+    {
+      "id": "n:146b945085c51bbb0cd2c979bec2b8f2e19ee42209754270e9fb01731c36541d",
+      "identity": [
+        "skill-reference",
+        "sample",
+        "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+        "skill-reference",
+        "references/note.md"
+      ],
+      "kind": "skill-reference",
+      "label": "skill reference",
+      "source": {
+        "locator": "https://example.invalid/skill",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "commit",
+          "value": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "path": "references/note.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "text",
+        "bytes": 16,
+        "lines": 1,
+        "sha256": "fcef57c02d3a7896b225b0280dbc90bf50553871670bbc447c9ac7937e8dfbcc"
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "skill": {
+        "origin": "lock",
+        "materialization": "UNKNOWN"
+      }
+    },
+    {
+      "id": "n:162465923e461810c10f9d236b843838b494365ea3ac54fefaaa511438f282f0",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "chapter",
+        "5"
+      ],
+      "kind": "generated",
+      "label": "claude_code chapter 5",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 856,
+              "end": 891
+            }
+          ],
+          "bytes": 35,
+          "lines": 3,
+          "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:22edcb4b17c3363b4c38acbbe30444328f67a188542c1c2373e8965440b4e0e7",
+      "identity": [
+        "quote-block",
+        "sample",
+        "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+        "35",
+        "59"
+      ],
+      "kind": "quote-block",
+      "label": "quote",
+      "source": {
+        "locator": "https://example.invalid/root",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "path": "context/base.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "text",
+        "bytes": 24,
+        "lines": 1,
+        "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 927,
+              "end": 951
+            }
+          ],
+          "bytes": 24,
+          "lines": 1,
+          "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+        },
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 821,
+              "end": 845
+            }
+          ],
+          "bytes": 24,
+          "lines": 1,
+          "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ],
+      "source_ranges": [
+        {
+          "start": 35,
+          "end": 59
+        }
+      ]
+    },
+    {
+      "id": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "identity": [
+        "emitted-document",
+        "sample",
+        "claude_code",
+        "emitted/claude_code/CLAUDE.md"
+      ],
+      "kind": "emitted-document",
+      "label": "claude_code document",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 951,
+        "lines": 33,
+        "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 951
+            }
+          ],
+          "bytes": 951,
+          "lines": 33,
+          "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:2f0873be6bf1555df77ce1b480337f84857a632cb7cebec2afc80da057328da4",
+      "identity": [
+        "section",
+        "sample",
+        "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+        "0",
+        "59"
+      ],
+      "kind": "section",
+      "label": "Baseline",
+      "source": {
+        "locator": "https://example.invalid/root",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "path": "context/base.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "text",
+        "bytes": 59,
+        "lines": 5,
+        "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 892,
+              "end": 951
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ],
+      "heading": {
+        "level": 1,
+        "text": "Baseline"
+      },
+      "source_ranges": [
+        {
+          "start": 0,
+          "end": 59
+        }
+      ]
+    },
+    {
+      "id": "n:309aa2ae8684550a37a9df63f5e49352a34e03e953421c044ae389921e3fffc6",
+      "identity": [
+        "section",
+        "sample",
+        "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+        "0",
+        "67"
+      ],
+      "kind": "section",
+      "label": "Guide",
+      "source": {
+        "locator": "https://example.invalid/nested",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "path": "context/guide.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "content": {
+        "status": "text",
+        "bytes": 67,
+        "lines": 7,
+        "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 788,
+              "end": 855
+            }
+          ],
+          "bytes": 67,
+          "lines": 7,
+          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": "environment selector: claude_code"
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": "environment selector excludes codex_cli"
+        }
+      ],
+      "heading": {
+        "level": 1,
+        "text": "Guide"
+      },
+      "source_ranges": [
+        {
+          "start": 0,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "id": "n:3516c56c41ef32f547bbbd85db807c789eb1c57e14ecdef21657207adb72f7e0",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "chapter",
+        "2"
+      ],
+      "kind": "generated",
+      "label": "claude_code chapter 2",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 37,
+        "lines": 3,
+        "sha256": "3073124ebf127870de1440f39a7d8aab21597e5934d0a51361b6f37389e8542b"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 750,
+              "end": 787
+            }
+          ],
+          "bytes": 37,
+          "lines": 3,
+          "sha256": "3073124ebf127870de1440f39a7d8aab21597e5934d0a51361b6f37389e8542b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:3c11d9bfe8e82d10a0a62cc28ef5f0ba29d66d57f9067b92d248839c39ef9eb4",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "separator",
+        "4"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 4",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 855,
+              "end": 856
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "identity": [
+        "root-package",
+        "sample",
+        "https://example.invalid/root",
+        "",
+        "commit",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "kind": "root-package",
+      "label": "sample-root",
+      "source": {
+        "locator": "https://example.invalid/root",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "path": null,
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 892,
+              "end": 951
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "composition": {
+        "requirement": {
+          "form": "revision",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "weight": 0,
+        "order": 1,
+        "declaration": "root"
+      }
+    },
+    {
+      "id": "n:478e6683ad51e909e2c5913b59632bedf009e26f332d10e8729c042e6eae4ad5",
+      "identity": [
+        "generated",
+        "sample",
+        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "codex_cli header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
+      },
+      "emissions": [
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:6d6eea63070b43884fb544e54ddb0bec0b7076f764db0ac9c15c21e8d56b3b11",
+      "identity": [
+        "generated",
+        "sample",
+        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+        "separator",
+        "3"
+      ],
+      "kind": "generated",
+      "label": "codex_cli separator 3",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 785,
+              "end": 786
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "identity": [
+        "profile-package",
+        "sample",
+        "https://example.invalid/nested",
+        "",
+        "commit",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "kind": "profile-package",
+      "label": "sample-nested",
+      "source": {
+        "locator": "https://example.invalid/nested",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "path": null,
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 788,
+              "end": 855
+            }
+          ],
+          "bytes": 67,
+          "lines": 7,
+          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "composition": {
+        "requirement": {
+          "form": "revision",
+          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "weight": 0,
+        "order": 0,
+        "declaration": "requires.contexts.sample-nested"
+      }
+    },
+    {
+      "id": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "identity": [
+        "profile",
+        "sample"
+      ],
+      "kind": "profile",
+      "label": "sample",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 951
+            }
+          ],
+          "bytes": 951,
+          "lines": 33,
+          "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611"
+        },
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:9419d8b9a622b79632281d9c9da871ba248410e2d592d6364efadac3b3dce494",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "separator",
+        "6"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 6",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 891,
+              "end": 892
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:a91c2f90ca20452c776cb4395d746cda5752cbf7538de9a4eed7ddd9fef902b2",
+      "identity": [
+        "skill-body",
+        "sample",
+        "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+        "skill-body",
+        "SKILL.md"
+      ],
+      "kind": "skill-body",
+      "label": "skill body",
+      "source": {
+        "locator": "https://example.invalid/skill",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "commit",
+          "value": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "path": "SKILL.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "text",
+        "bytes": 47,
+        "lines": 3,
+        "sha256": "52061c9b151deae8c5f36713f8764476080a78cf66eefb617db99f266e5c94d5"
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "skill": {
+        "origin": "lock",
+        "materialization": "UNKNOWN"
+      },
+      "source_ranges": [
+        {
+          "start": 65,
+          "end": 112
+        }
+      ]
+    },
+    {
+      "id": "n:ae9ef3ed37b46a4d031ea16d9c6329d73c80d75ba17a0b9bbcd5b5c229e25ddc",
+      "identity": [
+        "project-instruction",
+        "sample",
+        "project",
+        "AGENTS.md"
+      ],
+      "kind": "project-instruction",
+      "label": "project instructions",
+      "source": {
+        "locator": "fixture:project",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "UNKNOWN",
+          "value": ""
+        },
+        "path": "AGENTS.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "fd3844105c32da339e340131ab830f866e4a5947a9000cdb2c5360b6cc799736"
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:b273fed4c5b9eb2f032a6f50b0ee69abdbbff2ecd4f441ff629778be027ae14f",
+      "identity": [
+        "overlay",
+        "sample",
+        "https://example.invalid/overlay",
+        "profiles/extra",
+        "commit",
+        "cccccccccccccccccccccccccccccccccccccccc",
+        "overlays/0",
+        "10"
+      ],
+      "kind": "overlay",
+      "label": "sample-overlay",
+      "source": {
+        "locator": "https://example.invalid/overlay",
+        "directory": "profiles/extra",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "cccccccccccccccccccccccccccccccccccccccc"
+        },
+        "path": null,
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:b273fed4c5b9eb2f032a6f50b0ee69abdbbff2ecd4f441ff629778be027ae14f",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "composition": {
+        "requirement": {
+          "form": "tag",
+          "value": "v1.0.0"
+        },
+        "weight": 10,
+        "order": 2,
+        "declaration": "overlays/0"
+      }
+    },
+    {
+      "id": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "identity": [
+        "instruction-module",
+        "sample",
+        "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+        "0",
+        "context/base.md"
+      ],
+      "kind": "instruction-module",
+      "label": "base.md",
+      "source": {
+        "locator": "https://example.invalid/root",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "path": "context/base.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "text",
+        "bytes": 59,
+        "lines": 5,
+        "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 892,
+              "end": 951
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "identity": [
+        "emitted-document",
+        "sample",
+        "codex_cli",
+        "emitted/codex_cli/AGENTS.md"
+      ],
+      "kind": "emitted-document",
+      "label": "codex_cli document",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 845,
+        "lines": 21,
+        "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e"
+      },
+      "emissions": [
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+      "identity": [
+        "skill",
+        "sample",
+        "https://example.invalid/skill",
+        "",
+        "commit",
+        "dddddddddddddddddddddddddddddddddddddddd"
+      ],
+      "kind": "skill",
+      "label": "sample-skill",
+      "source": {
+        "locator": "https://example.invalid/skill",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "commit",
+          "value": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "path": null,
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "skill": {
+        "origin": "lock",
+        "materialization": "UNKNOWN"
+      }
+    },
+    {
+      "id": "n:dbb59e76cae2d2d7dc20f3540c2494d3cd24ac887dfc344007ea4cda8226acde",
+      "identity": [
+        "generated",
+        "sample",
+        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+        "separator",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "codex_cli separator 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:f3f5ebaf1516900f8961f3db08824dbd12000b66ec6fde0ca6bd8fc07c13800c",
+      "identity": [
+        "generated",
+        "sample",
+        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "claude_code header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
+      },
+      "emissions": [
+        {
+          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:f4085ce54ba82ea6b56a15012f39917957522d8df0d241f07b178b18ef5cd293",
+      "identity": [
+        "generated",
+        "sample",
+        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+        "chapter",
+        "2"
+      ],
+      "kind": "generated",
+      "label": "codex_cli chapter 2",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+      },
+      "emissions": [
+        {
+          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "ranges": [
+            {
+              "start": 750,
+              "end": 785
+            }
+          ],
+          "bytes": 35,
+          "lines": 3,
+          "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "n:067c786a2ff891154c26f2409334d4f65fb265c826dbfd2439d9f3d0815d904e",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:0fe848ec348a2d01654c48998c3fe7a90c4c745cfa4d79818cd5c1d44e98c735",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+      "to": "n:309aa2ae8684550a37a9df63f5e49352a34e03e953421c044ae389921e3fffc6",
+      "kind": "section",
+      "order": 0
+    },
+    {
+      "from": "n:162465923e461810c10f9d236b843838b494365ea3ac54fefaaa511438f282f0",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:2f0873be6bf1555df77ce1b480337f84857a632cb7cebec2afc80da057328da4",
+      "to": "n:22edcb4b17c3363b4c38acbbe30444328f67a188542c1c2373e8965440b4e0e7",
+      "kind": "quote",
+      "order": 0
+    },
+    {
+      "from": "n:3516c56c41ef32f547bbbd85db807c789eb1c57e14ecdef21657207adb72f7e0",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:3c11d9bfe8e82d10a0a62cc28ef5f0ba29d66d57f9067b92d248839c39ef9eb4",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "to": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "kind": "contains",
+      "order": 0
+    },
+    {
+      "from": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "to": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "kind": "requires-profile",
+      "order": 0,
+      "requirement": {
+        "form": "revision",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    {
+      "from": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "to": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+      "kind": "requires-skill",
+      "order": 0,
+      "requirement": {
+        "form": "revision",
+        "value": "dddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "from": "n:478e6683ad51e909e2c5913b59632bedf009e26f332d10e8729c042e6eae4ad5",
+      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:6d6eea63070b43884fb544e54ddb0bec0b7076f764db0ac9c15c21e8d56b3b11",
+      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "to": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+      "kind": "contains",
+      "order": 0
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "emits",
+      "order": 0
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "kind": "emits",
+      "order": 1
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:b273fed4c5b9eb2f032a6f50b0ee69abdbbff2ecd4f441ff629778be027ae14f",
+      "kind": "overlay",
+      "order": 0
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:ae9ef3ed37b46a4d031ea16d9c6329d73c80d75ba17a0b9bbcd5b5c229e25ddc",
+      "kind": "project",
+      "order": 0
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "kind": "root",
+      "order": 0
+    },
+    {
+      "from": "n:9419d8b9a622b79632281d9c9da871ba248410e2d592d6364efadac3b3dce494",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "to": "n:2f0873be6bf1555df77ce1b480337f84857a632cb7cebec2afc80da057328da4",
+      "kind": "section",
+      "order": 0
+    },
+    {
+      "from": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+      "to": "n:a91c2f90ca20452c776cb4395d746cda5752cbf7538de9a4eed7ddd9fef902b2",
+      "kind": "body",
+      "order": 0
+    },
+    {
+      "from": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+      "to": "n:0a28652886065815c9e6d9a85b5b44b0ae8317faccf798ac6f0bf5b40bb9a267",
+      "kind": "lists",
+      "order": 0
+    },
+    {
+      "from": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+      "to": "n:146b945085c51bbb0cd2c979bec2b8f2e19ee42209754270e9fb01731c36541d",
+      "kind": "references",
+      "order": 0
+    },
+    {
+      "from": "n:dbb59e76cae2d2d7dc20f3540c2494d3cd24ac887dfc344007ea4cda8226acde",
+      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:f3f5ebaf1516900f8961f3db08824dbd12000b66ec6fde0ca6bd8fc07c13800c",
+      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:f4085ce54ba82ea6b56a15012f39917957522d8df0d241f07b178b18ef5cd293",
+      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "kind": "contributes",
+      "order": 0
+    }
+  ],
+  "documents": [
+    {
+      "node": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "environment": "claude_code",
+      "root": "fixture",
+      "path": "emitted/claude_code/CLAUDE.md",
+      "form": "monolithic",
+      "origin": "rendered",
+      "bytes": 951,
+      "lines": 33,
+      "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611",
+      "coverage": [
+        {
+          "node": "n:f3f5ebaf1516900f8961f3db08824dbd12000b66ec6fde0ca6bd8fc07c13800c",
+          "range": {
+            "start": 0,
+            "end": 749
+          }
+        },
+        {
+          "node": "n:0fe848ec348a2d01654c48998c3fe7a90c4c745cfa4d79818cd5c1d44e98c735",
+          "range": {
+            "start": 749,
+            "end": 750
+          }
+        },
+        {
+          "node": "n:3516c56c41ef32f547bbbd85db807c789eb1c57e14ecdef21657207adb72f7e0",
+          "range": {
+            "start": 750,
+            "end": 787
+          }
+        },
+        {
+          "node": "n:067c786a2ff891154c26f2409334d4f65fb265c826dbfd2439d9f3d0815d904e",
+          "range": {
+            "start": 787,
+            "end": 788
+          }
+        },
+        {
+          "node": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+          "range": {
+            "start": 788,
+            "end": 855
+          }
+        },
+        {
+          "node": "n:3c11d9bfe8e82d10a0a62cc28ef5f0ba29d66d57f9067b92d248839c39ef9eb4",
+          "range": {
+            "start": 855,
+            "end": 856
+          }
+        },
+        {
+          "node": "n:162465923e461810c10f9d236b843838b494365ea3ac54fefaaa511438f282f0",
+          "range": {
+            "start": 856,
+            "end": 891
+          }
+        },
+        {
+          "node": "n:9419d8b9a622b79632281d9c9da871ba248410e2d592d6364efadac3b3dce494",
+          "range": {
+            "start": 891,
+            "end": 892
+          }
+        },
+        {
+          "node": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+          "range": {
+            "start": 892,
+            "end": 951
+          }
+        }
+      ]
+    },
+    {
+      "node": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "environment": "codex_cli",
+      "root": "fixture",
+      "path": "emitted/codex_cli/AGENTS.md",
+      "form": "monolithic",
+      "origin": "rendered",
+      "bytes": 845,
+      "lines": 21,
+      "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e",
+      "coverage": [
+        {
+          "node": "n:478e6683ad51e909e2c5913b59632bedf009e26f332d10e8729c042e6eae4ad5",
+          "range": {
+            "start": 0,
+            "end": 749
+          }
+        },
+        {
+          "node": "n:dbb59e76cae2d2d7dc20f3540c2494d3cd24ac887dfc344007ea4cda8226acde",
+          "range": {
+            "start": 749,
+            "end": 750
+          }
+        },
+        {
+          "node": "n:f4085ce54ba82ea6b56a15012f39917957522d8df0d241f07b178b18ef5cd293",
+          "range": {
+            "start": 750,
+            "end": 785
+          }
+        },
+        {
+          "node": "n:6d6eea63070b43884fb544e54ddb0bec0b7076f764db0ac9c15c21e8d56b3b11",
+          "range": {
+            "start": 785,
+            "end": 786
+          }
+        },
+        {
+          "node": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+          "range": {
+            "start": 786,
+            "end": 845
+          }
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

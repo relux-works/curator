@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "sample-root",
+  "version": "1.0.0",
+  "context": {
+    "modules": [
+      {
+        "path": "base.md"
+      }
+    ]
+  },
+  "requires": {
+    "contexts": {
+      "sample-nested": {
+        "git": "https://example.invalid/nested",
+        "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    "skills": {
+      "sample-skill": {
+        "git": "https://example.invalid/skill",
+        "revision": "dddddddddddddddddddddddddddddddddddddddd"
+      }
+    }
+  }
+}

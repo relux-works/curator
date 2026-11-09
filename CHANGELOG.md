@@ -18,6 +18,12 @@ All notable implementation changes are recorded here.
   replacement. Default behavior and tool-owned trust, credentials and policy
   caches remain unchanged.
 
+### Documentation
+
+- Propose the offline profile graph CLI contract, `curator-profile-graph/1`
+  JSON Schema and a synthetic golden with exact-byte validation. The command
+  is not implemented in this contract round.
+
 ## v0.15.0-rc.9 — 2026-10-24
 
 ### Fixed
