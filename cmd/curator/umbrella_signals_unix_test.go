@@ -23,7 +23,7 @@ const umbrellaSignalProvider = `package main
 import ("fmt"; "io"; "os"; "os/signal"; "strconv"; "syscall")
 func main() {
  signals := make(chan os.Signal, 16)
- signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+ signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGCONT)
  mode := os.Args[2]
  var input []byte
  if mode != "count" { input, _ = io.ReadAll(os.Stdin) }
@@ -31,6 +31,7 @@ func main() {
  if code, err := strconv.Atoi(mode); err == nil { os.Exit(code) }
  for s := range signals {
   n := s.(syscall.Signal)
+  if n == syscall.SIGCONT { fmt.Println("continued"); continue }
   fmt.Printf("signal %d\n", n)
   if mode == "ignore-term" && n == syscall.SIGTERM { continue }
   if mode == "count" { continue }

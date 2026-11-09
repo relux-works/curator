@@ -21,6 +21,7 @@ func openUmbrellaPTY(t *testing.T) (*os.File, *os.File) {
 		}
 	}
 	var name [128]byte
+	//nolint:staticcheck // SA1019: pinned x/sys/unix has no libSystem wrapper for Darwin's 128-byte TIOCPTYGNAME output.
 	if _, _, errno := unix.Syscall(unix.SYS_IOCTL, master.Fd(), unix.TIOCPTYGNAME, uintptr(unsafe.Pointer(&name[0]))); errno != 0 {
 		t.Fatal(errno)
 	}

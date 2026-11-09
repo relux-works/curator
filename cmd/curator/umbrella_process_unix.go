@@ -36,7 +36,7 @@ func runUmbrellaProvider(command *exec.Cmd) error {
 	var original int
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err == nil {
-		defer tty.Close()
+		defer func() { _ = tty.Close() }()
 		original, err = unix.IoctlGetInt(int(tty.Fd()), unix.TIOCGPGRP)
 		if err == nil && original == syscall.Getpgrp() {
 			terminal = tty

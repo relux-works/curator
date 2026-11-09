@@ -83,7 +83,9 @@ func TestUmbrellaProviderTerminal(t *testing.T) {
 			}
 			return line
 		case <-time.After(5 * time.Second):
-			t.Fatal("PTY output timeout")
+			state, _ := exec.Command("ps", "-o", "pid=,ppid=,stat=", "-p", fmt.Sprintf("%d,%d", child.Process.Pid, pid)).Output()
+			fg, _ := unix.IoctlGetInt(int(master.Fd()), unix.TIOCGPGRP)
+			t.Fatalf("PTY output timeout; foreground=%d state=%s", fg, state)
 		}
 		return ""
 	}
@@ -162,8 +164,12 @@ func TestUmbrellaProviderTerminal(t *testing.T) {
 		t.Fatal(err)
 	}
 	wait()
-	// The fake has Go's default CONT disposition; an INT receipt proves that
-	// it resumed, and that the forwarding loop remains live after continuation.
+	// CONT delivery is asynchronous. Await the provider's actual receipt before
+	// testing a later INT: on Darwin an INT sent while stopped can be lost on
+	// CONT even for a directly supervised child, without curator in the path.
+	if line := next(); line != "continued" {
+		t.Fatalf("CONT receipt: %q", line)
+	}
 	if err := child.Process.Signal(syscall.SIGINT); err != nil {
 		t.Fatal(err)
 	}
