@@ -618,6 +618,20 @@ measures 2.1.305 and 2.1.307 separately using the same offline tools. Run
 Its guide lists exact-digest opt-ins, per-atom verdicts, Python collectors and
 narrowing controls; private fixtures go under `.temp/`.
 
+On Unix, umbrella providers (including `curator run`) receive INT, TERM, HUP
+and QUIT sent to the curator PID. Curator waits for the provider: normal exit
+codes pass through and signal deaths return `128 + signal`. A provider that
+ignores TERM keeps curator waiting; there is no timeout or forced escalation.
+The provider has a separate process group and takes the controlling terminal
+foreground when curator owns it, so terminal Ctrl-C reaches the provider once.
+Provider stop/continue follows the curator wrapper, and terminal foreground
+ownership is restored on completion. The provider owns forwarding to its
+descendants. Argv, environment and stdio pass through as before; non-Unix
+execution is unchanged.
+Run `go test ./cmd/curator -run '^TestUmbrellaProvider' -count=1` for compiled
+provider signal, exit, transport, job-control and lifecycle controls; keep logs
+in `.temp/`.
+
 Run `go test ./cmd/curator -run 'Test(RegisteredSubcommandHelpNoWrites|CommandHelp)'`
 for built-in and nested command help, zero-write snapshots, the init positive
 control, provider passthrough, and narrowing mutants. Keep logs under `.temp/`.

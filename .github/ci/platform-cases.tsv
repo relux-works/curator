@@ -1122,3 +1122,9 @@ internal/buildcache	TestLinuxHSMExceptionContract	linux	-	-	declaration only: HS
 internal/buildcache	TestLinuxProbeRemovalCandidates	linux	-	-	inotify observes no write-open for retained candidates and actual close-write for an aged removal control
 internal/buildcache	TestLinuxRetiredReprobe	linux	-	-	late exec and probe errors retain the retired tree; stopping or repairing permits native cleanup
 internal/godriver	TestDistroToolchainLayoutRemedy	linux,darwin	-	-	closed upstream toolchain admitted; escaping distro src links refuse without mutation and name CURATOR_GO remedy
+
+# Umbrella Unix provider lifecycle (BUG-261109-8oy4yr).
+cmd/curator	TestUmbrellaProviderSignals	linux,darwin	-	-	PID-only INT TERM HUP QUIT reach the compiled provider; TERM death returns 143 and is reaped
+cmd/curator	TestUmbrellaProviderExitControls	linux,darwin	-	-	exit 0 1 42 pass through; ignored TERM keeps curator waiting until HUP
+cmd/curator	TestUmbrellaProviderSignalCleanup	linux,darwin	-	-	exited children refuse late signals; completion and start failure unregister the handler
+cmd/curator	TestUmbrellaProviderTerminal	linux,darwin	-	-	real controlling PTY Ctrl-C and PID-only INT arrive once; stop/continue and foreground restoration work
