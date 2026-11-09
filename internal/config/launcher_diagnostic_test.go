@@ -21,7 +21,7 @@ func TestLauncherNotificationVersionTokens(t *testing.T) {
 			}
 			cfg, err := Load(path, nil)
 			if token == "8.0" || token == "8e0" {
-				var diagnostic *ConfigDiagnostic
+				var diagnostic *Diagnostic
 				if cfg != nil || !errors.As(err, &diagnostic) || diagnostic.Code != "config_schema_unsupported" || diagnostic.Path != "schema_version" || err.Error() != "schema_version: must be an integer" {
 					t.Fatalf("integer-token refusal: %v", err)
 				}
@@ -59,7 +59,7 @@ func TestLauncherNotificationDiagnosticContract(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else {
-				var diagnostic *ConfigDiagnostic
+				var diagnostic *Diagnostic
 				if cfg != nil || !errors.As(err, &diagnostic) || diagnostic.Code != row.code || diagnostic.Path != row.path || strings.Contains(err.Error(), "HOSTILE_SECRET") {
 					t.Fatalf("diagnostic: %v", err)
 				}
@@ -85,7 +85,7 @@ func TestLauncherNotificationSystemLockDiagnostic(t *testing.T) {
 				}
 				return
 			}
-			var diagnostic *ConfigDiagnostic
+			var diagnostic *Diagnostic
 			if cfg != nil || !errors.As(err, &diagnostic) || diagnostic.Code != "launcher_selection_machine_only" || diagnostic.Path != "extensions" || err.Error() != "extensions: launcher selections belong only to the selected machine configuration" {
 				t.Fatalf("system refusal: %v", err)
 			}

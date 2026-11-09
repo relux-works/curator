@@ -7,23 +7,23 @@ import (
 	"strings"
 )
 
-// ConfigDiagnostic carries the fixed code/path vocabulary of the notification
+// Diagnostic carries the fixed code/path vocabulary of the notification
 // corpus while retaining the ordinary loader's compatibility text and cause.
 // Neither field contains rejected configuration names or values.
-type ConfigDiagnostic struct {
+type Diagnostic struct {
 	Code  string
 	Path  string
 	cause error
 }
 
-func (e *ConfigDiagnostic) Error() string { return e.cause.Error() }
-func (e *ConfigDiagnostic) Unwrap() error { return e.cause }
+func (e *Diagnostic) Error() string { return e.cause.Error() }
+func (e *Diagnostic) Unwrap() error { return e.cause }
 func configDiagnostic(code, path string, err error) error {
-	var existing *ConfigDiagnostic
+	var existing *Diagnostic
 	if errors.As(err, &existing) {
 		return err
 	}
-	return &ConfigDiagnostic{Code: code, Path: path, cause: err}
+	return &Diagnostic{Code: code, Path: path, cause: err}
 }
 
 // Keep predecessor numeric decoding unchanged. Only the new schema-8 raw-file

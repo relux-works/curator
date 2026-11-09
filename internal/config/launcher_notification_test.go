@@ -149,9 +149,10 @@ func TestLauncherNotificationClosedSelection(t *testing.T) {
 		// Older carriers must refuse for their own version/selection reason,
 		// rather than passing this control on an unrelated loader failure.
 		want := "extensions: requires manager-config schema_version 7 or 8"
-		if schema == 6 {
+		switch schema {
+		case 6:
 			want = "schema_version: unsupported config schema_version 6; this config requires a newer tool"
-		} else if schema == 7 {
+		case 7:
 			want = "extensions: invalid launcher selection"
 		}
 		if cfg, err := Load(path, nil); cfg != nil || err == nil || err.Error() != want {

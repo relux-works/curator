@@ -493,7 +493,7 @@ not `8.0` or `8e0`. Released predecessor numeric forms remain admitted.
 Notification absence and explicit `off` remain distinct metadata selections.
 Claude-auth plan/apply/restore retains schema 8 and all non-auth selections.
 
-The loader exposes fixed `ConfigDiagnostic` code/path pairs matching the
+The loader exposes fixed `Diagnostic` code/path pairs matching the
 [Host notification corpus](https://github.com/relux-works/curator-spec/blob/main/protocol/host-notification-proposal.md#4-refusal-diagnostics-and-precedence):
 `config_json_invalid` / `$`, `config_schema_unsupported` / `schema_version`,
 `launcher_selection_machine_only` / `extensions`,
