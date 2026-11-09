@@ -208,6 +208,10 @@ func Applicable(pkg Package, class, environment string) []Module {
 // environment. It returns written=false when the root declares no context
 // (environments §2): no surface exists and no file is written.
 func Monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence, environment string, packages map[string]Package) (document []byte, written bool, err error) {
+	return monolithic(lock, lockHash, precedence, environment, packages, nil)
+}
+
+func monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence, environment string, packages map[string]Package, trace *Rendered) (document []byte, written bool, err error) {
 	rootPkg, ok := packages[lock.Root]
 	if !ok {
 		return nil, false, fmt.Errorf("no package content for the root %s", lock.Root)
@@ -223,7 +227,7 @@ func Monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 	if err != nil {
 		return nil, false, err
 	}
-	parts := [][]byte{header}
+	parts := []Part{{Kind: "header", Bytes: header}}
 	for _, member := range order {
 		pkg, ok := packages[member.Name]
 		if !ok {
@@ -233,15 +237,19 @@ func Monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 		if len(modules) == 0 {
 			continue
 		}
-		parts = append(parts, ChapterPart(member))
+		parts = append(parts, Part{Kind: "chapter", Bytes: ChapterPart(member)})
 		for _, module := range modules {
 			if err := contextpkg.ValidateModuleBytes(module.Bytes); err != nil {
 				return nil, false, fmt.Errorf("module %s of %s: %v", module.Path, member.Name, err)
 			}
-			parts = append(parts, module.Bytes)
+			parts = append(parts, modulePart(member.Name, pkg, module))
 		}
 	}
-	return Join(parts), true, nil
+	rendered := JoinParts(parts)
+	if trace != nil {
+		*trace = rendered
+	}
+	return rendered.Bytes, true, nil
 }
 
 // SystemPrompt assembles the system-prompt output (environments §5.5): the
@@ -256,6 +264,10 @@ func Monolithic(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 // contributes no bytes, and its validity was settled at snapshot
 // validation.
 func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment string, packages map[string]Package, admission Admission) (document []byte, written bool, dropped []DroppedModule, err error) {
+	return systemPrompt(lock, precedence, environment, packages, admission, nil)
+}
+
+func systemPrompt(lock *contextlock.Lock, precedence Precedence, environment string, packages map[string]Package, admission Admission, trace *Rendered) (document []byte, written bool, dropped []DroppedModule, err error) {
 	policy, err := admission.Policy()
 	if err != nil {
 		return nil, false, nil, err
@@ -277,14 +289,18 @@ func SystemPrompt(lock *contextlock.Lock, precedence Precedence, environment str
 	if len(admitted) == 0 {
 		return nil, false, dropped, nil
 	}
-	parts := make([][]byte, 0, len(admitted))
+	parts := make([]Part, 0, len(admitted))
 	for _, module := range admitted {
 		if err := contextpkg.ValidateModuleBytes(module.Module.Bytes); err != nil {
 			return nil, false, dropped, fmt.Errorf("module %s of %s: %v", module.Module.Path, module.Package, err)
 		}
-		parts = append(parts, module.Module.Bytes)
+		parts = append(parts, modulePart(module.Package, packages[module.Package], module.Module))
 	}
-	return Join(parts), true, dropped, nil
+	rendered := JoinParts(parts)
+	if trace != nil {
+		*trace = rendered
+	}
+	return rendered.Bytes, true, dropped, nil
 }
 
 // SurfaceHash is the core §8 content hash over a materialized file set keyed

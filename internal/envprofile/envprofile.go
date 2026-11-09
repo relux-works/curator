@@ -189,8 +189,12 @@ func validProfileName(name string) bool { return identifiers.Valid(name) }
 
 // readSource loads a profile's install record.
 func readSource(home, name string) (Source, error) {
+	return readSourceWith(home, name, stateread.ReadRegularFile)
+}
+
+func readSourceWith(home, name string, read func(string) (stateread.File, error)) (Source, error) {
 	path := sourcePath(home, name)
-	result, err := stateread.ReadFile(path) // #nosec G304 -- profile name validated by callers
+	result, err := read(path) // #nosec G304 -- profile name validated by callers
 	if err != nil {
 		return Source{}, err
 	}

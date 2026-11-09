@@ -88,6 +88,10 @@ func referencePath(packageName, modulePath string) string {
 // surface exists and no file is written. Module files carry the modules'
 // exact bytes with no header, chapter, or reference line added.
 func Referenced(lock *contextlock.Lock, lockHash string, precedence Precedence, environment string, packages map[string]Package) (files map[string][]byte, written bool, err error) {
+	return referenced(lock, lockHash, precedence, environment, packages, nil)
+}
+
+func referenced(lock *contextlock.Lock, lockHash string, precedence Precedence, environment string, packages map[string]Package, traces map[string]Rendered) (files map[string][]byte, written bool, err error) {
 	if !SupportsReferenced(environment) {
 		return nil, false, fmt.Errorf("%s: the %s adapter supports no referenced form", DiagFormUnsupported, environment)
 	}
@@ -109,7 +113,7 @@ func Referenced(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 	files = map[string][]byte{}
 	var instructions []string
 	instructions = []string{}
-	parts := [][]byte{header}
+	parts := []Part{{Kind: "header", Bytes: header}}
 	for _, member := range order {
 		pkg, ok := packages[member.Name]
 		if !ok {
@@ -120,7 +124,7 @@ func Referenced(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 			continue
 		}
 		if environment == "claude_code" {
-			parts = append(parts, ChapterPart(member))
+			parts = append(parts, Part{Kind: "chapter", Bytes: ChapterPart(member)})
 		}
 		for _, module := range modules {
 			if err := contextpkg.ValidateModuleBytes(module.Bytes); err != nil {
@@ -134,21 +138,31 @@ func Referenced(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 				return nil, false, fmt.Errorf("%s: duplicate module path %q", DiagPathCollision, path)
 			}
 			files[path] = module.Bytes
+			if traces != nil {
+				traces[path] = JoinParts([]Part{modulePart(member.Name, pkg, module)})
+			}
 			if environment == "claude_code" {
-				parts = append(parts, []byte("@"+path+"\n"))
+				parts = append(parts, Part{Kind: "import", Bytes: []byte("@" + path + "\n")})
 			} else {
 				instructions = append(instructions, path)
 			}
 		}
 	}
 	target := RootTarget(environment)
-	files[target] = Join(parts)
+	rendered := JoinParts(parts)
+	files[target] = rendered.Bytes
+	if traces != nil {
+		traces[target] = rendered
+	}
 	if environment == "opencode" {
 		document, err := OpenCodeConfig(instructions)
 		if err != nil {
 			return nil, false, err
 		}
 		files[OpenCodeConfigName] = document
+		if traces != nil {
+			traces[OpenCodeConfigName] = JoinParts([]Part{{Kind: "wrapper", Bytes: document}})
+		}
 	}
 	names := make([]string, 0, len(files))
 	for path := range files {

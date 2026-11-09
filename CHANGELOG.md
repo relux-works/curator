@@ -18,6 +18,11 @@ All notable implementation changes are recorded here.
   replacement. Default behavior and tool-owned trust, credentials and policy
   caches remain unchanged.
 
+- Implement `curator profile graph` as a bounded, read-only offline command,
+  with versioned JSON, real resolver/emitter attribution, exact coverage,
+  immutable pin verification and atomic named refusals. Source preview needs
+  no bootstrap; command goldens cover shared DAG and overlay occurrences.
+
 ### Documentation
 
 - Propose the offline profile graph CLI contract, `curator-profile-graph/1`

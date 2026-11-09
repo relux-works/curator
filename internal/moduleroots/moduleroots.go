@@ -105,6 +105,11 @@ func fail(code, path, format string, args ...any) error {
 // It performs the whole "declaration and containment" half of §4.2.3, which
 // MUST complete before the fixed `go list`.
 func ValidateDeclaration(snapshot, field string, modules, buildRoots, runtimeRoots []string) error {
+	return ValidateDeclarationWith(snapshot, field, modules, buildRoots, runtimeRoots, os.Lstat)
+}
+
+// ValidateDeclarationWith preserves validation with caller-owned metadata admission.
+func ValidateDeclarationWith(snapshot, field string, modules, buildRoots, runtimeRoots []string, lstat func(string) (os.FileInfo, error)) error {
 	seen := make(map[string]bool, len(modules))
 	for _, module := range modules {
 		if !identifiers.PortablePath(module) {
@@ -114,22 +119,22 @@ func ValidateDeclaration(snapshot, field string, modules, buildRoots, runtimeRoo
 			return fail(DeclarationInvalid, field, "%q is declared more than once", module)
 		}
 		seen[module] = true
-		if err := validateDirectory(snapshot, module, field); err != nil {
+		if err := validateDirectoryWith(snapshot, module, field, lstat); err != nil {
 			return err
 		}
 	}
 	return validateContainment(field, modules, buildRoots, runtimeRoots)
 }
 
-// validateDirectory proves the declared directory is a real, link-free
+// validateDirectoryWith proves the declared directory is a real, link-free
 // directory strictly inside the snapshot that carries go.mod directly. Every
 // package-controlled component is inspected with Lstat, so no link can
 // redirect the check outside the snapshot.
-func validateDirectory(snapshot, module, field string) error {
+func validateDirectoryWith(snapshot, module, field string, lstat func(string) (os.FileInfo, error)) error {
 	current := snapshot
 	for _, component := range strings.Split(module, "/") {
 		current = filepath.Join(current, component)
-		info, err := os.Lstat(current)
+		info, err := lstat(current)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return fail(DeclarationInvalid, field, "declared module directory does not exist: %s", module)
@@ -143,7 +148,7 @@ func validateDirectory(snapshot, module, field string) error {
 			return fail(DeclarationInvalid, field, "declared module directory must be a directory: %s", module)
 		}
 	}
-	info, err := os.Lstat(filepath.Join(current, GoModName))
+	info, err := lstat(filepath.Join(current, GoModName))
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return fail(DeclarationInvalid, field, "declared module directory must contain a regular %s directly: %s", GoModName, module)
 	}

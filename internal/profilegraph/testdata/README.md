@@ -1,20 +1,22 @@
-# Profile graph contract fixtures
+# Profile graph fixtures
 
-`small/` is entirely synthetic. The root requires one nested profile and one
-skill; the composition adds one module-free overlay from a selected directory.
-The two modules include an environment selector, a quote and a fenced example.
-The fixture also admits one project instruction file. All remote locators use
-the reserved `.invalid` namespace, and the commit ids are synthetic pins.
+`small/graph.json` and `dag-overlays/graph.json` are real command goldens.
+`cmd/curator/profile_graph_test.go` creates synthetic immutable caches and
+hash-verified local Git objects through `graphtest`, then invokes real CLI
+dispatch. These fixtures contain no captured operator data.
 
-`graph.json` is the proposed wire example. `context-lock.json` is a canonical
-lock consumed by the current materializer. `emitted/` holds its byte-exact
-outputs for `claude_code` and `codex_cli`. The contract tests recreate those
-outputs in memory and validate the schema, input transcript digest, identity
-tuples and additive byte ledger. The listing's normalized content is separate
-from the source `SKILL.md`; body and reference bytes are not in either emitted
-document. Runtime loading remains unknown.
+The small golden replaces the original illustrative commit pins with real
+content-addressed fixture objects, uses the actual build version, includes the
+registered environment catalogue, and reports references as declared unread.
+It has no project nodes because no project scope was selected. The original
+wire example, its canonical lock and byte-exact emitted examples remain under
+`small/contract-example.json`, `small/context-lock.json` and `small/emitted/`.
+Those files retain the contract-round historical checks.
 
-Run `GOFLAGS= go test ./internal/profilegraph -count=1` from the repository root.
-Update the example and its measured hashes together when the contract changes.
-There is no graph command or fixture capture from an installed home. Schema
-and accounting controls do not qualify the future filesystem safety policy.
+The second golden preserves two overlays sharing locator/revision but selecting
+different directories and weights, and a nested DAG with one shared leaf.
+
+Run `GOFLAGS= go test ./internal/profilegraph/... ./cmd/curator/...`.
+Regenerate the command goldens explicitly with
+`UPDATE_PROFILE_GRAPH_GOLDEN=1 GOFLAGS= go test ./cmd/curator -run '^TestProfileGraphCommandGoldens$' -count=1`.
+The command itself never writes goldens or other files. Test logs go in `.temp/`.

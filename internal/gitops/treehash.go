@@ -69,7 +69,7 @@ func TreeObjectIDFromDir(root, objectFormat string) (string, error) {
 	if metadata.Kind != stateread.KindPresent || metadata.Info == nil || !metadata.Info.IsDir() {
 		return "", fmt.Errorf("tree root is not a present directory")
 	}
-	return treeObjectID(root, objectFormat, newHash)
+	return treeObjectID(root, objectFormat, newHash, TreeReader{stateread.ReadDir, stateread.Lstat, stateread.ReadRegularFile})
 }
 
 type treeObjectEntry struct {
@@ -79,8 +79,25 @@ type treeObjectEntry struct {
 	object []byte
 }
 
-func treeObjectID(dir, objectFormat string, newHash func() hash.Hash) (string, error) {
-	listing, err := stateread.ReadDir(dir)
+// TreeReader allows bounded callers to reuse the resolver's exact tree identity
+// algorithm while retaining custody of every filesystem operation.
+type TreeReader struct {
+	ReadDir  func(string) (stateread.Directory, error)
+	Lstat    func(string) (stateread.Metadata, error)
+	ReadFile func(string) (stateread.File, error)
+}
+
+// TreeObjectIDWith hashes a tree through caller-owned filesystem admission.
+func TreeObjectIDWith(root, objectFormat string, reader TreeReader) (string, error) {
+	hasher, err := gitHasher(objectFormat)
+	if err != nil {
+		return "", err
+	}
+	return treeObjectID(root, objectFormat, hasher, reader)
+}
+
+func treeObjectID(dir, objectFormat string, newHash func() hash.Hash, reader TreeReader) (string, error) {
+	listing, err := reader.ReadDir(dir)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +108,7 @@ func treeObjectID(dir, objectFormat string, newHash func() hash.Hash) (string, e
 	for _, child := range listing.Entries {
 		name := child.Name()
 		path := filepath.Join(dir, name)
-		metadata, err := stateread.Lstat(path)
+		metadata, err := reader.Lstat(path)
 		if err != nil {
 			return "", err
 		}
@@ -103,7 +120,7 @@ func treeObjectID(dir, objectFormat string, newHash func() hash.Hash) (string, e
 		case metadata.Info.IsDir():
 			entry.mode = "40000"
 			entry.isDir = true
-			childTree, err := treeObjectID(path, objectFormat, newHash)
+			childTree, err := treeObjectID(path, objectFormat, newHash, reader)
 			if err != nil {
 				return "", fmt.Errorf("hash directory %q: %w", name, err)
 			}
@@ -115,7 +132,7 @@ func treeObjectID(dir, objectFormat string, newHash func() hash.Hash) (string, e
 			if metadata.Info.Size() < 0 || metadata.Info.Size() > maxSnapshotFileBytes {
 				return "", fmt.Errorf("tree file %q exceeds the supported snapshot size", name)
 			}
-			file, err := stateread.ReadRegularFile(path)
+			file, err := reader.ReadFile(path)
 			if err != nil {
 				return "", err
 			}
@@ -195,13 +212,19 @@ func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string
 	if err != nil {
 		return "", "", err
 	}
+	projected, err := ProjectedTreeID(format, directory, tree)
+	return projected, format, err
+}
+
+// ProjectedTreeID wraps a verified selected tree in its directory ancestors.
+func ProjectedTreeID(format, directory, tree string) (string, error) {
 	newHash, err := gitHasher(format)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	oid, err := hex.DecodeString(tree)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	components := strings.Split(directory, "/")
 	for i := len(components) - 1; i >= 0; i-- {
@@ -212,5 +235,5 @@ func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string
 		body.Write(oid)
 		oid = gitObjectID("tree", body.Bytes(), newHash)
 	}
-	return hex.EncodeToString(oid), format, nil
+	return hex.EncodeToString(oid), nil
 }

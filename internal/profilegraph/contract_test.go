@@ -1,5 +1,5 @@
-// Package profilegraph_test checks the proposed wire contract only. There is
-// no graph command, filesystem admission implementation or runtime probe here.
+// Package profilegraph_test retains independent wire-contract and renderer
+// controls alongside the executable producer tests.
 package profilegraph_test
 
 import (
@@ -72,7 +72,7 @@ func nodeOf(g map[string]any, kind string) map[string]any {
 // must fail schema validation at its affected property; no command is exercised.
 func TestGraphSchemaGoldenAndRejections(t *testing.T) {
 	schema := contractSchema(t)
-	if err := schema.Validate(readJSON(t, "testdata/small/graph.json")); err != nil {
+	if err := schema.Validate(readJSON(t, "testdata/small/contract-example.json")); err != nil {
 		t.Fatal(err)
 	}
 	cases := []struct {
@@ -98,7 +98,7 @@ func TestGraphSchemaGoldenAndRejections(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := readJSON(t, "testdata/small/graph.json")
+			g := readJSON(t, "testdata/small/contract-example.json")
 			tc.change(g)
 			err := schema.Validate(g)
 			var validation *jsonschema.ValidationError
@@ -151,7 +151,7 @@ type graph struct {
 
 func fixtureGraph(t *testing.T) graph {
 	t.Helper()
-	raw, err := os.ReadFile("testdata/small/graph.json")
+	raw, err := os.ReadFile("testdata/small/contract-example.json")
 	if err != nil {
 		t.Fatal(err)
 	}

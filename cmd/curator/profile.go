@@ -22,11 +22,14 @@ func (c cli) profileUseUsage() {
 // import, list, use, update, remove, sync, compose, mcp.
 func (c cli) cmdProfile(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose | mcp")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose | mcp | graph")
 		return exitUsage
 	}
+	if args[0] == "graph" {
+		return c.cmdProfileGraph(args[1:])
+	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp|graph> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()

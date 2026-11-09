@@ -1170,24 +1170,24 @@ curator ui
 
 The command displays interactive status dashboards for project skills.
 
-## Profile graph contract (draft, not implemented)
+## Profile graph contract
 
 ### curator profile graph
 
-The proposed command accepts these selectors:
+The command accepts these selectors:
 
 ```text
 curator profile graph <profile> [--json] [--source <dir>] [--env <id>]
 ```
 
-This section reserves a read-only, offline command. The current CLI does not
-implement it. The machine contract is
+This read-only, offline command emits the machine contract
 [`curator-profile-graph/1`](../internal/profilegraph/schemas/curator-profile-graph-v1.schema.json).
-The small [golden graph](../internal/profilegraph/testdata/small/graph.json)
-is a contract fixture, not captured runtime output. The executable command
-grammar remains in `cmd/curator/command_help.go`; no runnable verb is added in
-this round. This is an implementation-owned proposal for contract review,
-not a change to the separately versioned environment protocol.
+The [small command golden](../internal/profilegraph/testdata/small/graph.json)
+and [shared DAG/overlay golden](../internal/profilegraph/testdata/dag-overlays/graph.json)
+are captured through real command dispatch over synthetic immutable snapshots.
+The original illustrative graph remains `small/contract-example.json`.
+The executable grammar is in `cmd/curator/command_help.go`; this command does
+not change the separately versioned environment protocol.
 
 `<profile>` selects an installed profile by name. Its stored lock, recorded
 composition and exact local snapshots are authoritative. A newer checkout,
@@ -1343,7 +1343,8 @@ Bodies/references need not be opened to report their declared presence. Binary
 references cannot have text lines. No body bytes inflate listing cost.
 Project files are entries already selected by admitted Curator project scope
 metadata. With no such selection, the graph has no project-instruction nodes.
-The fixture explicitly admits one project input. Arbitrary parent chains,
+The retained contract example explicitly admits one project input. Arbitrary
+parent chains,
 memory, runtime extras and missing-file discovery are not inferred. Package
 projections include their contained modules, not dependency subtrees. Only
 the final profile projection includes the complete composition.
@@ -1419,14 +1420,20 @@ must avoid secret-bearing paths or values.
 | Locked installed inputs versus offline source preview; detect installed drift | Never attribute current source bytes to an older installed lock | 2026-11-09 |
 | Logical relative locators and sorted input transcript digest | Reproduce provenance without exporting home paths or unrelated config | 2026-11-09 |
 | Fixed read/output budgets, deny-list and named symlink refusal | Bound offline work and prevent sensitive or out-of-root reads | 2026-11-09 |
+| Separate package, occurrence and content identities (D02) | Directory, declaration slot and weight preserve distinct overlay occurrences; DAG reuse retains one shared package | 2026-11-10 |
+| Declared requirement separate from resolved provenance (D03) | Keep requirement form, nullable version, revision kind, directory and explicit unknown ownership without guessing an editing destination | 2026-11-10 |
+| Atomic exit protocol and seven fatal classes (D11) | Exit 0 emits one graph, exit 2 is usage, exit 1 emits one named fatal diagnostic and no graph; only `graph_load_unknown` is nonfatal | 2026-11-10 |
+| V1 limits may rise but never fall (Q3) | Lower limits or changed semantics require `/2`; injectable lower budgets are test controls only | 2026-11-10 |
+| Declared unread references have null bytes and hash (D06) | No metadata-derived size or invented content measurement in v1 | 2026-11-10 |
+| Instrument the shared emitter and reuse resolve input/pin algorithms | Derive module attribution from emitted parts, preserving byte accounting without reimplementing composition | 2026-11-10 |
+| Read local Git objects directly with bounded no-follow reads | Avoid Git configuration, hooks, lazy fetching, helpers, locks and writes during graph capture | 2026-11-10 |
 
 ### Open contract questions
 
-1. Confirm the v1 budgets and closed-schema evolution policy with consumers.
-2. Confirm whether declared-but-unread skill references suffice for the first
-   implementation, or require a separately bounded explicit-content selector.
-3. Confirm the safe source of runtime-discovered skill inventory. Until one is
-   admitted, that origin remains representable but unavailable to the producer.
+A safe source of runtime-discovered inventory remains unadmitted. The producer
+does not discover runtime extras; their schema origin remains representable
+for a future explicitly admitted projection. This does not block locked skills
+or source preview.
 
 ## Operator configuration
 

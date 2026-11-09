@@ -31,24 +31,24 @@ var (
 // Load reads the skill spec of a snapshot directory. agent-skill.json is
 // canonical, csk-skill.json is a legacy read alias, and agents/runtime.json is
 // consulted only when neither modern filename exists (Spec §4).
-func Load(snapshot string) (*Spec, error) {
+func (reader Reader) Load(snapshot string) (*Spec, error) {
 	canonicalPath := filepath.Join(snapshot, CanonicalManifestName)
 	legacyPath := filepath.Join(snapshot, LegacyManifestName)
-	canonicalExists, err := pathExists(canonicalPath)
+	canonicalExists, err := reader.pathExists(canonicalPath)
 	if err != nil {
 		return nil, err
 	}
-	legacyExists, err := pathExists(legacyPath)
+	legacyExists, err := reader.pathExists(legacyPath)
 	if err != nil {
 		return nil, err
 	}
 
 	if canonicalExists && legacyExists {
-		canonical, canonicalData, err := loadSkillManifest(canonicalPath, CanonicalManifestName)
+		canonical, canonicalData, err := reader.loadSkillManifest(canonicalPath, CanonicalManifestName)
 		if err != nil {
 			return nil, err
 		}
-		_, legacyData, err := loadSkillManifest(legacyPath, LegacyManifestName)
+		_, legacyData, err := reader.loadSkillManifest(legacyPath, LegacyManifestName)
 		if err != nil {
 			return nil, err
 		}
@@ -58,34 +58,34 @@ func Load(snapshot string) (*Spec, error) {
 		return canonical, nil
 	}
 	if canonicalExists {
-		spec, _, loadErr := loadSkillManifest(canonicalPath, CanonicalManifestName)
+		spec, _, loadErr := reader.loadSkillManifest(canonicalPath, CanonicalManifestName)
 		return spec, loadErr
 	}
 	if legacyExists {
-		spec, _, loadErr := loadSkillManifest(legacyPath, LegacyManifestName)
+		spec, _, loadErr := reader.loadSkillManifest(legacyPath, LegacyManifestName)
 		return spec, loadErr
 	}
 	runtimePath := filepath.Join(snapshot, filepath.FromSlash(RuntimeFallbackName))
-	runtimeExists, err := pathExists(runtimePath)
+	runtimeExists, err := reader.pathExists(runtimePath)
 	if err != nil {
 		return nil, err
 	}
 	if runtimeExists {
-		return loadRuntimeFallback(runtimePath)
+		return reader.loadRuntimeFallback(runtimePath)
 	}
 	return &Spec{Commands: map[string]Command{}, Capabilities: capabilities.ImplicitNone()}, nil
 }
 
 // ManifestSourcePath returns the protocol path that Load will report for
 // diagnostics. It does not parse the selected file.
-func ManifestSourcePath(snapshot string) string {
-	if exists, _ := pathExists(filepath.Join(snapshot, CanonicalManifestName)); exists {
+func (reader Reader) ManifestSourcePath(snapshot string) string {
+	if exists, _ := reader.pathExists(filepath.Join(snapshot, CanonicalManifestName)); exists {
 		return CanonicalManifestName
 	}
-	if exists, _ := pathExists(filepath.Join(snapshot, LegacyManifestName)); exists {
+	if exists, _ := reader.pathExists(filepath.Join(snapshot, LegacyManifestName)); exists {
 		return LegacyManifestName
 	}
-	if exists, _ := pathExists(filepath.Join(snapshot, filepath.FromSlash(RuntimeFallbackName))); exists {
+	if exists, _ := reader.pathExists(filepath.Join(snapshot, filepath.FromSlash(RuntimeFallbackName))); exists {
 		return RuntimeFallbackName
 	}
 	return ""
@@ -98,8 +98,8 @@ func ManifestSourcePath(snapshot string) string {
 // the legacy fallback spec or an empty one (Spec §4). Lstat, not Stat, so a
 // manifest symlink counts as present even when its target is gone; the parse
 // that follows is then what fails, loudly, naming the file.
-func pathExists(path string) (bool, error) {
-	if _, err := os.Lstat(path); err != nil {
+func (reader Reader) pathExists(path string) (bool, error) {
+	if _, err := reader.Lstat(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return false, nil
 		}
@@ -108,8 +108,8 @@ func pathExists(path string) (bool, error) {
 	return true, nil
 }
 
-func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, error) {
-	data, err := decodeObject(filePath)
+func (reader Reader) loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, error) {
+	data, err := reader.decodeObject(filePath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -157,7 +157,7 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 	var runtimeRoots []string
 	if schema >= 2 {
 		if raw, present := data["runtime_roots"]; present {
-			runtimeRoots, err = parseRuntimeRoots(raw, snapshot)
+			runtimeRoots, err = reader.parseRuntimeRoots(raw, snapshot)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -166,7 +166,7 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 	var buildRoots []string
 	if schema >= 6 {
 		if raw, present := data["build_roots"]; present {
-			buildRoots, err = parseBuildRoots(raw, snapshot, runtimeRoots)
+			buildRoots, err = reader.parseBuildRoots(raw, snapshot, runtimeRoots)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -177,17 +177,17 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 		return nil, nil, err
 	}
 
-	commands, err := parseCommands(data["commands"], schema, snapshot, runtimeRoots)
+	commands, err := reader.parseCommands(data["commands"], schema, snapshot, runtimeRoots)
 	if err != nil {
 		return nil, nil, err
 	}
 	if schema >= 6 {
-		if err := validateBuildLayout(snapshot, buildRoots, commands); err != nil {
+		if err := reader.validateBuildLayout(snapshot, buildRoots, commands); err != nil {
 			return nil, nil, err
 		}
 	}
 	if schema >= 8 {
-		if err := validateModuleRoots(snapshot, buildRoots, runtimeRoots, commands); err != nil {
+		if err := reader.validateModuleRoots(snapshot, buildRoots, runtimeRoots, commands); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -216,8 +216,8 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 	}, data, nil
 }
 
-func loadRuntimeFallback(filePath string) (*Spec, error) {
-	data, err := decodeObject(filePath)
+func (reader Reader) loadRuntimeFallback(filePath string) (*Spec, error) {
+	data, err := reader.decodeObject(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func loadRuntimeFallback(filePath string) (*Spec, error) {
 	}, nil
 }
 
-func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) (map[string]Command, error) {
+func (reader Reader) parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) (map[string]Command, error) {
 	if raw == nil {
 		return map[string]Command{}, nil
 	}
@@ -303,7 +303,7 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 					if rel == "" {
 						continue
 					}
-					if err := validateScriptFile(snapshot, rel, runtimeRoots, label+"."+field); err != nil {
+					if err := reader.validateScriptFile(snapshot, rel, runtimeRoots, label+"."+field); err != nil {
 						return err
 					}
 				}
@@ -752,7 +752,7 @@ func parseMcpServers(raw any) (map[string]McpServer, error) {
 
 // parseRuntimeRoots validates runtime_roots per Spec §5.3: POSIX-relative,
 // existing directories, unique, pairwise disjoint.
-func parseRuntimeRoots(raw any, snapshot string) ([]string, error) {
+func (reader Reader) parseRuntimeRoots(raw any, snapshot string) ([]string, error) {
 	list, ok := raw.([]any)
 	if !ok {
 		return nil, verr.New("runtime_roots", "must be a list")
@@ -768,7 +768,7 @@ func parseRuntimeRoots(raw any, snapshot string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		info, statErr := os.Stat(filepath.Join(snapshot, filepath.FromSlash(root)))
+		info, statErr := reader.Stat(filepath.Join(snapshot, filepath.FromSlash(root)))
 		if statErr != nil {
 			return nil, verr.New(field, "runtime root does not exist: %s", root)
 		}
@@ -803,7 +803,7 @@ func parseRuntimeRoots(raw any, snapshot string) ([]string, error) {
 // parseBuildRoots validates the schema v6 module roots without invoking a Go
 // toolchain. Filesystem validation uses lstat on every package-controlled path
 // component so links cannot redirect checks outside the immutable snapshot.
-func parseBuildRoots(raw any, snapshot string, runtimeRoots []string) ([]string, error) {
+func (reader Reader) parseBuildRoots(raw any, snapshot string, runtimeRoots []string) ([]string, error) {
 	list, ok := raw.([]any)
 	if !ok {
 		return nil, verr.New("build_roots", "must be a list")
@@ -819,7 +819,7 @@ func parseBuildRoots(raw any, snapshot string, runtimeRoots []string) ([]string,
 		if err != nil {
 			return nil, err
 		}
-		if err := validateLinkFreeDirectory(snapshot, root, field, "build root"); err != nil {
+		if err := reader.validateLinkFreeDirectory(snapshot, root, field, "build root"); err != nil {
 			return nil, err
 		}
 		roots = append(roots, root)
@@ -944,7 +944,7 @@ func parseModuleDeclaration(entry map[string]any, schema int, label string) ([]s
 // before the driver's fixed `go list`, which is where the failure boundary of
 // that section places it. Form and bijection validation belong to the driver,
 // after `go list` returns and before `go build`.
-func validateModuleRoots(snapshot string, buildRoots, runtimeRoots []string, commands map[string]Command) error {
+func (reader Reader) validateModuleRoots(snapshot string, buildRoots, runtimeRoots []string, commands map[string]Command) error {
 	names := make([]string, 0, len(commands))
 	for name := range commands {
 		names = append(names, name)
@@ -956,7 +956,7 @@ func validateModuleRoots(snapshot string, buildRoots, runtimeRoots []string, com
 			continue
 		}
 		field := "commands." + name + ".modules"
-		if err := moduleroots.ValidateDeclaration(snapshot, field, command.Modules, buildRoots, runtimeRoots); err != nil {
+		if err := moduleroots.ValidateDeclarationWith(snapshot, field, command.Modules, buildRoots, runtimeRoots, reader.Lstat); err != nil {
 			return err
 		}
 	}
@@ -972,7 +972,7 @@ func sortedKeys(set map[string]bool) []string {
 	return keys
 }
 
-func validateBuildLayout(snapshot string, buildRoots []string, commands map[string]Command) error {
+func (reader Reader) validateBuildLayout(snapshot string, buildRoots []string, commands map[string]Command) error {
 	used := make(map[string]bool, len(buildRoots))
 	names := make([]string, 0, len(commands))
 	for name := range commands {
@@ -994,10 +994,10 @@ func validateBuildLayout(snapshot string, buildRoots []string, commands map[stri
 		if len(containing) != 1 {
 			return verr.New(field, "must be below exactly one build_roots entry")
 		}
-		if err := validateLinkFreeDirectory(snapshot, command.SourceDir, field, "source directory"); err != nil {
+		if err := reader.validateLinkFreeDirectory(snapshot, command.SourceDir, field, "source directory"); err != nil {
 			return err
 		}
-		if err := validateNearestGoMod(snapshot, containing[0], command.SourceDir, field); err != nil {
+		if err := reader.validateNearestGoMod(snapshot, containing[0], command.SourceDir, field); err != nil {
 			return err
 		}
 		used[containing[0]] = true
@@ -1010,11 +1010,11 @@ func validateBuildLayout(snapshot string, buildRoots []string, commands map[stri
 	return nil
 }
 
-func validateLinkFreeDirectory(snapshot, rel, field, noun string) error {
+func (reader Reader) validateLinkFreeDirectory(snapshot, rel, field, noun string) error {
 	current := snapshot
 	for _, component := range strings.Split(rel, "/") {
 		current = filepath.Join(current, component)
-		info, err := os.Lstat(current)
+		info, err := reader.Lstat(current)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return verr.New(field, "%s does not exist: %s", noun, rel)
@@ -1031,11 +1031,11 @@ func validateLinkFreeDirectory(snapshot, rel, field, noun string) error {
 	return nil
 }
 
-func validateNearestGoMod(snapshot, buildRoot, sourceDir, field string) error {
+func (reader Reader) validateNearestGoMod(snapshot, buildRoot, sourceDir, field string) error {
 	current := sourceDir
 	for {
 		modPath := filepath.Join(snapshot, filepath.FromSlash(current), "go.mod")
-		info, err := os.Lstat(modPath)
+		info, err := reader.Lstat(modPath)
 		switch {
 		case err == nil:
 			if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
@@ -1055,8 +1055,8 @@ func validateNearestGoMod(snapshot, buildRoot, sourceDir, field string) error {
 	}
 }
 
-func validateScriptFile(snapshot, rel string, runtimeRoots []string, label string) error {
-	info, err := os.Stat(filepath.Join(snapshot, filepath.FromSlash(rel)))
+func (reader Reader) validateScriptFile(snapshot, rel string, runtimeRoots []string, label string) error {
+	info, err := reader.Stat(filepath.Join(snapshot, filepath.FromSlash(rel)))
 	if err != nil {
 		return verr.New(label, "source file not found: %s", rel)
 	}
@@ -1104,8 +1104,8 @@ func pathContains(root, rel string) bool {
 	return true
 }
 
-func decodeObject(filePath string) (map[string]any, error) {
-	payload, err := os.ReadFile(filePath) // #nosec G304 -- manifest path is derived from the snapshot directory
+func (reader Reader) decodeObject(filePath string) (map[string]any, error) {
+	payload, err := reader.ReadFile(filePath) // #nosec G304 -- manifest path is derived from the snapshot directory
 	if err != nil {
 		return nil, err
 	}
@@ -1177,3 +1177,18 @@ func rejectUnknown(obj map[string]any, allowed map[string]bool, label string) er
 	sort.Strings(unknown)
 	return verr.New(label, "has unsupported field(s): %s", strings.Join(unknown, ", "))
 }
+
+// Reader keeps filesystem policy with the caller while retaining all spec validation.
+type Reader struct {
+	ReadFile    func(string) ([]byte, error)
+	Lstat, Stat func(string) (os.FileInfo, error)
+}
+
+// NativeReader supplies the ordinary filesystem policy for installed packages.
+func NativeReader() Reader { return Reader{os.ReadFile, os.Lstat, os.Stat} }
+
+// Load reads canonical, legacy or runtime skill metadata with native reads.
+func Load(snapshot string) (*Spec, error) { return NativeReader().Load(snapshot) }
+
+// ManifestSourcePath identifies the selected metadata file without parsing it.
+func ManifestSourcePath(snapshot string) string { return NativeReader().ManifestSourcePath(snapshot) }

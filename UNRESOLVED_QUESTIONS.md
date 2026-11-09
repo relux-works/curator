@@ -1,8 +1,8 @@
 # Unresolved questions
 
-- TASK-261109-8nwurz: The draft profile graph contract needs consumer agreement
-  on bounded output/read budgets, declared-but-unread skill reference handling
-  and a safe source of runtime-discovered inventory before command development.
+- TASK-261109-8nwurz: Runtime-discovered skill inventory has no admitted safe
+  source yet. The producer reports locked skills and explicit uncertainty;
+  budgets and declared-but-unread references follow the confirmed v1 decisions.
   [Contract questions](docs/cli.md#open-contract-questions).
 
 - TASK-261026-6b5ioc: Profile skill runtime needs a successor lock allocation

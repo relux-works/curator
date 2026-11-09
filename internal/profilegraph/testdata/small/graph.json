@@ -2,186 +2,124 @@
   "schema_version": "curator-profile-graph/1",
   "generator": {
     "name": "curator",
-    "version": "0.0.0-contract-fixture"
+    "version": "dev"
   },
-  "inputs_digest": "ef928867f533d663cf4297a2a22d8a952e224ad7f3c2480c7e97997e26a13547",
+  "inputs_digest": "3d4153667712ee1794ee3ae9e6ae70755c52a70b468f4ea9ac3841d031f16d84",
   "scope": {
     "profile": "sample",
-    "mode": "source",
+    "mode": "installed",
     "environments": [
       "claude_code",
-      "codex_cli"
+      "codex_cli",
+      "muse",
+      "opencode",
+      "pi"
     ]
   },
   "inputs": [
     {
-      "root": "fixture",
+      "root": "git/example.invalid/nested",
+      "path": "objects/48/309cf49e429835a2709222767eeeff0f476bd9",
+      "sha256": "72adbd095f8fd6acf903143af5e6c0d0eb1808ffda86d493f19fdc821834bfd4",
+      "bytes": 130
+    },
+    {
+      "root": "git/example.invalid/overlay",
+      "path": "objects/3b/ab6fb603cbdf22c96d4ecbf0981a69b0e0c396",
+      "sha256": "2835b64e18e51e85425dd3a48c4b84802e32e054b128c646b01c4a51d22537a2",
+      "bytes": 131
+    },
+    {
+      "root": "git/example.invalid/root",
+      "path": "objects/fc/de6af5031999d831c29016087a51f18060f0f1",
+      "sha256": "a87d6d43984f8ad35993c894e54c7ef2ebfdb7b9d727228d448f6c1d7692383c",
+      "bytes": 129
+    },
+    {
+      "root": "git/example.invalid/skill",
+      "path": "objects/6b/c98468ad07bb7937bc65e2cfa6229e3838965c",
+      "sha256": "5046e7d212c01b381205e94335c73722868e0e8ded54e0d97773120a309bcae8",
+      "bytes": 130
+    },
+    {
+      "root": "managed",
+      "path": "profiles/sample/lock.json",
+      "sha256": "1f84399a97af86a848be52eae01efac465fd24c2aa3d1a45878ef9dda343bd40",
+      "bytes": 981
+    },
+    {
+      "root": "managed",
+      "path": "profiles/sample/source.json",
+      "sha256": "685195410d4b8a233efdcdbf2aea76cbd66cd2a0da741e40fbf54da9ab8fcd1f",
+      "bytes": 121
+    },
+    {
+      "root": "projection",
       "path": "composition.json",
-      "sha256": "66302c147eb47600a3211607add41f27e6ddef2823398b42fe2baf31eb6910e1",
-      "bytes": 311
+      "sha256": "62acb1173c719de3ba9dcb25e967c4f39c6b830ae81019150d0873c485d8b1d4",
+      "bytes": 328
     },
     {
-      "root": "fixture",
-      "path": "context-lock.json",
-      "sha256": "b975a4c745d4e4a432ca489bcd2371363284bc654e139c7118e8b348b3196344",
-      "bytes": 1013
+      "root": "projection",
+      "path": "environments.json",
+      "sha256": "c1d6539cbd5b02afcb66450c910240ee75478d3b68b2cea0dfa88222f0435718",
+      "bytes": 50
     },
     {
-      "root": "fixture",
-      "path": "nested/agent-context.json",
+      "root": "snapshot/context/sample-nested/48309cf49e429835a2709222767eeeff0f476bd9",
+      "path": "agent-context.json",
       "sha256": "f70f7f7967a4449ae4ca83a7a6944dfe930af0ec74063f5248018bfb95d5fbe5",
       "bytes": 222
     },
     {
-      "root": "fixture",
-      "path": "nested/context/guide.md",
+      "root": "snapshot/context/sample-nested/48309cf49e429835a2709222767eeeff0f476bd9",
+      "path": "context/guide.md",
       "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502",
       "bytes": 67
     },
     {
-      "root": "fixture",
-      "path": "overlay/agent-context.json",
+      "root": "snapshot/context/sample-overlay/3bab6fb603cbdf22c96d4ecbf0981a69b0e0c396",
+      "path": "profiles/extra/agent-context.json",
       "sha256": "a103e91939be66ed61039ab38825f8059be1db76d44e3a0d87929099bbe77268",
       "bytes": 76
     },
     {
-      "root": "fixture",
-      "path": "project/AGENTS.md",
-      "sha256": "fd3844105c32da339e340131ab830f866e4a5947a9000cdb2c5360b6cc799736",
-      "bytes": 35
+      "root": "snapshot/context/sample-root/fcde6af5031999d831c29016087a51f18060f0f1",
+      "path": "agent-context.json",
+      "sha256": "f39449af8cc2e54a2ea6a72f25c53c9c8b1aafad7ef2dbfacc61361b12936bc3",
+      "bytes": 359
     },
     {
-      "root": "fixture",
-      "path": "root/agent-context.json",
-      "sha256": "1e89d3bf7dac8d606c081eda0217fd22adc5037e21913565ca02eeeca51c63cd",
-      "bytes": 514
-    },
-    {
-      "root": "fixture",
-      "path": "root/context/base.md",
+      "root": "snapshot/context/sample-root/fcde6af5031999d831c29016087a51f18060f0f1",
+      "path": "context/base.md",
       "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015",
       "bytes": 59
     },
     {
-      "root": "fixture",
-      "path": "skill/SKILL.md",
+      "root": "snapshot/skill/sample-skill/6bc98468ad07bb7937bc65e2cfa6229e3838965c",
+      "path": "SKILL.md",
       "sha256": "c836d0e07f4c9617ff73403aa085458ede529e79b779dd4a0a3de6f6fcd8d0b6",
       "bytes": 112
     },
     {
-      "root": "fixture",
-      "path": "skill/references/note.md",
+      "root": "snapshot/skill/sample-skill/6bc98468ad07bb7937bc65e2cfa6229e3838965c",
+      "path": "references/note.md",
       "sha256": "fcef57c02d3a7896b225b0280dbc90bf50553871670bbc447c9ac7937e8dfbcc",
       "bytes": 16
     }
   ],
   "nodes": [
     {
-      "id": "n:067c786a2ff891154c26f2409334d4f65fb265c826dbfd2439d9f3d0815d904e",
+      "id": "n:0765a530b586c556821668b53f7ce721495b3966942c1a8b94fd3c0f72a94767",
       "identity": [
         "generated",
         "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-        "separator",
-        "3"
-      ],
-      "kind": "generated",
-      "label": "claude_code separator 3",
-      "source": null,
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 1,
-        "lines": 1,
-        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-      },
-      "emissions": [
-        {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-          "ranges": [
-            {
-              "start": 787,
-              "end": 788
-            }
-          ],
-          "bytes": 1,
-          "lines": 1,
-          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "always",
-          "state": "emitted",
-          "basis": "rendering-rule",
-          "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:0a28652886065815c9e6d9a85b5b44b0ae8317faccf798ac6f0bf5b40bb9a267",
-      "identity": [
-        "skill-listing",
-        "sample",
-        "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-        "skill-listing",
-        "SKILL.md"
-      ],
-      "kind": "skill-listing",
-      "label": "skill listing",
-      "source": {
-        "locator": "https://example.invalid/skill",
-        "directory": "",
-        "version": null,
-        "revision": {
-          "kind": "commit",
-          "value": "dddddddddddddddddddddddddddddddddddddddd"
-        },
-        "path": "SKILL.md",
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "content": {
-        "status": "text",
-        "bytes": 37,
-        "lines": 2,
-        "sha256": "a8e4e7b4c87e60eec48f5ff3ad07a11e15be12c25e0ec4e98ff7baf8bdbdb51a"
-      },
-      "emissions": [],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "UNKNOWN",
-          "state": "available",
-          "basis": "UNKNOWN",
-          "condition": null
-        },
-        {
-          "environment": "codex_cli",
-          "class": "UNKNOWN",
-          "state": "available",
-          "basis": "UNKNOWN",
-          "condition": null
-        }
-      ],
-      "skill": {
-        "origin": "lock",
-        "materialization": "listed-only"
-      }
-    },
-    {
-      "id": "n:0fe848ec348a2d01654c48998c3fe7a90c4c745cfa4d79818cd5c1d44e98c735",
-      "identity": [
-        "generated",
-        "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
         "separator",
         "1"
       ],
       "kind": "generated",
-      "label": "claude_code separator 1",
+      "label": "pi separator 1",
       "source": null,
       "layer": null,
       "content": {
@@ -192,11 +130,11 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
           "ranges": [
             {
-              "start": 749,
-              "end": 750
+              "start": 785,
+              "end": 786
             }
           ],
           "bytes": 1,
@@ -207,137 +145,392 @@
       "loads": [
         {
           "environment": "claude_code",
-          "class": "always",
-          "state": "emitted",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
-      "identity": [
-        "instruction-module",
-        "sample",
-        "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
-        "0",
-        "context/guide.md"
-      ],
-      "kind": "instruction-module",
-      "label": "guide.md",
-      "source": {
-        "locator": "https://example.invalid/nested",
-        "directory": "",
-        "version": "1.0.0",
-        "revision": {
-          "kind": "commit",
-          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        },
-        "path": "context/guide.md",
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
-      "content": {
-        "status": "text",
-        "bytes": 67,
-        "lines": 7,
-        "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
-      },
-      "emissions": [
-        {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-          "ranges": [
-            {
-              "start": 788,
-              "end": 855
-            }
-          ],
-          "bytes": 67,
-          "lines": 7,
-          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "always",
-          "state": "emitted",
-          "basis": "rendering-rule",
-          "condition": "environment selector: claude_code"
         },
         {
           "environment": "codex_cli",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
-          "condition": "environment selector excludes codex_cli"
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
         }
       ]
     },
     {
-      "id": "n:146b945085c51bbb0cd2c979bec2b8f2e19ee42209754270e9fb01731c36541d",
+      "id": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
       "identity": [
-        "skill-reference",
+        "emitted-document",
         "sample",
-        "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-        "skill-reference",
-        "references/note.md"
+        "muse",
+        "config/muse/AGENTS.md"
       ],
-      "kind": "skill-reference",
-      "label": "skill reference",
-      "source": {
-        "locator": "https://example.invalid/skill",
-        "directory": "",
-        "version": null,
-        "revision": {
-          "kind": "commit",
-          "value": "dddddddddddddddddddddddddddddddddddddddd"
-        },
-        "path": "references/note.md",
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "kind": "emitted-document",
+      "label": "muse document",
+      "source": null,
+      "layer": null,
       "content": {
         "status": "text",
-        "bytes": 16,
-        "lines": 1,
-        "sha256": "fcef57c02d3a7896b225b0280dbc90bf50553871670bbc447c9ac7937e8dfbcc"
+        "bytes": 845,
+        "lines": 21,
+        "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
       },
-      "emissions": [],
+      "emissions": [
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        }
+      ],
       "loads": [
         {
           "environment": "claude_code",
           "class": "UNKNOWN",
-          "state": "available",
+          "state": "UNKNOWN",
           "basis": "UNKNOWN",
           "condition": null
         },
         {
           "environment": "codex_cli",
           "class": "UNKNOWN",
-          "state": "available",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "identity": [
+        "root-package",
+        "sample",
+        "example.invalid/root",
+        "",
+        "commit",
+        "fcde6af5031999d831c29016087a51f18060f0f1"
+      ],
+      "kind": "root-package",
+      "label": "sample-root",
+      "source": {
+        "locator": "example.invalid/root",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "fcde6af5031999d831c29016087a51f18060f0f1"
+        },
+        "path": null,
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 892,
+              "end": 951
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
           "basis": "UNKNOWN",
           "condition": null
         }
       ],
-      "skill": {
-        "origin": "lock",
-        "materialization": "UNKNOWN"
+      "composition": {
+        "requirement": {
+          "form": "revision",
+          "value": "fcde6af5031999d831c29016087a51f18060f0f1"
+        },
+        "weight": 0,
+        "order": 1,
+        "declaration": "root"
       }
     },
     {
-      "id": "n:162465923e461810c10f9d236b843838b494365ea3ac54fefaaa511438f282f0",
+      "id": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "identity": [
+        "instruction-module",
+        "sample",
+        "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+        "0",
+        "context/base.md"
+      ],
+      "kind": "instruction-module",
+      "label": "base.md",
+      "source": {
+        "locator": "example.invalid/root",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "fcde6af5031999d831c29016087a51f18060f0f1"
+        },
+        "path": "context/base.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "content": {
+        "status": "text",
+        "bytes": 59,
+        "lines": 5,
+        "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 892,
+              "end": 951
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:2455defe897adc5137a7d5cf4e95f68b015059c9d91a357b44501d0d5ca6c19c",
       "identity": [
         "generated",
         "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
         "chapter",
-        "5"
+        "0"
       ],
       "kind": "generated",
-      "label": "claude_code chapter 5",
+      "label": "muse chapter 0",
       "source": null,
       "layer": null,
       "content": {
@@ -348,11 +541,11 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
           "ranges": [
             {
-              "start": 856,
-              "end": 891
+              "start": 750,
+              "end": 785
             }
           ],
           "bytes": 35,
@@ -363,37 +556,65 @@
       "loads": [
         {
           "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
           "class": "always",
           "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         }
       ]
     },
     {
-      "id": "n:22edcb4b17c3363b4c38acbbe30444328f67a188542c1c2373e8965440b4e0e7",
+      "id": "n:33cc152ac4e404451e6f1ecbdcedfed3f3a51eec79dc7368d30747239f4ee25c",
       "identity": [
         "quote-block",
         "sample",
-        "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+        "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
         "35",
         "59"
       ],
       "kind": "quote-block",
       "label": "quote",
       "source": {
-        "locator": "https://example.invalid/root",
+        "locator": "example.invalid/root",
         "directory": "",
         "version": "1.0.0",
         "revision": {
           "kind": "commit",
-          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "value": "fcde6af5031999d831c29016087a51f18060f0f1"
         },
         "path": "context/base.md",
         "authoring_source": null,
         "ownership": "UNKNOWN"
       },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
       "content": {
         "status": "text",
         "bytes": 24,
@@ -402,7 +623,7 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
               "start": 927,
@@ -414,7 +635,43 @@
           "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
         },
         {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 821,
+              "end": 845
+            }
+          ],
+          "bytes": 24,
+          "lines": 1,
+          "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+        },
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 821,
+              "end": 845
+            }
+          ],
+          "bytes": 24,
+          "lines": 1,
+          "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+        },
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 821,
+              "end": 845
+            }
+          ],
+          "bytes": 24,
+          "lines": 1,
+          "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+        },
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
           "ranges": [
             {
               "start": 821,
@@ -440,6 +697,27 @@
           "state": "emitted",
           "basis": "rendering-rule",
           "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
         }
       ],
       "source_ranges": [
@@ -450,101 +728,266 @@
       ]
     },
     {
-      "id": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "id": "n:35fd33008492aa0de21538c47ef4649f49bf6610944ec463345ce8b7dfaa2fa7",
+      "identity": [
+        "skill-body",
+        "sample",
+        "n:845dbba089bba56db5300c1c39157998dd7b16a1cc9145c7e80b7e9aa0930026",
+        "skill-body",
+        "SKILL.md"
+      ],
+      "kind": "skill-body",
+      "label": "skill body",
+      "source": {
+        "locator": "example.invalid/skill",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "commit",
+          "value": "6bc98468ad07bb7937bc65e2cfa6229e3838965c"
+        },
+        "path": "SKILL.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "content": {
+        "status": "text",
+        "bytes": 48,
+        "lines": 4,
+        "sha256": "991a5fa7c20c7511798448983df4fc0a669be11f20948ec6264e0c67ffb302de"
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "source_ranges": [
+        {
+          "start": 64,
+          "end": 112
+        }
+      ],
+      "skill": {
+        "origin": "lock",
+        "materialization": "UNKNOWN"
+      }
+    },
+    {
+      "id": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
       "identity": [
         "emitted-document",
         "sample",
-        "claude_code",
-        "emitted/claude_code/CLAUDE.md"
+        "codex_cli",
+        "AGENTS.md"
       ],
       "kind": "emitted-document",
-      "label": "claude_code document",
+      "label": "codex_cli document",
       "source": null,
       "layer": null,
       "content": {
         "status": "text",
-        "bytes": 951,
-        "lines": 33,
-        "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611"
+        "bytes": 845,
+        "lines": 21,
+        "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
           "ranges": [
             {
               "start": 0,
-              "end": 951
+              "end": 845
             }
           ],
-          "bytes": 951,
-          "lines": 33,
-          "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611"
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
         }
       ],
       "loads": [
         {
           "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
           "condition": null
         }
       ]
     },
     {
-      "id": "n:2f0873be6bf1555df77ce1b480337f84857a632cb7cebec2afc80da057328da4",
+      "id": "n:411f79e12b20a051b5ba2cedd1e84b4f9777a4505517a2476f7fa80049e1bea9",
       "identity": [
-        "section",
+        "overlay",
         "sample",
-        "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
-        "0",
-        "59"
+        "example.invalid/overlay",
+        "profiles/extra",
+        "commit",
+        "3bab6fb603cbdf22c96d4ecbf0981a69b0e0c396",
+        "overlays/0",
+        "10"
       ],
-      "kind": "section",
-      "label": "Baseline",
+      "kind": "overlay",
+      "label": "sample-overlay",
       "source": {
-        "locator": "https://example.invalid/root",
-        "directory": "",
+        "locator": "example.invalid/overlay",
+        "directory": "profiles/extra",
         "version": "1.0.0",
         "revision": {
           "kind": "commit",
-          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "value": "3bab6fb603cbdf22c96d4ecbf0981a69b0e0c396"
         },
-        "path": "context/base.md",
+        "path": null,
         "authoring_source": null,
         "ownership": "UNKNOWN"
       },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "layer": "n:411f79e12b20a051b5ba2cedd1e84b4f9777a4505517a2476f7fa80049e1bea9",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "composition": {
+        "requirement": {
+          "form": "revision",
+          "value": "3bab6fb603cbdf22c96d4ecbf0981a69b0e0c396"
+        },
+        "weight": 10,
+        "order": 2,
+        "declaration": "overlays/0"
+      }
+    },
+    {
+      "id": "n:48b7adcbc2fbd0d43d54f338eb39502fa058895a38443cfc79067daa4179e605",
+      "identity": [
+        "generated",
+        "sample",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+        "separator",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 1",
+      "source": null,
+      "layer": null,
       "content": {
         "status": "text",
-        "bytes": 59,
-        "lines": 5,
-        "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
-              "start": 892,
-              "end": 951
+              "start": 787,
+              "end": 788
             }
           ],
-          "bytes": 59,
-          "lines": 5,
-          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
-        },
-        {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-          "ranges": [
-            {
-              "start": 786,
-              "end": 845
-            }
-          ],
-          "bytes": 59,
-          "lines": 5,
-          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
         }
       ],
       "loads": [
@@ -557,47 +1000,341 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:55ea11cb242c1b4eb037f8b659fcab0806b7f89aa0549c7d43a81106985d4565",
+      "identity": [
+        "generated",
+        "sample",
+        "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+        "separator",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "muse separator 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:5c355b18f8aa4ceaea74bd72bfc35bc910b372095f7f95a74eedc83c7713c807",
+      "identity": [
+        "generated",
+        "sample",
+        "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+        "chapter",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "opencode chapter 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+      },
+      "emissions": [
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 750,
+              "end": 785
+            }
+          ],
+          "bytes": 35,
+          "lines": 3,
+          "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:624a159e22f320bf9c46bf96e3ae8464fafd2af5e0578e977229c5d5594c42e9",
+      "identity": [
+        "generated",
+        "sample",
+        "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+        "chapter",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "pi chapter 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+      },
+      "emissions": [
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 750,
+              "end": 785
+            }
+          ],
+          "bytes": 35,
+          "lines": 3,
+          "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
           "condition": null
         }
+      ]
+    },
+    {
+      "id": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "identity": [
+        "emitted-document",
+        "sample",
+        "claude_code",
+        "CLAUDE.md"
       ],
-      "heading": {
-        "level": 1,
-        "text": "Baseline"
+      "kind": "emitted-document",
+      "label": "claude_code document",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 951,
+        "lines": 33,
+        "sha256": "9ee2028301fe109820de8c814dbfcbbed7cd369c9c72d2000c9f5dfe8444f42d"
       },
-      "source_ranges": [
+      "emissions": [
         {
-          "start": 0,
-          "end": 59
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 951
+            }
+          ],
+          "bytes": 951,
+          "lines": 33,
+          "sha256": "9ee2028301fe109820de8c814dbfcbbed7cd369c9c72d2000c9f5dfe8444f42d"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
         }
       ]
     },
     {
-      "id": "n:309aa2ae8684550a37a9df63f5e49352a34e03e953421c044ae389921e3fffc6",
+      "id": "n:6b50c7da67be7da46057c0da4c053d6cc70a92f850d12617fe5ca381317b46e0",
       "identity": [
-        "section",
+        "instruction-module",
         "sample",
-        "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+        "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
         "0",
-        "67"
+        "context/guide.md"
       ],
-      "kind": "section",
-      "label": "Guide",
+      "kind": "instruction-module",
+      "label": "guide.md",
       "source": {
-        "locator": "https://example.invalid/nested",
+        "locator": "example.invalid/nested",
         "directory": "",
         "version": "1.0.0",
         "revision": {
           "kind": "commit",
-          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          "value": "48309cf49e429835a2709222767eeeff0f476bd9"
         },
         "path": "context/guide.md",
         "authoring_source": null,
         "ownership": "UNKNOWN"
       },
-      "layer": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
+      "layer": "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
       "content": {
         "status": "text",
         "bytes": 67,
@@ -606,7 +1343,7 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
               "start": 788,
@@ -624,38 +1361,120 @@
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
-          "condition": "environment selector: claude_code"
+          "condition": "environments=claude_code"
         },
         {
           "environment": "codex_cli",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
-          "condition": "environment selector excludes codex_cli"
-        }
-      ],
-      "heading": {
-        "level": 1,
-        "text": "Guide"
-      },
-      "source_ranges": [
+          "condition": "environments=claude_code"
+        },
         {
-          "start": 0,
-          "end": 67
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": "environments=claude_code"
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": "environments=claude_code"
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": "environments=claude_code"
         }
       ]
     },
     {
-      "id": "n:3516c56c41ef32f547bbbd85db807c789eb1c57e14ecdef21657207adb72f7e0",
+      "id": "n:6f75a564aa4c7eda021cfd4f6b60e7e4d4b33978b126ebfe03e09def0d58f48e",
       "identity": [
         "generated",
         "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-        "chapter",
-        "2"
+        "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+        "separator",
+        "1"
       ],
       "kind": "generated",
-      "label": "claude_code chapter 2",
+      "label": "opencode separator 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 785,
+              "end": 786
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:7660885fa47f552536fb77c21436818fc3d59cf2d8410b3867d6ec32e3886b99",
+      "identity": [
+        "generated",
+        "sample",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+        "chapter",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "claude_code chapter 0",
       "source": null,
       "layer": null,
       "content": {
@@ -666,7 +1485,7 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
               "start": 750,
@@ -685,157 +1504,59 @@
           "state": "emitted",
           "basis": "rendering-rule",
           "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:3c11d9bfe8e82d10a0a62cc28ef5f0ba29d66d57f9067b92d248839c39ef9eb4",
-      "identity": [
-        "generated",
-        "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-        "separator",
-        "4"
-      ],
-      "kind": "generated",
-      "label": "claude_code separator 4",
-      "source": null,
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 1,
-        "lines": 1,
-        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-      },
-      "emissions": [
+        },
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-          "ranges": [
-            {
-              "start": 855,
-              "end": 856
-            }
-          ],
-          "bytes": 1,
-          "lines": 1,
-          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-        }
-      ],
-      "loads": [
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
         {
-          "environment": "claude_code",
-          "class": "always",
-          "state": "emitted",
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         }
       ]
     },
     {
-      "id": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "identity": [
-        "root-package",
-        "sample",
-        "https://example.invalid/root",
-        "",
-        "commit",
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      ],
-      "kind": "root-package",
-      "label": "sample-root",
-      "source": {
-        "locator": "https://example.invalid/root",
-        "directory": "",
-        "version": "1.0.0",
-        "revision": {
-          "kind": "commit",
-          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        },
-        "path": null,
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "content": {
-        "status": "not-applicable",
-        "bytes": null,
-        "lines": null,
-        "sha256": null
-      },
-      "emissions": [
-        {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-          "ranges": [
-            {
-              "start": 892,
-              "end": 951
-            }
-          ],
-          "bytes": 59,
-          "lines": 5,
-          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
-        },
-        {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-          "ranges": [
-            {
-              "start": 786,
-              "end": 845
-            }
-          ],
-          "bytes": 59,
-          "lines": 5,
-          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
-          "condition": null
-        },
-        {
-          "environment": "codex_cli",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
-          "condition": null
-        }
-      ],
-      "composition": {
-        "requirement": {
-          "form": "revision",
-          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        },
-        "weight": 0,
-        "order": 1,
-        "declaration": "root"
-      }
-    },
-    {
-      "id": "n:478e6683ad51e909e2c5913b59632bedf009e26f332d10e8729c042e6eae4ad5",
+      "id": "n:7fb0ccb17ae4e4696f3860d14b5252f1bc1976c8a123c09a404cd873fdbab037",
       "identity": [
         "generated",
         "sample",
-        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
         "header",
         "0"
       ],
       "kind": "generated",
-      "label": "codex_cli header 0",
+      "label": "claude_code header 0",
       "source": null,
       "layer": null,
       "content": {
         "status": "text",
         "bytes": 749,
         "lines": 11,
-        "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
+        "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
       },
       "emissions": [
         {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
               "start": 0,
@@ -844,132 +1565,46 @@
           ],
           "bytes": 749,
           "lines": 11,
-          "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "codex_cli",
-          "class": "always",
-          "state": "emitted",
-          "basis": "rendering-rule",
-          "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:6d6eea63070b43884fb544e54ddb0bec0b7076f764db0ac9c15c21e8d56b3b11",
-      "identity": [
-        "generated",
-        "sample",
-        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-        "separator",
-        "3"
-      ],
-      "kind": "generated",
-      "label": "codex_cli separator 3",
-      "source": null,
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 1,
-        "lines": 1,
-        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-      },
-      "emissions": [
-        {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-          "ranges": [
-            {
-              "start": 785,
-              "end": 786
-            }
-          ],
-          "bytes": 1,
-          "lines": 1,
-          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "codex_cli",
-          "class": "always",
-          "state": "emitted",
-          "basis": "rendering-rule",
-          "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
-      "identity": [
-        "profile-package",
-        "sample",
-        "https://example.invalid/nested",
-        "",
-        "commit",
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-      ],
-      "kind": "profile-package",
-      "label": "sample-nested",
-      "source": {
-        "locator": "https://example.invalid/nested",
-        "directory": "",
-        "version": "1.0.0",
-        "revision": {
-          "kind": "commit",
-          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        },
-        "path": null,
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
-      "content": {
-        "status": "not-applicable",
-        "bytes": null,
-        "lines": null,
-        "sha256": null
-      },
-      "emissions": [
-        {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-          "ranges": [
-            {
-              "start": 788,
-              "end": 855
-            }
-          ],
-          "bytes": 67,
-          "lines": 7,
-          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+          "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
         }
       ],
       "loads": [
         {
           "environment": "claude_code",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
           "condition": null
         },
         {
           "environment": "codex_cli",
           "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
           "condition": null
         }
-      ],
-      "composition": {
-        "requirement": {
-          "form": "revision",
-          "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        },
-        "weight": 0,
-        "order": 0,
-        "declaration": "requires.contexts.sample-nested"
-      }
+      ]
     },
     {
       "id": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
@@ -989,7 +1624,7 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
               "start": 0,
@@ -998,10 +1633,10 @@
           ],
           "bytes": 951,
           "lines": 33,
-          "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611"
+          "sha256": "9ee2028301fe109820de8c814dbfcbbed7cd369c9c72d2000c9f5dfe8444f42d"
         },
         {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
           "ranges": [
             {
               "start": 0,
@@ -1010,7 +1645,43 @@
           ],
           "bytes": 845,
           "lines": 21,
-          "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e"
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        },
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        },
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        },
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
         }
       ],
       "loads": [
@@ -1027,20 +1698,41 @@
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
           "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
         }
       ]
     },
     {
-      "id": "n:9419d8b9a622b79632281d9c9da871ba248410e2d592d6364efadac3b3dce494",
+      "id": "n:8451ce61fc3c690a6818e941f928c2821e8066c597db5fbd707d34463f822568",
       "identity": [
         "generated",
         "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+        "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
         "separator",
-        "6"
+        "0"
       ],
       "kind": "generated",
-      "label": "claude_code separator 6",
+      "label": "opencode separator 0",
       "source": null,
       "layer": null,
       "content": {
@@ -1051,11 +1743,11 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
           "ranges": [
             {
-              "start": 891,
-              "end": 892
+              "start": 749,
+              "end": 750
             }
           ],
           "bytes": 1,
@@ -1066,145 +1758,66 @@
       "loads": [
         {
           "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
           "class": "always",
           "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         }
       ]
     },
     {
-      "id": "n:a91c2f90ca20452c776cb4395d746cda5752cbf7538de9a4eed7ddd9fef902b2",
+      "id": "n:845dbba089bba56db5300c1c39157998dd7b16a1cc9145c7e80b7e9aa0930026",
       "identity": [
-        "skill-body",
+        "skill",
         "sample",
-        "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-        "skill-body",
-        "SKILL.md"
-      ],
-      "kind": "skill-body",
-      "label": "skill body",
-      "source": {
-        "locator": "https://example.invalid/skill",
-        "directory": "",
-        "version": null,
-        "revision": {
-          "kind": "commit",
-          "value": "dddddddddddddddddddddddddddddddddddddddd"
-        },
-        "path": "SKILL.md",
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "content": {
-        "status": "text",
-        "bytes": 47,
-        "lines": 3,
-        "sha256": "52061c9b151deae8c5f36713f8764476080a78cf66eefb617db99f266e5c94d5"
-      },
-      "emissions": [],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "UNKNOWN",
-          "state": "available",
-          "basis": "UNKNOWN",
-          "condition": null
-        },
-        {
-          "environment": "codex_cli",
-          "class": "UNKNOWN",
-          "state": "available",
-          "basis": "UNKNOWN",
-          "condition": null
-        }
-      ],
-      "skill": {
-        "origin": "lock",
-        "materialization": "UNKNOWN"
-      },
-      "source_ranges": [
-        {
-          "start": 65,
-          "end": 112
-        }
-      ]
-    },
-    {
-      "id": "n:ae9ef3ed37b46a4d031ea16d9c6329d73c80d75ba17a0b9bbcd5b5c229e25ddc",
-      "identity": [
-        "project-instruction",
-        "sample",
-        "project",
-        "AGENTS.md"
-      ],
-      "kind": "project-instruction",
-      "label": "project instructions",
-      "source": {
-        "locator": "fixture:project",
-        "directory": "",
-        "version": null,
-        "revision": {
-          "kind": "UNKNOWN",
-          "value": ""
-        },
-        "path": "AGENTS.md",
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
-      },
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 35,
-        "lines": 3,
-        "sha256": "fd3844105c32da339e340131ab830f866e4a5947a9000cdb2c5360b6cc799736"
-      },
-      "emissions": [],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
-          "condition": null
-        },
-        {
-          "environment": "codex_cli",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
-          "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:b273fed4c5b9eb2f032a6f50b0ee69abdbbff2ecd4f441ff629778be027ae14f",
-      "identity": [
-        "overlay",
-        "sample",
-        "https://example.invalid/overlay",
-        "profiles/extra",
+        "example.invalid/skill",
+        "",
         "commit",
-        "cccccccccccccccccccccccccccccccccccccccc",
-        "overlays/0",
-        "10"
+        "6bc98468ad07bb7937bc65e2cfa6229e3838965c"
       ],
-      "kind": "overlay",
-      "label": "sample-overlay",
+      "kind": "skill",
+      "label": "sample-skill",
       "source": {
-        "locator": "https://example.invalid/overlay",
-        "directory": "profiles/extra",
-        "version": "1.0.0",
+        "locator": "example.invalid/skill",
+        "directory": "",
+        "version": null,
         "revision": {
           "kind": "commit",
-          "value": "cccccccccccccccccccccccccccccccccccccccc"
+          "value": "6bc98468ad07bb7937bc65e2cfa6229e3838965c"
         },
         "path": null,
         "authoring_source": null,
         "ownership": "UNKNOWN"
       },
-      "layer": "n:b273fed4c5b9eb2f032a6f50b0ee69abdbbff2ecd4f441ff629778be027ae14f",
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
       "content": {
         "status": "not-applicable",
         "bytes": null,
@@ -1226,42 +1839,840 @@
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
           "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
         }
       ],
-      "composition": {
-        "requirement": {
-          "form": "tag",
-          "value": "v1.0.0"
-        },
-        "weight": 10,
-        "order": 2,
-        "declaration": "overlays/0"
+      "skill": {
+        "origin": "lock",
+        "materialization": "UNKNOWN"
       }
     },
     {
-      "id": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "id": "n:856c7815984fcb681a06c25618c3fb622f967fcb3174113d6d58d8f384ab4047",
       "identity": [
-        "instruction-module",
+        "skill-listing",
         "sample",
-        "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-        "0",
-        "context/base.md"
+        "n:845dbba089bba56db5300c1c39157998dd7b16a1cc9145c7e80b7e9aa0930026",
+        "skill-listing",
+        "SKILL.md"
       ],
-      "kind": "instruction-module",
-      "label": "base.md",
+      "kind": "skill-listing",
+      "label": "skill listing",
       "source": {
-        "locator": "https://example.invalid/root",
+        "locator": "example.invalid/skill",
+        "directory": "",
+        "version": null,
+        "revision": {
+          "kind": "commit",
+          "value": "6bc98468ad07bb7937bc65e2cfa6229e3838965c"
+        },
+        "path": "SKILL.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "content": {
+        "status": "text",
+        "bytes": 37,
+        "lines": 2,
+        "sha256": "a8e4e7b4c87e60eec48f5ff3ad07a11e15be12c25e0ec4e98ff7baf8bdbdb51a"
+      },
+      "emissions": [],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "skill": {
+        "origin": "lock",
+        "materialization": "listed-only"
+      }
+    },
+    {
+      "id": "n:9305ebf875d7778afe2504c2582577bb52af52f113b14d4affb089855803dbce",
+      "identity": [
+        "generated",
+        "sample",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+        "separator",
+        "3"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 3",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 891,
+              "end": 892
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:9a1aa76bd62c250a89d126cb685fc03878f5055a1954b4916c049abe71bd3e59",
+      "identity": [
+        "generated",
+        "sample",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+        "chapter",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "claude_code chapter 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 856,
+              "end": 891
+            }
+          ],
+          "bytes": 35,
+          "lines": 3,
+          "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:a5a504078e900122bb44a66dbd27b856f9d137f0994115f5f0e43098d4bb0f64",
+      "identity": [
+        "generated",
+        "sample",
+        "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+        "separator",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "codex_cli separator 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:a6138a5387f6fad2a50f711c4bdef35688245913df28cb679c7df0acdfc2210b",
+      "identity": [
+        "generated",
+        "sample",
+        "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+        "separator",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "codex_cli separator 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 785,
+              "end": 786
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:a6795d6b9529980fe501f56be1370b94eccd22478e25e5a079e76204a52df9b7",
+      "identity": [
+        "generated",
+        "sample",
+        "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "codex_cli header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+      },
+      "emissions": [
+        {
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "identity": [
+        "emitted-document",
+        "sample",
+        "pi",
+        "AGENTS.md"
+      ],
+      "kind": "emitted-document",
+      "label": "pi document",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 845,
+        "lines": 21,
+        "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+      },
+      "emissions": [
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:ba56e9ae0ee9ae1710588397b8e124be5fb1b3a2e43a5f4f41a7a1b3017a3b79",
+      "identity": [
+        "generated",
+        "sample",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+        "separator",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:c08e1e377e48b648f0247b427b27fd2a4fd92a2d6cda2e41a5a87bfd19f1c0c1",
+      "identity": [
+        "generated",
+        "sample",
+        "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+        "separator",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "muse separator 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 785,
+              "end": 786
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:c5c809e008e178e32fbf2dbe05009c7331c5a3579481b4b101acc70d242387de",
+      "identity": [
+        "generated",
+        "sample",
+        "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+        "separator",
+        "2"
+      ],
+      "kind": "generated",
+      "label": "claude_code separator 2",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 855,
+              "end": 856
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:cb7245b376ddea307ed1cf5f1ee58e68b08a1d3a4c3be097bd6127753324578c",
+      "identity": [
+        "generated",
+        "sample",
+        "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+        "separator",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "pi separator 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:ccea891372c604b4e3e9cad593c30b8581c42ebdc8f10760878fd90829235721",
+      "identity": [
+        "section",
+        "sample",
+        "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+        "0",
+        "59"
+      ],
+      "kind": "section",
+      "label": "Baseline",
+      "source": {
+        "locator": "example.invalid/root",
         "directory": "",
         "version": "1.0.0",
         "revision": {
           "kind": "commit",
-          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "value": "fcde6af5031999d831c29016087a51f18060f0f1"
         },
         "path": "context/base.md",
         "authoring_source": null,
         "ownership": "UNKNOWN"
       },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "layer": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
       "content": {
         "status": "text",
         "bytes": 59,
@@ -1270,7 +2681,7 @@
       },
       "emissions": [
         {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
           "ranges": [
             {
               "start": 892,
@@ -1282,7 +2693,43 @@
           "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
         },
         {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
           "ranges": [
             {
               "start": 786,
@@ -1308,201 +2755,51 @@
           "state": "emitted",
           "basis": "rendering-rule",
           "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-      "identity": [
-        "emitted-document",
-        "sample",
-        "codex_cli",
-        "emitted/codex_cli/AGENTS.md"
-      ],
-      "kind": "emitted-document",
-      "label": "codex_cli document",
-      "source": null,
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 845,
-        "lines": 21,
-        "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e"
-      },
-      "emissions": [
+        },
         {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-          "ranges": [
-            {
-              "start": 0,
-              "end": 845
-            }
-          ],
-          "bytes": 845,
-          "lines": 21,
-          "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e"
-        }
-      ],
-      "loads": [
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
         {
-          "environment": "codex_cli",
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
           "condition": null
         }
-      ]
-    },
-    {
-      "id": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-      "identity": [
-        "skill",
-        "sample",
-        "https://example.invalid/skill",
-        "",
-        "commit",
-        "dddddddddddddddddddddddddddddddddddddddd"
       ],
-      "kind": "skill",
-      "label": "sample-skill",
-      "source": {
-        "locator": "https://example.invalid/skill",
-        "directory": "",
-        "version": null,
-        "revision": {
-          "kind": "commit",
-          "value": "dddddddddddddddddddddddddddddddddddddddd"
-        },
-        "path": null,
-        "authoring_source": null,
-        "ownership": "UNKNOWN"
+      "heading": {
+        "level": 1,
+        "text": "Baseline"
       },
-      "layer": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "content": {
-        "status": "not-applicable",
-        "bytes": null,
-        "lines": null,
-        "sha256": null
-      },
-      "emissions": [],
-      "loads": [
+      "source_ranges": [
         {
-          "environment": "claude_code",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
-          "condition": null
-        },
-        {
-          "environment": "codex_cli",
-          "class": "UNKNOWN",
-          "state": "UNKNOWN",
-          "basis": "UNKNOWN",
-          "condition": null
-        }
-      ],
-      "skill": {
-        "origin": "lock",
-        "materialization": "UNKNOWN"
-      }
-    },
-    {
-      "id": "n:dbb59e76cae2d2d7dc20f3540c2494d3cd24ac887dfc344007ea4cda8226acde",
-      "identity": [
-        "generated",
-        "sample",
-        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-        "separator",
-        "1"
-      ],
-      "kind": "generated",
-      "label": "codex_cli separator 1",
-      "source": null,
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 1,
-        "lines": 1,
-        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-      },
-      "emissions": [
-        {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-          "ranges": [
-            {
-              "start": 749,
-              "end": 750
-            }
-          ],
-          "bytes": 1,
-          "lines": 1,
-          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "codex_cli",
-          "class": "always",
-          "state": "emitted",
-          "basis": "rendering-rule",
-          "condition": null
+          "start": 0,
+          "end": 59
         }
       ]
     },
     {
-      "id": "n:f3f5ebaf1516900f8961f3db08824dbd12000b66ec6fde0ca6bd8fc07c13800c",
+      "id": "n:d18f9c8cbb4309bba57c701adf32fcfe773d079c9e152794f02c58bc8403bfca",
       "identity": [
         "generated",
         "sample",
-        "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-        "header",
+        "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+        "chapter",
         "0"
       ],
       "kind": "generated",
-      "label": "claude_code header 0",
-      "source": null,
-      "layer": null,
-      "content": {
-        "status": "text",
-        "bytes": 749,
-        "lines": 11,
-        "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
-      },
-      "emissions": [
-        {
-          "document": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-          "ranges": [
-            {
-              "start": 0,
-              "end": 749
-            }
-          ],
-          "bytes": 749,
-          "lines": 11,
-          "sha256": "6cfc82150def97537f74232f90128b59fc9fab6a4d2898e7e4378661beb97cc3"
-        }
-      ],
-      "loads": [
-        {
-          "environment": "claude_code",
-          "class": "always",
-          "state": "emitted",
-          "basis": "rendering-rule",
-          "condition": null
-        }
-      ]
-    },
-    {
-      "id": "n:f4085ce54ba82ea6b56a15012f39917957522d8df0d241f07b178b18ef5cd293",
-      "identity": [
-        "generated",
-        "sample",
-        "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-        "chapter",
-        "2"
-      ],
-      "kind": "generated",
-      "label": "codex_cli chapter 2",
+      "label": "codex_cli chapter 0",
       "source": null,
       "layer": null,
       "content": {
@@ -1513,7 +2810,7 @@
       },
       "emissions": [
         {
-          "document": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+          "document": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
           "ranges": [
             {
               "start": 750,
@@ -1527,269 +2824,868 @@
       ],
       "loads": [
         {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:d764b360604ce83791b215fa5102d8b08c67c7bae30c49054e794b0a8a2d9dea",
+      "identity": [
+        "generated",
+        "sample",
+        "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "opencode header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+      },
+      "emissions": [
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "identity": [
+        "emitted-document",
+        "sample",
+        "opencode",
+        "AGENTS.md"
+      ],
+      "kind": "emitted-document",
+      "label": "opencode document",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 845,
+        "lines": 21,
+        "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+      },
+      "emissions": [
+        {
+          "document": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:d9c06d32747f450f34b2098a510ecb31651bd5be9b13aa3dd235067e042d05f0",
+      "identity": [
+        "generated",
+        "sample",
+        "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "pi header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+      },
+      "emissions": [
+        {
+          "document": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
           "condition": null
         }
       ]
+    },
+    {
+      "id": "n:e309be0a46d23799c54e1304966da9ba70fca4000e4758cf03b1babf5cd2cf43",
+      "identity": [
+        "generated",
+        "sample",
+        "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "muse header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+      },
+      "emissions": [
+        {
+          "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
+      "identity": [
+        "context-package",
+        "sample",
+        "example.invalid/nested",
+        "",
+        "commit",
+        "48309cf49e429835a2709222767eeeff0f476bd9"
+      ],
+      "kind": "context-package",
+      "label": "sample-nested",
+      "source": {
+        "locator": "example.invalid/nested",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "48309cf49e429835a2709222767eeeff0f476bd9"
+        },
+        "path": null,
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
+      "content": {
+        "status": "not-applicable",
+        "bytes": null,
+        "lines": null,
+        "sha256": null
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 788,
+              "end": 855
+            }
+          ],
+          "bytes": 67,
+          "lines": 7,
+          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        }
+      ],
+      "composition": {
+        "requirement": {
+          "form": "revision",
+          "value": "48309cf49e429835a2709222767eeeff0f476bd9"
+        },
+        "weight": 0,
+        "order": 0,
+        "declaration": "requires.contexts.sample-nested"
+      }
+    },
+    {
+      "id": "n:f5cf226d452f8e4ebac8f2953588e668e6378c24aaf8d51274df53f8ff21b787",
+      "identity": [
+        "section",
+        "sample",
+        "n:6b50c7da67be7da46057c0da4c053d6cc70a92f850d12617fe5ca381317b46e0",
+        "0",
+        "67"
+      ],
+      "kind": "section",
+      "label": "Guide",
+      "source": {
+        "locator": "example.invalid/nested",
+        "directory": "",
+        "version": "1.0.0",
+        "revision": {
+          "kind": "commit",
+          "value": "48309cf49e429835a2709222767eeeff0f476bd9"
+        },
+        "path": "context/guide.md",
+        "authoring_source": null,
+        "ownership": "UNKNOWN"
+      },
+      "layer": "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
+      "content": {
+        "status": "text",
+        "bytes": 67,
+        "lines": 7,
+        "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+      },
+      "emissions": [
+        {
+          "document": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+          "ranges": [
+            {
+              "start": 788,
+              "end": 855
+            }
+          ],
+          "bytes": 67,
+          "lines": 7,
+          "sha256": "b9d7e1b31fcd479d8c1601047ddf7a06c5014b242cdda005b9d4718728000502"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "claude_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ],
+      "heading": {
+        "level": 1,
+        "text": "Guide"
+      },
+      "source_ranges": [
+        {
+          "start": 0,
+          "end": 67
+        }
+      ]
     }
   ],
   "edges": [
     {
-      "from": "n:067c786a2ff891154c26f2409334d4f65fb265c826dbfd2439d9f3d0815d904e",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "from": "n:0765a530b586c556821668b53f7ce721495b3966942c1a8b94fd3c0f72a94767",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
       "kind": "contributes",
-      "order": 0
+      "order": 3
     },
     {
-      "from": "n:0fe848ec348a2d01654c48998c3fe7a90c4c745cfa4d79818cd5c1d44e98c735",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
-      "to": "n:309aa2ae8684550a37a9df63f5e49352a34e03e953421c044ae389921e3fffc6",
-      "kind": "section",
-      "order": 0
-    },
-    {
-      "from": "n:162465923e461810c10f9d236b843838b494365ea3ac54fefaaa511438f282f0",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:2f0873be6bf1555df77ce1b480337f84857a632cb7cebec2afc80da057328da4",
-      "to": "n:22edcb4b17c3363b4c38acbbe30444328f67a188542c1c2373e8965440b4e0e7",
-      "kind": "quote",
-      "order": 0
-    },
-    {
-      "from": "n:3516c56c41ef32f547bbbd85db807c789eb1c57e14ecdef21657207adb72f7e0",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:3c11d9bfe8e82d10a0a62cc28ef5f0ba29d66d57f9067b92d248839c39ef9eb4",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "to": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+      "from": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "to": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
       "kind": "contains",
       "order": 0
     },
     {
-      "from": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "to": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
-      "kind": "requires-profile",
+      "from": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "to": "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
+      "kind": "requires-context",
       "order": 0,
       "requirement": {
         "form": "revision",
-        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        "value": "48309cf49e429835a2709222767eeeff0f476bd9"
       }
     },
     {
-      "from": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
-      "to": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
+      "from": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
+      "to": "n:845dbba089bba56db5300c1c39157998dd7b16a1cc9145c7e80b7e9aa0930026",
       "kind": "requires-skill",
       "order": 0,
       "requirement": {
         "form": "revision",
-        "value": "dddddddddddddddddddddddddddddddddddddddd"
+        "value": "6bc98468ad07bb7937bc65e2cfa6229e3838965c"
       }
     },
     {
-      "from": "n:478e6683ad51e909e2c5913b59632bedf009e26f332d10e8729c042e6eae4ad5",
-      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
       "kind": "contributes",
+      "order": 4
+    },
+    {
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+      "kind": "contributes",
+      "order": 4
+    },
+    {
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "kind": "contributes",
+      "order": 4
+    },
+    {
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "kind": "contributes",
+      "order": 4
+    },
+    {
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 8
+    },
+    {
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:33cc152ac4e404451e6f1ecbdcedfed3f3a51eec79dc7368d30747239f4ee25c",
+      "kind": "quote",
       "order": 0
     },
     {
-      "from": "n:6d6eea63070b43884fb544e54ddb0bec0b7076f764db0ac9c15c21e8d56b3b11",
-      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-      "kind": "contributes",
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:ccea891372c604b4e3e9cad593c30b8581c42ebdc8f10760878fd90829235721",
+      "kind": "section",
       "order": 0
     },
     {
-      "from": "n:7aa78335fa88b833615e17ce389d441729cd0dca97df8afff1c9ca15cc8e8e5c",
-      "to": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
-      "kind": "contains",
+      "from": "n:2455defe897adc5137a7d5cf4e95f68b015059c9d91a357b44501d0d5ca6c19c",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "kind": "contributes",
+      "order": 2
+    },
+    {
+      "from": "n:48b7adcbc2fbd0d43d54f338eb39502fa058895a38443cfc79067daa4179e605",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 3
+    },
+    {
+      "from": "n:55ea11cb242c1b4eb037f8b659fcab0806b7f89aa0549c7d43a81106985d4565",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "kind": "contributes",
+      "order": 1
+    },
+    {
+      "from": "n:5c355b18f8aa4ceaea74bd72bfc35bc910b372095f7f95a74eedc83c7713c807",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "kind": "contributes",
+      "order": 2
+    },
+    {
+      "from": "n:624a159e22f320bf9c46bf96e3ae8464fafd2af5e0578e977229c5d5594c42e9",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "kind": "contributes",
+      "order": 2
+    },
+    {
+      "from": "n:6b50c7da67be7da46057c0da4c053d6cc70a92f850d12617fe5ca381317b46e0",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 4
+    },
+    {
+      "from": "n:6b50c7da67be7da46057c0da4c053d6cc70a92f850d12617fe5ca381317b46e0",
+      "to": "n:f5cf226d452f8e4ebac8f2953588e668e6378c24aaf8d51274df53f8ff21b787",
+      "kind": "section",
+      "order": 0
+    },
+    {
+      "from": "n:6f75a564aa4c7eda021cfd4f6b60e7e4d4b33978b126ebfe03e09def0d58f48e",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "kind": "contributes",
+      "order": 3
+    },
+    {
+      "from": "n:7660885fa47f552536fb77c21436818fc3d59cf2d8410b3867d6ec32e3886b99",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 2
+    },
+    {
+      "from": "n:7fb0ccb17ae4e4696f3860d14b5252f1bc1976c8a123c09a404cd873fdbab037",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
       "order": 0
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
       "kind": "emits",
       "order": 0
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "to": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
       "kind": "emits",
       "order": 1
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:b273fed4c5b9eb2f032a6f50b0ee69abdbbff2ecd4f441ff629778be027ae14f",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "kind": "emits",
+      "order": 2
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "kind": "emits",
+      "order": 3
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "kind": "emits",
+      "order": 4
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:411f79e12b20a051b5ba2cedd1e84b4f9777a4505517a2476f7fa80049e1bea9",
       "kind": "overlay",
-      "order": 0
+      "order": 2,
+      "requirement": {
+        "form": "revision",
+        "value": "3bab6fb603cbdf22c96d4ecbf0981a69b0e0c396"
+      }
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:ae9ef3ed37b46a4d031ea16d9c6329d73c80d75ba17a0b9bbcd5b5c229e25ddc",
-      "kind": "project",
-      "order": 0
-    },
-    {
-      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:41e5546dc29e199bea804e3808b57bdde5ce3b0b37fd0d208462f2a02842e780",
+      "to": "n:2161ea5befa347f7c42f54822186889f3e9705bc79423217d191acd50973e90b",
       "kind": "root",
-      "order": 0
+      "order": 0,
+      "requirement": {
+        "form": "revision",
+        "value": "fcde6af5031999d831c29016087a51f18060f0f1"
+      }
     },
     {
-      "from": "n:9419d8b9a622b79632281d9c9da871ba248410e2d592d6364efadac3b3dce494",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "from": "n:8451ce61fc3c690a6818e941f928c2821e8066c597db5fbd707d34463f822568",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
       "kind": "contributes",
-      "order": 0
+      "order": 1
     },
     {
-      "from": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
-      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
-      "kind": "contributes",
-      "order": 0
-    },
-    {
-      "from": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
-      "to": "n:2f0873be6bf1555df77ce1b480337f84857a632cb7cebec2afc80da057328da4",
-      "kind": "section",
-      "order": 0
-    },
-    {
-      "from": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-      "to": "n:a91c2f90ca20452c776cb4395d746cda5752cbf7538de9a4eed7ddd9fef902b2",
+      "from": "n:845dbba089bba56db5300c1c39157998dd7b16a1cc9145c7e80b7e9aa0930026",
+      "to": "n:35fd33008492aa0de21538c47ef4649f49bf6610944ec463345ce8b7dfaa2fa7",
       "kind": "body",
       "order": 0
     },
     {
-      "from": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-      "to": "n:0a28652886065815c9e6d9a85b5b44b0ae8317faccf798ac6f0bf5b40bb9a267",
+      "from": "n:845dbba089bba56db5300c1c39157998dd7b16a1cc9145c7e80b7e9aa0930026",
+      "to": "n:856c7815984fcb681a06c25618c3fb622f967fcb3174113d6d58d8f384ab4047",
       "kind": "lists",
       "order": 0
     },
     {
-      "from": "n:d4f8913e009da4f582b2a404c783781b2277dbb3b67fbde219ff692981fc2264",
-      "to": "n:146b945085c51bbb0cd2c979bec2b8f2e19ee42209754270e9fb01731c36541d",
-      "kind": "references",
-      "order": 0
+      "from": "n:9305ebf875d7778afe2504c2582577bb52af52f113b14d4affb089855803dbce",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 7
     },
     {
-      "from": "n:dbb59e76cae2d2d7dc20f3540c2494d3cd24ac887dfc344007ea4cda8226acde",
-      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "from": "n:9a1aa76bd62c250a89d126cb685fc03878f5055a1954b4916c049abe71bd3e59",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 6
+    },
+    {
+      "from": "n:a5a504078e900122bb44a66dbd27b856f9d137f0994115f5f0e43098d4bb0f64",
+      "to": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+      "kind": "contributes",
+      "order": 1
+    },
+    {
+      "from": "n:a6138a5387f6fad2a50f711c4bdef35688245913df28cb679c7df0acdfc2210b",
+      "to": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+      "kind": "contributes",
+      "order": 3
+    },
+    {
+      "from": "n:a6795d6b9529980fe501f56be1370b94eccd22478e25e5a079e76204a52df9b7",
+      "to": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
       "kind": "contributes",
       "order": 0
     },
     {
-      "from": "n:f3f5ebaf1516900f8961f3db08824dbd12000b66ec6fde0ca6bd8fc07c13800c",
-      "to": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "from": "n:ba56e9ae0ee9ae1710588397b8e124be5fb1b3a2e43a5f4f41a7a1b3017a3b79",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 1
+    },
+    {
+      "from": "n:c08e1e377e48b648f0247b427b27fd2a4fd92a2d6cda2e41a5a87bfd19f1c0c1",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "kind": "contributes",
+      "order": 3
+    },
+    {
+      "from": "n:c5c809e008e178e32fbf2dbe05009c7331c5a3579481b4b101acc70d242387de",
+      "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
+      "kind": "contributes",
+      "order": 5
+    },
+    {
+      "from": "n:cb7245b376ddea307ed1cf5f1ee58e68b08a1d3a4c3be097bd6127753324578c",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "kind": "contributes",
+      "order": 1
+    },
+    {
+      "from": "n:d18f9c8cbb4309bba57c701adf32fcfe773d079c9e152794f02c58bc8403bfca",
+      "to": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
+      "kind": "contributes",
+      "order": 2
+    },
+    {
+      "from": "n:d764b360604ce83791b215fa5102d8b08c67c7bae30c49054e794b0a8a2d9dea",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
       "kind": "contributes",
       "order": 0
     },
     {
-      "from": "n:f4085ce54ba82ea6b56a15012f39917957522d8df0d241f07b178b18ef5cd293",
-      "to": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "from": "n:d9c06d32747f450f34b2098a510ecb31651bd5be9b13aa3dd235067e042d05f0",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
       "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:e309be0a46d23799c54e1304966da9ba70fca4000e4758cf03b1babf5cd2cf43",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:f5657a986a7bfb4dca2a15b9ceb34c4ec1c88002b840e9b95c49480a7171a156",
+      "to": "n:6b50c7da67be7da46057c0da4c053d6cc70a92f850d12617fe5ca381317b46e0",
+      "kind": "contains",
       "order": 0
     }
   ],
   "documents": [
     {
-      "node": "n:2a2477599382a25f0c88f28227fd296c74c5f2358b3d42a9aef440f30aea0b84",
+      "node": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
       "environment": "claude_code",
-      "root": "fixture",
-      "path": "emitted/claude_code/CLAUDE.md",
+      "root": "environment/claude_code",
+      "path": "CLAUDE.md",
       "form": "monolithic",
       "origin": "rendered",
       "bytes": 951,
       "lines": 33,
-      "sha256": "852ed99b8bb200096ae592bc36ef83f51fffcbc40d696fd54ce33358207dc611",
+      "sha256": "9ee2028301fe109820de8c814dbfcbbed7cd369c9c72d2000c9f5dfe8444f42d",
       "coverage": [
         {
-          "node": "n:f3f5ebaf1516900f8961f3db08824dbd12000b66ec6fde0ca6bd8fc07c13800c",
+          "node": "n:7fb0ccb17ae4e4696f3860d14b5252f1bc1976c8a123c09a404cd873fdbab037",
           "range": {
             "start": 0,
             "end": 749
           }
         },
         {
-          "node": "n:0fe848ec348a2d01654c48998c3fe7a90c4c745cfa4d79818cd5c1d44e98c735",
+          "node": "n:ba56e9ae0ee9ae1710588397b8e124be5fb1b3a2e43a5f4f41a7a1b3017a3b79",
           "range": {
             "start": 749,
             "end": 750
           }
         },
         {
-          "node": "n:3516c56c41ef32f547bbbd85db807c789eb1c57e14ecdef21657207adb72f7e0",
+          "node": "n:7660885fa47f552536fb77c21436818fc3d59cf2d8410b3867d6ec32e3886b99",
           "range": {
             "start": 750,
             "end": 787
           }
         },
         {
-          "node": "n:067c786a2ff891154c26f2409334d4f65fb265c826dbfd2439d9f3d0815d904e",
+          "node": "n:48b7adcbc2fbd0d43d54f338eb39502fa058895a38443cfc79067daa4179e605",
           "range": {
             "start": 787,
             "end": 788
           }
         },
         {
-          "node": "n:1055b6b6293e169558af0d0cca50fa583db8f46c73c75dc7c34ccd51fb6ec799",
+          "node": "n:6b50c7da67be7da46057c0da4c053d6cc70a92f850d12617fe5ca381317b46e0",
           "range": {
             "start": 788,
             "end": 855
           }
         },
         {
-          "node": "n:3c11d9bfe8e82d10a0a62cc28ef5f0ba29d66d57f9067b92d248839c39ef9eb4",
+          "node": "n:c5c809e008e178e32fbf2dbe05009c7331c5a3579481b4b101acc70d242387de",
           "range": {
             "start": 855,
             "end": 856
           }
         },
         {
-          "node": "n:162465923e461810c10f9d236b843838b494365ea3ac54fefaaa511438f282f0",
+          "node": "n:9a1aa76bd62c250a89d126cb685fc03878f5055a1954b4916c049abe71bd3e59",
           "range": {
             "start": 856,
             "end": 891
           }
         },
         {
-          "node": "n:9419d8b9a622b79632281d9c9da871ba248410e2d592d6364efadac3b3dce494",
+          "node": "n:9305ebf875d7778afe2504c2582577bb52af52f113b14d4affb089855803dbce",
           "range": {
             "start": 891,
             "end": 892
           }
         },
         {
-          "node": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+          "node": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
           "range": {
             "start": 892,
             "end": 951
@@ -1798,46 +3694,190 @@
       ]
     },
     {
-      "node": "n:cf902898eb1a445c071e70b89a6cbe7692f6eea90ef94d45f295111919ef5000",
+      "node": "n:3a53750dec22ef3b372c3817b473be1d3a2cb050ecaaa7b45c86268497d15efa",
       "environment": "codex_cli",
-      "root": "fixture",
-      "path": "emitted/codex_cli/AGENTS.md",
+      "root": "environment/codex_cli",
+      "path": "AGENTS.md",
       "form": "monolithic",
       "origin": "rendered",
       "bytes": 845,
       "lines": 21,
-      "sha256": "01a27c86ff185bf54bdfe8ebc2d72519db542205d694cb4a916337da7314689e",
+      "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4",
       "coverage": [
         {
-          "node": "n:478e6683ad51e909e2c5913b59632bedf009e26f332d10e8729c042e6eae4ad5",
+          "node": "n:a6795d6b9529980fe501f56be1370b94eccd22478e25e5a079e76204a52df9b7",
           "range": {
             "start": 0,
             "end": 749
           }
         },
         {
-          "node": "n:dbb59e76cae2d2d7dc20f3540c2494d3cd24ac887dfc344007ea4cda8226acde",
+          "node": "n:a5a504078e900122bb44a66dbd27b856f9d137f0994115f5f0e43098d4bb0f64",
           "range": {
             "start": 749,
             "end": 750
           }
         },
         {
-          "node": "n:f4085ce54ba82ea6b56a15012f39917957522d8df0d241f07b178b18ef5cd293",
+          "node": "n:d18f9c8cbb4309bba57c701adf32fcfe773d079c9e152794f02c58bc8403bfca",
           "range": {
             "start": 750,
             "end": 785
           }
         },
         {
-          "node": "n:6d6eea63070b43884fb544e54ddb0bec0b7076f764db0ac9c15c21e8d56b3b11",
+          "node": "n:a6138a5387f6fad2a50f711c4bdef35688245913df28cb679c7df0acdfc2210b",
           "range": {
             "start": 785,
             "end": 786
           }
         },
         {
-          "node": "n:cdb9cb080ff684698be20d1588476e68ed5fa3003ddf9c2968a1ed515847285a",
+          "node": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+          "range": {
+            "start": 786,
+            "end": 845
+          }
+        }
+      ]
+    },
+    {
+      "node": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "environment": "muse",
+      "root": "environment/muse",
+      "path": "config/muse/AGENTS.md",
+      "form": "monolithic",
+      "origin": "rendered",
+      "bytes": 845,
+      "lines": 21,
+      "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4",
+      "coverage": [
+        {
+          "node": "n:e309be0a46d23799c54e1304966da9ba70fca4000e4758cf03b1babf5cd2cf43",
+          "range": {
+            "start": 0,
+            "end": 749
+          }
+        },
+        {
+          "node": "n:55ea11cb242c1b4eb037f8b659fcab0806b7f89aa0549c7d43a81106985d4565",
+          "range": {
+            "start": 749,
+            "end": 750
+          }
+        },
+        {
+          "node": "n:2455defe897adc5137a7d5cf4e95f68b015059c9d91a357b44501d0d5ca6c19c",
+          "range": {
+            "start": 750,
+            "end": 785
+          }
+        },
+        {
+          "node": "n:c08e1e377e48b648f0247b427b27fd2a4fd92a2d6cda2e41a5a87bfd19f1c0c1",
+          "range": {
+            "start": 785,
+            "end": 786
+          }
+        },
+        {
+          "node": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+          "range": {
+            "start": 786,
+            "end": 845
+          }
+        }
+      ]
+    },
+    {
+      "node": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "environment": "opencode",
+      "root": "environment/opencode",
+      "path": "AGENTS.md",
+      "form": "monolithic",
+      "origin": "rendered",
+      "bytes": 845,
+      "lines": 21,
+      "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4",
+      "coverage": [
+        {
+          "node": "n:d764b360604ce83791b215fa5102d8b08c67c7bae30c49054e794b0a8a2d9dea",
+          "range": {
+            "start": 0,
+            "end": 749
+          }
+        },
+        {
+          "node": "n:8451ce61fc3c690a6818e941f928c2821e8066c597db5fbd707d34463f822568",
+          "range": {
+            "start": 749,
+            "end": 750
+          }
+        },
+        {
+          "node": "n:5c355b18f8aa4ceaea74bd72bfc35bc910b372095f7f95a74eedc83c7713c807",
+          "range": {
+            "start": 750,
+            "end": 785
+          }
+        },
+        {
+          "node": "n:6f75a564aa4c7eda021cfd4f6b60e7e4d4b33978b126ebfe03e09def0d58f48e",
+          "range": {
+            "start": 785,
+            "end": 786
+          }
+        },
+        {
+          "node": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+          "range": {
+            "start": 786,
+            "end": 845
+          }
+        }
+      ]
+    },
+    {
+      "node": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "environment": "pi",
+      "root": "environment/pi",
+      "path": "AGENTS.md",
+      "form": "monolithic",
+      "origin": "rendered",
+      "bytes": 845,
+      "lines": 21,
+      "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4",
+      "coverage": [
+        {
+          "node": "n:d9c06d32747f450f34b2098a510ecb31651bd5be9b13aa3dd235067e042d05f0",
+          "range": {
+            "start": 0,
+            "end": 749
+          }
+        },
+        {
+          "node": "n:cb7245b376ddea307ed1cf5f1ee58e68b08a1d3a4c3be097bd6127753324578c",
+          "range": {
+            "start": 749,
+            "end": 750
+          }
+        },
+        {
+          "node": "n:624a159e22f320bf9c46bf96e3ae8464fafd2af5e0578e977229c5d5594c42e9",
+          "range": {
+            "start": 750,
+            "end": 785
+          }
+        },
+        {
+          "node": "n:0765a530b586c556821668b53f7ce721495b3966942c1a8b94fd3c0f72a94767",
+          "range": {
+            "start": 785,
+            "end": 786
+          }
+        },
+        {
+          "node": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
           "range": {
             "start": 786,
             "end": 845
@@ -1846,5 +3886,11 @@
       ]
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "class": "graph_load_unknown",
+      "node": null,
+      "message": "Curator rendering is not evidence of runtime injection."
+    }
+  ]
 }

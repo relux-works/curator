@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/skillspec"
-	"gopkg.in/yaml.v3"
 )
 
 // ExpansionOptions supplies acquisition-owned Git trees and machine-owned
@@ -397,74 +395,48 @@ func ReadSkillPackage(dir string) (string, *skillspec.Spec, error) {
 }
 
 func selectedPackage(dir string) (string, *skillspec.Spec, error) {
+	return ReadSkillPackageWith(dir, skillspec.NativeReader())
+}
+
+// ReadSkillPackageWith reuses package validation with a protected reader.
+func ReadSkillPackageWith(dir string, reader skillspec.Reader) (string, *skillspec.Spec, error) {
 	file := filepath.Join(dir, "SKILL.md")
-	info, err := os.Lstat(file)
+	info, err := reader.Lstat(file)
 	if err != nil {
 		return "", nil, err
 	}
 	if !info.Mode().IsRegular() {
 		return "", nil, fmt.Errorf("SKILL.md must be a regular file")
 	}
-	data, err := os.ReadFile(file) // #nosec G304 -- contained selected package; fixed metadata filename
+	data, err := reader.ReadFile(file) // #nosec G304 -- contained selected package; fixed metadata filename
 	if err != nil {
 		return "", nil, err
 	}
-	lines := bytes.Split(bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n")), []byte("\n"))
-	if len(lines) < 3 || string(lines[0]) != "---" {
-		return "", nil, fmt.Errorf("missing YAML frontmatter")
-	}
-	end := 1
-	for end < len(lines) && string(lines[end]) != "---" {
-		end++
-	}
-	if end == len(lines) {
-		return "", nil, fmt.Errorf("unterminated YAML frontmatter")
-	}
-	var metadata map[string]any
-	if err := yaml.Unmarshal(bytes.Join(lines[1:end], []byte("\n")), &metadata); err != nil {
-		return "", nil, fmt.Errorf("invalid YAML frontmatter: %w", err)
-	}
-	name, ok := metadata["name"].(string)
-	if !ok || !identifiers.Valid(name) {
-		return "", nil, fmt.Errorf("invalid SKILL.md name")
-	}
-	description, ok := metadata["description"].(string)
-	if !ok || strings.TrimSpace(description) == "" {
-		return "", nil, fmt.Errorf("invalid SKILL.md description")
-	}
-	if raw, ok := metadata["triggers"]; ok {
-		triggers, ok := raw.([]any)
-		if !ok {
-			return "", nil, fmt.Errorf("invalid triggers")
-		}
-		for _, raw := range triggers {
-			value, ok := raw.(string)
-			if !ok || strings.TrimSpace(value) == "" {
-				return "", nil, fmt.Errorf("invalid trigger")
-			}
-		}
+	name, _, _, err := ParseSkillListing(data)
+	if err != nil {
+		return "", nil, err
 	}
 	modern := false
 	for _, file := range []string{skillspec.CanonicalManifestName, skillspec.LegacyManifestName} {
-		present, err := regularMetadata(dir, file)
+		present, err := regularMetadataWith(dir, file, reader.Lstat)
 		if err != nil {
 			return "", nil, err
 		}
 		modern = modern || present
 	}
 	if !modern {
-		if _, err := regularMetadata(dir, skillspec.RuntimeFallbackName); err != nil {
+		if _, err := regularMetadataWith(dir, skillspec.RuntimeFallbackName, reader.Lstat); err != nil {
 			return "", nil, err
 		}
 	}
-	spec, err := skillspec.Load(dir)
+	spec, err := reader.Load(dir)
 	if err != nil {
 		return "", nil, err
 	}
 	// Schema 1 permits an optional identity extension. Later schemas reject
 	// unknown identity fields in skillspec.Load; do not invent one for them.
 	if spec.SourceFile == skillspec.CanonicalManifestName || spec.SourceFile == skillspec.LegacyManifestName {
-		payload, err := os.ReadFile(filepath.Join(dir, spec.SourceFile)) // #nosec G304 -- filename chosen by skillspec.Load
+		payload, err := reader.ReadFile(filepath.Join(dir, spec.SourceFile)) // #nosec G304 -- filename chosen by skillspec.Load
 		if err != nil {
 			return "", nil, err
 		}
@@ -482,12 +454,12 @@ func selectedPackage(dir string) (string, *skillspec.Spec, error) {
 // Metadata is read during expansion, before snapshot capture. Refuse links and
 // special files here too, rather than reading outside the package or blocking
 // on a FIFO. Only actual absence permits the ordinary manifest fallback.
-func regularMetadata(root, relative string) (bool, error) {
+func regularMetadataWith(root, relative string, lstat func(string) (os.FileInfo, error)) (bool, error) {
 	current := root
 	parts := strings.Split(relative, "/")
 	for i, part := range parts {
 		current = filepath.Join(current, part)
-		info, err := os.Lstat(current)
+		info, err := lstat(current)
 		if os.IsNotExist(err) {
 			return false, nil
 		}

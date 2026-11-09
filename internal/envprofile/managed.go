@@ -2723,7 +2723,7 @@ func loadResolveInputsWithOwner(home, profile string, readRegularFile func(strin
 	if err := validateLockBoundary(home, profile, owner); err != nil {
 		return Source{}, nil, "", err
 	}
-	source, err := readSource(home, profile)
+	source, err := readSourceWith(home, profile, readRegularFile)
 	if err != nil {
 		if isStateAbsent(err) {
 			return Source{}, nil, "", fmt.Errorf("%s: profile %q is not installed", DiagProfileUnknown, profile)
