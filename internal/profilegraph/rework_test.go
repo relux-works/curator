@@ -17,12 +17,34 @@ import (
 	"github.com/relux-works/curator/internal/profilegraph/graphtest"
 )
 
+// Residual families include the original db3 witness, extension variants and
+// mixed-case spellings. Numeric subtest names keep fixture ancestors neutral.
+func producerResidualDeniedNames() []string {
+	return []string{
+		"a.db3", "cache.db-wal", "a.db.backup", "cache.sqlite3", "cache.sqlite.backup",
+		".envrc", ".environment", "password.json", "passwd.json", "my-password-notes.md", "my-passwd-notes.md",
+		".netrc", ".npmrc", ".pypirc", ".git-credentials", "cert.p12", "cert.pfx", "app.keystore", "keystore-notes.md", "app.jks",
+		"A.DB3", "CACHE.DB-WAL", "CACHE.SQLITE3", ".EnVrC", "My-PaSsWoRd.json", "My-PaSsWd.json",
+		".NeTrC", ".NpMrC", ".PyPiRc", ".GiT-CrEdEnTiAlS", "CERT.P12", "CERT.PFX", "APP.KeYsToRe", "APP.JKS",
+	}
+}
+
+// These neighbors do not match the basename rules: database requires a dot
+// before db/sqlite, auth is prefix-only, and credential dotfiles are exact.
+func producerAllowedFamilyNames() []string {
+	return []string{"guide.md", "database.md", "database-notes.md", "sqlite-notes.md", "my-auth.md", "envrc.md", "netrc.md", ".npmrc-notes.md", "cert.p120", "app.jks-notes.md"}
+}
+
 // Each family refuses a declared payload before open, and skips an undeclared
 // sibling before open/hash/ledger insertion, in source and installed state trees.
 // A nearby ordinary module must still render; broad rejection cannot pass.
 func TestProducerDenyFamilies(t *testing.T) {
 	names := []string{"token.json", "oauth.json", ".env.local", "secrets.json", "credentials.json", ".env", ".EnV.LoCaL", "access-ToKeN.json", "my-SeCrEt.json", "my-CrEdEnTiAl.json", "my-OAuTh.json", "AuTh.json", "cert.PEM", "private.KEY", "ID_ed25519", "cache.SQLITE-wal", "cache.DB", "HiStOrY.backup", "chat-SeSsIoN.json", "trace.LOG", "login.KEYCHAIN-db", "login.KEYRING", "token-budget.md", "bash_history", "cache-wal", "cache-shm", "auth/cache.json", "logs/trace.txt", "log/trace.txt", "shell-snapshots/capture.txt"}
+	names = append(names, producerResidualDeniedNames()...)
+	deniedCount := len(names)
+	names = append(names, producerAllowedFamilyNames()...)
 	for i, name := range names {
+		wantDenied := i < deniedCount
 		for _, installed := range []bool{false, true} {
 			for _, declared := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%02d/installed=%t/declared=%t", i, installed, declared), func(t *testing.T) {
@@ -36,7 +58,12 @@ func TestProducerDenyFamilies(t *testing.T) {
 						manifest := fmt.Sprintf(`{"schema_version":1,"name":"sample","version":"1.0.0","context":{"modules":[{"path":%q},{"path":"base.md"}]}}`, name)
 						writeFixture(t, source, "agent-context.json", []byte(manifest))
 					}
-					writeFixture(t, source, rel, []byte("synthetic denied payload\n"))
+					writeFixture(t, source, rel, []byte("# Synthetic rule\n"))
+					if installed && !wantDenied {
+						// Allowed additions belong in the installed pin; excluded
+						// siblings above must leave the original pin unchanged.
+						repinFixture(t, home, source)
+					}
 					req.Reader = profilegraph.NewReader(profilegraph.V1Limits)
 					opened := false
 					ordinaryOpened := false
@@ -50,10 +77,10 @@ func TestProducerDenyFamilies(t *testing.T) {
 					}
 					before := snapshot(t, home)
 					g, err := profilegraph.Build(req)
-					if opened {
-						t.Fatal("denied payload opened")
+					if wantDenied && opened {
+						t.Fatalf("denied payload opened: %s", name)
 					}
-					if declared {
+					if declared && wantDenied {
 						if g != nil || err == nil || !strings.HasPrefix(err.Error(), "graph_path_denied:") {
 							t.Fatalf("declared: graph=%v err=%v", g, err)
 						}
@@ -64,10 +91,15 @@ func TestProducerDenyFamilies(t *testing.T) {
 						if !ordinaryOpened || len(g.Documents) != 1 || g.Documents[0].Bytes == 0 {
 							t.Fatal("ordinary module did not render")
 						}
+						listed := false
 						for _, input := range g.Inputs {
-							if input.Path == rel {
-								t.Fatal("denied payload hashed/listed")
-							}
+							listed = listed || input.Path == rel
+						}
+						if wantDenied && listed {
+							t.Fatalf("denied payload hashed/listed: %s", name)
+						}
+						if !wantDenied && (!opened || !listed) {
+							t.Fatalf("ordinary neighbor missing: %s opened=%t listed=%t", name, opened, listed)
 						}
 					}
 					if snapshot(t, home) != before {
@@ -261,7 +293,9 @@ func TestProducerLocalOverlayMismatch(t *testing.T) {
 // an ordinary neighbor proves the offline object route can resolve and render.
 func TestProducerObjectFamilies(t *testing.T) {
 	names := []string{"token.json", "oauth.json", ".env.local", "secrets.json", "credentials.json", ".env", ".EnV.LoCaL", "access-ToKeN.json", "my-SeCrEt.json", "my-CrEdEnTiAl.json", "my-OAuTh.json", "AuTh.json", "cert.PEM", "private.KEY", "ID_ed25519", "cache.SQLITE-wal", "cache.DB", "HiStOrY.backup", "chat-SeSsIoN.json", "trace.LOG", "login.KEYCHAIN-db", "login.KEYRING", "token-budget.md", "bash_history", "cache-wal", "cache-shm", "auth/cache.json", "logs/trace.txt", "log/trace.txt", "shell-snapshots/capture.txt"}
-	names = append(names, "guide.md")
+	names = append(names, producerResidualDeniedNames()...)
+	deniedCount := len(names)
+	names = append(names, producerAllowedFamilyNames()...)
 	for i, name := range names {
 		t.Run(fmt.Sprintf("%02d", i), func(t *testing.T) {
 			home, source := t.TempDir(), t.TempDir()
@@ -290,12 +324,12 @@ func TestProducerObjectFamilies(t *testing.T) {
 				}
 			}
 			g, err := profilegraph.Build(req)
-			if name == "guide.md" {
-				if err != nil || g == nil || !opened {
+			if i >= deniedCount {
+				if err != nil || g == nil || !opened || len(g.Documents) != 1 || g.Documents[0].Bytes == 0 {
 					t.Fatalf("ordinary object failed: %v opened=%t", err, opened)
 				}
 			} else if g != nil || err == nil || !strings.HasPrefix(err.Error(), "graph_path_denied:") || opened {
-				t.Fatalf("denied object: graph=%v err=%v opened=%t", g, err, opened)
+				t.Fatalf("denied object %s: graph=%t err=%v opened=%t", name, g != nil, err, opened)
 			}
 		})
 	}

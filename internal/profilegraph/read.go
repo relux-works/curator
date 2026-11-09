@@ -66,13 +66,15 @@ func NewReader(limits Limits) *Reader {
 
 // Deny families by case-insensitive basename at every path component. This
 // intentionally also denies benign names such as token-budget.md: declarations
-// cannot waive a sensitive-family classification.
+// cannot waive a sensitive-family classification. Database families require
+// a dot before db/sqlite, with any suffix (a.db3, a.db.backup), not a bare
+// substring (database.md).
 func denied(p string) bool {
 	for _, c := range strings.Split(strings.ToLower(filepath.ToSlash(p)), "/") {
-		if c == ".ssh" || c == ".gnupg" || c == "log" || c == "logs" || c == ".env" || strings.HasPrefix(c, ".env.") || c == "shell-snapshots" || c == "shell_snapshots" {
+		if c == ".ssh" || c == ".gnupg" || c == "log" || c == "logs" || strings.HasPrefix(c, ".env") || c == ".netrc" || c == ".npmrc" || c == ".pypirc" || c == ".git-credentials" || c == "shell-snapshots" || c == "shell_snapshots" {
 			return true
 		}
-		for _, family := range []string{"token", "secret", "credential", "oauth", "session", "keychain", "keyring", ".sqlite"} {
+		for _, family := range []string{"token", "secret", "credential", "password", "passwd", "oauth", "session", "keychain", "keyring", "keystore", ".sqlite", ".db"} {
 			if strings.Contains(c, family) {
 				return true
 			}
@@ -82,7 +84,7 @@ func denied(p string) bool {
 				return true
 			}
 		}
-		for _, suffix := range []string{".log", ".db", "-wal", "-shm", "_history", ".pem", ".key"} {
+		for _, suffix := range []string{".log", "-wal", "-shm", "_history", ".pem", ".key", ".p12", ".pfx", ".jks"} {
 			if strings.HasSuffix(c, suffix) {
 				return true
 			}
