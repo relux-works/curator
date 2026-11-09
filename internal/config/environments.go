@@ -226,7 +226,7 @@ func parseEnvironmentsVersion(raw any, schema int) (Environments, error) {
 		}
 	}
 	if rawStore, present := obj["credential_store"]; present {
-		if schema != SchemaVersion5 && schema != SchemaVersion7 {
+		if schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8 {
 			return Environments{}, verr.New("environments.credential_store", "requires manager-config schema_version 5")
 		}
 		stores, err := parseCredentialStore(rawStore)
@@ -968,7 +968,7 @@ func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
 			return nil, verr.New(label, "must be an object")
 		}
 		for key := range entry {
-			if key != "pin" && key != "file" && key != "span" && key != "reason" && ((schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7) || key != "hash_version") {
+			if key != "pin" && key != "file" && key != "span" && key != "reason" && ((schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8) || key != "hash_version") {
 				return nil, verr.New(label, "has unsupported field %q", key)
 			}
 		}
@@ -978,7 +978,7 @@ func parseSecretWaivers(raw any, schema int) ([]SecretMaterialWaiver, error) {
 		}
 		hashVersion := 0
 		if rawVersion, present := entry["hash_version"]; present {
-			if schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 {
+			if schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != SchemaVersion8 {
 				return nil, verr.New(label+".hash_version", "requires manager-config schema_version 3")
 			}
 			value, ok := integerValue(rawVersion)
@@ -1160,7 +1160,7 @@ func (c *Config) EffectiveJSON() map[string]any {
 	env := map[string]any{}
 	if c != nil {
 		env = c.Env.render()
-		if c.Schema == SchemaVersion5 || c.Schema == SchemaVersion7 {
+		if c.Schema == SchemaVersion5 || c.Schema == SchemaVersion7 || c.Schema == SchemaVersion8 {
 			stores := map[string]any{}
 			for profile, entries := range c.Env.CredentialStore {
 				nested := map[string]any{}
