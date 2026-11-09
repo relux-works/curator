@@ -63,13 +63,27 @@ func (r *Reader) boundary(root, rel string) (string, string, error) {
 func NewReader(limits Limits) *Reader {
 	return &Reader{Limits: limits, inputs: map[string]Input{}, cache: map[string][]byte{}}
 }
+
+// Deny families by case-insensitive basename at every path component. This
+// intentionally also denies benign names such as token-budget.md: declarations
+// cannot waive a sensitive-family classification.
 func denied(p string) bool {
 	for _, c := range strings.Split(strings.ToLower(filepath.ToSlash(p)), "/") {
-		if c == ".ssh" || c == ".gnupg" || c == "logs" || c == ".env" || c == "shell-snapshots" || c == "shell_snapshots" || strings.HasSuffix(c, ".log") || strings.HasSuffix(c, ".db") || strings.Contains(c, ".sqlite") || strings.HasSuffix(c, "-wal") || strings.HasSuffix(c, "-shm") || strings.HasSuffix(c, "_history") || strings.HasSuffix(c, ".pem") || strings.HasSuffix(c, ".key") {
+		if c == ".ssh" || c == ".gnupg" || c == "log" || c == "logs" || c == ".env" || strings.HasPrefix(c, ".env.") || c == "shell-snapshots" || c == "shell_snapshots" {
 			return true
 		}
-		for _, prefix := range []string{"auth", "credential", "session", "history", "id_"} {
+		for _, family := range []string{"token", "secret", "credential", "oauth", "session", "keychain", "keyring", ".sqlite"} {
+			if strings.Contains(c, family) {
+				return true
+			}
+		}
+		for _, prefix := range []string{"auth", "history", "id_"} {
 			if strings.HasPrefix(c, prefix) {
+				return true
+			}
+		}
+		for _, suffix := range []string{".log", ".db", "-wal", "-shm", "_history", ".pem", ".key"} {
+			if strings.HasSuffix(c, suffix) {
 				return true
 			}
 		}

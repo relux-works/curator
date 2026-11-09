@@ -1377,12 +1377,21 @@ never open content in auth, credential, session, history or log directories;
 never open auth/credential files, private keys, token stores, shell histories,
 session transcripts, SQLite/database files (including WAL/SHM sidecars), logs,
 or shell snapshots. Matching is case-insensitive on path components and known
-file families, including `.ssh`, `.gnupg`, `auth*`, `credential*`, `session*`,
-`history*`, `logs`, `*.log`, `*.sqlite*`, `*.db`, `*-wal`, `*-shm`,
-`*_history`, `.env`, `*.pem`, `*.key` and `id_*`. Apply the same payload
-restrictions to source and cache roots so a source selector cannot bypass them.
+file families. Match each basename case-insensitively, including directory
+components: `.ssh`, `.gnupg`, `auth*` (including `auth.json`), `*credential*`,
+`*token*`, `*secret*`, `*oauth*`, `*session*`, `history*`, `log`, `logs`,
+`*.log`, `*.sqlite*`, `*.db`, `*-wal`, `*-shm`, `*_history`, `.env`, `.env.*`,
+`*.pem`, `*.key`, `id_*`, `*keychain*`, `*keyring*`, `shell-snapshots` and
+`shell_snapshots`. Apply the same payload restrictions to source and cache
+roots so a source selector cannot bypass them. Benign names matching these
+families, such as `token-budget.md` or `author.md`, are denied too; declarations
+provide no safe-name exception. Rename such modules to an unambiguous name.
 Metadata classification may inspect path kind; denied payloads must never be
-opened, hashed, included or echoed in errors. Refuse as `graph_path_denied`.
+opened, hashed, included or echoed in errors. An explicitly declared denied
+input refuses as `graph_path_denied`. Whole-tree source/state walks skip denied
+siblings and directories before opening them; they contribute neither hashes
+nor input rows. The remaining tree must still match any installed state pin;
+a pin that included excluded payloads refuses rather than borrowing that pin.
 Do not inspect auth/keychain state to resolve uncertainty.
 
 Resolve every path component beneath explicitly admitted managed/source/project
@@ -1427,6 +1436,8 @@ must avoid secret-bearing paths or values.
 | Declared unread references have null bytes and hash (D06) | No metadata-derived size or invented content measurement in v1 | 2026-11-10 |
 | Instrument the shared emitter and reuse resolve input/pin algorithms | Derive module attribution from emitted parts, preserving byte accounting without reimplementing composition | 2026-11-10 |
 | Read local Git objects directly with bounded no-follow reads | Avoid Git configuration, hooks, lazy fetching, helpers, locks and writes during graph capture | 2026-11-10 |
+| Deny basename families before payload reads; skip undeclared siblings and refuse declared ones | Protect environment variants, embedded token/secret/credential/OAuth names, keys, database sidecars, sessions, histories, logs and keychain/keyring files on every read route. Deny benign matches such as `token-budget.md` too: an explicit declaration cannot prove safe content, and renaming is safer than a bypass | 2026-11-10 |
+| Match path overlays through the shared resolver state seed, package key and state pin | Path/state lock members intentionally have empty source/directory. Reuse package projection and versioned tree hashing, retain declaration slot and weight, and reject mismatched names, state bytes or weights. Installed mode validates the bounded declaration tree against the pin but renders locked snapshot bytes | 2026-11-10 |
 
 ### Open contract questions
 

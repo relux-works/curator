@@ -48,20 +48,21 @@ func (p packageInput) read(r *Reader, rel string) ([]byte, error) {
 }
 
 type build struct {
-	err      error
-	source   envprofile.Source
-	req      Request
-	r        *Reader
-	g        Graph
-	lock     *contextlock.Lock
-	lockHash string
-	packages map[string]packageInput
-	material map[string]contextmaterialize.Package
-	layers   map[string]*Node
-	modules  map[string]*Node
-	nodes    map[string]*Node
-	profile  *Node
-	objects  map[string]gitObject
+	err          error
+	source       envprofile.Source
+	req          Request
+	r            *Reader
+	g            Graph
+	lock         *contextlock.Lock
+	lockHash     string
+	packages     map[string]packageInput
+	material     map[string]contextmaterialize.Package
+	layers       map[string]*Node
+	modules      map[string]*Node
+	nodes        map[string]*Node
+	profile      *Node
+	objects      map[string]gitObject
+	pathOverlays map[int]contextresolve.Overlay
 }
 
 // Build resolves admitted local inputs and returns either one graph or nil.
@@ -237,6 +238,11 @@ func (b *build) sourceTree(root, label, rel string, files map[string][]byte, dep
 			continue
 		}
 		p := path.Join(rel, name)
+		// Undeclared sensitive siblings are outside the graph input set. A
+		// declaration still reaches Reader.Read and receives graph_path_denied.
+		if denied(p) {
+			continue
+		}
 		if entry.IsDir() {
 			if err := b.sourceTree(root, label, p, files, depth+1); err != nil {
 				return err

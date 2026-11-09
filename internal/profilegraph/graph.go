@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -95,20 +96,29 @@ func (b *build) composition(m contextlock.Member, order int) Composition {
 	if m.Overlay {
 		declaration = "overlays/UNKNOWN"
 		for i, o := range b.req.Projection.Overlays {
-			canonical := o.Source
-			if identity.ClassifySource(o.Source) != identity.SourcePath {
-				var err error
-				canonical, err = (offlineSource{b}).Identity("", "", o.Source)
+			if o.Weight == nil || *o.Weight != m.Weight {
+				continue
+			}
+			if identity.ClassifySource(o.Source) == identity.SourcePath {
+				overlay, _, err := b.pathOverlay(i, o)
 				if err != nil {
 					b.err = err
 					continue
 				}
-			}
-			if canonical != m.Source || o.Directory != m.Directory || o.Weight == nil || *o.Weight != m.Weight {
-				continue
-			}
-			if o.Revision != "" && o.Revision != m.Commit {
-				continue
+				// State selections are keyed by kind/name and pinned by StateHash;
+				// the resolver intentionally leaves Source and Directory empty.
+				if contextresolve.Key(contextlock.KindContext, overlay.Name) != contextresolve.Key(m.Kind, m.Name) || m.StateHash == "" || m.Commit != "" || m.Source != "" || m.Directory != "" || overlay.State.StateHash != m.PinKey() {
+					continue
+				}
+			} else {
+				canonical, err := (offlineSource{b}).Identity("", "", o.Source)
+				if err != nil {
+					b.err = err
+					continue
+				}
+				if canonical != m.Source || o.Directory != m.Directory || o.Revision != "" && o.Revision != m.Commit {
+					continue
+				}
 			}
 			declaration = "overlays/" + itoa(i)
 			if o.Range != "" {
@@ -120,7 +130,7 @@ func (b *build) composition(m contextlock.Member, order int) Composition {
 			}
 			break
 		}
-		if declaration == "overlays/UNKNOWN" {
+		if declaration == "overlays/UNKNOWN" && b.err == nil {
 			b.err = refusal("graph_invalid_input")
 		}
 	} else if m.Name != b.lock.Root {

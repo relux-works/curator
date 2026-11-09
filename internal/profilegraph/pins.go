@@ -13,8 +13,9 @@ import (
 )
 
 // verifyState reuses install's versioned content hash over protected bounded
-// reads. Every snapshot file participates; an altered unrendered sibling cannot
-// borrow the old lock identity.
+// reads. Every admitted snapshot file participates; denied siblings are never
+// read. The remaining tree must match the lock, so an altered ordinary sibling
+// or a pin containing excluded payloads cannot borrow the old identity.
 func (b *build) verifyState(p packageInput) error {
 	files := map[string][]byte{}
 	if err := b.sourceTree(p.root, p.label, ".", files, 0); err != nil {

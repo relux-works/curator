@@ -101,35 +101,12 @@ func (s offlineSource) Manifest(kind, name, source, directory, commit string) (*
 }
 func (b *build) previewOverlay(slot int, o envprofile.OverlaySpec) (contextresolve.Overlay, error) {
 	if identity.ClassifySource(o.Source) == identity.SourcePath {
-		if o.Directory != "" || o.Tag != "" || o.Range != "" || o.Revision != "" {
-			return contextresolve.Overlay{}, refusal("graph_invalid_input")
-		}
-		root, err := filepath.Abs(o.Source)
+		overlay, p, err := b.pathOverlay(slot, o)
 		if err != nil {
 			return contextresolve.Overlay{}, err
 		}
-		if err := admittedTree(root); err != nil {
-			return contextresolve.Overlay{}, err
-		}
-		label := "overlay/" + itoa(slot)
-		raw, err := b.r.Read(root, label, contextpkg.ManifestName)
-		if err != nil {
-			return contextresolve.Overlay{}, err
-		}
-		m, err := contextpkg.ParseManifest(raw)
-		if err != nil {
-			return contextresolve.Overlay{}, err
-		}
-		files := map[string][]byte{}
-		if err := b.sourceTree(root, label, ".", files, 0); err != nil {
-			return contextresolve.Overlay{}, err
-		}
-		h, err := hashing.ContentSHA256Files(files, hashing.WriteVersion())
-		if err != nil {
-			return contextresolve.Overlay{}, err
-		}
-		b.packages[m.Name] = packageInput{root: root, label: label, manifest: m}
-		return contextresolve.Overlay{Name: m.Name, Source: o.Source, Weight: o.Weight, State: &contextresolve.StatePackage{StateHash: strings.TrimPrefix(h, "sha256:"), Manifest: envprofile.GraphPackage(m)}}, nil
+		b.packages[overlay.Name] = p
+		return overlay, nil
 	}
 	source, err := (offlineSource{b}).Identity("", "", o.Source)
 	if err != nil {
@@ -175,6 +152,53 @@ func (b *build) previewOverlay(slot int, o envprofile.OverlaySpec) (contextresol
 	b.packages[manifest.Name] = packageInput{label: "git/" + source + "/" + commit, prefix: o.Directory, manifest: manifest}
 	return contextresolve.Overlay{Name: manifest.Name, Source: source, Directory: o.Directory, Revision: o.Revision, Range: o.Range, Tag: o.Tag, Weight: o.Weight}, nil
 }
+
+// pathOverlay constructs install's state seed using the shared package and
+// versioned content-hash algorithms, without snapshotting or unguarded OS reads.
+// Installed graphs validate declaration identity but render only locked bytes.
+func (b *build) pathOverlay(slot int, o envprofile.OverlaySpec) (contextresolve.Overlay, packageInput, error) {
+	if o.Directory != "" || o.Tag != "" || o.Range != "" || o.Revision != "" {
+		return contextresolve.Overlay{}, packageInput{}, refusal("graph_invalid_input")
+	}
+	if overlay, ok := b.pathOverlays[slot]; ok {
+		return overlay, b.packages[overlay.Name], nil
+	}
+	root, err := filepath.Abs(o.Source)
+	if err != nil {
+		return contextresolve.Overlay{}, packageInput{}, err
+	}
+	if err := admittedTree(root); err != nil {
+		return contextresolve.Overlay{}, packageInput{}, err
+	}
+	label := "overlay/" + itoa(slot)
+	raw, err := b.r.Read(root, label, contextpkg.ManifestName)
+	if err != nil {
+		return contextresolve.Overlay{}, packageInput{}, err
+	}
+	m, err := contextpkg.ParseManifest(raw)
+	if err != nil {
+		return contextresolve.Overlay{}, packageInput{}, err
+	}
+	files := map[string][]byte{}
+	if err := b.sourceTree(root, label, ".", files, 0); err != nil {
+		return contextresolve.Overlay{}, packageInput{}, err
+	}
+	version := hashing.WriteVersion()
+	if b.lock != nil {
+		version = b.lock.ContentHashVersion()
+	}
+	h, err := hashing.ContentSHA256Files(files, version)
+	if err != nil {
+		return contextresolve.Overlay{}, packageInput{}, err
+	}
+	overlay := contextresolve.Overlay{Name: m.Name, Source: o.Source, Weight: o.Weight, State: &contextresolve.StatePackage{StateHash: strings.TrimPrefix(h, "sha256:"), Manifest: envprofile.GraphPackage(m)}}
+	if b.pathOverlays == nil {
+		b.pathOverlays = map[int]contextresolve.Overlay{}
+	}
+	b.pathOverlays[slot] = overlay
+	return overlay, packageInput{root: root, label: label, manifest: m}, nil
+}
+
 func (b *build) packageRead(p packageInput, rel string) ([]byte, error) {
 	if p.root != "" {
 		return p.read(b.r, rel)
