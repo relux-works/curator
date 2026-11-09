@@ -398,6 +398,33 @@ func TestProducerRenderLimitIsAtomic(t *testing.T) {
 		t.Fatal("render refusal wrote inputs")
 	}
 }
+
+// Escaping source and lock records get the named graph refusal before legacy
+// resolver metadata checks can obscure it. The nearby valid fixture still builds.
+func TestProducerInstalledRecordEscape(t *testing.T) {
+	for _, record := range []string{"source.json", "lock.json"} {
+		t.Run(record, func(t *testing.T) {
+			home, _ := simpleFixture(t)
+			full := filepath.Join(home, "profiles/sample", record)
+			if err := os.Remove(full); err != nil {
+				t.Fatal(err)
+			}
+			outside := t.TempDir()
+			writeFixture(t, outside, "payload.json", []byte("outside sentinel\n"))
+			if err := os.Symlink(filepath.Join(outside, "payload.json"), full); err != nil {
+				t.Fatal(err)
+			}
+			before := snapshot(t, home) + snapshot(t, outside)
+			g, err := profilegraph.Build(buildRequest(home))
+			if g != nil || err == nil || !strings.HasPrefix(err.Error(), "graph_symlink_escape:") {
+				t.Fatalf("record escape: %v", err)
+			}
+			if snapshot(t, home)+snapshot(t, outside) != before {
+				t.Fatal("record refusal wrote files")
+			}
+		})
+	}
+}
 func simpleFixture(t *testing.T) (string, string) {
 	t.Helper()
 	home := t.TempDir()

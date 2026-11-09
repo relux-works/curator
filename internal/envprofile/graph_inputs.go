@@ -11,6 +11,14 @@ import (
 // credential checks, runtime probes or a current-profile lookup. The caller
 // supplies bounded protected reads of both records.
 func GraphInputs(home, profile string, read func(string) (stateread.File, error)) (Source, *contextlock.Lock, string, error) {
+	// Admit both records before legacy owner/boundary metadata checks, so an
+	// escaping link retains the graph reader's named refusal. Protected readers
+	// cache these bytes; the shared resolver still parses and validates them.
+	for _, path := range []string{sourcePath(home, profile), lockPath(home, profile)} {
+		if _, err := read(path); err != nil {
+			return Source{}, nil, "", err
+		}
+	}
 	return loadResolveInputsWith(home, profile, read)
 }
 
