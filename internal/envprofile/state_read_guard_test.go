@@ -101,13 +101,13 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/godriver/graph.go:validatePackageInputs",
 		"internal/godriver/moduleroots.go:readVendorModules",
 		"internal/manifest/expand.go:checkOutputBoundary",
-		"internal/manifest/expand.go:regularMetadata",
 		"internal/manifest/expand.go:rejectDirectorySymlinks",
 		"internal/manifest/expand.go:selectionDirectory",
-		"internal/moduleroots/moduleroots.go:validateDirectory",
-		"internal/skillspec/parse.go:pathExists",
-		"internal/skillspec/parse.go:validateLinkFreeDirectory",
-		"internal/skillspec/parse.go:validateNearestGoMod",
+		// Native entry points now wire function-valued reads into the shared
+		// package validator. Ownership and absence semantics are unchanged;
+		// graph callers inject their protected reader instead of this wiring.
+		"internal/moduleroots/moduleroots.go:ValidateDeclaration",
+		"internal/skillspec/parse.go:NativeReader",
 		"internal/snapshot/boundaries.go:EnumerateInputs",
 		"internal/snapshot/boundaries.go:ValidateLocalPackage",
 		"internal/snapshot/boundaries.go:ValidateRootInputs",
@@ -192,6 +192,8 @@ func reviewedManagerReadExceptions() map[string]string {
 	return exceptions
 }
 
+// Every absence-sensitive read found by the production AST scan has a seam
+// route or reviewed exception; stale exception entries also refuse.
 func TestManagerOwnedAbsenceReadsAreGuarded(t *testing.T) {
 	_, testFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -229,6 +231,8 @@ func TestManagerOwnedAbsenceReadsAreGuarded(t *testing.T) {
 	}
 }
 
+// The scanner rejects both planted alias-based absence collapses; the
+// production scan above supplies the nearby valid positive control.
 func TestManagerReadScannerFindsAliasedNotExistCollapse(t *testing.T) {
 	root := t.TempDir()
 	for _, directory := range []string{"internal/envprofile", "internal/stateread", "cmd/curator"} {
