@@ -36,7 +36,7 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
 			{"contextpkg/contextpkg.go", `if schemaVersion == 2 {`, `if schemaVersion == 2 || schemaVersion == 1 {`},
 		}},
 		{"selected-frontmatter-description", "envprofile", "^TestSkillDirectoryMetadata$/^empty-description$", "TestSkillDirectoryMetadata/empty-description", "want refusal manifest_invalid", []directoryMutation{
-			{"manifest/expand.go", `if !ok || strings.TrimSpace(description) == "" {`, `if !ok || (strings.TrimSpace(description) == "" && name != "formatter") {`},
+			{"manifest/skill_listing.go", `if !ok || strings.TrimSpace(description) == "" {`, `if !ok || (strings.TrimSpace(description) == "" && name != "formatter") {`},
 		}},
 		{"selected-frontmatter-name", "envprofile", "^TestSkillDirectoryMetadata$/^wrong-name$", "TestSkillDirectoryMetadata/wrong-name", "want refusal manifest_invalid", []directoryMutation{
 			{"envprofile/gitsource.go", `if skillName != name {`, `if skillName != name && !(name == "formatter" && skillName == "sibling") {`},
