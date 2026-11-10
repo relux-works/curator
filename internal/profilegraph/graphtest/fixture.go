@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Write creates a file inside a test-owned fixture tree.
@@ -26,7 +27,12 @@ func Write(root, rel string, raw []byte) error {
 	if err := os.MkdirAll(filepath.Dir(full), 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(full, raw, 0600)
+	if err := os.WriteFile(full, raw, 0600); err != nil {
+		return err
+	}
+	// Mode bits alone do not establish the installed lock's private boundary
+	// on Windows. Protect only this test-owned file using the native DACL.
+	return privatedir.ProtectFile(full)
 }
 
 // Object writes a hash-verified synthetic object, never an authored delivery commit.

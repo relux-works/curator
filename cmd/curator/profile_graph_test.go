@@ -4,15 +4,107 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/profilegraph"
 	"github.com/relux-works/curator/internal/profilegraph/graphtest"
 )
+
+// Both builders must establish the real lock boundary, including when a
+// test-owned lock already has broad mutation permissions. The native Windows
+// helper plants a foreign-write DACL; Unix plants group/other write bits.
+// After construction, the command must still refuse that same violation
+// atomically, preserve its bytes/metadata, and leave its permissions unsafe.
+func TestProfileGraphFixtureLockBoundary(t *testing.T) {
+	for _, name := range []string{"small", "dag-overlays"} {
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("CURATOR_SYSTEM_CONFIG", filepath.Join(home, "absent-policy.json"))
+			lockPath := filepath.Join(home, "profiles/sample/lock.json")
+			if err := graphtest.Write(home, "profiles/sample/lock.json", []byte("{}")); err != nil {
+				t.Fatal(err)
+			}
+			boundary := func() error {
+				return pathboundary.ValidateLeafWithOwner(home, lockPath, pathboundary.DefaultOwnerLookup())
+			}
+			plant := func() {
+				breakCacheProtection(t, lockPath)
+				var failure *pathboundary.Failure
+				if err := boundary(); !errors.As(err, &failure) || failure.Check != pathboundary.CheckPermissions {
+					t.Fatalf("foreign-write control did not fail permissions: %v", err)
+				}
+			}
+			plant()
+			var err error
+			if name == "small" {
+				_, err = graphtest.Small(home, "../../internal/profilegraph/testdata/small")
+			} else {
+				_, err = graphtest.DAG(home)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := boundary(); err != nil {
+				t.Fatalf("fixture lock boundary: %v", err)
+			}
+			for _, valid := range []bool{true, false} {
+				if !valid {
+					plant()
+				}
+				before := graphCommandSnapshot(t, home)
+				var stdout, stderr bytes.Buffer
+				code := run([]string{"profile", "graph", "sample", "--json"}, fileConfigSource(filepath.Join(home, "config.json")), &stdout, &stderr)
+				if valid && (code != exitOK || stdout.Len() == 0) {
+					t.Fatalf("private lock: code %d: %s", code, stderr.String())
+				}
+				if !valid && (code != exitFail || stdout.Len() != 0 || !strings.Contains(stderr.String(), "graph_invalid_input")) {
+					t.Fatalf("writable lock: code %d: %s", code, stderr.String())
+				}
+				if graphCommandSnapshot(t, home) != before {
+					t.Fatal("command changed fixture bytes or metadata")
+				}
+				if !valid && boundary() == nil {
+					t.Fatal("command repaired the refused lock permissions")
+				}
+			}
+		})
+	}
+}
+
+// Windows absolute/UNC shapes and backslash traversal refuse before payload
+// admission on every host; an ordinary relative file remains readable. This
+// exercises lexical admission, not native drive resolution or reparse races.
+func TestProfileGraphReaderPathRefusals(t *testing.T) {
+	root := t.TempDir()
+	if err := graphtest.Write(root, "context/base.md", []byte("allowed\n")); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{`C:\outside\base.md`, `\\server\share\base.md`, "//server/share/base.md", `..\outside.md`, `context\..\..\outside.md`} {
+		t.Run(rel, func(t *testing.T) {
+			r := profilegraph.NewReader(profilegraph.V1Limits)
+			opens := 0
+			r.OpenHook = func(_, _ string) { opens++ }
+			if raw, err := r.Read(root, "source", "context/base.md"); err != nil || string(raw) != "allowed\n" || opens != 1 {
+				t.Fatalf("relative positive control: %q %v opens=%d", raw, err, opens)
+			}
+			before := graphCommandSnapshot(t, root)
+			raw, err := r.Read(root, "source", rel)
+			var refusal *profilegraph.Error
+			if raw != nil || !errors.As(err, &refusal) || refusal.Class != "graph_invalid_input" || opens != 1 {
+				t.Fatalf("path refusal: %q %v opens=%d", raw, err, opens)
+			}
+			if graphCommandSnapshot(t, root) != before {
+				t.Fatal("path refusal changed the fixture")
+			}
+		})
+	}
+}
 
 // Both goldens are produced by real CLI dispatch over immutable snapshots and
 // local Git objects. This also proves that shared dependencies remain one node
