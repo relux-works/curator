@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -194,6 +195,7 @@ func TestProducerGoldenSchemaAndIdentity(t *testing.T) {
 
 // An intermediate cache-directory link cannot redefine the admitted root.
 // An internal link to a denied basename is refused before payload open too.
+// Windows rejects the reparse point itself; Unix checks the resolved basename.
 func TestProducerParentLinksAndDeniedTargets(t *testing.T) {
 	for _, deniedTarget := range []bool{false, true} {
 		home, entry := simpleFixture(t)
@@ -225,7 +227,7 @@ func TestProducerParentLinksAndDeniedTargets(t *testing.T) {
 		before := snapshot(t, home)
 		g, err := profilegraph.Build(req)
 		want := "graph_symlink_escape"
-		if deniedTarget {
+		if deniedTarget && runtime.GOOS != "windows" {
 			want = "graph_path_denied"
 		}
 		if g != nil || err == nil || !strings.HasPrefix(err.Error(), want+":") || opened {
