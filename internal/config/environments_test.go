@@ -6,6 +6,54 @@ import (
 	"testing"
 )
 
+func TestEffectiveJSONClaudeSettingsMode(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  map[string]any
+		want string
+	}{
+		{name: "absent", env: map[string]any{}},
+		{name: "empty", env: map[string]any{"claude_settings_mode": map[string]any{}}},
+		{
+			name: "configured",
+			env: map[string]any{"claude_settings_mode": map[string]any{
+				"zeta": "read-only", "alpha": "native",
+			}},
+			want: `{"alpha":"native","zeta":"read-only"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := Parse(map[string]any{
+				"schema_version": 2,
+				"skills_root":    t.TempDir(),
+				"projects":       map[string]any{},
+				"environments":   tc.env,
+			}, "config.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			env := cfg.EffectiveJSON()["environments"].(map[string]any)
+			value, present := env["claude_settings_mode"]
+			if tc.want == "" {
+				if present {
+					t.Fatalf("empty claude_settings_mode emitted: %#v", value)
+				}
+				return
+			}
+			if !present {
+				t.Fatal("configured claude_settings_mode omitted")
+			}
+			raw, err := json.Marshal(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(raw) != tc.want {
+				t.Fatalf("claude_settings_mode = %s, want %s", raw, tc.want)
+			}
+		})
+	}
+}
+
 // These tests drive the production entry points Parse and Load for the
 // manager-config schema 2 and system-config schema 2 surfaces (environments
 // §12.1, §12.2; manager §1, §12).

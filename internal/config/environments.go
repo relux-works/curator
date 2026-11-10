@@ -1323,20 +1323,15 @@ func (e Environments) render() map[string]any {
 	if e.RequireCurrent != nil {
 		require = *e.RequireCurrent
 	}
-	claudeSettings := map[string]any{}
-	for profile, mode := range e.ClaudeSettingsMode {
-		claudeSettings[profile] = mode
-	}
 	permissions := map[string]any{}
 	for profile, mode := range e.Permissions {
 		permissions[profile] = mode
 	}
-	return map[string]any{
+	rendered := map[string]any{
 		"current_profile": current, "scoped_current": scoped, "overlays": overlays,
 		"overlay_default_weight": e.OverlayDefaultWeight, "overlays_allowed": e.OverlaysAllowed,
-		"precedence":           map[string]any{"winner": e.Precedence.Winner, "placement": e.Precedence.Placement},
-		"claude_settings_mode": claudeSettings,
-		"forms":                forms, "system_prompt_files": spf, "targets": targets,
+		"precedence": map[string]any{"winner": e.Precedence.Winner, "placement": e.Precedence.Placement},
+		"forms":      forms, "system_prompt_files": spf, "targets": targets,
 		"isolation": isolation, "xdg_seed_allowlist": xdg, "passable_env_names": passable,
 		"mcp_package_allowlist": mcp, "shadow_acknowledged": shadow,
 		"secret_material_waivers":   waivers,
@@ -1347,6 +1342,14 @@ func (e Environments) render() map[string]any {
 		"source_signers":         sourceSigners,
 		"require_source_signers": e.RequireSourceSigners,
 	}
+	if len(e.ClaudeSettingsMode) > 0 {
+		claudeSettings := map[string]any{}
+		for profile, mode := range e.ClaudeSettingsMode {
+			claudeSettings[profile] = mode
+		}
+		rendered["claude_settings_mode"] = claudeSettings
+	}
+	return rendered
 }
 
 // EnvLockKey maps an env config knob path to the manager §1 locked key that

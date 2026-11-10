@@ -21,11 +21,9 @@ import (
 
 func writeFixture(t *testing.T, root, rel string, raw []byte) {
 	t.Helper()
-	full := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(full), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(full, raw, 0600); err != nil {
+	// Shared fixture writes establish the native owner-only file boundary,
+	// including the protected DACL required for installed locks on Windows.
+	if err := graphtest.Write(root, rel, raw); err != nil {
 		t.Fatal(err)
 	}
 }
