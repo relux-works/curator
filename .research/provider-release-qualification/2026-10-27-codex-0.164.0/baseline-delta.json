@@ -1,0 +1,437 @@
+{
+  "format": "provider-canary-follow-up-v1",
+  "scope": "Codex 0.164.0 replay; unchanged-provider evidence carried from baseline",
+  "observed_date": "2026-10-27",
+  "baseline_commit": "01d86d8ab2e5851cb96c9c5bfc5e8784678e164e",
+  "baseline": "../2026-10-27/baseline.json",
+  "admitted": false,
+  "mandatory_verdict_drift": "none observed in all 15 replayed Codex cells; unchanged providers carry prior evidence",
+  "qualification_status": "observed; mandatory resume memory-off still fails; no admission",
+  "proof_manifest_sha256": "ad4610121189ace337cc258b52286f699bd923f82d908afef43f6c6e47160151",
+  "releases": {
+    "codex": {
+      "before": {
+        "sha256": "8813367285524ac798dd96d1b071aea30d58708c7226fd236cd275cf1cfdee31",
+        "size_bytes": 249952688,
+        "version": "0.163.0"
+      },
+      "after": {
+        "version": "0.164.0",
+        "sha256": "d8990e3ee7acfbc26f91265b12a1a83f0fee40d0e0f8f1f40a37d4ec21f499cf",
+        "size_bytes": 260293200
+      },
+      "byte_drift": true,
+      "version_drift": true,
+      "qualification_required": true
+    },
+    "claude": {
+      "before": {
+        "sha256": "85d8c08707fcfd1e78ffa0204eefbc6ec9e4fe22f375fb2767ef85d957ed3161",
+        "size_bytes": 276185504,
+        "version": "2.1.311"
+      },
+      "after": {
+        "version": "2.1.311",
+        "sha256": "85d8c08707fcfd1e78ffa0204eefbc6ec9e4fe22f375fb2767ef85d957ed3161",
+        "size_bytes": 276185504
+      },
+      "byte_drift": false,
+      "version_drift": false,
+      "qualification_required": false
+    },
+    "muse": {
+      "before": {
+        "sha256": "9fd40ae9c6dfb847e3ef58b61405c004d0ebbf19ceb0297be966f750b3b84aa0",
+        "size_bytes": 408650416,
+        "version": "1.4.13-R6996.1"
+      },
+      "after": {
+        "version": "1.4.13-R6996.1",
+        "sha256": "9fd40ae9c6dfb847e3ef58b61405c004d0ebbf19ceb0297be966f750b3b84aa0",
+        "size_bytes": 408650416
+      },
+      "byte_drift": false,
+      "version_drift": false,
+      "qualification_required": false
+    }
+  },
+  "verdicts": {
+    "codex/interactive/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/startup-observations.json",
+      "current_evidence": "proofs/startup-observations.json"
+    },
+    "codex/interactive/memory-off": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/startup-observations.json",
+      "current_evidence": "proofs/startup-observations.json"
+    },
+    "codex/interactive/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/startup-observations.json",
+      "current_evidence": "proofs/startup-observations.json"
+    },
+    "codex/interactive/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/startup-observations.json",
+      "current_evidence": "proofs/startup-observations.json"
+    },
+    "codex/interactive/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/startup-observations.json",
+      "current_evidence": "proofs/startup-observations.json"
+    },
+    "codex/exec/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/permissions-memory.json",
+      "current_evidence": "proofs/codex-observations.json"
+    },
+    "codex/exec/memory-off": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/permissions-memory.json",
+      "current_evidence": "proofs/codex-observations.json"
+    },
+    "codex/exec/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/loader-observations.json",
+      "current_evidence": "proofs/codex-loader-observations.json"
+    },
+    "codex/exec/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/loader-observations.json",
+      "current_evidence": "proofs/codex-loader-observations.json"
+    },
+    "codex/exec/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/loader-observations.json",
+      "current_evidence": "proofs/codex-loader-observations.json"
+    },
+    "codex/resume/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/permissions-memory.json",
+      "current_evidence": "proofs/codex-observations.json"
+    },
+    "codex/resume/memory-off": {
+      "before": "fail",
+      "after": "fail",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/permissions-memory.json",
+      "current_evidence": "proofs/codex-observations.json"
+    },
+    "codex/resume/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/loader-observations.json",
+      "current_evidence": "proofs/codex-loader-observations.json"
+    },
+    "codex/resume/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/loader-observations.json",
+      "current_evidence": "proofs/codex-loader-observations.json"
+    },
+    "codex/resume/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "replayed on explicit Codex 0.164.0 candidate; see bounded surface limits",
+      "behavioral_change_observed": false,
+      "qualification_required": true,
+      "baseline_evidence": "evidence/loader-observations.json",
+      "current_evidence": "proofs/codex-loader-observations.json"
+    },
+    "claude/interactive/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "claude/interactive/memory-off": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "claude/interactive/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "claude/interactive/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "claude/interactive/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "claude/exec/permissions": {
+      "before": "fail",
+      "after": "fail",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/claude.json"
+    },
+    "claude/exec/memory-off": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/claude.json"
+    },
+    "claude/exec/project-mcp": {
+      "before": "pass",
+      "after": "pass",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/loader-observations.json"
+    },
+    "claude/exec/project-trust": {
+      "before": "fail",
+      "after": "fail",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/loader-observations.json"
+    },
+    "claude/exec/hooks": {
+      "before": "fail",
+      "after": "fail",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/loader-observations.json"
+    },
+    "claude/resume/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/claude.json"
+    },
+    "claude/resume/memory-off": {
+      "before": "fail",
+      "after": "fail",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/claude.json"
+    },
+    "claude/resume/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/loader-observations.json"
+    },
+    "claude/resume/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/loader-observations.json"
+    },
+    "claude/resume/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/loader-observations.json"
+    },
+    "muse/interactive/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "muse/interactive/memory-off": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "muse/interactive/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "muse/interactive/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "muse/interactive/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/startup-observations.json"
+    },
+    "muse/exec/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/permissions-memory.json"
+    },
+    "muse/exec/memory-off": {
+      "before": "fail",
+      "after": "fail",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/permissions-memory.json"
+    },
+    "muse/exec/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/muse-resume-observations.json"
+    },
+    "muse/exec/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/muse-resume-observations.json"
+    },
+    "muse/exec/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/muse-resume-observations.json"
+    },
+    "muse/resume/permissions": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/permissions-memory.json"
+    },
+    "muse/resume/memory-off": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/permissions-memory.json"
+    },
+    "muse/resume/project-mcp": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/muse-resume-observations.json"
+    },
+    "muse/resume/project-trust": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/muse-resume-observations.json"
+    },
+    "muse/resume/hooks": {
+      "before": "unknown",
+      "after": "unknown",
+      "status": "carried from identical baseline bytes; not replayed",
+      "behavioral_change_observed": false,
+      "qualification_required": false,
+      "baseline_evidence": "evidence/muse-resume-observations.json"
+    }
+  },
+  "publication_status": "stacked draft requested; independent review and hosted checks required",
+  "mandatory_verdict_changes": []
+}

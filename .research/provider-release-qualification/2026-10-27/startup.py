@@ -17,6 +17,7 @@ import termios
 import time
 
 from replay import PINS, REPO
+from candidate import check_binaries, load_candidate
 
 
 def run(binary, args, root, real_home, terminal=False, seconds=6):
@@ -121,15 +122,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binaries", type=Path, required=True)
     parser.add_argument("--scratch", type=Path, required=True)
+    parser.add_argument("--candidate", type=Path, help="explicit version/SHA research pins")
+    parser.add_argument("--provider", choices=PINS, help="probe only this provider")
     a = parser.parse_args()
     scratch = a.scratch.resolve()
     if not scratch.is_relative_to(REPO / ".tmp") or scratch.exists():
         parser.error("fresh repository .tmp required")
-    binaries = {name: (a.binaries / name).resolve(strict=True) for name in PINS}
-    for name, binary in binaries.items():
-        if hashlib.sha256(binary.read_bytes()).hexdigest() != PINS[name]:
-            parser.error("foreign digest: no provider execution")
+    candidate = None
+    releases = {name: {"sha256": digest} for name, digest in PINS.items()}
+    try:
+        if a.candidate:
+            candidate = load_candidate(a.candidate)
+            releases = candidate["releases"]
+        binaries = check_binaries(a.binaries, releases, [a.provider] if a.provider else PINS)
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
     scratch.mkdir(parents=True)
+    (scratch / "candidate-receipt.json").write_text(json.dumps({"candidate": candidate, "admitted": False}, indent=2) + "\n")
     rows = {}
     manager = ["-c", 'approval_policy="never"', "-c", 'sandbox_mode="read-only"']
     for key in ("features.memories", "features.memory_tool", "memories.generate_memories", "memories.use_memories", "memories.dedicated_tools"):

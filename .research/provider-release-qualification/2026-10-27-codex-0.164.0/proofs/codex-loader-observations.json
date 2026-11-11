@@ -1,0 +1,145 @@
+[
+  {
+    "case": "TestConfigLayers_trusted",
+    "record": "config-result.json",
+    "sha256_sanitized_record": "f78100b24897754b601fbefe542998fdcf67649f3eb4e429b80fbca0382ac843",
+    "facts": {
+      "PROJECT_HOOK": true,
+      "APPROVED_HOOK": true,
+      "project_tool": false,
+      "approved_tool": false,
+      "\"approval_policy\":\"never\"": true,
+      "\"type\":\"readOnly\"": false
+    }
+  },
+  {
+    "case": "TestConfigLayers_trusted",
+    "record": "hooks-result.json",
+    "sha256_sanitized_record": "cd37b395bf339f372d90079f9d0afab6cbc629b29cb57d1da9ca7dec4f067f01",
+    "facts": {
+      "PROJECT_HOOK": true,
+      "APPROVED_HOOK": true,
+      "project_tool": false,
+      "approved_tool": false,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    }
+  },
+  {
+    "case": "TestConfigLayers_trusted",
+    "record": "permission-thread.json",
+    "sha256_sanitized_record": "f52ddff479625cd29349b0b610d97249602ddb565308131d8eb99ad0a51cdfad",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": false,
+      "project_tool": false,
+      "approved_tool": false,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    }
+  },
+  {
+    "case": "TestConfigLayers_untrusted",
+    "record": "config-result.json",
+    "sha256_sanitized_record": "cce7c03192177e7e7b923d331e12be79f8390428b5e6dc3837fffed07a7a06d1",
+    "facts": {
+      "PROJECT_HOOK": true,
+      "APPROVED_HOOK": true,
+      "project_tool": false,
+      "approved_tool": false,
+      "\"approval_policy\":\"never\"": true,
+      "\"type\":\"readOnly\"": false
+    }
+  },
+  {
+    "case": "TestConfigLayers_untrusted",
+    "record": "hooks-result.json",
+    "sha256_sanitized_record": "fca339c1ced182cbeacdc0a30d3bfe5b14110c52c410c3631dbe2e225b56df2f",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": true,
+      "project_tool": false,
+      "approved_tool": false,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    }
+  },
+  {
+    "case": "TestConfigLayers_untrusted",
+    "record": "permission-thread.json",
+    "sha256_sanitized_record": "5f180c1a7520bceb1b9a9cc79b497edfb1cfa78f5235e166c6051c94754cc8d3",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": false,
+      "project_tool": false,
+      "approved_tool": false,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": true
+    }
+  },
+  {
+    "case": "TestMCPRuntime_trusted_false",
+    "record": "mcp-status.json",
+    "sha256_sanitized_record": "a3fcd348957bde9bfb2e83dc3730643b2f389ab591b402e294d670dc7b09ab7a",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": false,
+      "project_tool": false,
+      "approved_tool": true,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    },
+    "server_names": [
+      "approved_tool"
+    ]
+  },
+  {
+    "case": "TestMCPRuntime_trusted_true",
+    "record": "mcp-status.json",
+    "sha256_sanitized_record": "bacefd3491abfa8f8502c473d8d46427da436c7097d19cfc43bee583b937112c",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": false,
+      "project_tool": true,
+      "approved_tool": true,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    },
+    "server_names": [
+      "approved_tool",
+      "project_tool"
+    ]
+  },
+  {
+    "case": "TestMCPRuntime_untrusted_false",
+    "record": "mcp-status.json",
+    "sha256_sanitized_record": "7f357500dd8d9cefa2e97ce388704bc360c9643f8c898573e910a6a8418b26ed",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": false,
+      "project_tool": false,
+      "approved_tool": true,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    },
+    "server_names": [
+      "approved_tool"
+    ]
+  },
+  {
+    "case": "TestMCPRuntime_untrusted_true",
+    "record": "mcp-status.json",
+    "sha256_sanitized_record": "7f357500dd8d9cefa2e97ce388704bc360c9643f8c898573e910a6a8418b26ed",
+    "facts": {
+      "PROJECT_HOOK": false,
+      "APPROVED_HOOK": false,
+      "project_tool": false,
+      "approved_tool": true,
+      "\"approval_policy\":\"never\"": false,
+      "\"type\":\"readOnly\"": false
+    },
+    "server_names": [
+      "approved_tool"
+    ]
+  }
+]
