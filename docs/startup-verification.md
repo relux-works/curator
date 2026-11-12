@@ -75,6 +75,11 @@ Lock6 extends lock4 and does not enable lock5 skill-plan adoption. Its required
 order. An entry contains `manifest` and `manifest_sha256`. The latter is SHA-256
 of the manifest's CCJ-1 bytes, spelled `sha256:` plus64 lowercase hex digits.
 
+Legacy root-addressed skills retain the existing declaration validation without
+retroactive frontmatter requirements. Selected-directory skills retain their
+existing stricter metadata validation. Neither path infers runtime authority
+from prose or frontmatter.
+
 Every manifest field is required:
 
 | Fields | Meaning |
@@ -141,3 +146,9 @@ preserves the old selection and lock. Startup never silently migrates a profile.
 
 Independent gates retain their existing diagnostics. The launcher forwards Core
 stderr before executing the provider and refuses a nonzero Core resolution.
+
+Permissive startup preserves mismatching source evidence even when the launcher
+requests repair. If provisioning would require a legacy identity/lock migration,
+perform that migration explicitly first; startup does not silently rewrite the
+lock. Composition also requires its observed source generation to remain stable
+through the operation, independently of the selected verification level.

@@ -187,7 +187,17 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 		return Entry{}, err
 	}
 	reader := c.reader(root)
-	if _, _, err := manifest.ReadSkillPackageWith(root, reader); err != nil {
+	// The existing resolver deliberately retains the legacy root-addressed
+	// skill contract. Selected-directory skills use section-3 frontmatter;
+	// legacy roots validate declarations without retroactive metadata rules.
+	if identity.Directory == "" {
+		if _, present := c.data["SKILL.md"]; !present {
+			return Entry{}, failure("skill_integrity_manifest_invalid", "legacy skill has no SKILL.md")
+		}
+		if _, err := reader.Load(root); err != nil {
+			return Entry{}, failure("skill_integrity_manifest_invalid", "skill declaration is invalid")
+		}
+	} else if _, _, err := manifest.ReadSkillPackageWith(root, reader); err != nil {
 		return Entry{}, failure("skill_integrity_manifest_invalid", "skill declaration is invalid")
 	}
 	content, err := hashing.ContentSHA256Files(c.data, hashing.VersionV2)
@@ -303,6 +313,28 @@ func admitEntry(root, path string, info os.FileInfo, folded map[string]bool) (st
 		return "", failure("skill_integrity_boundary_invalid", "skill path boundary is invalid")
 	}
 	return rel, nil
+}
+
+// ValidateLegacyBoundary checks the existing full snapshot without adopting
+// lock6 capture limits or evidence. Unreadable entries never hide a later
+// observed forbidden kind. Byte identity remains the legacy pin algorithm.
+func ValidateLegacyBoundary(root string) error {
+	folded := map[string]bool{}
+	var unavailable error
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			unavailable = failure("skill_integrity_unavailable", "snapshot entry cannot be observed")
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			unavailable = failure("skill_integrity_unavailable", "snapshot metadata cannot be observed")
+			return nil
+		}
+		_, err = admitEntry(root, path, info, folded)
+		return err
+	})
+	return errors.Join(unavailable, err)
 }
 
 func (c *capture) revalidate(ctx context.Context, root string, budget *Budget) error {

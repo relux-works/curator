@@ -64,7 +64,8 @@ func writeManagedFixture(t *testing.T, profile string) *managedFixture {
 	})
 	skillSource := "github.com/example/skill-my"
 	skillPin := writeGitStoreFixture(t, home, "skill", "myskill", skillSource, map[string]string{
-		"SKILL.md": "# myskill\n",
+		"SKILL.md":         "# myskill\n",
+		"agent-skill.json": `{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}}`,
 	})
 	lock := &contextlock.Lock{
 		Root: profile,
