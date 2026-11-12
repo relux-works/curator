@@ -150,6 +150,9 @@ type capture struct {
 	data  map[string][]byte
 	infos map[string]os.FileInfo
 	files []File
+	// Complete describes the initial traversal and reads, before revalidation.
+	// A partial observation cannot establish that an expected file is absent.
+	complete bool
 }
 
 func (c *capture) reader(root string) skillspec.Reader {
@@ -200,9 +203,10 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 	c, err := captureTree(ctx, root, budget)
 	if err != nil {
 		// A completed per-file mismatch is a failure even if a later read is
-		// unavailable. Partial capture never proves an expected file absent.
-		if expected != nil && c != nil && observedMismatch(c.files, expected.Files) {
-			return Entry{}, errors.Join(failure("skill_integrity_mismatch", "observed file changed before verification became unavailable"), err)
+		// unavailable. A completed traversal also establishes missing members;
+		// a partial capture never proves an expected file absent.
+		if expected != nil && c != nil && observedMismatch(c.files, expected.Files, c.complete) {
+			return Entry{}, errors.Join(failure("skill_integrity_mismatch", "observed file roster or metadata contradicted expected evidence"), err)
 		}
 		return Entry{}, err
 	}
@@ -297,6 +301,7 @@ func captureTree(ctx context.Context, root string, budget *Budget) (*capture, er
 	if err := errors.Join(observations...); err != nil {
 		return c, err
 	}
+	c.complete = true
 	if err := c.revalidate(ctx, root, budget); err != nil {
 		return c, err
 	}
@@ -599,7 +604,7 @@ func exactKeys(object map[string]json.RawMessage, keys ...string) bool {
 	return true
 }
 
-func observedMismatch(observed, expected []File) bool {
+func observedMismatch(observed, expected []File, complete bool) bool {
 	byPath := map[string]File{}
 	for _, file := range expected {
 		byPath[file.Path] = file
@@ -609,5 +614,5 @@ func observedMismatch(observed, expected []File) bool {
 			return true
 		}
 	}
-	return false
+	return complete && len(observed) != len(expected)
 }
