@@ -223,7 +223,7 @@ func TestEvidenceJSONRefusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, _ := json.Marshal(e)
-	for _, kind := range []string{"unknown", "missing-executable", "null-executable", "null-source", "changed-identity", "changed-hash", "case-collision"} {
+	for _, kind := range []string{"unknown", "missing-executable", "null-executable", "null-source", "changed-identity", "changed-hash", "case-collision", "nonportable-path"} {
 		t.Run(kind, func(t *testing.T) {
 			var object map[string]any
 			decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -235,6 +235,8 @@ func TestEvidenceJSONRefusals(t *testing.T) {
 			files := m["files"].([]any)
 			first := files[0].(map[string]any)
 			switch kind {
+			case "nonportable-path":
+				first["path"] = "notes:local.txt"
 			case "unknown":
 				object["extra"] = true
 			case "missing-executable":
@@ -343,4 +345,22 @@ func (c *cancelAfterChecks) Err() error {
 		c.cancel()
 	}
 	return c.Context.Err()
+}
+
+// The resolver's admitted legacy root form permits bare SKILL.md. Applying a
+// directory selector invokes the existing stricter metadata contract instead.
+func TestLegacyRootMetadataCompatibility(t *testing.T) {
+	root, id := fixture(t)
+	writeFixture(t, root, "SKILL.md", []byte("# Existing legacy context\n"), 0o644)
+	if _, err := Build(context.Background(), root, id, nil); err != nil {
+		t.Fatalf("legacy valid form rejected: %v", err)
+	}
+	id.Directory = "skills/fixture-skill"
+	if _, err := Build(context.Background(), root, id, nil); !IsCode(err, "skill_integrity_manifest_invalid") {
+		t.Fatalf("selected invalid metadata: %v", err)
+	}
+	writeFixture(t, root, "SKILL.md", []byte("---\nname: fixture-skill\ndescription: Valid selected context.\n---\nContext.\n"), 0o644)
+	if _, err := Build(context.Background(), root, id, nil); err != nil {
+		t.Fatalf("selected valid form rejected: %v", err)
+	}
 }

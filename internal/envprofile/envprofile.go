@@ -445,14 +445,16 @@ func InUseByAnyScope(home, name string) (bool, error) {
 // regardless of any enabled flag — an advisory profile install does not
 // exist.
 type Policy struct {
-	AllowedSources       []string
-	MCPAllowlist         []string
-	SourceSigners        map[string][]contextresolve.Signer
-	RequireSourceSigners bool
-	Revocations          []string
-	SecurityPosture      string
-	PassableEnvNames     []string
-	PassableEnvNamesSet  bool
+	// Zero retains the default local-verification baseline for API callers.
+	StartupVerificationLevel int
+	AllowedSources           []string
+	MCPAllowlist             []string
+	SourceSigners            map[string][]contextresolve.Signer
+	RequireSourceSigners     bool
+	Revocations              []string
+	SecurityPosture          string
+	PassableEnvNames         []string
+	PassableEnvNamesSet      bool
 	// OverlaysAllowed is the effective §12.1 composition policy: false
 	// empties every overlay list at resolution (environments §12.2).
 	OverlaysAllowed bool
@@ -615,21 +617,22 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 		return Policy{OverlaysAllowed: true, OverlayDefaultWeight: config.DefaultOverlayWeight}
 	}
 	policy := Policy{
-		AllowedSources:          cfg.AllowedSources,
-		MCPAllowlist:            cfg.Env.MCPPackageAllowlist,
-		SourceSigners:           make(map[string][]contextresolve.Signer, len(cfg.Env.SourceSigners)),
-		RequireSourceSigners:    cfg.Env.RequireSourceSigners,
-		Revocations:             cfg.Audit.Revocations,
-		SecurityPosture:         cfg.EffectiveSecurityPosture(),
-		PassableEnvNames:        cfg.Env.PassableEnvNames,
-		PassableEnvNamesSet:     cfg.Env.PassableEnvNamesSet,
-		OverlaysAllowed:         cfg.Env.OverlaysAllowed,
-		OverlayDefaultWeight:    int64(cfg.Env.OverlayDefaultWeight),
-		PrecedenceWinner:        cfg.Env.Precedence.Winner,
-		PrecedencePlacement:     cfg.Env.Precedence.Placement,
-		RequireCurrent:          cfg.Env.RequireCurrent,
-		RequireCurrentLocked:    cfg.Locked["environments.require_current_profile"],
-		TransitiveSystemModules: cfg.Env.TransitiveSystemModules,
+		StartupVerificationLevel: cfg.StartupVerification.Level,
+		AllowedSources:           cfg.AllowedSources,
+		MCPAllowlist:             cfg.Env.MCPPackageAllowlist,
+		SourceSigners:            make(map[string][]contextresolve.Signer, len(cfg.Env.SourceSigners)),
+		RequireSourceSigners:     cfg.Env.RequireSourceSigners,
+		Revocations:              cfg.Audit.Revocations,
+		SecurityPosture:          cfg.EffectiveSecurityPosture(),
+		PassableEnvNames:         cfg.Env.PassableEnvNames,
+		PassableEnvNamesSet:      cfg.Env.PassableEnvNamesSet,
+		OverlaysAllowed:          cfg.Env.OverlaysAllowed,
+		OverlayDefaultWeight:     int64(cfg.Env.OverlayDefaultWeight),
+		PrecedenceWinner:         cfg.Env.Precedence.Winner,
+		PrecedencePlacement:      cfg.Env.Precedence.Placement,
+		RequireCurrent:           cfg.Env.RequireCurrent,
+		RequireCurrentLocked:     cfg.Locked["environments.require_current_profile"],
+		TransitiveSystemModules:  cfg.Env.TransitiveSystemModules,
 	}
 	for source, signers := range cfg.Env.SourceSigners {
 		policy.SourceSigners[source] = make([]contextresolve.Signer, 0, len(signers))
@@ -896,6 +899,9 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	if err := prepareStartupEvidence(home, manager, result, options.Policy); err != nil {
+		return Info{}, false, false, err
+	}
 	if err := options.Policy.checkHardenedMCP(result.Lock); err != nil {
 		return Info{}, false, false, err
 	}
@@ -1006,6 +1012,9 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 	overlayInputDefaults(&input, policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
+		return Info{}, false, false, err
+	}
+	if err := prepareStartupEvidence(home, manager, result, policy); err != nil {
 		return Info{}, false, false, err
 	}
 	if err := policy.checkHardenedMCP(result.Lock); err != nil {
@@ -1369,6 +1378,9 @@ func updateLocked(op *operation, home, name string, policy Policy, sink, warning
 	if err != nil {
 		return Info{}, false, err
 	}
+	if err := prepareStartupEvidence(home, manager, result, policy); err != nil {
+		return Info{}, false, err
+	}
 	if err := policy.checkHardenedMCP(result.Lock); err != nil {
 		return Info{}, false, err
 	}
@@ -1610,7 +1622,7 @@ func overlayOwner(home, name string) (string, bool, error) {
 // enabled flag. An advisory profile install does not exist.
 func auditAndStore(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
 	// Successor installs validate the entire closure before publishing stores.
-	if result.Lock.SchemaVersion == contextlock.SchemaVersion4 {
+	if result.Lock.SchemaVersion == contextlock.SchemaVersion4 || result.Lock.SchemaVersion == contextlock.SkillIntegritySchemaVersion {
 		warnings, err := auditCandidates(home, manager, result, policy)
 		if err != nil {
 			return nil, err

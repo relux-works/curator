@@ -269,7 +269,7 @@ func pinnedCommitTree(home string, member contextlock.Member, entry string) (str
 	}
 	treeID, format, err := gitops.PinnedDirectorySnapshotTree(repo, member.Commit, directory)
 	if err != nil {
-		return "", "", fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)
+		return "", "", &pinUnavailable{cause: fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)}
 	}
 	return treeID, format, nil
 }

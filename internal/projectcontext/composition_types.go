@@ -120,6 +120,7 @@ type Composition struct {
 
 // CompositionPreview retains the derived records and in-memory output bytes.
 type CompositionPreview struct {
+	Warnings     []string `json:",omitempty"`
 	MCPEnvNames  []string `json:",omitempty"`
 	Record       CompositionRecord
 	Generation   Generation
