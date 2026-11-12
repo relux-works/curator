@@ -78,12 +78,13 @@ func (r Requirement) exact() bool { return r.Range == "" }
 // Package is the manifest of one package at one commit as resolution reads
 // it. Version is empty for a skill.
 type Package struct {
-	SchemaVersion int
-	SkillCommands map[string]bool
-	Version       string
-	Weight        int64
-	Weights       map[string]int64
-	Requires      []Requirement
+	StartupVerificationLevel *int
+	SchemaVersion            int
+	SkillCommands            map[string]bool
+	Version                  string
+	Weight                   int64
+	Weights                  map[string]int64
+	Requires                 []Requirement
 }
 
 // Candidate is one version tag of a source peeled to its commit.
@@ -962,7 +963,7 @@ func (r *resolver) build() (*Result, error) {
 		lockHashVersion = 2
 	}
 	for _, sel := range r.selected {
-		if (sel.pkg != nil && sel.pkg.SchemaVersion == 2) || (sel.kind == contextlock.KindSkill && sel.directory != "") {
+		if (sel.pkg != nil && sel.pkg.SchemaVersion >= 2) || (sel.kind == contextlock.KindSkill && sel.directory != "") {
 			lockSchema, lockHashVersion = contextlock.SchemaVersion4, 2
 		}
 	}

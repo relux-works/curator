@@ -6,69 +6,96 @@ import (
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envauthority"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 )
 
-// VisitCompositionProfile checks manager-wide credential authority, then reads
-// the explicitly selected lock and its complete protected closure. The caller
-// holds the manager home lock and must copy any needed bytes during visit. No machine-current fallback, acquisition,
-// repair or managed-home publication occurs here. Pins and boundaries are
-// checked on both sides of the visitor, including members it does not consume.
+// VisitCompositionProfile retains default local verification for existing
+// callers. Configured callers use VisitCompositionProfileWithPolicy.
 func VisitCompositionProfile(home, name, expected string, visit func(*contextlock.Lock, contextlock.Member, string) error) error {
+	_, err := VisitCompositionProfileWithPolicy(home, name, expected, Policy{}, visit)
+	return err
+}
+
+// VisitCompositionProfileWithPolicy reads the explicit protected selection and
+// every required observation before applying policy. It acquires no source,
+// synthesizes no evidence and publishes no home. The caller holds the home lock.
+// Source generation must remain stable even when initial mismatches are allowed.
+func VisitCompositionProfileWithPolicy(home, name, expected string, policy Policy, visit func(*contextlock.Lock, contextlock.Member, string) error) ([]string, error) {
 	if !identifiers.Valid(name) || expected == "" || visit == nil {
-		return fmt.Errorf("invalid composition profile selection")
+		return nil, fmt.Errorf("invalid composition profile selection")
 	}
-	check := func() (*contextlock.Lock, error) {
+	var initialGeneration []string
+	check := func(initial bool) (*contextlock.Lock, []string, error) {
 		if err := envauthority.Validate(home); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if err := validateLockBoundary(home, name, nil); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		lock, hash, err := readLock(home, name)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if strings.TrimPrefix(hash, "sha256:") != expected {
-			return nil, fmt.Errorf("selected profile lock changed")
+			return nil, nil, fmt.Errorf("selected profile lock changed")
 		}
 		if failure := validateNamedStoreBoundaries(home, lock, nil); failure != nil {
-			return nil, failure.Err
+			return nil, nil, failure.Err
 		}
-		if failure := validateNamedStorePins(home, lock); failure != nil {
-			return nil, failure.Err
+		checks, err := startupChecks(home, lock)
+		if err != nil {
+			return nil, nil, err
 		}
-		return lock, nil
+		verdict, err := startupVerdict(policy, lock, checks)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !verdict.Allow {
+			return nil, verdict.Warnings, fmt.Errorf("%s: composition verification refused", strings.Join(verdict.Refusals, "; "))
+		}
+		generation := make([]string, 0, len(lock.Members))
+		for _, member := range lock.Members {
+			digest, err := hashing.ContentSHA256WithVersion(memberEntryPath(home, member), map[string]bool{}, hashing.VersionV2)
+			if err != nil {
+				return nil, verdict.Warnings, err
+			}
+			generation = append(generation, digest)
+		}
+		if initial {
+			initialGeneration = generation
+		} else if !equalStrings(initialGeneration, generation) {
+			return nil, verdict.Warnings, fmt.Errorf("composition profile source generation changed")
+		}
+		return lock, verdict.Warnings, nil
 	}
-	lock, err := check()
+	lock, warnings, err := check(true)
 	if err != nil {
-		return err
+		return warnings, err
 	}
 	manager := newGitManager(home)
-
 	for _, member := range lock.Members {
 		entry := manager.entryPath(home, resolvedOf(member))
 		cleanup := func() {}
 		if member.Commit != "" {
-			var e error
-			entry, cleanup, _, e = extractPinnedSnapshot(home, member)
-			if e != nil {
-				return e
+			var err error
+			entry, cleanup, _, err = extractPinnedSnapshot(home, member)
+			if err != nil {
+				return warnings, err
 			}
 		}
-		root, e := selectedPackageRoot(entry, member.Directory)
-		if e == nil {
-			e = visit(lock, member, root)
+		root, err := selectedPackageRoot(entry, member.Directory)
+		if err == nil {
+			err = visit(lock, member, root)
 		}
 		cleanup()
-		if e != nil {
-			return e
+		if err != nil {
+			return warnings, err
 		}
 		if err := envauthority.Validate(home); err != nil {
-			return err
+			return warnings, err
 		}
 	}
-
-	_, err = check()
-	return err
+	_, _, err = check(false)
+	return warnings, err
 }

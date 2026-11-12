@@ -103,6 +103,9 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 	if err != nil {
 		return Info{}, err
 	}
+	if err := prepareStartupEvidence(home, manager, result, policy); err != nil {
+		return Info{}, err
+	}
 	if err := checkAdmissionPrePublish(home, manager, result, policy); err != nil {
 		return Info{}, err
 	}
