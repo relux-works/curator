@@ -44,6 +44,10 @@ changed source. Cancellation before publication preserves the original file.
 A durability/readback failure after publication reports that the edit applied
 but remains unverified.
 
+The safe editor uses the existing Unix owner/mode and no-follow admission.
+Other platforms retain policy reads and refuse CLI file edits until equivalent
+descriptor and ownership protections are qualified.
+
 The closed read projection has schema `curator.startup-verification/1`, required
 `level` and `origin` (`default`, `machine` or `system`), plus optional
 `grant_service`. It contains no managed-home paths.
