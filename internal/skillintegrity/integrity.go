@@ -218,61 +218,53 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 func captureTree(ctx context.Context, root string, budget *Budget) (*capture, error) {
 	c := &capture{data: map[string][]byte{}, infos: map[string]os.FileInfo{}, files: []File{}}
 	folded := map[string]bool{}
+	var observations []error
 	err := filepath.WalkDir(root, func(path string, dir fs.DirEntry, walkErr error) error {
 		if err := budget.check(ctx); err != nil {
 			return err
 		}
 		if walkErr != nil {
-			return failure("skill_integrity_unavailable", "skill tree cannot be observed")
+			observations = append(observations, failure("skill_integrity_unavailable", "skill tree cannot be observed"))
+			return nil
 		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return failure("skill_integrity_boundary_invalid", "invalid relative path")
-		}
-		rel = filepath.ToSlash(rel)
 		info, err := dir.Info()
 		if err != nil {
-			return failure("skill_integrity_unavailable", "skill entry cannot be observed")
+			observations = append(observations, failure("skill_integrity_unavailable", "skill entry cannot be observed"))
+			return nil
 		}
-		if rel != "." {
-			if !identifiers.PortablePath(rel) || folded[strings.ToLower(rel)] {
-				return failure("skill_integrity_boundary_invalid", "nonportable or colliding path")
-			}
-			folded[strings.ToLower(rel)] = true
-			for _, part := range strings.Split(rel, "/") {
-				if part == ".git" {
-					return failure("skill_integrity_boundary_invalid", "Git metadata is not skill payload")
-				}
-			}
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return failure("skill_integrity_boundary_invalid", "payload links are forbidden")
-		}
-		if err := pathboundary.ValidateRouteWithOwner(root, path, pathboundary.DefaultOwnerLookup()); err != nil {
-			return failure("skill_integrity_boundary_invalid", "skill path boundary is invalid")
+		rel, err := admitEntry(root, path, info, folded)
+		if err != nil {
+			return err
 		}
 		c.infos[rel] = info
 		if info.IsDir() {
 			return nil
 		}
-		if !info.Mode().IsRegular() || !singleLink(path, info) {
-			return failure("skill_integrity_boundary_invalid", "payload must contain single-link regular files")
-		}
 		if budget.files >= MaxFiles || info.Size() < 0 || info.Size() > MaxBytes-budget.bytes {
 			return failure("skill_integrity_manifest_invalid", "capture budget exceeded")
 		}
-		data, observed, err := readCapturedFile(path, info, MaxBytes-budget.bytes)
+		remaining := MaxBytes - budget.bytes
+		// Reserve every observed regular file, including unavailable reads,
+		// so closure limits cannot be bypassed with unreadable entries.
+		budget.files++
+		budget.bytes += info.Size()
+		data, observed, err := readCapturedFile(path, info, remaining)
 		if err != nil {
+			if IsCode(err, "skill_integrity_unavailable") {
+				observations = append(observations, err)
+				return nil
+			}
 			return err
 		}
-		budget.files++
-		budget.bytes += int64(len(data))
 		c.data[rel] = data
 		c.infos[rel] = observed
 		c.files = append(c.files, File{Path: rel, Size: int64(len(data)), Executable: observed.Mode().Perm()&0o111 != 0, SHA256: digest(data)})
 		return budget.check(ctx)
 	})
 	if err != nil {
+		observations = append(observations, err)
+	}
+	if err := errors.Join(observations...); err != nil {
 		return c, err
 	}
 	if err := c.revalidate(ctx, root, budget); err != nil {
@@ -282,41 +274,113 @@ func captureTree(ctx context.Context, root string, budget *Budget) (*capture, er
 	return c, nil
 }
 
+// admitEntry is the positive path/kind admission used by both passes. A late
+// forbidden entry must remain a hard boundary refusal at every startup level.
+func admitEntry(root, path string, info os.FileInfo, folded map[string]bool) (string, error) {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", failure("skill_integrity_boundary_invalid", "invalid relative path")
+	}
+	rel = filepath.ToSlash(rel)
+	if rel == "." && !info.IsDir() {
+		return "", failure("skill_integrity_boundary_invalid", "skill root must be a directory")
+	}
+	if rel != "." {
+		if !identifiers.PortablePath(rel) || folded[strings.ToLower(rel)] {
+			return "", failure("skill_integrity_boundary_invalid", "nonportable or colliding path")
+		}
+		folded[strings.ToLower(rel)] = true
+		for _, part := range strings.Split(rel, "/") {
+			if strings.EqualFold(part, ".git") {
+				return "", failure("skill_integrity_boundary_invalid", "Git metadata is not skill payload")
+			}
+		}
+	}
+	if info.Mode()&os.ModeSymlink != 0 || (!info.IsDir() && (!info.Mode().IsRegular() || !singleLink(path, info))) {
+		return "", failure("skill_integrity_boundary_invalid", "payload must contain directories and single-link regular files")
+	}
+	if err := pathboundary.ValidateRouteWithOwner(root, path, pathboundary.DefaultOwnerLookup()); err != nil {
+		return "", failure("skill_integrity_boundary_invalid", "skill path boundary is invalid")
+	}
+	return rel, nil
+}
+
 func (c *capture) revalidate(ctx context.Context, root string, budget *Budget) error {
-	seen := 0
+	seen := map[string]bool{}
+	folded := map[string]bool{}
+	failed, unavailable, complete := false, false, true
+	priorFiles, priorBytes := budget.files-len(c.files), budget.bytes
+	for _, file := range c.files {
+		priorBytes -= file.Size
+	}
+	regular, total := 0, int64(0)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if err := budget.check(ctx); err != nil {
 			return err
 		}
 		if walkErr != nil {
-			return failure("skill_integrity_unavailable", "skill tree cannot be rechecked")
+			unavailable, complete = true, false
+			return nil
 		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return failure("skill_integrity_boundary_invalid", "invalid relative path")
-		}
-		rel = filepath.ToSlash(rel)
 		info, err := entry.Info()
 		if err != nil {
-			return failure("skill_integrity_unavailable", "skill entry cannot be rechecked")
+			unavailable, complete = true, false
+			return nil
 		}
-		if info.Mode()&os.ModeSymlink != 0 || (!info.IsDir() && (!info.Mode().IsRegular() || !singleLink(path, info))) {
-			return failure("skill_integrity_boundary_invalid", "skill entry changed to a forbidden kind")
+		rel, err := admitEntry(root, path, info, folded)
+		if err != nil {
+			return err
+		}
+		seen[rel] = true
+		if !info.IsDir() {
+			regular++
+			if priorFiles+regular > MaxFiles || info.Size() < 0 || info.Size() > MaxBytes-priorBytes-total {
+				return failure("skill_integrity_manifest_invalid", "rechecked closure exceeds capture budget")
+			}
+			total += info.Size()
 		}
 		before, ok := c.infos[rel]
-		if !ok || !os.SameFile(before, info) || before.Mode() != info.Mode() || before.Size() != info.Size() || !before.ModTime().Equal(info.ModTime()) {
-			return failure("skill_integrity_mismatch", "skill tree changed during capture")
+		if !ok {
+			if info.IsDir() {
+				unavailable = true
+			} else {
+				failed = true
+			}
+			return nil
 		}
-		seen++
+		if !os.SameFile(before, info) || before.Mode() != info.Mode() || before.Size() != info.Size() || !before.ModTime().Equal(info.ModTime()) {
+			// Timestamp/inode changes alone do not contradict the frozen byte
+			// identity. Keep scanning: a later forbidden entry is still fatal.
+			if !info.IsDir() && (before.Size() != info.Size() || before.Mode().Perm()&0o111 != info.Mode().Perm()&0o111) {
+				failed = true
+			} else {
+				unavailable = true
+			}
+		}
 		return nil
 	})
+	if err == nil && complete {
+		for path, before := range c.infos {
+			if !seen[path] {
+				if before.IsDir() {
+					unavailable = true
+				} else {
+					failed = true
+				}
+			}
+		}
+	}
+	var results []error
+	if failed {
+		results = append(results, failure("skill_integrity_mismatch", "skill roster or bound metadata changed during capture"))
+	}
+	if unavailable {
+		results = append(results, failure("skill_integrity_unavailable", "skill capture could not be revalidated"))
+	}
 	if err != nil {
-		return err
+		results = append(results, err)
 	}
-	if seen != len(c.infos) {
-		return failure("skill_integrity_mismatch", "skill roster changed during capture")
-	}
-	return nil
+	return errors.Join(results...)
 }
 
 // Validate binds evidence to its already validated lock identity before I/O.
