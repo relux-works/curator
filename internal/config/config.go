@@ -61,6 +61,7 @@ var DefaultAgents = []string{"codex_cli"}
 // among them — are deliberately absent and never lockable: credential
 // material is operator-owned (ratified with the spec owner 2026-08-23).
 var LockableKeys = map[string]bool{
+	"startup_verification":                   true,
 	"audit_registries":                       true,
 	"disable_builtin_registries":             true,
 	"allowed_sources":                        true,
@@ -88,7 +89,8 @@ var (
 )
 
 var managerKeys = map[string]bool{
-	"schema_version": true, "skills_root": true, "default_agents": true,
+	"startup_verification": true,
+	"schema_version":       true, "skills_root": true, "default_agents": true,
 	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
 	"projects": true, "allowed_sources": true, "audit": true,
 	"security_posture": true,
@@ -167,7 +169,9 @@ type Execution struct {
 
 // Config is the effective machine configuration.
 type Config struct {
-	Path string
+	StartupVerification       StartupVerification
+	StartupVerificationOrigin string
+	Path                      string
 	// Schema is the effective schema_version: 1, 2, 3, 5, or 7.
 	Schema     int
 	Extensions *LauncherExtensions
@@ -383,8 +387,16 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		return nil, nil, fmt.Errorf("extensions: launcher selections belong only to the selected machine configuration")
 	}
 	systemSchema, ok := integerValue(systemData["schema_version"])
-	if !ok || (systemSchema != SchemaVersion && systemSchema != SchemaVersion2) {
+	if !ok || (systemSchema != SchemaVersion && (systemSchema != SchemaVersion2 && systemSchema != StartupVerificationSchemaVersion)) {
 		return nil, nil, verr.New("schema_version", "system config %s requires schema_version 1 or 2", systemPath)
+	}
+	if raw, present := systemData["startup_verification"]; present {
+		if systemSchema != StartupVerificationSchemaVersion {
+			return nil, nil, fmt.Errorf("startup_verification_schema_unsupported: system startup policy requires the new carrier")
+		}
+		if _, err := ParseStartupVerification(raw); err != nil {
+			return nil, nil, err
+		}
 	}
 	for key := range systemData {
 		if key != "locked" && !managerKeys[key] {
@@ -392,7 +404,7 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		}
 	}
 	if rawPosture, present := systemData["security_posture"]; present {
-		if systemSchema != SchemaVersion2 {
+		if systemSchema != SchemaVersion2 && systemSchema != StartupVerificationSchemaVersion {
 			return nil, nil, verr.New("security_posture", "system config %s requires schema_version 2 for security_posture", systemPath)
 		}
 		if posture, ok := rawPosture.(string); !ok || posture != SecurityPostureHardened {
@@ -410,13 +422,13 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 			return nil, nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
 		}
 		if strings.HasPrefix(key, "environments.") {
-			if systemSchema != SchemaVersion2 {
+			if systemSchema != SchemaVersion2 && systemSchema != StartupVerificationSchemaVersion {
 				return nil, nil, verr.New("locked", "system config %s cannot lock %q under schema_version 1", systemPath, key)
 			}
 		} else if strings.HasPrefix(key, "environments") {
 			return nil, nil, verr.New("locked", "system config %s cannot lock %q: lock the environments.<key> knob", systemPath, key)
 		}
-		if key == "security_posture" && systemSchema != SchemaVersion2 {
+		if key == "security_posture" && (systemSchema != SchemaVersion2 && systemSchema != StartupVerificationSchemaVersion) {
 			return nil, nil, verr.New("locked", "system config %s cannot lock security_posture under schema_version 1", systemPath)
 		}
 		if !LockableKeys[key] {
@@ -433,7 +445,7 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 	// A system file carries only the lockable environments subset with the
 	// §12.1 value grammars; isolation is lockable in either direction (§12.2).
 	if rawEnv, present := systemData["environments"]; present && rawEnv != nil {
-		if systemSchema != SchemaVersion2 {
+		if systemSchema != SchemaVersion2 && systemSchema != StartupVerificationSchemaVersion {
 			return nil, nil, verr.New("environments", "system config %s carries environments under schema_version 1", systemPath)
 		}
 		if _, err := parseSystemEnvironments(rawEnv); err != nil {
@@ -490,6 +502,9 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 				merged["schema_version"] = float64(SchemaVersion2)
 			}
 		}
+	}
+	if _, present := merged["startup_verification"]; present {
+		merged["schema_version"] = StartupVerificationSchemaVersion
 	}
 	return merged, locked, nil
 }
@@ -580,18 +595,39 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 	if !ok {
 		return nil, verr.New("schema_version", "must be an integer")
 	}
-	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 {
+	if schema != SchemaVersion && schema != SchemaVersion2 && schema != SchemaVersion3 && schema != SchemaVersion5 && schema != SchemaVersion7 && schema != StartupVerificationSchemaVersion {
 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
 	}
 	var extensions *LauncherExtensions
 	if raw, present := data["extensions"]; present {
-		if schema != SchemaVersion7 {
+		if schema != SchemaVersion7 && schema != StartupVerificationSchemaVersion {
 			return nil, fmt.Errorf("extensions: requires manager-config schema_version 7")
 		}
 		var err error
 		extensions, err = parseLauncherExtensions(raw)
 		if err != nil {
 			return nil, err
+		}
+		if extensions.GrantService != nil && schema != StartupVerificationSchemaVersion {
+			return nil, fmt.Errorf("startup_verification_schema_unsupported: grant_service requires the startup policy carrier")
+		}
+	}
+	startup := StartupVerification{Level: 3}
+	startupOrigin := "default"
+	if raw, present := data["startup_verification"]; present {
+		if schema != StartupVerificationSchemaVersion {
+			return nil, fmt.Errorf("startup_verification_schema_unsupported: startup_verification requires the startup policy carrier")
+		}
+		var err error
+		startup, err = ParseStartupVerification(raw)
+		if err != nil {
+			return nil, err
+		}
+		startupOrigin = "machine"
+		if _, machinePresent := machineData["startup_verification"]; !machinePresent || locked["startup_verification"] {
+			if _, systemPresent := systemData["startup_verification"]; systemPresent {
+				startupOrigin = "system"
+			}
 		}
 	}
 	if schema == SchemaVersion && hasConfigKey(machineData, "security_posture") {
@@ -783,28 +819,30 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 		locked = map[string]bool{}
 	}
 	cfg := &Config{
-		Path:                     path,
-		Schema:                   schema,
-		Extensions:               extensions,
-		Env:                      env,
-		UserIsolation:            env.Isolation,
-		Locked:                   locked,
-		SkillsRoot:               expandHome(skillsRoot),
-		PreferredLocale:          preferredLocale,
-		DefaultAgents:            defaultAgents,
-		AdapterMode:              adapterMode,
-		WorktreeAliasPattern:     worktreePattern,
-		Projects:                 projects,
-		Audit:                    audit,
-		Execution:                execution,
-		AllowedSources:           allowedSources,
-		AuditRegistries:          registries,
-		DisableBuiltinRegistries: disableBuiltin,
-		BuildSSH:                 buildSSH,
-		BuildHTTPS:               buildHTTPS,
-		ScriptInterpreters:       scriptInterpreters,
-		ScriptDiagnosticsDir:     diagnosticsDir,
-		SecurityPosture:          posture,
+		StartupVerification:       startup,
+		StartupVerificationOrigin: startupOrigin,
+		Path:                      path,
+		Schema:                    schema,
+		Extensions:                extensions,
+		Env:                       env,
+		UserIsolation:             env.Isolation,
+		Locked:                    locked,
+		SkillsRoot:                expandHome(skillsRoot),
+		PreferredLocale:           preferredLocale,
+		DefaultAgents:             defaultAgents,
+		AdapterMode:               adapterMode,
+		WorktreeAliasPattern:      worktreePattern,
+		Projects:                  projects,
+		Audit:                     audit,
+		Execution:                 execution,
+		AllowedSources:            allowedSources,
+		AuditRegistries:           registries,
+		DisableBuiltinRegistries:  disableBuiltin,
+		BuildSSH:                  buildSSH,
+		BuildHTTPS:                buildHTTPS,
+		ScriptInterpreters:        scriptInterpreters,
+		ScriptDiagnosticsDir:      diagnosticsDir,
+		SecurityPosture:           posture,
 	}
 	cfg.SecurityPostureSource = securityPostureSource(data, machineData, systemData, locked, schema)
 	cfg.postureSources = securityPostureSources(data, machineData, systemData, locked)
@@ -1290,6 +1328,9 @@ func readObject(path string) (map[string]any, error) {
 	}
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("malformed JSON in config %s", path)
+	}
+	if err := validateStartupJSON(payload); err != nil {
+		return nil, err
 	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {
