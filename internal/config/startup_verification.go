@@ -37,12 +37,17 @@ func validateStartupJSON(payload []byte) error {
 // StartupVerificationSchemaVersion is the unsigned startup-policy carrier.
 const StartupVerificationSchemaVersion = 11
 
+// StartupVerification carries the machine's startup verification baseline.
 type StartupVerification struct {
 	Level int `json:"level"`
 }
+
+// GrantServiceReference holds centre location metadata without a service protocol.
 type GrantServiceReference struct {
 	Endpoint string `json:"endpoint"`
 }
+
+// StartupVerificationProjection exposes the effective machine policy and its origin.
 type StartupVerificationProjection struct {
 	Schema       string                 `json:"schema"`
 	Level        int                    `json:"level"`
@@ -57,6 +62,7 @@ func ParseStartupVerification(raw any) (StartupVerification, error) {
 	return StartupVerification{Level: level}, err
 }
 
+// StartupProjection returns policy metadata with an independent centre reference.
 func (c *Config) StartupProjection() StartupVerificationProjection {
 	p := StartupVerificationProjection{Schema: "curator.startup-verification/1", Level: c.StartupVerification.Level, Origin: c.StartupVerificationOrigin}
 	if c.Extensions != nil && c.Extensions.GrantService != nil {

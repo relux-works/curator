@@ -16,6 +16,7 @@ func hasSettingsCarrier(version int) bool {
 	return version == SchemaVersion4 || version == SchemaVersion5 || version == SkillIntegritySchemaVersion
 }
 
+// SkillIdentity projects an already validated lock member's evidence identity.
 func SkillIdentity(member Member) skillintegrity.Identity {
 	return skillintegrity.Identity{Name: member.Name, Source: member.Source, Commit: member.Commit, StateSHA256: member.StateHash, Directory: member.Directory}
 }
