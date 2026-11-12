@@ -78,6 +78,9 @@ platform-control	^book shell toolchain requires Unix paths$	allow	the optional d
 platform-control	^native contribution witnesses require measured host tuple$	allow	the opt-in Claude mutation witnesses require the measured darwin/arm64 tuple; portable refusal tests still run
 
 # --- host capability --------------------------------------------------------
+host-capability	^filesystem cannot represent the colliding pair$	allow	the fixture observed that both case spellings identify one file; parser collision controls still execute
+host-capability	^filesystem cannot materialize the executable-bit mutation$	allow	the fixture observed that chmod cannot produce an executable bit; byte and roster drift controls still execute
+host-capability	^fixture requires Unix permission denial without root bypass$	allow	the guarded mode-000 fixture needs an unprivileged Unix caller; Windows boundary and ordinary drift controls still execute
 host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
 host-capability	filesystem does not support (hard|symbolic) links	allow	the runner filesystem provides no such link
 host-capability	this host cannot create	allow	the runner cannot create the artefact the vector needs
