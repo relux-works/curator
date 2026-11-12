@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -119,8 +120,8 @@ func TestNativeDeclarationsPreserveAuthority(t *testing.T) {
 // A present unreadable manifest is unavailable evidence, never a synthesized
 // declaration. Root execution cannot establish the Unix mode-denial witness.
 func TestUnreadableNativeIsNotAbsence(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root bypasses fixture read permissions")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("fixture requires Unix permission denial without root bypass")
 	}
 	root, id := fixture(t)
 	path := filepath.Join(root, "agent-skill.json")
@@ -154,6 +155,13 @@ func TestEvidenceRejectsEveryDriftDirection(t *testing.T) {
 			case "execute":
 				if err := os.Chmod(filepath.Join(root, "references/guide.md"), 0o755); err != nil {
 					t.Fatal(err)
+				}
+				observed, err := os.Stat(filepath.Join(root, "references/guide.md"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if observed.Mode().Perm()&0o111 == 0 {
+					t.Skip("filesystem cannot materialize the executable-bit mutation")
 				}
 			case "native-substitution":
 				writeFixture(t, root, "agent-skill.json", []byte(syntheticDeclaration), 0o644)
