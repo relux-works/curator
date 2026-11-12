@@ -451,8 +451,9 @@ func DecodeEntry(raw []byte, expected Identity) (Entry, error) {
 		if !bytes.Equal(boolean, []byte("true")) && !bytes.Equal(boolean, []byte("false")) {
 			return invalid()
 		}
-		size, err := strconv.ParseInt(string(bytes.TrimSpace(file["size"])), 10, 64)
-		if err != nil || size < 0 || size > MaxBytes {
+		sizeToken := string(bytes.TrimSpace(file["size"]))
+		size, err := strconv.ParseInt(sizeToken, 10, 64)
+		if err != nil || size < 0 || size > MaxBytes || strconv.FormatInt(size, 10) != sizeToken {
 			return invalid()
 		}
 	}

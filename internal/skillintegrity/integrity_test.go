@@ -269,6 +269,33 @@ func TestEvidenceJSONRefusals(t *testing.T) {
 	}
 }
 
+// A real empty file supplies the valid zero-size control. Alternate numeric
+// spellings must refuse even when coercion would reproduce its valid hash.
+func TestEvidenceSizeTokenGrammar(t *testing.T) {
+	root, id := fixture(t)
+	writeFixture(t, root, "references/guide.md", nil, 0o644)
+	e, err := Build(context.Background(), root, id, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DecodeEntry(raw, id); err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{"-0", "0.0", "0e0"} {
+		changed := bytes.Replace(raw, []byte(`"size":0`), []byte(`"size":`+token), 1)
+		if bytes.Equal(raw, changed) {
+			t.Fatal("control plant did not apply")
+		}
+		if _, err := DecodeEntry(changed, id); !IsCode(err, "skill_integrity_manifest_invalid") {
+			t.Fatalf("size %s: %v", token, err)
+		}
+	}
+}
+
 // Shared closure budgets cannot reset at each skill. Cancellation does not
 // synthesize evidence, and an observed mismatch survives later unavailability.
 func TestEvidenceBudgetsAndInterruptedMismatch(t *testing.T) {
