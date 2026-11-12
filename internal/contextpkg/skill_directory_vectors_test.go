@@ -110,7 +110,7 @@ func TestSkillDirectoryClosedSuccessors(t *testing.T) {
 			delete(m, "requires")
 			m["codex_settings"] = map[string]any{}
 		}},
-		{"manifest-unsupported-three", false, func(m map[string]any) { m["schema_version"] = 3 }},
+		{"manifest-unsupported-four", false, func(m map[string]any) { m["schema_version"] = 4 }},
 		{"manifest-unknown-top-level", false, func(m map[string]any) { m["unexpected"] = true }},
 		{"lock-no-precedence", true, func(m map[string]any) { delete(m, "precedence") }},
 		{"lock-no-settings", true, func(m map[string]any) { delete(m, "codex_settings") }},
@@ -163,11 +163,16 @@ func TestSkillDirectoryClosedSuccessors(t *testing.T) {
 			}
 		})
 	}
-	// Nearby valid controls exercise both empty settings and frozen lock 2.
+	// Nearby valid controls exercise manifests2/3 and frozen lock2.
 	var m map[string]any
 	_ = json.Unmarshal(fixture.Manifest, &m)
 	m["codex_settings"] = map[string]any{}
 	raw, _ := json.Marshal(m)
+	if _, err = contextpkg.ParseManifest(raw); err != nil {
+		t.Fatal(err)
+	}
+	m["schema_version"] = 3
+	raw, _ = json.Marshal(m)
 	if _, err = contextpkg.ParseManifest(raw); err != nil {
 		t.Fatal(err)
 	}

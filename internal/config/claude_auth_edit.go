@@ -129,6 +129,9 @@ func claudeAuthObject(raw []byte) (map[string]any, error) {
 	if protocoljson.Validate(raw) != nil {
 		return nil, ErrClaudeAuthEditRefused
 	}
+	if validateStartupJSON(raw) != nil {
+		return nil, ErrClaudeAuthEditRefused
+	}
 	var object map[string]any
 	if json.Unmarshal(raw, &object) != nil || object == nil {
 		return nil, ErrClaudeAuthEditRefused
@@ -246,7 +249,7 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 		return nil, err
 	}
 	version, ok := integerValue(before["schema_version"])
-	if !ok || (version != 2 && version != 7) {
+	if !ok || (version != 2 && version != SchemaVersion7 && version != StartupVerificationSchemaVersion) {
 		return nil, ErrClaudeAuthEditRefused
 	}
 	if _, err := loadObject(path, before, nil); err != nil {
@@ -273,8 +276,10 @@ func PlanClaudeAuth(path string, selection LauncherClaudeAuth) (*ClaudeAuthEditP
 	}
 	extensions["claude_auth"] = selected
 	after["extensions"] = extensions
-	after["schema_version"] = float64(7)
-	// Defense in depth: for currently valid schema-2/7 sources this constructor
+	if version, _ := integerValue(after["schema_version"]); version < SchemaVersion7 {
+		after["schema_version"] = float64(SchemaVersion7)
+	}
+	// Defense in depth: for valid supported sources this constructor
 	// changes only schema/auth, so no valid input currently reaches the refusal.
 	// Restore independently needs this check for later unrelated edits.
 	if !claudeAuthEquivalent(path, before, after) {

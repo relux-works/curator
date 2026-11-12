@@ -15,8 +15,9 @@ const SchemaVersion7 = 7
 // LauncherExtensions contains only metadata references. Reading, editing and
 // exporting these values never reads a secret store or starts a runtime.
 type LauncherExtensions struct {
-	Proxy      *LauncherProxy      `json:"proxy,omitempty"`
-	ClaudeAuth *LauncherClaudeAuth `json:"claude_auth,omitempty"`
+	GrantService *GrantServiceReference `json:"grant_service,omitempty"`
+	Proxy        *LauncherProxy         `json:"proxy,omitempty"`
+	ClaudeAuth   *LauncherClaudeAuth    `json:"claude_auth,omitempty"`
 }
 
 // LauncherProxy selects a named network profile from the admitted catalog.
@@ -88,11 +89,18 @@ func parseLauncherExtensions(raw any) (*LauncherExtensions, error) {
 		return fail()
 	}
 	for key := range object {
-		if key != "proxy" && key != "claude_auth" {
+		if key != "proxy" && key != "claude_auth" && key != "grant_service" {
 			return fail()
 		}
 	}
 	result := &LauncherExtensions{}
+	if rawGrant, present := object["grant_service"]; present {
+		value, err := parseGrantService(rawGrant)
+		if err != nil {
+			return nil, err
+		}
+		result.GrantService = value
+	}
 	if rawProxy, present := object["proxy"]; present {
 		proxy, ok := launcherMembers(rawProxy, "profile")
 		if !ok {

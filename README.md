@@ -135,6 +135,11 @@ and [§5](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f7
 
 ## Execution assurance
 
+Startup policy and complete external-skill evidence are specified in
+[Startup verification](docs/startup-verification.md). Read the effective machine
+selection with `curator config startup-verification --json`; edits use
+`curator config startup-verification --level 3`.
+
 Compiled builds default to portable execution mode using an authenticated manager/worker session. Verified execution mode (`execution.mode: verified`) is an explicit non-fallback selection: because this release ships no platform provider, a missing, unhealthy, incompatible, or drifted provider fails closed rather than falling back to portable execution. Portable, verified, legacy assurance-blind, cross-provider, and capability-drifted cache entries occupy disjoint cache key identities, and every adopted or published artifact carries the exact build-session receipt used at dispatch. Language source-closure adapters (Rust, SwiftPM, npm, pnpm, Yarn Classic, and Modern Yarn) bind ecosystem toolchains and resolve immutable source snapshots. See [docs/authoring-language-adapters.md](docs/authoring-language-adapters.md) for adapter authoring contracts and [docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md) for cross-adapter conformance.
 
 ## Compiled-command status, diagnostics, and repair
