@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/skillspec"
 )
@@ -32,6 +33,13 @@ func writeFixture(t *testing.T, root, path string, data []byte, mode os.FileMode
 	}
 	if err := os.Chmod(full, mode); err != nil {
 		t.Fatal(err)
+	}
+	// Windows permission bits do not establish the owner/DACL boundary.
+	// These fixture writes are new test payloads, never pre-existing inputs.
+	if runtime.GOOS == "windows" {
+		if err := privatedir.ProtectTree(root); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

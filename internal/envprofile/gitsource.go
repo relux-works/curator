@@ -22,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/pkgversion"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -936,6 +937,12 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 		return "", func() {}, err
 	}
 	if err := extractMemberSnapshot(repo, resolved.Commit, resolved.Kind, resolved.Directory, snapshot); err != nil {
+		_ = os.RemoveAll(snapshot)
+		return "", func() {}, err
+	}
+	// Qualify only this newly extracted inspection tree. Existing source and
+	// store entries retain their permissions and must pass their own boundary.
+	if err := privatedir.ProtectTree(snapshot); err != nil {
 		_ = os.RemoveAll(snapshot)
 		return "", func() {}, err
 	}

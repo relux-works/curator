@@ -118,13 +118,15 @@ func startupChecks(home string, lock *contextlock.Lock) ([]startupverification.O
 			if !errors.As(err, &unavailable) && !errors.As(err, &fileError) {
 				return nil, &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: err}
 			}
-			detail := fmt.Sprintf("%s: store entry %s/%s failed %s check", envregistry.DiagStoreUntrusted, member.Kind, member.Name, diagPinHash)
+			detail := fmt.Sprintf("%s: store entry %s/%s failed %s check:", envregistry.DiagStoreUntrusted, member.Kind, member.Name, diagPinHash)
 			if unavailable != nil {
-				detail += ": pinned commit object unavailable"
+				detail += " pinned commit object unavailable"
+			} else {
+				detail += " pinned content cannot be read"
 			}
 			checks = append(checks, startupverification.Observation{Status: startupverification.Unavailable, Code: detail})
 		} else if actual != expected {
-			checks = append(checks, startupverification.Observation{Status: startupverification.Failed, Code: fmt.Sprintf("%s: store entry %s/%s failed %s check", envregistry.DiagStoreUntrusted, member.Kind, member.Name, diagPinHash)})
+			checks = append(checks, startupverification.Observation{Status: startupverification.Failed, Code: fmt.Sprintf("%s: store entry %s/%s failed %s check: snapshot content differs", envregistry.DiagStoreUntrusted, member.Kind, member.Name, diagPinHash)})
 		} else {
 			checks = append(checks, startupverification.Observation{Status: startupverification.Passed, Code: "profile_pin_verified"})
 		}
