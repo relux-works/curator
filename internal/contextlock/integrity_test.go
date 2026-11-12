@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/skillintegrity"
 )
 
@@ -17,6 +19,12 @@ func integrityFixture(t *testing.T) *Lock {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("---\nname: fixture-skill\ndescription: Fixture skill.\n---\nFixture context.\n"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	// Windows mode bits alone do not establish a private skill boundary.
+	if runtime.GOOS == "windows" {
+		if err := privatedir.ProtectTree(root); err != nil {
+			t.Fatal(err)
+		}
 	}
 	member := Member{Kind: KindSkill, Name: "fixture-skill", Source: "https://example.org/skill.git", Commit: strings.Repeat("a", 40), RequiredBy: []string{"root"}}
 	e, err := skillintegrity.Build(context.Background(), root, SkillIdentity(member), nil)
