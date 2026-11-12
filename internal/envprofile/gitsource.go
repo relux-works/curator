@@ -932,7 +932,7 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 	default:
 		return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("unknown cached source state %q", repoMetadata.Kind))
 	}
-	snapshot, err := os.MkdirTemp("", "curator-profile-inspect-*")
+	snapshot, err := privatedir.TempStaging("", "curator-profile-inspect-*")
 	if err != nil {
 		return "", func() {}, err
 	}
