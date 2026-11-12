@@ -33,7 +33,7 @@ func TestSkillDirectoryNarrowingMutants(t *testing.T) {
 			{"audit/audit.go", `RulesetVersion = "` + audit.RulesetVersion + `"`, `RulesetVersion = "4"`},
 		}},
 		{"schema-one-directory", "contextpkg", "^TestSkillDirectorySchemaVectors$/^manifest-v1-still-refuses-skill-directory$", "TestSkillDirectorySchemaVectors/manifest-v1-still-refuses-skill-directory", "valid=false", []directoryMutation{
-			{"contextpkg/contextpkg.go", `if schemaVersion == 2 {`, `if schemaVersion == 2 || schemaVersion == 1 {`},
+			{"contextpkg/contextpkg.go", `if schemaVersion >= 2 {`, `if schemaVersion >= 1 {`},
 		}},
 		{"selected-frontmatter-description", "envprofile", "^TestSkillDirectoryMetadata$/^empty-description$", "TestSkillDirectoryMetadata/empty-description", "want refusal manifest_invalid", []directoryMutation{
 			{"manifest/skill_listing.go", `if !ok || strings.TrimSpace(description) == "" {`, `if !ok || (strings.TrimSpace(description) == "" && name != "formatter") {`},

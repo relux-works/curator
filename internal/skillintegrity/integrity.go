@@ -25,22 +25,34 @@ import (
 	"github.com/relux-works/curator/internal/skillspec"
 )
 
+// Schema identifies the unsigned skill evidence format.
 const Schema = "curator.skill-integrity/1"
+
+// MaxFiles bounds the regular files across one selected skill closure.
 const MaxFiles = 16384
+
+// MaxBytes bounds the file bytes across one selected skill closure.
 const MaxBytes int64 = 64 << 20
+
+// VerificationTimeout bounds one shared skill verification pass.
 const VerificationTimeout = 30 * time.Second
 const syntheticDeclaration = `{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}}`
 
+// Diagnostic classifies an integrity refusal or unavailable observation.
 type Diagnostic struct {
 	Code   string
 	Detail string
 }
 
 func (d *Diagnostic) Error() string { return d.Code + ": " + d.Detail }
+
+// Is matches diagnostics by their stable code rather than their detail.
 func (d *Diagnostic) Is(target error) bool {
 	other, ok := target.(*Diagnostic)
 	return ok && d.Code == other.Code
 }
+
+// IsCode reports whether an error chain contains the given integrity code.
 func IsCode(err error, code string) bool { return errors.Is(err, &Diagnostic{Code: code}) }
 func failure(code, detail string) error  { return &Diagnostic{code, detail} }
 
@@ -53,12 +65,16 @@ type Identity struct {
 	StateSHA256 string `json:"state_sha256"`
 	Directory   string `json:"directory"`
 }
+
+// File records one portable regular file's content and executable bit.
 type File struct {
 	Path       string `json:"path"`
 	Size       int64  `json:"size"`
 	Executable bool   `json:"executable"`
 	SHA256     string `json:"sha256"`
 }
+
+// Manifest binds a complete file roster and declaration to a selected member.
 type Manifest struct {
 	Schema string `json:"schema"`
 	Identity
@@ -70,6 +86,8 @@ type Manifest struct {
 	ContentSHA256     string          `json:"content_sha256"`
 	Files             []File          `json:"files"`
 }
+
+// Entry pairs a manifest with its canonical CCJ-1 digest.
 type Entry struct {
 	Manifest       Manifest `json:"manifest"`
 	ManifestSHA256 string   `json:"manifest_sha256"`
@@ -91,6 +109,7 @@ func (m Manifest) Object() map[string]any {
 	return map[string]any{"schema": m.Schema, "name": m.Name, "source": m.Source, "commit": m.Commit, "state_sha256": m.StateSHA256, "directory": m.Directory, "manifest_kind": m.ManifestKind, "declaration_path": m.DeclarationPath, "declaration_sha256": m.DeclarationSHA256, "declaration": declaration, "hash_version": m.HashVersion, "content_sha256": m.ContentSHA256, "files": files}
 }
 
+// Object projects the entry's admitted JSON domain for canonical encoding.
 func (e Entry) Object() map[string]any {
 	return map[string]any{"manifest": e.Manifest.Object(), "manifest_sha256": e.ManifestSHA256}
 }
@@ -102,6 +121,7 @@ type Budget struct {
 	started time.Time
 }
 
+// NewBudget starts the shared file, byte and deadline budget for one pass.
 func NewBudget() *Budget { return &Budget{started: time.Now()} }
 func (b *Budget) check(ctx context.Context) error {
 	if ctx.Err() != nil || time.Since(b.started) > VerificationTimeout {
@@ -119,7 +139,7 @@ func validDigest(value string) bool {
 		return false
 	}
 	for _, c := range value[7:] {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}

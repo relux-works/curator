@@ -247,6 +247,8 @@ func TestProfileSkillProjectionPublication(t *testing.T) {
 // Old Curator-owned raw-root links and old skills surface hashes are stale in
 // both native status and managed verification. Repair replaces them without
 // takeover, preserves the lock, and converges to readable projected context.
+// The old-marker cases use an unframed projected digest to isolate version
+// framing even when declaration files make the raw snapshot digest different.
 func TestProfileSkillProjectionRepair(t *testing.T) {
 	for _, mode := range []string{"old-marker", "raw-link", "raw-copy"} {
 		for _, id := range []string{"claude_code", "codex_cli"} {
@@ -286,6 +288,13 @@ func TestProfileSkillProjectionRepair(t *testing.T) {
 				oldHash, err := hashing.ContentSHA256WithVersion(raw, map[string]bool{}, lock.ContentHashVersion())
 				if err != nil {
 					t.Fatal(err)
+				}
+				if mode == "old-marker" {
+					skill, err := projectSkill(fx.home, raw, lock.ContentHashVersion())
+					if err != nil {
+						t.Fatal(err)
+					}
+					oldHash = skill.hash
 				}
 				before, err := os.ReadFile(lockPath(fx.home, fx.profile))
 				if err != nil {

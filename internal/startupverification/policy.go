@@ -4,32 +4,42 @@ package startupverification
 
 import "fmt"
 
+// DefaultLevel requires complete local verification unless explicitly configured.
 const DefaultLevel = 3
 
+// Diagnostic exposes a stable startup policy error code and its detail.
 type Diagnostic struct {
 	Code   string
 	Detail string
 }
 
 func (d *Diagnostic) Error() string { return d.Code + ": " + d.Detail }
+
+// Invalid reports a malformed policy input or unknown verification outcome.
 func Invalid(detail string) error {
 	return &Diagnostic{Code: "startup_verification_invalid", Detail: detail}
 }
 
+// Status classifies a required local verification observation.
 type Status string
 
+// Local outcomes distinguish a definite failure from unavailable evidence.
 const (
 	Passed      Status = "passed"
 	Failed      Status = "failed"
 	Unavailable Status = "unavailable"
 )
 
+// Observation carries one local check's typed outcome and diagnostic code.
 type Observation struct {
 	Status Status
 	Code   string
 }
+
+// Centre classifies the verification centre's availability and verdict.
 type Centre string
 
+// Centre outcomes keep fallback conditions separate from explicit refusals.
 const (
 	CentreAbsent      Centre = "absent"
 	CentrePassed      Centre = "passed"
@@ -38,6 +48,7 @@ const (
 	CentreInvalid     Centre = "invalid"
 )
 
+// Verdict records admission, verification completeness and all policy diagnostics.
 type Verdict struct {
 	Allow    bool
 	Verified bool
