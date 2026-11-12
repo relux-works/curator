@@ -1,0 +1,496 @@
+// Package skillintegrity captures and verifies unsigned skill evidence bound to
+// an already validated profile member. It never modifies a source or profile.
+package skillintegrity
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/skillspec"
+)
+
+const Schema = "curator.skill-integrity/1"
+const MaxFiles = 16384
+const MaxBytes int64 = 64 << 20
+const VerificationTimeout = 30 * time.Second
+const syntheticDeclaration = `{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}}`
+
+type Diagnostic struct {
+	Code   string
+	Detail string
+}
+
+func (d *Diagnostic) Error() string { return d.Code + ": " + d.Detail }
+func (d *Diagnostic) Is(target error) bool {
+	other, ok := target.(*Diagnostic)
+	return ok && d.Code == other.Code
+}
+func IsCode(err error, code string) bool { return errors.Is(err, &Diagnostic{Code: code}) }
+func failure(code, detail string) error  { return &Diagnostic{code, detail} }
+
+// Identity must come from the existing strict lock member reader. Its source,
+// Git/state pin and selected-directory validation remains that reader's contract.
+type Identity struct {
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	Commit      string `json:"commit"`
+	StateSHA256 string `json:"state_sha256"`
+	Directory   string `json:"directory"`
+}
+type File struct {
+	Path       string `json:"path"`
+	Size       int64  `json:"size"`
+	Executable bool   `json:"executable"`
+	SHA256     string `json:"sha256"`
+}
+type Manifest struct {
+	Schema string `json:"schema"`
+	Identity
+	ManifestKind      string          `json:"manifest_kind"`
+	DeclarationPath   string          `json:"declaration_path"`
+	DeclarationSHA256 string          `json:"declaration_sha256"`
+	Declaration       json.RawMessage `json:"declaration"`
+	HashVersion       int             `json:"hash_version"`
+	ContentSHA256     string          `json:"content_sha256"`
+	Files             []File          `json:"files"`
+}
+type Entry struct {
+	Manifest       Manifest `json:"manifest"`
+	ManifestSHA256 string   `json:"manifest_sha256"`
+}
+
+// Object projects only the admitted JSON domain for CCJ-1 encoding.
+func (m Manifest) Object() map[string]any {
+	files := make([]any, 0, len(m.Files))
+	for _, file := range m.Files {
+		files = append(files, map[string]any{"path": file.Path, "size": file.Size, "executable": file.Executable, "sha256": file.SHA256})
+	}
+	var declaration any
+	if m.Declaration != nil {
+		decoder := json.NewDecoder(bytes.NewReader(m.Declaration))
+		decoder.UseNumber()
+		// Validate checks the closed declaration before this projection is used.
+		_ = decoder.Decode(&declaration)
+	}
+	return map[string]any{"schema": m.Schema, "name": m.Name, "source": m.Source, "commit": m.Commit, "state_sha256": m.StateSHA256, "directory": m.Directory, "manifest_kind": m.ManifestKind, "declaration_path": m.DeclarationPath, "declaration_sha256": m.DeclarationSHA256, "declaration": declaration, "hash_version": m.HashVersion, "content_sha256": m.ContentSHA256, "files": files}
+}
+
+func (e Entry) Object() map[string]any {
+	return map[string]any{"manifest": e.Manifest.Object(), "manifest_sha256": e.ManifestSHA256}
+}
+
+// Budget is shared across every skill in one compose/verification pass.
+type Budget struct {
+	files   int
+	bytes   int64
+	started time.Time
+}
+
+func NewBudget() *Budget { return &Budget{started: time.Now()} }
+func (b *Budget) check(ctx context.Context) error {
+	if ctx.Err() != nil || time.Since(b.started) > VerificationTimeout {
+		return failure("skill_integrity_unavailable", "verification interrupted or deadline reached")
+	}
+	return nil
+}
+
+func digest(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+func validDigest(value string) bool {
+	if len(value) != 71 || !strings.HasPrefix(value, "sha256:") {
+		return false
+	}
+	for _, c := range value[7:] {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+type capture struct {
+	data  map[string][]byte
+	infos map[string]os.FileInfo
+	files []File
+}
+
+func (c *capture) reader(root string) skillspec.Reader {
+	relative := func(path string) (string, error) {
+		rel, err := filepath.Rel(root, path)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "", fs.ErrPermission
+		}
+		return filepath.ToSlash(rel), nil
+	}
+	stat := func(path string) (os.FileInfo, error) {
+		rel, err := relative(path)
+		if err != nil {
+			return nil, err
+		}
+		info, ok := c.infos[rel]
+		if !ok {
+			return nil, fs.ErrNotExist
+		}
+		return info, nil
+	}
+	return skillspec.Reader{Lstat: stat, Stat: stat, ReadFile: func(path string) ([]byte, error) {
+		rel, err := relative(path)
+		if err != nil {
+			return nil, err
+		}
+		data, ok := c.data[rel]
+		if !ok {
+			return nil, fs.ErrNotExist
+		}
+		return bytes.Clone(data), nil
+	}}
+}
+
+// Build uses one bounded capture for both hashing and native metadata parsing.
+// The caller supplies a shared budget for a closure, or nil for one skill.
+func Build(ctx context.Context, root string, identity Identity, budget *Budget) (Entry, error) {
+	return build(ctx, root, identity, budget, nil)
+}
+
+func build(ctx context.Context, root string, identity Identity, budget *Budget, expected *Manifest) (Entry, error) {
+	if budget == nil {
+		budget = NewBudget()
+	}
+	if err := budget.check(ctx); err != nil {
+		return Entry{}, err
+	}
+	c, err := captureTree(ctx, root, budget)
+	if err != nil {
+		// A completed per-file mismatch is a failure even if a later read is
+		// unavailable. Partial capture never proves an expected file absent.
+		if expected != nil && c != nil && observedMismatch(c.files, expected.Files) {
+			return Entry{}, errors.Join(failure("skill_integrity_mismatch", "observed file changed before verification became unavailable"), err)
+		}
+		return Entry{}, err
+	}
+	reader := c.reader(root)
+	if _, _, err := manifest.ReadSkillPackageWith(root, reader); err != nil {
+		return Entry{}, failure("skill_integrity_manifest_invalid", "skill declaration is invalid")
+	}
+	content, err := hashing.ContentSHA256Files(c.data, hashing.VersionV2)
+	if err != nil {
+		return Entry{}, failure("skill_integrity_manifest_invalid", "content hash could not be computed")
+	}
+	m := Manifest{Schema: Schema, Identity: identity, HashVersion: 2, ContentSHA256: content, Files: c.files, ManifestKind: "synthesized", Declaration: json.RawMessage(syntheticDeclaration)}
+	if source := reader.ManifestSourcePath(root); source != "" {
+		m.ManifestKind = "native"
+		m.DeclarationPath = source
+		m.DeclarationSHA256 = digest(c.data[source])
+		m.Declaration = nil
+	}
+	raw, err := protocoljson.MarshalCanonical(m.Object())
+	if err != nil || int64(len(raw)) > MaxBytes {
+		return Entry{}, failure("skill_integrity_manifest_invalid", "manifest exceeds evidence budget")
+	}
+	if err := budget.check(ctx); err != nil {
+		return Entry{}, err
+	}
+	entry := Entry{Manifest: m, ManifestSHA256: digest(raw)}
+	if err := entry.Validate(identity); err != nil {
+		return Entry{}, err
+	}
+	return entry, nil
+}
+
+func captureTree(ctx context.Context, root string, budget *Budget) (*capture, error) {
+	c := &capture{data: map[string][]byte{}, infos: map[string]os.FileInfo{}, files: []File{}}
+	folded := map[string]bool{}
+	err := filepath.WalkDir(root, func(path string, dir fs.DirEntry, walkErr error) error {
+		if err := budget.check(ctx); err != nil {
+			return err
+		}
+		if walkErr != nil {
+			return failure("skill_integrity_unavailable", "skill tree cannot be observed")
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return failure("skill_integrity_boundary_invalid", "invalid relative path")
+		}
+		rel = filepath.ToSlash(rel)
+		info, err := dir.Info()
+		if err != nil {
+			return failure("skill_integrity_unavailable", "skill entry cannot be observed")
+		}
+		if rel != "." {
+			if !identifiers.PortablePath(rel) || folded[strings.ToLower(rel)] {
+				return failure("skill_integrity_boundary_invalid", "nonportable or colliding path")
+			}
+			folded[strings.ToLower(rel)] = true
+			for _, part := range strings.Split(rel, "/") {
+				if part == ".git" {
+					return failure("skill_integrity_boundary_invalid", "Git metadata is not skill payload")
+				}
+			}
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return failure("skill_integrity_boundary_invalid", "payload links are forbidden")
+		}
+		if err := pathboundary.ValidateRouteWithOwner(root, path, pathboundary.DefaultOwnerLookup()); err != nil {
+			return failure("skill_integrity_boundary_invalid", "skill path boundary is invalid")
+		}
+		c.infos[rel] = info
+		if info.IsDir() {
+			return nil
+		}
+		if !info.Mode().IsRegular() || !singleLink(path, info) {
+			return failure("skill_integrity_boundary_invalid", "payload must contain single-link regular files")
+		}
+		if budget.files >= MaxFiles || info.Size() < 0 || info.Size() > MaxBytes-budget.bytes {
+			return failure("skill_integrity_manifest_invalid", "capture budget exceeded")
+		}
+		data, observed, err := readCapturedFile(path, info, MaxBytes-budget.bytes)
+		if err != nil {
+			return err
+		}
+		budget.files++
+		budget.bytes += int64(len(data))
+		c.data[rel] = data
+		c.infos[rel] = observed
+		c.files = append(c.files, File{Path: rel, Size: int64(len(data)), Executable: observed.Mode().Perm()&0o111 != 0, SHA256: digest(data)})
+		return budget.check(ctx)
+	})
+	if err != nil {
+		return c, err
+	}
+	if err := c.revalidate(ctx, root, budget); err != nil {
+		return c, err
+	}
+	sort.Slice(c.files, func(i, j int) bool { return c.files[i].Path < c.files[j].Path })
+	return c, nil
+}
+
+func (c *capture) revalidate(ctx context.Context, root string, budget *Budget) error {
+	seen := 0
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if err := budget.check(ctx); err != nil {
+			return err
+		}
+		if walkErr != nil {
+			return failure("skill_integrity_unavailable", "skill tree cannot be rechecked")
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return failure("skill_integrity_boundary_invalid", "invalid relative path")
+		}
+		rel = filepath.ToSlash(rel)
+		info, err := entry.Info()
+		if err != nil {
+			return failure("skill_integrity_unavailable", "skill entry cannot be rechecked")
+		}
+		if info.Mode()&os.ModeSymlink != 0 || (!info.IsDir() && (!info.Mode().IsRegular() || !singleLink(path, info))) {
+			return failure("skill_integrity_boundary_invalid", "skill entry changed to a forbidden kind")
+		}
+		before, ok := c.infos[rel]
+		if !ok || !os.SameFile(before, info) || before.Mode() != info.Mode() || before.Size() != info.Size() || !before.ModTime().Equal(info.ModTime()) {
+			return failure("skill_integrity_mismatch", "skill tree changed during capture")
+		}
+		seen++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if seen != len(c.infos) {
+		return failure("skill_integrity_mismatch", "skill roster changed during capture")
+	}
+	return nil
+}
+
+// Validate binds evidence to its already validated lock identity before I/O.
+func (e Entry) Validate(expected Identity) error {
+	m := e.Manifest
+	invalid := func() error { return failure("skill_integrity_manifest_invalid", "invalid integrity evidence") }
+	if m.Schema != Schema || m.HashVersion != 2 {
+		return failure("skill_integrity_unsupported_version", "unsupported integrity version")
+	}
+	if m.Identity != expected {
+		return failure("skill_integrity_manifest_invalid", "integrity identity differs from its lock member")
+	}
+	if !identifiers.Valid(m.Name) || !validDigest(m.ContentSHA256) || m.Files == nil || len(m.Files) > MaxFiles {
+		return invalid()
+	}
+	var total int64
+	folded := map[string]bool{}
+	roster := map[string]File{}
+	last := ""
+	for _, file := range m.Files {
+		if !identifiers.PortablePath(file.Path) || file.Path <= last || folded[strings.ToLower(file.Path)] || file.Size < 0 || file.Size > MaxBytes-total || !validDigest(file.SHA256) {
+			return invalid()
+		}
+		last = file.Path
+		folded[strings.ToLower(file.Path)] = true
+		total += file.Size
+		roster[file.Path] = file
+	}
+	switch m.ManifestKind {
+	case "native":
+		if m.DeclarationPath != skillspec.CanonicalManifestName && m.DeclarationPath != skillspec.LegacyManifestName && m.DeclarationPath != skillspec.RuntimeFallbackName {
+			return invalid()
+		}
+		file, ok := roster[m.DeclarationPath]
+		if !ok || !validDigest(m.DeclarationSHA256) || file.SHA256 != m.DeclarationSHA256 || (len(m.Declaration) != 0 && !bytes.Equal(m.Declaration, []byte("null"))) {
+			return invalid()
+		}
+	case "synthesized":
+		if m.DeclarationPath != "" || m.DeclarationSHA256 != "" {
+			return invalid()
+		}
+		var declaration any
+		decoder := json.NewDecoder(bytes.NewReader(m.Declaration))
+		decoder.UseNumber()
+		if protocoljson.Validate(m.Declaration) != nil || decoder.Decode(&declaration) != nil {
+			return invalid()
+		}
+		var declarationFields map[string]json.RawMessage
+		if json.Unmarshal(m.Declaration, &declarationFields) != nil || !bytes.Equal(bytes.TrimSpace(declarationFields["schema_version"]), []byte("3")) {
+			return invalid()
+		}
+		got, err := protocoljson.MarshalCanonical(declaration)
+		if err != nil {
+			return invalid()
+		}
+		var synthetic any
+		decoder = json.NewDecoder(strings.NewReader(syntheticDeclaration))
+		decoder.UseNumber()
+		_ = decoder.Decode(&synthetic)
+		want, _ := protocoljson.MarshalCanonical(synthetic)
+		if !bytes.Equal(got, want) {
+			return invalid()
+		}
+		for _, path := range []string{skillspec.CanonicalManifestName, skillspec.LegacyManifestName, skillspec.RuntimeFallbackName} {
+			if _, present := roster[path]; present {
+				return invalid()
+			}
+		}
+	default:
+		return invalid()
+	}
+	raw, err := protocoljson.MarshalCanonical(m.Object())
+	if err != nil || int64(len(raw)) > MaxBytes || !validDigest(e.ManifestSHA256) || digest(raw) != e.ManifestSHA256 {
+		return invalid()
+	}
+	return nil
+}
+
+// Verify never creates evidence. Missing evidence is handled by the caller's
+// typed unavailable observation; malformed supplied evidence is always fatal.
+func Verify(ctx context.Context, root string, expected Identity, e Entry, budget *Budget) error {
+	if err := e.Validate(expected); err != nil {
+		return err
+	}
+	actual, err := build(ctx, root, expected, budget, &e.Manifest)
+	if err != nil {
+		return err
+	}
+	if actual.ManifestSHA256 != e.ManifestSHA256 {
+		return failure("skill_integrity_mismatch", "skill roster, bytes, metadata or declaration changed")
+	}
+	return nil
+}
+
+// DecodeEntry enforces required fields as well as unknown-field rejection;
+// a missing false/zero-valued member must not acquire a decoding default.
+func DecodeEntry(raw []byte, expected Identity) (Entry, error) {
+	invalid := func() (Entry, error) {
+		return Entry{}, failure("skill_integrity_manifest_invalid", "invalid evidence JSON")
+	}
+	if int64(len(raw)) > MaxBytes || protocoljson.Validate(raw) != nil {
+		return invalid()
+	}
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil || !exactKeys(object, "manifest", "manifest_sha256") {
+		return invalid()
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(object["manifest"], &m) != nil || !exactKeys(m, "schema", "name", "source", "commit", "state_sha256", "directory", "manifest_kind", "declaration_path", "declaration_sha256", "declaration", "hash_version", "content_sha256", "files") {
+		return invalid()
+	}
+	for _, key := range []string{"schema", "name", "source", "commit", "state_sha256", "directory", "manifest_kind", "declaration_path", "declaration_sha256", "content_sha256"} {
+		if value := bytes.TrimSpace(m[key]); len(value) == 0 || value[0] != '"' {
+			return invalid()
+		}
+	}
+	filesDecoder := json.NewDecoder(bytes.NewReader(m["files"]))
+	if token, err := filesDecoder.Token(); err != nil || token != json.Delim('[') {
+		return invalid()
+	}
+	count := 0
+	for filesDecoder.More() {
+		if count >= MaxFiles {
+			return invalid()
+		}
+		count++
+		var file map[string]json.RawMessage
+		if filesDecoder.Decode(&file) != nil || !exactKeys(file, "path", "size", "executable", "sha256") {
+			return invalid()
+		}
+		boolean := bytes.TrimSpace(file["executable"])
+		if !bytes.Equal(boolean, []byte("true")) && !bytes.Equal(boolean, []byte("false")) {
+			return invalid()
+		}
+		size, err := strconv.ParseInt(string(bytes.TrimSpace(file["size"])), 10, 64)
+		if err != nil || size < 0 || size > MaxBytes {
+			return invalid()
+		}
+	}
+	if _, err := filesDecoder.Token(); err != nil {
+		return invalid()
+	}
+	var e Entry
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&e) != nil {
+		return invalid()
+	}
+	if err := e.Validate(expected); err != nil {
+		return Entry{}, err
+	}
+	return e, nil
+}
+func exactKeys(object map[string]json.RawMessage, keys ...string) bool {
+	if len(object) != len(keys) {
+		return false
+	}
+	for _, key := range keys {
+		if _, ok := object[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func observedMismatch(observed, expected []File) bool {
+	byPath := map[string]File{}
+	for _, file := range expected {
+		byPath[file.Path] = file
+	}
+	for _, file := range observed {
+		if want, ok := byPath[file.Path]; !ok || file != want {
+			return true
+		}
+	}
+	return false
+}

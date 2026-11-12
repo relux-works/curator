@@ -113,6 +113,7 @@ var commandRegistry = []commandSpec{
 	{"config claude-auth restore", "--backup PATH --expect-current-sha256 Y", "Restore a validated private backup and retain it.", claudeAuthConfigUsage, nil},
 	{"config show", "", "Print the effective machine configuration.", "", nil},
 	{"config launcher", "", "Print the selected machine launcher's non-secret JSON projection.", "", nil},
+	{"config startup-verification", "[--json | --level 1..4]", "Read or set the machine startup verification level.", "", nil},
 	{"config build-ssh", "<add|list|remove> [arguments]", "Manage SSH credentials for external build repositories.", buildSSHUsage, nil},
 	{"config build-ssh add", "<scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]", "Add or replace SSH credentials for a repository scope.", buildSSHUsage, nil},
 	{"config build-ssh list", "", "List configured SSH credential scopes.", buildSSHUsage, nil},
