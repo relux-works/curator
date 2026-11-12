@@ -384,12 +384,20 @@ func driveDirectoryVector(t *testing.T, tc directoryVector) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if expectedPin != info.LockHash {
-			t.Fatalf("substituted fixture lock identity mismatch: want %s got %s; lock=%s", expectedPin, info.LockHash, directoryJSON(t, info.Lock.Object()))
+		// These published lock4 vectors still prove exact member/pin and
+		// precedence compatibility. Lock6 evidence has separate full-roster
+		// controls; remove only the new carrier fields for this projection.
+		legacy := *info.Lock
+		legacy.SchemaVersion = 4
+		legacy.StartupVerificationLevel = nil
+		legacy.SkillIntegrity = nil
+		legacyPin, e := legacy.Hash()
+		if e != nil || expectedPin != legacyPin {
+			t.Fatalf("legacy fixture projection mismatch: want %s got %s: %v", expectedPin, legacyPin, e)
 		}
 	}
-	if directory != "" && info.Lock.SchemaVersion != 4 {
-		t.Fatalf("schema=%d want 4", info.Lock.SchemaVersion)
+	if directory != "" && info.Lock.SchemaVersion != contextlock.SkillIntegritySchemaVersion {
+		t.Fatalf("schema=%d want integrity carrier", info.Lock.SchemaVersion)
 	}
 	if _, ok := tc.Changes["requirers"]; ok {
 		if !reflect.DeepEqual(member.RequiredBy, []string{"consumer-a", "consumer-b"}) {

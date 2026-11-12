@@ -60,8 +60,10 @@ type state struct {
 // claimed. Agent approval requires a future manager-grant entry point; there
 // is deliberately no caller-supplied approver or ceiling parameter here.
 type Store struct {
-	Home       string
-	Precedence contextlock.Precedence
+	// StartupVerificationLevel is the selected machine baseline; zero defaults to3.
+	StartupVerificationLevel int
+	Home                     string
+	Precedence               contextlock.Precedence
 }
 
 func (s Store) precedence() contextlock.Precedence {
@@ -72,10 +74,11 @@ func (s Store) precedence() contextlock.Precedence {
 }
 
 type operation struct {
-	state      state
-	root       string
-	lock       *managerlock.HomeLock
-	precedence contextlock.Precedence
+	startupVerificationLevel int
+	state                    state
+	root                     string
+	lock                     *managerlock.HomeLock
+	precedence               contextlock.Precedence
 }
 
 func newID() string {
@@ -118,7 +121,7 @@ func (s Store) beginValidated(create bool, validate func() error) (*operation, e
 	if err != nil {
 		return nil, err
 	}
-	op := &operation{root: filepath.Join(m.Home(), "project-context"), lock: lock, precedence: s.precedence()}
+	op := &operation{startupVerificationLevel: s.StartupVerificationLevel, root: filepath.Join(m.Home(), "project-context"), lock: lock, precedence: s.precedence()}
 	ok := false
 	defer func() {
 		if !ok {

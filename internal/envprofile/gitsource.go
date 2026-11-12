@@ -949,7 +949,7 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 // Malformed network and file:// sources also pass through here and are
 // rejected at that Identity boundary with profile_source_invalid.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
-	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
+	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights, StartupVerificationLevel: manifest.StartupVerificationLevel}
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{

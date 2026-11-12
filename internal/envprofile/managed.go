@@ -42,6 +42,7 @@ import (
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/startupverification"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -99,12 +100,14 @@ func ManagedHomeDir(home, profile, envID string) string {
 
 // ResolveRequest is one env resolve or repair operation.
 type ResolveRequest struct {
-	Home      string
-	Profile   string
-	EnvID     string
-	LaunchDir string
-	Machine   envregistry.MachineConfig
-	Repair    bool
+	// Capture remains a strict evidence-producing operation at every level.
+	strictStartupInput bool
+	Home               string
+	Profile            string
+	EnvID              string
+	LaunchDir          string
+	Machine            envregistry.MachineConfig
+	Repair             bool
 	// PreserveLock refuses repair that changes the effective profile pin.
 	PreserveLock bool
 	// DryRun reports store rebuilds that a repair would perform without
@@ -2047,6 +2050,7 @@ func sortedKeysBytes(values map[string][]byte) []string {
 // verification is the lock-free currency verdict over exactly the surfaces
 // the marker records (§10.1).
 type verification struct {
+	contentChecks         []startupverification.Observation
 	current               bool
 	reasons               []string
 	warnings              []string
@@ -2063,6 +2067,11 @@ type verification struct {
 	hash         string
 	order        []contextlock.Member
 	servers      []contextmaterialize.MCPServer
+}
+
+func (v *verification) contentReason(status startupverification.Status, reason string) {
+	v.reasons = append(v.reasons, reason)
+	v.contentChecks = append(v.contentChecks, startupverification.Observation{Status: status, Code: "environment_surface_content"})
 }
 
 // SurfaceDiagnostics for status rows (environments §8.5).
@@ -2151,7 +2160,11 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 	}
 	for _, skill := range plan.skillProjections {
 		if err := verifySkillProjection(req.Home, skill); err != nil {
-			verdict.reasons = append(verdict.reasons, "skill projection: "+err.Error())
+			if errors.Is(err, ErrSkillProjectionIdentity) {
+				verdict.contentReason(startupverification.Failed, "skill projection: "+err.Error())
+			} else {
+				verdict.reasons = append(verdict.reasons, "skill projection: "+err.Error())
+			}
 			verdict.mark(envmarker.SurfaceSkills, DiagSurfaceDrift)
 		}
 	}
@@ -2209,10 +2222,14 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 			v.mark(key, DiagSurfaceMissing)
 			continue
 		}
-		if !equalStrings(recorded.Paths, expected.Paths) || recorded.ContentSHA256 != expected.ContentSHA256 {
+		if !equalStrings(recorded.Paths, expected.Paths) {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface %s record does not match", key))
 			v.mark(key, DiagSurfaceDrift)
 			continue
+		}
+		if recorded.ContentSHA256 != expected.ContentSHA256 {
+			v.contentReason(startupverification.Failed, fmt.Sprintf("surface %s record does not match", key))
+			v.mark(key, DiagSurfaceDrift)
 		}
 		if key == envmarker.SurfaceRootContext && recorded.Form != plan.form {
 			v.reasons = append(v.reasons, fmt.Sprintf("root-context form %s is not the effective %s", recorded.Form, plan.form))
@@ -2297,7 +2314,7 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 					continue
 				}
 				if contextmaterialize.FileHash(state.Bytes) != contextmaterialize.FileHash(expected) {
-					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target bytes differ", path))
+					v.contentReason(startupverification.Failed, fmt.Sprintf("surface file %s is drifted: link target bytes differ", path))
 					v.mark(key, DiagSurfaceDrift)
 				}
 				continue
@@ -2340,7 +2357,7 @@ func (v *verification) checkCopy(path, full string, document []byte) string {
 		return DiagSurfaceMissing
 	}
 	if contextmaterialize.FileHash(state.Bytes) != contextmaterialize.FileHash(document) {
-		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
+		v.contentReason(startupverification.Failed, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
 		return DiagSurfaceDrift
 	}
 	return ""
@@ -2367,7 +2384,7 @@ func (v *verification) checkFallbackCopy(path, full, source string) string {
 			return DiagSurfaceUnreadable
 		}
 		if got != want {
-			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
+			v.contentReason(startupverification.Failed, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
 			return DiagSurfaceDrift
 		}
 		return ""
@@ -2952,7 +2969,23 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if err := policy.checkHardenedMCP(lock); err != nil {
 		return nil, err
 	}
-	if failure := validateNamedStorePins(req.Home, lock); failure != nil {
+	var floors []int
+	if lock.StartupVerificationLevel != nil {
+		floors = append(floors, *lock.StartupVerificationLevel)
+	}
+	effectiveLevel, err := startupverification.EffectiveLevel(policy.startupBaseline(), floors...)
+	if err != nil {
+		return nil, err
+	}
+	localChecks, localErr := startupChecks(req.Home, lock)
+	if localErr != nil && (!req.Repair || effectiveLevel < 3) {
+		return nil, localErr
+	}
+	// Source repair remains strict at local-verification levels. Permissive
+	// startup observes and warns without replacing mismatching store evidence.
+	pinRequest := req
+	pinRequest.Policy.StartupVerificationLevel = effectiveLevel
+	if failure := validateNamedStorePinsForRepair(pinRequest, lock); failure != nil {
 		if pinnedCommitObjectUnavailable(failure) {
 			return nil, failure
 		}
@@ -2971,22 +3004,26 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		}
 		return nil, failure
 	}
-	if req.Repair && !req.DryRun && repairWouldChangeLockHash(lock) {
-		return repairUnderLock(&req, adapter, source)
-	}
-	if req.Repair {
+	needsIdentityRepair := req.Repair && effectiveLevel >= 3 && repairWouldChangeLockHash(lock)
+	var nativeRepairReason string
+	if req.Repair && effectiveLevel >= 3 {
 		row, err := nativeSkillsState(req.Home, profile, adapter.ID, req.nativeHome)
 		if err != nil {
 			return nil, err
 		}
 		if row != nil && row.State != "current" {
-			if req.DryRun {
-				return &ResolveResult{StaleReasons: []string{row.Detail}}, fmt.Errorf("%s: %s", DiagHomeStale, row.Detail)
-			}
-			return repairUnderLock(&req, adapter, source)
+			nativeRepairReason = row.Detail
 		}
 	}
 	verdict := verify(&req, adapter, source, lock, hash)
+	if needsIdentityRepair {
+		verdict.reasons = append(verdict.reasons, "profile content identity needs migration")
+		verdict.current = false
+	}
+	if nativeRepairReason != "" {
+		verdict.reasons = append(verdict.reasons, nativeRepairReason)
+		verdict.current = false
+	}
 	if verdict.credentialSourceError != nil {
 		return nil, verdict.credentialSourceError
 	}
@@ -2995,6 +3032,59 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	}
 	if verdict.passthroughReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
+	}
+	{
+		if localErr != nil {
+			return nil, localErr
+		}
+		checks := append(append([]startupverification.Observation{}, localChecks...), verdict.contentChecks...)
+		// A requested strict repair may fix home content, but it cannot
+		// manufacture missing profile evidence or accept a source mismatch.
+		if req.Repair && effectiveLevel >= 3 && !verdict.current {
+			checks = localChecks
+		}
+		decision, err := startupVerdict(policy, lock, checks)
+		if err != nil {
+			return nil, err
+		}
+		if req.strictStartupInput && effectiveLevel < 3 {
+			decision, err = startupverification.Decide(3, checks, startupverification.CentreAbsent)
+			if err != nil {
+				return nil, err
+			}
+		}
+		verdict.warnings = append(verdict.warnings, decision.Warnings...)
+		if !decision.Allow {
+			details := []string{}
+			for _, check := range checks {
+				if check.Status != startupverification.Passed {
+					details = append(details, check.Code)
+				}
+			}
+			if len(verdict.reasons) > 0 {
+				details = append(details, DiagHomeStale+": "+strings.Join(verdict.reasons, "; "))
+			}
+			prefix := strings.Join(decision.Refusals, "; ")
+			// Pin observations own this diagnostic prefix; preserve the
+			// established store refusal while retaining the new verdict codes.
+			for _, check := range checks {
+				if check.Status != startupverification.Passed && strings.HasPrefix(check.Code, envregistry.DiagStoreUntrusted+": ") {
+					prefix = envregistry.DiagStoreUntrusted + ": " + prefix
+					break
+				}
+			}
+			return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: local startup evidence refused: %s", prefix, strings.Join(details, "; "))
+		}
+		if len(verdict.reasons) == len(verdict.contentChecks) && (!req.Repair || effectiveLevel < 3 || verdict.current) {
+			verdict.current = true
+		}
+		if req.Repair && effectiveLevel < 3 && !verdict.current {
+			for _, check := range localChecks {
+				if check.Status == startupverification.Failed {
+					return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: required home cannot be repaired from mismatching evidence", DiagHomeStale)
+				}
+			}
+		}
 	}
 	if verdict.current {
 		fragment, err := buildFragment(&req, adapter, verdict)
@@ -3013,7 +3103,14 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if req.DryRun {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
 	}
-	return repairUnderLock(&req, adapter, source)
+	if effectiveLevel < 3 && repairWouldChangeLockHash(lock) {
+		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: explicit profile migration is required before permissive home provisioning", DiagRepairNeedsLockMigration)
+	}
+	result, err := repairUnderLock(&req, adapter, source)
+	if result != nil {
+		result.Warnings = append(result.Warnings, verdict.warnings...)
+	}
+	return result, err
 }
 
 // repairWouldChangeLockHash is the preflight predicate for every lock-changing
