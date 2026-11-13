@@ -1155,3 +1155,12 @@ internal/envprofile	TestNativeHomePhysicalContainment/manager-missing-child	linu
 internal/envprofile	TestNativeHomePhysicalContainment/default-without-selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
 internal/envprofile	TestNativeHomePhysicalContainment/default-after-managed-selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
 internal/envprofile	TestNativeHomePhysicalContainment/case-distinct-outside	linux,darwin,windows	linux,darwin,windows	host-capability	distinct case spellings remain external when Stat and SameFile prove distinct directories
+# Separate draft store reader: mandatory guards; explicitly non-canonical rehearsal.
+internal/envprofile	TestStoreVerificationReaderClosedCarrier	linux,darwin,windows	-	-	closed case reader rejects malformed and unsupported inputs beside a valid control
+internal/envprofile	TestStoreVerificationSelectionRefusesIncompletePin	linux,darwin,windows	-	-	partial or mismatched store selection refuses before cases
+internal/envprofile	TestStoreVerificationCanonicalSelectorGuard	linux,darwin,windows	-	-	canonical gate refuses present-empty and set selectors beside an unset control
+internal/envprofile	TestStoreVerificationProductionNonreference	linux,darwin,windows	-	-	production source has no selector reference and a planted read is detected
+internal/envprofile	TestStoreVerificationPinnedCorpusReader	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
+internal/envprofile	TestStoreVerificationActualReaderDirections	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
+internal/storecompatibility	TestExactMigrationPartitionAndControls	linux,darwin,windows	-	-	exact38-row32/6 migration partition rejects a same-count swapped-ID plant
+internal/storecompatibility	TestReplayEventDoesNotNormalizeDuplicateVerdicts	linux,darwin,windows	-	-	decoded duplicate event keys cannot erase a failing verdict
