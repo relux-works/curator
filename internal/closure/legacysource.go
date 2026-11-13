@@ -47,7 +47,9 @@ func refreshCheckout(opts Options, name, declared, chain, repo string) error {
 //   - with no declaration, or a declared local path, the stored origin is the
 //     only refresh source: a network origin is gated, a local origin is
 //     resolved to its absolute physical path, and a declared local path must
-//     name the stored origin's location or the checkout itself (Rule B).
+//     name the stored origin's location or the checkout itself (Rule B). A
+//     local origin spelled with leading or trailing whitespace is refused
+//     (source_path_whitespace), like such a declaration (gateSource).
 //
 // isDeclared reports that the endpoint is the declaration. An empty endpoint
 // means the checkout has no origin and is not fetched. Other remotes are
@@ -77,7 +79,13 @@ func bindCheckout(opts Options, name, declared, chain, repo string) (endpoint st
 		}
 		return declared, true, nil
 	case declared != "":
-		if originErr != nil || originID != "" || !sameLocalSource(declared, origin, repo) {
+		if originErr != nil || originID != "" {
+			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
+		}
+		if err := originSpelling(name, chain, repo, origin); err != nil {
+			return "", false, err
+		}
+		if !sameLocalSource(declared, origin, repo) {
 			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
 		}
 		return localOriginEndpoint(name, chain, repo, origin)
@@ -87,13 +95,37 @@ func bindCheckout(opts Options, name, declared, chain, repo string) (endpoint st
 		}
 		return origin, false, nil
 	default:
+		if err := originSpelling(name, chain, repo, origin); err != nil {
+			return "", false, err
+		}
 		return localOriginEndpoint(name, chain, repo, origin)
 	}
 }
 
+// edgeWhitespace reports a source spelling that begins or ends with
+// whitespace. git reads such bytes as part of a local path, while every
+// curator reading of a source spelling (identity.Parse, the clone lane's
+// argument) trims them, so the two readings can name different locations.
+func edgeWhitespace(spelling string) bool {
+	return spelling != strings.TrimSpace(spelling)
+}
+
+// originSpelling refuses a stored local origin spelled with leading or
+// trailing whitespace (source_path_whitespace) instead of choosing between
+// git's byte reading and the trimmed one.
+func originSpelling(name, chain, repo, origin string) error {
+	if !edgeWhitespace(origin) {
+		return nil
+	}
+	return fmt.Errorf(
+		"source_path_whitespace: stored local origin %q of checkout %s for %s begins or ends with whitespace, which git reads as part of the path; nothing was fetched; set the origin without it (via %s)",
+		origin, repo, name, chain)
+}
+
 // localOriginEndpoint turns a stored local origin into the endpoint handed
 // to git: its absolute physical path, read from the checkout as git fetch
-// reads a relative origin. git reads a bare relative word such as "mirror",
+// reads a relative origin, with every byte of every resolved component kept
+// (fetchEndpoint hands it to git unmodified). git reads a bare relative word such as "mirror",
 // and a file:// URL, as the name of a configured remote before a location.
 // A configuration remote name can never begin with "/", so the absolute
 // POSIX path is unambiguous; a path that does not begin with "/" (a Windows
@@ -136,14 +168,16 @@ func fetchSource(opts Options, name, chain, repo, endpoint string, declared bool
 }
 
 // fetchEndpoint is the production refresh of one endpoint. A network
-// endpoint uses the operator transport, like the clone path; a local one
-// involves no network transport and uses the isolated configuration. Neither
-// consults the checkout's remotes.
+// endpoint uses the operator transport, like the clone path; a local one,
+// always an absolute physical path from localOriginEndpoint, involves no
+// network transport, uses the isolated configuration and is handed to git
+// byte for byte (no trimming: a final space can name another repository).
+// Neither consults the checkout's remotes.
 func fetchEndpoint(repo, endpoint string) error {
 	if id, err := identity.Parse(endpoint); err != nil || id != "" {
 		return gitops.FetchURLRefusingRedirect(repo, endpoint)
 	}
-	return gitops.FetchURLIsolated(repo, endpoint)
+	return gitops.FetchLocalPathIsolated(repo, endpoint)
 }
 
 // redirectDiagnostic returns source_url_redirected for a *gitops.RedirectError
@@ -216,22 +250,29 @@ func sameLocation(left, right string) bool {
 }
 
 // localPathOf returns the filesystem path a local source spells: a file://
-// URL's path, or the raw value. It does not clean the result: ".." must be
-// walked after the symlinks before it (physicalPath).
+// URL's path, or the raw value. It neither trims nor cleans the result: a
+// path byte is significant (edgeWhitespace spellings are refused before this
+// point), and ".." must be walked after the symlinks before it
+// (physicalPath). A file: spelling without "//" is refused: git reads it as
+// an scp-like host "file", not as a location.
 func localPathOf(raw string) (string, bool) {
-	value := strings.TrimSpace(raw)
+	value := raw
 	if value == "" {
 		return "", false
 	}
 	if len(value) >= 5 && strings.EqualFold(value[:5], "file:") {
+		if !strings.HasPrefix(value[5:], "//") {
+			return "", false
+		}
 		parsed, err := url.Parse(value)
 		if err != nil {
 			return "", false
 		}
+		// The host is dropped, as git drops it for file:// (probed: a
+		// file://otherhost/x fetch reads /x). Percent escapes never reach
+		// this point: identity.Parse refuses them, and the stored-origin
+		// case then takes the gated network branch, which refuses too.
 		value = parsed.Path
-		if parsed.Opaque != "" {
-			value = parsed.Opaque
-		}
 		// file:///C:/x carries the drive after a leading slash.
 		if len(value) >= 3 && value[0] == '/' && identity.IsDrivePath(value[1:]) {
 			value = value[1:]

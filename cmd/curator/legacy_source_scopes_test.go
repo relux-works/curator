@@ -76,3 +76,95 @@ func TestUpgradeAllBindsEveryProjectToTheSharedCheckout(t *testing.T) {
 		}
 	})
 }
+
+// republishV1 moves tag v1 of a bare repository to a new commit whose
+// SKILL.md carries marker, and adds the tag marker on that commit.
+func republishV1(t *testing.T, bare, marker string) {
+	t.Helper()
+	work := filepath.Join(t.TempDir(), "work")
+	runGit(t, filepath.Dir(work), "clone", "-q", bare, work)
+	skill := filepath.Join(work, "SKILL.md")
+	content, err := os.ReadFile(skill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, skill, string(content)+"\n"+marker+"\n")
+	runGit(t, work, "commit", "-qam", marker)
+	runGit(t, work, "tag", "-f", "v1")
+	runGit(t, work, "tag", marker)
+	runGit(t, work, "push", "-q", "--force", "origin", "HEAD:refs/heads/main", "refs/tags/v1", "refs/tags/"+marker)
+}
+
+// Claim (review R2 witness, real CLI): `upgrade app` with the "direct"
+// checkout's ordinary origin file://<root>/mirror, mirror -> a repository
+// whose name ends in a space, and a distinct sibling without the space,
+// fetches the symlink target: its fresh-intended tag arrives, the sibling's
+// tag does not, and the installed skill is the target's v1 payload, not the
+// sibling's; with no declared source and with the matching file://
+// declaration. Control: an ordinary target name with a distinct sibling
+// behaves the same.
+func TestUpgradeFetchesTheExactPhysicalOrigin(t *testing.T) {
+	for _, names := range []struct{ name, intended, sibling string }{
+		{"final space", "direct.git ", "direct.git"},
+		{"ordinary path control", "direct.git", "other.git"},
+	} {
+		for _, declared := range []bool{false, true} {
+			label := names.name + "/undeclared"
+			if declared {
+				label = names.name + "/declared file URL"
+			}
+			t.Run(label, func(t *testing.T) {
+				fixture := newUpgradeFixture(t, "app")
+				root, err := filepath.EvalSymlinks(filepath.Dir(fixture.skillsRoot))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(filepath.Join(root, names.intended), 0o755); err != nil {
+					t.Skipf("filesystem refuses %q: %v", names.intended, err)
+				}
+				if err := os.Remove(filepath.Join(root, names.intended)); err != nil {
+					t.Fatal(err)
+				}
+				for name, marker := range map[string]string{names.intended: "fresh-intended", names.sibling: "only-in-trimmed-sibling"} {
+					bare := filepath.Join(root, name)
+					runGit(t, root, "clone", "-q", "--bare", filepath.Join(root, "upstream", "direct"), bare)
+					republishV1(t, bare, marker)
+				}
+				mirror := filepath.Join(root, "mirror")
+				if err := os.Symlink(filepath.Join(root, names.intended), mirror); err != nil {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				mirrorURL := "file://" + filepath.ToSlash(mirror)
+				if filepath.VolumeName(mirror) != "" {
+					mirrorURL = "file:///" + filepath.ToSlash(mirror)
+				}
+				checkout := filepath.Join(fixture.skillsRoot, "direct")
+				runGit(t, checkout, "remote", "set-url", "origin", mirrorURL)
+				if declared {
+					fixture.declareGit(t, "app", "direct", mirrorURL)
+				} else {
+					fixture.declare(t, "app", "direct")
+				}
+
+				code, stdout, stderr := capture(t, fixture.configPath, "upgrade", "app")
+				if code != exitOK {
+					t.Fatalf("upgrade app = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+				}
+				if fetches := countFetches(stdout, "direct"); fetches != 1 {
+					t.Fatalf("direct fetched %d times, want 1\n%s", fetches, stdout)
+				}
+				tags := runGitOutput(t, checkout, "tag", "-l")
+				if !strings.Contains(tags, "fresh-intended") || strings.Contains(tags, "only-in-trimmed-sibling") {
+					t.Fatalf("tags %q: want the symlink target's tag and not the sibling's", tags)
+				}
+				installed, err := os.ReadFile(filepath.Join(fixture.projects["app"], ".agents", "skills", "direct", "SKILL.md"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(installed), "fresh-intended") || strings.Contains(string(installed), "only-in-trimmed-sibling") {
+					t.Fatalf("installed SKILL.md is not the symlink target's v1 payload:\n%s", installed)
+				}
+			})
+		}
+	}
+}

@@ -603,11 +603,19 @@ func repoKey(repo string) string {
 }
 
 // gateSource applies the machine allowlist before any network clone or
-// fetch (Spec §8.2).
+// fetch (Spec §8.2). A declared local path that begins or ends with
+// whitespace is refused first (source_path_whitespace): the clone lane trims
+// it while git reads those bytes as part of the path, so the declaration
+// would name two different locations.
 func gateSource(opts Options, name, gitURL, chain string) error {
 	id, err := identity.Parse(gitURL)
 	if err != nil {
 		return fmt.Errorf("invalid source for %s: %s; %v; required via %s", name, gitURL, err, chain)
+	}
+	if id == "" && edgeWhitespace(gitURL) {
+		return fmt.Errorf(
+			"source_path_whitespace: %s declares local source %q, which begins or ends with whitespace; git reads it as part of the path while declarations are trimmed; nothing was cloned or fetched; remove the whitespace (via %s)",
+			name, gitURL, chain)
 	}
 	if identity.Allowed(id, opts.AllowedSources) {
 		return nil

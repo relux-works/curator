@@ -114,14 +114,15 @@ func FetchURLRefusingRedirect(repo, remoteURL string) error {
 // OriginURL reads the checkout's stored origin URL without network access.
 // Values are read like the profile lane's cache binding: repository-local
 // configuration with its includes expanded, NUL-delimited, before any
-// url.<base>.insteadOf rewrite. present is false when no origin URL is
-// configured. Several values, or a blank one, are refused, because git would
-// fetch from only one of them.
+// url.<base>.insteadOf rewrite. The value is returned byte for byte, leading
+// and trailing whitespace included (git reads them as part of the URL).
+// present is false when no origin URL is configured. Several values, or a
+// blank one, are refused, because git would fetch from only one of them.
 func OriginURL(repo string) (originURL string, present bool, err error) {
 	if err := EnsureRepo(repo); err != nil {
 		return "", false, err
 	}
-	out, err := run(repo, "config", "--local", "--includes", "--null", "--get-all", "remote.origin.url")
+	out, err := runUntrimmed(repo, "config", "--local", "--includes", "--null", "--get-all", "remote.origin.url")
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
