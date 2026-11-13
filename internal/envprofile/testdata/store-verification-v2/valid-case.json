@@ -1,0 +1,51 @@
+[
+  {
+    "schema": "curator.environment-store-case/2",
+    "capability": "agent-environments",
+    "capability_revision": 2,
+    "name": "control-resolve-context-intact",
+    "case_kind": "implementation",
+    "operation": "resolve",
+    "condition": "intact",
+    "member_kind": "context",
+    "source_kind": "git",
+    "home_state": "current",
+    "verification_levels": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "expected": {
+      "diagnostic": "",
+      "failing_check": "",
+      "fragment_emitted": true,
+      "row_current": true,
+      "writes": [],
+      "store_rebuilt": false,
+      "lock_unchanged": true,
+      "plant_preserved": false,
+      "path_named": false,
+      "rule_named": false
+    },
+    "positive_control": "control-resolve-context-intact",
+    "predecessor": null,
+    "forbidden_observations": [
+      {
+        "name": "rejects-valid-neighbor",
+        "observation": {
+          "diagnostic": "environment_store_untrusted",
+          "failing_check": "",
+          "fragment_emitted": false,
+          "row_current": false,
+          "writes": [],
+          "store_rebuilt": false,
+          "lock_unchanged": true,
+          "plant_preserved": false,
+          "path_named": false,
+          "rule_named": false
+        }
+      }
+    ]
+  }
+]

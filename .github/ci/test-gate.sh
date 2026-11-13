@@ -44,6 +44,13 @@ GO="${GO:-go}"
 GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-60m}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
+# Presence, including an empty value, cannot replace the canonical gate with
+# the separate explicitly pinned store-qualification rehearsal.
+if [ "${CURATOR_STORE_VERIFICATION_ROOT+present}" = present ] || [ "${CURATOR_STORE_VERIFICATION_MANIFEST_SHA256+present}" = present ]; then
+	echo 'test-gate: canonical conformance refuses store qualification selectors.' >&2
+	exit 2
+fi
+
 if [ "$#" -ne 1 ]; then
 	echo 'test-gate: usage: test-gate.sh <evidence-dir>' >&2
 	exit 2

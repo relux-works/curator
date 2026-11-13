@@ -488,6 +488,12 @@ Focused checks are
 `go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|ReadPuritySSHNamespaceVerdict|GPGSignaturePipe|ReadPurityDirectoryHandleWitness|ReadOnlyGPGKeyringPrivateBoundary|SignatureFilesRealSSH|SignatureFileTransport|SignaturePEImportValidation|SignatureScratchWitness)'`;
 keep captured test output under `.temp/`.
 
+The draft store qualification reader and historical compatibility checker are
+documented in [startup verification](docs/startup-verification.md#store-qualification-tools).
+Run `go test -p=1 -parallel=1 ./internal/storecompatibility` for the exact-partition
+controls; `go run ./tools/check-store-compatibility -input .temp/store-replay.jsonl`
+checks an actual complete replay stream. Save reports under `.temp/`.
+
 For managed Claude gateway settings, configure
 `curator env config set claude_settings_mode.<profile> read-only`, then run
 `curator env resolve claude_code --profile <profile> --repair`. The managed-home
