@@ -57,8 +57,12 @@ All notable implementation changes are recorded here.
   earlier project of `upgrade --all` already refreshed; only a fetch of the
   identical endpoint is deduplicated. A local origin is fetched by its
   absolute physical path, never as a spelling git could read as a remote
-  name (`source_origin_ambiguous` where that cannot be ruled out), and
-  local paths compare with symlinks resolved before `..`. The published
+  name (`source_origin_ambiguous` where that cannot be ruled out) and with
+  every byte kept, so a symlink target ending in a space is never fetched as
+  its trimmed sibling, and local paths compare with symlinks resolved before
+  `..`. A declared local path or stored local origin that begins or ends
+  with whitespace refuses with `source_path_whitespace`, also before a
+  clone; a `file:` origin without `//` is not read as a location. The published
   manager-lifecycle vectors pass unchanged.
 - An existing profile source cache refreshes from the git descriptor the
   operation names, not from the origin stored when the cache was first

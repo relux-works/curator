@@ -280,6 +280,9 @@ not fetched and resolves from its local state.
   a relative origin is read from the checkout, as git reads it. Git is never
   handed the raw spelling, because git reads a bare word such as `mirror`, or
   a `file://` URL, as the name of a configured remote before a location.
+  The physical path is handed to git byte for byte: a symlink target whose
+  name ends in a space, tab or newline is fetched as named, never as the
+  sibling without that byte.
 - A declared local path must name the stored origin's location, or the
   checkout itself. A relative declaration is read from the working directory.
   Every path is resolved as the filesystem walks it, with each symlink
@@ -297,6 +300,13 @@ Refusals, each made before anything is fetched unless noted:
   the declaration, or one side is local and the other a network URL. The
   diagnostic names the declared URL, the stored origin, both identities and
   the checkout. Repoint the checkout's origin or fix the declaration.
+- `source_path_whitespace`: a declared local path, or a stored local origin,
+  begins or ends with whitespace. Git reads those bytes as part of the path,
+  while a declaration is trimmed (the clone path clones the trimmed
+  spelling), so the two readings can name different directories. Also
+  applies before a clone or a dev-substitution clone. Remove the whitespace
+  from the declaration or the origin. Whitespace inside a spelling, and in
+  the directories a spelling resolves to, is kept exactly.
 - `source_origin_ambiguous`: on a platform whose absolute paths do not begin
   with `/` (Windows), a local origin's absolute path is also the name of a
   configured remote of the checkout. Rename that remote.
