@@ -2866,10 +2866,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if err := validateProfilePathSources(profile, source, req.Policy); err != nil {
 		return nil, err
 	}
-	if failure := validateNamedStoreBoundaries(req.Home, lock, req.boundaryOwnerLookup); failure != nil {
-		// Structural/path violations are tamper evidence, even with repair.
-		// Preserve them and refuse before any source or home mutation.
-		return nil, failure
+	absentStore, err := inspectStoreAvailability(req.Home, lock, req.boundaryOwnerLookup)
+	if err != nil {
+		return nil, err
 	}
 	if err := validateMarkerBoundary(req.Home, profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
 		if req.Repair && req.DryRun {
@@ -2895,6 +2894,23 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	effectiveLevel, err := startupverification.EffectiveLevel(policy.startupBaseline(), floors...)
 	if err != nil {
 		return nil, err
+	}
+	if len(absentStore) != 0 {
+		failure := absentStore[0]
+		if !req.Repair || effectiveLevel < 3 {
+			return nil, failure
+		}
+		if req.DryRun {
+			return nil, dryRunStoreEntryFailure(failure)
+		}
+		if req.storeRepairAttempted {
+			return nil, absentStoreRepairRefusal(failure)
+		}
+		if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
+			return nil, err
+		}
+		req.storeRepairAttempted = true
+		return Resolve(req)
 	}
 	localChecks, localErr := startupChecks(req.Home, lock)
 	if localErr != nil {
@@ -3060,6 +3076,9 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 			return err
 		}
 		if err := req.validatePreservedLock(); err != nil {
+			return err
+		}
+		if err := req.validateRepairStoreStructure(); err != nil {
 			return err
 		}
 		if req.EnvID == envregistry.CodexCLI {

@@ -198,19 +198,9 @@ func gitHasher(objectFormat string) (func() hash.Hash, error) {
 // ancestors around the selected tree. Comparing the entire projected snapshot
 // also detects unexpected sibling files added to the store.
 func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string, error) {
-	tree, format, err := PinnedCommitTree(repo, commit)
+	tree, format, err := pinnedSnapshotSelection(repo, commit, directory)
 	if err != nil || directory == "" {
 		return tree, format, err
-	}
-	env, cleanup, err := isolatedGitEnv()
-	if err != nil {
-		return "", "", err
-	}
-	defer cleanup()
-	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
-	tree, err = directoryTree(repo, tree, directory, env)
-	if err != nil {
-		return "", "", err
 	}
 	projected, err := ProjectedTreeID(format, directory, tree)
 	return projected, format, err
