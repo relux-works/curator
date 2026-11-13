@@ -352,3 +352,37 @@ func TestReadPurityVendorObservation(t *testing.T) {
 		t.Fatalf("explicit probe positive did not execute: %v", err)
 	}
 }
+
+// Fragment construction consumes the credential policy frozen by verification;
+// it must not ask even a supplied observation callback for another release.
+func TestReadPurityFragmentUsesCredentialObservation(t *testing.T) {
+	fx, _, _ := museFixture(t)
+	req := fx.request(envregistry.Muse)
+	req.readOnly = true
+	observations := 0
+	req.Detect = func(envregistry.Adapter) string { observations++; return "unknown" }
+	adapter, err := envregistry.ByID(envregistry.Muse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := readSource(fx.home, fx.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, hash, err := readLock(fx.home, fx.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verdict := verifyHomeObserved(&req, adapter, source, lock, hash, "unknown")
+	if len(verdict.reasons) != 0 || verdict.plan == nil {
+		t.Fatalf("prepared fixture is not current: %v", verdict.reasons)
+	}
+	before := observations
+	_, err = buildFragment(&req, adapter, verdict)
+	if observations != before {
+		t.Fatal("fragment reobserved tool release")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
