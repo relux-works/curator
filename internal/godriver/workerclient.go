@@ -55,10 +55,11 @@ type workerClient struct {
 	secret   string
 	evidence CapabilityEvidence
 
-	runContext context.Context
-	cancel     context.CancelFunc
-	finished   bool
-	drained    bool
+	callerContext context.Context
+	runContext    context.Context
+	cancel        context.CancelFunc
+	finished      bool
+	drained       bool
 }
 
 // launchWorker performs steps 3 to 6 of the worker session: it re-verifies the
@@ -93,7 +94,7 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 	runCtx, cancelBudget := context.WithTimeout(ctx, plan.Limits.Timeout)
 	watchCtx, cancelWatch := context.WithTimeout(ctx, plan.Limits.Timeout+workerShutdownGrace)
 	cancel := func() { cancelBudget(); cancelWatch() }
-	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel, runContext: runCtx}
+	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel, callerContext: ctx, runContext: runCtx}
 	defer func() {
 		if resultErr != nil {
 			client.teardown()
@@ -439,6 +440,26 @@ func workerEnvironment() []string {
 // deadlineFailure also guards artifact acceptance after successful child output:
 // a watchdog expiring during manager verification cannot turn into success.
 func (client *workerClient) deadlineFailure() error {
+	// Once the budget expired, later caller cancellation cannot replace its
+	// cause. Context cancellation causes are stable after their first end.
+	if client.runContext != nil && errors.Is(client.runContext.Err(), context.DeadlineExceeded) {
+		return contextFailure(client.runContext)
+	}
+	// Caller cancellation remains a real cause, even if cleanup finishes after
+	// the budget. Our own teardown cancellation is only lifecycle bookkeeping.
+	if err := contextFailure(client.callerContext); err != nil {
+		return err
+	}
+	if client.runContext != nil {
+		// Teardown stops the timer. A scheduling pause after that cancellation
+		// must not hide a whole-session deadline crossed before classification.
+		if deadline, ok := client.runContext.Deadline(); ok && !time.Now().Before(deadline) {
+			return diagnosticErr("process_timeout", context.DeadlineExceeded, "build operation context ended")
+		}
+		if client.callerContext != nil && client.finished && errors.Is(client.runContext.Err(), context.Canceled) {
+			return nil
+		}
+	}
 	return contextFailure(client.runContext)
 }
 

@@ -279,6 +279,8 @@ grace. A shorter caller deadline takes precedence. Deadline expiry reports
 messages in a live session still report
 `build_execution_worker_protocol_invalid`. The acceptance guard also rejects a
 result when the deadline expires during post-build verification.
+Cleanup cannot turn a live protocol failure into caller cancellation or hide
+an elapsed session budget. Genuine caller cancellation retains its own cause.
 
 On Linux and macOS, this permits up to 15 minutes of **unbounded aggregate CPU
 and memory use** per compiled command: neither an aggregate memory limit nor an
