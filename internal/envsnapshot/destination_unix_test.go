@@ -11,32 +11,63 @@ import (
 	"testing"
 )
 
-// Admission rejects shared temporary ancestors, so these real syscall fixtures
-// live in a caller-owned repository scratch allocation, outside protected roots.
+// Each fixture gets a disposable HOME below a canonical testing allocation.
+// Shared system temp ancestors require a private checkout scratch fallback;
+// neither the inherited HOME nor a sticky checkout decides fixture admission.
+func destinationTestHome(t *testing.T) string {
+	t.Helper()
+	base, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !destinationPrivateTempBase(base) {
+		base, err = filepath.Abs("../../.temp")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(base, 0700); err != nil {
+			t.Fatal(err)
+		}
+		base, err = filepath.EvalSymlinks(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !destinationPrivateTempBase(base) {
+			t.Fatal("destination fixtures need a temporary base without shared ancestors")
+		}
+	}
+	t.Setenv("TMPDIR", base)
+	allocation, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(allocation, "home")
+	if err := os.Mkdir(home, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	return home
+}
+
+func destinationPrivateTempBase(path string) bool {
+	for {
+		info, err := os.Stat(path)
+		if err != nil || !info.IsDir() || info.Mode().Perm()&0022 != 0 || info.Mode()&os.ModeSticky != 0 {
+			return false
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return true
+		}
+		path = parent
+	}
+}
+
 func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
 	t.Helper()
-	base, err := filepath.Abs("../../.temp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(base, 0700); err != nil {
-		t.Fatal(err)
-	}
-	base, err = filepath.EvalSymlinks(base)
-	if err != nil {
-		t.Fatal(err)
-	}
-	allocation, err := os.MkdirTemp(base, "destination-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(allocation); err != nil {
-			t.Error(err)
-		}
-	})
+	home := destinationTestHome(t)
 	// The target containing a protected root also needs a private parent.
-	root := filepath.Join(allocation, "fixture")
+	root := filepath.Join(home, "fixture")
 	if err := os.Mkdir(root, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -45,6 +76,82 @@ func destinationSandbox(t *testing.T) (string, DestinationPolicy) {
 		t.Fatal(err)
 	}
 	return root, DestinationPolicy{ProtectedRoots: []string{protected}}
+}
+
+// A sticky inherited HOME and TMPDIR must not receive destination fixtures.
+// The private control admits; an actual destination below the sticky root
+// still refuses without writes, and the inherited HOME stays empty.
+func TestDestinationSandboxHomeIndependence(t *testing.T) {
+	shared, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(shared, os.ModeSticky|0777); err != nil {
+		t.Fatal(err)
+	}
+	inheritedHome := filepath.Join(shared, "inherited-home")
+	if err := os.Mkdir(inheritedHome, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", inheritedHome)
+	t.Setenv("TMPDIR", shared)
+	t.Run("private-fixtures", func(t *testing.T) {
+		root, policy := destinationSandbox(t)
+		admitDestination(t, filepath.Join(root, "control"), policy, DestinationAbsent)
+		if home := os.Getenv("HOME"); home == inheritedHome || !destinationPrivateTempBase(home) {
+			t.Fatal("fixture HOME retained shared ancestors")
+		}
+		path := filepath.Join(inheritedHome, "target")
+		_, err := OpenDestination(path, policy)
+		requireDestinationError(t, err, DestinationInvalid, "directory-permissions")
+		assertAbsent(t, path)
+		entries, err := os.ReadDir(inheritedHome)
+		if err != nil || len(entries) != 0 {
+			t.Fatal("fixtures changed inherited HOME", entries, err)
+		}
+	})
+}
+
+// A checkout under a sticky ancestor must not move the valid destination
+// fixtures there. Actual destinations under that same ancestor still refuse.
+func TestDestinationSandboxCheckoutIndependence(t *testing.T) {
+	destinationTestHome(t)
+	// Resolve the scratch prefix so the walk reaches the sticky ancestor on macOS.
+	scratch, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared := filepath.Join(scratch, "shared")
+	checkout := filepath.Join(shared, "checkout")
+	packageDir := filepath.Join(checkout, "internal", "envsnapshot")
+	if err := os.MkdirAll(packageDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(shared, os.ModeSticky|0777); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(packageDir)
+	root, policy := destinationSandbox(t)
+	relative, err := filepath.Rel(os.Getenv("HOME"), root)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
+		t.Fatalf("destination fixture is outside the private home: %q, %v", relative, err)
+	}
+	admitDestination(t, filepath.Join(root, "control"), policy, DestinationAbsent)
+	assertAbsent(t, filepath.Join(checkout, ".temp"))
+	fromCheckout, err := filepath.Rel(packageDir, filepath.Join(root, "control"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = OpenDestination(fromCheckout, policy)
+	requireDestinationError(t, err, DestinationInvalid, "directory-permissions")
+	parent := filepath.Join(shared, "private")
+	if err := os.Mkdir(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(parent, "target")
+	_, err = OpenDestination(path, policy)
+	requireDestinationError(t, err, DestinationInvalid, "directory-permissions")
+	assertAbsent(t, path)
 }
 
 func admitDestination(t *testing.T, path string, policy DestinationPolicy, kind DestinationKind) *Destination {
@@ -111,16 +218,13 @@ func TestDestinationReadOnlyAdmission(t *testing.T) {
 		t.Fatal("absent target reported prior snapshot", yes, err)
 	}
 	assertAbsent(t, absent)
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	relative, err := filepath.Rel(cwd, root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	admitDestination(t, relative+"/relative", policy, DestinationAbsent)
-	assertAbsent(t, filepath.Join(root, "relative"))
+	t.Run("relative", func(t *testing.T) {
+		// Relative admission must start from a private directory too: the
+		// checkout cwd may itself have a shared temporary ancestor.
+		t.Chdir(root)
+		admitDestination(t, "relative", policy, DestinationAbsent)
+		assertAbsent(t, filepath.Join(root, "relative"))
+	})
 	for _, invalid := range []string{"", "/", "\x00", root + "/.", root + "/.."} {
 		_, err := OpenDestination(invalid, policy)
 		requireDestinationError(t, err, DestinationInvalid, "path-invalid")
