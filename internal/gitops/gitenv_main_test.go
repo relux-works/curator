@@ -27,14 +27,31 @@ func TestMain(m *testing.M) {
 }
 
 // fakeGit appends a line to $GIT_MARKER and fails, so a test can tell that
-// git was invoked without running a transport.
+// git was invoked without running a transport. With $GIT_FAKE_STDERR set it
+// instead records "LC_ALL=<value>", writes that text to standard error,
+// creates a clone's destination and succeeds, so a test can drive the
+// success-path stderr handling.
 func fakeGit() int {
+	stderr, succeed := os.LookupEnv("GIT_FAKE_STDERR")
+	line := "ran\n"
+	if succeed {
+		line = "LC_ALL=" + os.Getenv("LC_ALL") + "\n"
+	}
 	marker, err := os.OpenFile(os.Getenv("GIT_MARKER"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err == nil {
-		_, _ = marker.WriteString("ran\n")
+		_, _ = marker.WriteString(line)
 		_ = marker.Close()
 	}
-	return 1
+	if !succeed {
+		return 1
+	}
+	for _, arg := range os.Args[1:] {
+		if arg == "clone" {
+			_ = os.MkdirAll(filepath.Join(os.Args[len(os.Args)-1], ".git"), 0o755)
+		}
+	}
+	_, _ = os.Stderr.WriteString(stderr)
+	return 0
 }
 
 // fakeSSH writes its arguments, one per line, to $SSH_LOG and fails, so a
