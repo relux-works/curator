@@ -238,6 +238,12 @@ func validateWithinWithRegularCheck(root, target string, ownerLookup OwnerLookup
 		if index < len(parts)-1 && !info.IsDir() {
 			return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
 		}
+		if regularCheck != nil && info.Mode().IsRegular() {
+			info, err = snapshotFileInfo(current, info)
+			if err != nil {
+				return &Failure{Root: absolute, Path: current, Check: CheckSingleLink, Cause: err}
+			}
+		}
 		if err := checkNode(absolute, current, info, operator, ownerLookup); err != nil {
 			return err
 		}
@@ -311,6 +317,15 @@ func validateTreeWithRegularCheck(root, target string, operator OwnerIdentity, o
 				return &Failure{Root: root, Path: path, Check: CheckContainment, Reason: "symbolic-link target escapes the declared directory"}
 			}
 			return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
+		}
+		if regularCheck != nil && info.Mode().IsRegular() {
+			info, err = snapshotFileInfo(path, info)
+			if err != nil {
+				if result, gone := vanished(err); gone {
+					return result
+				}
+				return &Failure{Root: root, Path: path, Check: CheckSingleLink, Cause: err}
+			}
 		}
 		if err := checkNode(root, path, info, operator, ownerLookup); err != nil {
 			var failure *Failure
