@@ -38,6 +38,22 @@ All notable implementation changes are recorded here.
 
 ### Fixed
 
+- A legacy `skills_root` checkout reached by a closure fetch (`upgrade`,
+  `global upgrade`) and an existing git-substitution checkout no longer
+  refresh with `git fetch --all --tags --prune` through whatever remotes
+  they store, which reached an origin the declaration never named and the
+  `allowed_sources` gate never saw. A declared network URL is now gated,
+  compared by canonical identity with the stored origin, read locally, and
+  fetched itself over the operator transport (`gitops.FetchURL` semantics).
+  With no declaration or a declared local path, the stored origin is the
+  only refresh source: a network origin is gated and fetched exactly, a
+  local one is fetched with isolated configuration, and a declared local
+  path must name that origin or the checkout. Other remotes are never
+  contacted. New refusals: `source_origin_mismatch` (before any fetch),
+  `source_mixed_spelling` (one identity declared with two raw URLs in one
+  resolution) and `source_url_redirected` (git followed a server redirect
+  on clone or fetch; the hint names the target to declare). The published
+  manager-lifecycle vectors pass unchanged.
 - An existing profile source cache refreshes from the git descriptor the
   operation names, not from the origin stored when the cache was first
   cloned. A cache created through an HTTPS spelling whose transport the

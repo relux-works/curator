@@ -257,6 +257,49 @@ tags or branches again. It re-materializes missing snapshots from their
 declared source at the locked revision and leaves the lock unchanged. Use
 `curator project refresh` to explicitly resolve refs and replace the lock.
 
+#### Refreshing existing source checkouts
+
+For schema-1 (legacy) Skillfiles, `upgrade`, `global upgrade` and every
+other closure fetch refresh each reached checkout under `skills_root`, and
+each existing `Skillfile.dev.json` git-substitution checkout, from exactly
+one endpoint. They never run `git fetch --all`, never contact a remote other
+than the one chosen below, and never rewrite a checkout's remotes. The stored
+origin is read from the checkout's local configuration, without network
+access and before any `insteadOf` rewrite. A checkout without an origin is
+not fetched and resolves from its local state.
+
+- A declared network `git` URL passes the `allowed_sources` gate first, with
+  the clone path's wording. The checkout's stored origin must have the same
+  canonical identity; a different spelling of that identity (`.git` suffix,
+  host case, scp or HTTPS form) is fine. The declared URL itself is then
+  fetched over the operator's transport, the one clone uses.
+- With no declared `git` URL, the stored origin is the refresh source. A
+  network origin passes the `allowed_sources` gate and is fetched over the
+  operator's transport. A local origin (a path or `file://`) is fetched with
+  user and system git configuration isolated.
+- A declared local path must name the stored origin's location, or the
+  checkout itself, compared as cleaned absolute paths with symlinks resolved.
+  The stored origin is then fetched as above.
+
+Refusals, each made before anything is fetched unless noted:
+
+- `source_origin_mismatch`: the stored origin names another repository than
+  the declaration, or one side is local and the other a network URL. The
+  diagnostic names the declared URL, the stored origin, both identities and
+  the checkout. Repoint the checkout's origin or fix the declaration.
+- `source_mixed_spelling`: one resolution declares the same canonical
+  identity with two different raw URLs. The diagnostic names both spellings,
+  the identity and both requirer chains. Declare one spelling.
+- `source_url_redirected`: git reports that the server redirected a clone or
+  fetch (`warning: redirecting to <url>`). The diagnostic names the declared
+  URL or stored origin and the redirect target: declare the target, or set
+  the origin to it. A redirected clone is removed; the refs a redirected
+  fetch already wrote stay in the checkout, and the resolution stops.
+
+`curator update` and `curator global update` are not closure fetches: they
+still refresh every repository under the source root through its stored
+remotes.
+
 ### curator status
 
 `curator status` displays manifest, installed, and compiled command states.
