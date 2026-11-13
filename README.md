@@ -452,6 +452,14 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+Local SSH signer inspection uses OpenSSH `ssh-keygen -Y verify` with inherited
+signer/signature pipes. OpenPGP inspection uses `gpgv` and an already existing
+public keyring; it never initializes `GNUPGHOME`. Run `curator env status --json`
+to inspect `verification`, or `curator env status --check` to reject failed or
+unavailable evidence. Focused checks are
+`go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|GPGSignaturePipe)'`;
+keep captured test output under `.temp/`.
+
 For managed Claude gateway settings, configure
 `curator env config set claude_settings_mode.<profile> read-only`, then run
 `curator env resolve claude_code --profile <profile> --repair`. The managed-home
