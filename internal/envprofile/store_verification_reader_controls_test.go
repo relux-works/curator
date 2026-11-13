@@ -177,10 +177,10 @@ func TestStoreVerificationPinnedCorpusReader(t *testing.T) {
 			controlExecutions += len(row.Levels)
 		}
 	}
-	if implementation != 98 || controls != 6 || executions != 368 || controlExecutions != 22 {
+	if implementation != 128 || controls != 6 || executions != 452 || controlExecutions != 22 {
 		t.Fatalf("incomplete roster: %d/%d rows, %d/%d levels", implementation, controls, executions, controlExecutions)
 	}
-	t.Log("non-canonical draft reader:98 implementation/6 checker-control rows,368/22 declared levels; no runtime executions claimed")
+	t.Log("non-canonical draft reader:128 implementation/6 checker-control rows,452/22 declared levels; no runtime executions claimed")
 }
 
 // Actual frozen v1 bytes remain readable by their existing object type. That
