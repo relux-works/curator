@@ -148,3 +148,5 @@ platform-control	^exact mode bits are Unix-specific$	allow	only generated-drift 
 platform-control	^POSIX permission-bit witnesses; Windows DACL controls run separately$	allow	POSIX private-parent and file-mode witnesses run on Unix; Windows executes protected-DACL publication and broadened-ACL refusal controls
 
 platform-control	^symlink fixture requires Unix$	allow	the Codex manager-reader link and file-ancestor controls require the Unix fixture; ordinary metadata cases remain portable
+
+platform-control	^Unix wrapper control requires Unix symlink or signal semantics$	allow	the child-signal, home-symlink and nested-symlink cleanup witnesses require Unix; portable cleanup witnesses still run on Windows

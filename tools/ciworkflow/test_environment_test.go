@@ -156,7 +156,7 @@ func TestUnixTestEnvironment(t *testing.T) {
 		})
 	}
 	t.Run("relative-home", func(t *testing.T) {
-		broken := strings.Replace(string(contents), "childEnv.HOME = realpathSync(mkdtempSync(join(tmpdir(), 'curator-test-home-')));", "childEnv.HOME = '.';", 1)
+		broken := strings.Replace(string(contents), "childEnv.HOME = temporaryHome;", "childEnv.HOME = '.';", 1)
 		if broken == string(contents) {
 			t.Fatal("relative HOME plant not applied")
 		}
