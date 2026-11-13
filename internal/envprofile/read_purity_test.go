@@ -386,3 +386,48 @@ func TestReadPurityFragmentUsesCredentialObservation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Lexical and parent-link aliases of the builtin are refused before any lock,
+// recovery or profile write. Distinct valid case-sensitive names stay removable.
+func TestReadPurityBuiltinAliases(t *testing.T) {
+	for _, name := range []string{"./default", "unused/../default", "../profiles/default", "alias/default"} {
+		t.Run(name, func(t *testing.T) {
+			base := t.TempDir()
+			home := filepath.Join(base, "manager")
+			if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
+				t.Fatal(err)
+			}
+			if name == "alias/default" {
+				if err := os.Symlink(ProfilesDir(home), filepath.Join(ProfilesDir(home), "alias")); err != nil {
+					t.Skip("parent-link fixture unavailable")
+				}
+			}
+			before := readWitnesses(t, base)
+			err := Remove(home, name, false)
+			assertReadWitnesses(t, base, before)
+			if err == nil || !strings.Contains(err.Error(), "builtin_profile_remove_forbidden") {
+				t.Fatalf("builtin alias removal = %v", err)
+			}
+		})
+	}
+	t.Run("distinct-case-sensitive-profile", func(t *testing.T) {
+		home := gitFixtureHome(t)
+		pinHomes(t)
+		if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(ProfileDir(home, "Default")); err == nil {
+			t.Skip("case-insensitive store has no distinct positive name")
+		}
+		installIdleProfile(t, home, "Default")
+		if err := SetCurrent(home, DefaultProfile); err != nil {
+			t.Fatal(err)
+		}
+		if err := Remove(home, "Default", false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := readSource(home, DefaultProfile); err != nil {
+			t.Fatalf("valid removal changed builtin: %v", err)
+		}
+	})
+}
