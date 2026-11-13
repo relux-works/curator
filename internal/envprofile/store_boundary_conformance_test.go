@@ -45,6 +45,9 @@ type storeBoundaryVector struct {
 
 func readStoreBoundaryVectors(t *testing.T) storeBoundaryVectors {
 	t.Helper()
+	if err := storeVerificationCanonicalGuard(os.LookupEnv); err != nil {
+		t.Fatal(err)
+	}
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
