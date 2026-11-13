@@ -99,6 +99,8 @@ func ManagedHomeDir(home, profile, envID string) string {
 
 // ResolveRequest is one env resolve or repair operation.
 type ResolveRequest struct {
+	// readOnly consumes observations and never starts an implicit vendor probe.
+	readOnly  bool
 	Home      string
 	Profile   string
 	EnvID     string
@@ -115,8 +117,8 @@ type ResolveRequest struct {
 	// precedence primitives that drive emission order and the composition
 	// policy. The zero value resolves with the pair default.
 	Policy Policy
-	// Detect maps an adapter to its detected tool release, or "unknown".
-	// Nil means probe the machine read-only.
+	// Detect supplies an existing tool-release observation, or "unknown".
+	// Without one, reads/previews report unknown; explicit mutations may probe.
 	Detect func(adapter envregistry.Adapter) string
 	// NativeHomeOf resolves native homes; nil means the process homes.
 	// A test seam: production never sets it.
@@ -203,6 +205,9 @@ func (req *ResolveRequest) nativeHome(id string) (string, error) {
 func (req *ResolveRequest) detected(adapter envregistry.Adapter) string {
 	if req.Detect != nil {
 		return req.Detect(adapter)
+	}
+	if req.readOnly {
+		return "unknown"
 	}
 	return detectRelease(adapter.Probe)
 }
@@ -2776,6 +2781,7 @@ func Resolve(req ResolveRequest) (*ResolveResult, error) {
 // resolveVerified shares source admission while choosing the verification boundary.
 // Capture uses verifyHomeContent and forbids repair before entering this function.
 func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistry.Adapter, Source, *contextlock.Lock, string) *verification) (*ResolveResult, error) {
+	req.readOnly = !req.Repair || req.DryRun
 	if req.PreserveLock && !req.Repair {
 		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
 	}

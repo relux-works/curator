@@ -285,3 +285,70 @@ func TestReadPurityExistingRecordParentNotRepaired(t *testing.T) {
 	}
 	assertReadWitnesses(t, base, readBefore)
 }
+
+// Provisioned status, nonrepair resolve and a repair preview do not run the
+// implicit vendor probe. Supplied observations and explicit mutation probing
+// remain usable; the tripwire is this test binary in an isolated fixture.
+func TestReadPurityVendorObservation(t *testing.T) {
+	fx := writeManagedFixture(t, "sample")
+	seedLiveNativeCredentials(t, fx)
+	provision(t, fx, envregistry.ClaudeCode, envregistry.DefaultMachineConfig())
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "mcp-qualification-tripwire"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	probe := filepath.Join(t.TempDir(), name)
+	if err := os.Link(executable, probe); err != nil {
+		raw, err := os.ReadFile(executable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(probe, raw, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	marker := filepath.Join(t.TempDir(), "vendor-ran")
+	t.Setenv("CURATOR_TEST_MCP_QUALIFICATION_TRIPWIRE", marker)
+	index := -1
+	for i := range envregistry.Registry {
+		if envregistry.Registry[i].ID == envregistry.ClaudeCode {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		t.Fatal("missing fixture adapter")
+	}
+	original := envregistry.Registry[index]
+	envregistry.Registry[index].Probe = []string{probe}
+	t.Cleanup(func() { envregistry.Registry[index] = original })
+	req := statusRequest(fx)
+	req.Detect = nil
+	if _, err := StatusOf(req); err != nil {
+		t.Fatal(err)
+	}
+	for _, preview := range []bool{false, true} {
+		read := fx.request(envregistry.ClaudeCode)
+		read.Detect = nil
+		read.Repair = preview
+		read.DryRun = preview
+		_, _ = Resolve(read)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("read started vendor probe: %v", err)
+	}
+	observed := ResolveRequest{readOnly: true, Detect: func(envregistry.Adapter) string { return "observed" }}
+	if got := observed.detected(envregistry.Registry[index]); got != "observed" {
+		t.Fatalf("existing observation = %q", got)
+	}
+	explicit := ResolveRequest{}
+	_ = explicit.detected(envregistry.Registry[index])
+	data, err := os.ReadFile(marker)
+	if err != nil || string(data) != "called" {
+		t.Fatalf("explicit probe positive did not execute: %v", err)
+	}
+}

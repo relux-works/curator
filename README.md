@@ -256,7 +256,8 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 
 Profile listing, environment status and resolution without `--repair` only read
 existing local state. They do not create the builtin `default` profile, acquire
-sources or recover pending mutations. Repair previews (`--repair --dry-run`)
+sources, run implicit vendor release probes or recover pending mutations.
+Unobserved vendor releases remain `unknown`. Repair previews (`--repair --dry-run`)
 also leave state unchanged and report missing local inputs. Initialize or update
 profiles through an explicit mutating operation such as `profile use default`
 (updates retain the existing builtin). Removing `default` refuses with

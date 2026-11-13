@@ -12,7 +12,7 @@ func ReadOnlyEnv() []string {
 	env := []string{}
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
-		if isDraftAllowedEnv(name) {
+		if isDraftAllowedEnv(name) && !strings.EqualFold(name, "SSH_AUTH_SOCK") && !strings.EqualFold(name, "GIT_ASKPASS") {
 			env = append(env, entry)
 		}
 	}

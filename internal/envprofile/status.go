@@ -27,6 +27,7 @@ import (
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hookapproval"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/manifest"
@@ -313,6 +314,7 @@ type StatusRequest struct {
 
 func (req *StatusRequest) resolve() ResolveRequest {
 	return ResolveRequest{
+		readOnly:                 true,
 		Home:                     req.Home,
 		Machine:                  req.Machine,
 		Detect:                   req.Detect,
@@ -594,7 +596,9 @@ func lockedMemberTag(repo string, member contextlock.Member) string {
 		return ""
 	}
 	tag := "v" + member.Version
-	output, err := exec.Command("git", "-C", repo, "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}").Output() // #nosec G204 -- version is validated in the lock schema
+	command := exec.Command("git", "-C", repo, "rev-parse", "--verify", "refs/tags/"+tag+"^{commit}") // #nosec G204 -- version is validated in the lock schema
+	command.Env = gitops.ReadOnlyEnv()
+	output, err := command.Output()
 	if err != nil || strings.TrimSpace(string(output)) != member.Commit {
 		return ""
 	}

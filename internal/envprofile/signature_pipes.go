@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/relux-works/curator/internal/gitops"
 	"io"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 // descriptors. Neither signer policy nor signatures require a disk pathname.
 func runSignaturePipes(program string, args []string, payload []byte, inputs ...[]byte) ([]byte, error) {
 	command := exec.Command(program, args...)
+	command.Env = gitops.ReadOnlyEnv()
 	command.Stdin = bytes.NewReader(payload)
 	readers := make([]*os.File, 0, len(inputs))
 	writers := make([]*os.File, 0, len(inputs))
