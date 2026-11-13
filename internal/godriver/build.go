@@ -246,6 +246,9 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	if err != nil {
 		return Result{}, err
 	}
+	// Deferred first, so it runs after teardown and after the final
+	// classification of the returned error.
+	defer client.releaseCauses()
 	defer client.teardown()
 
 	bracket := func(phase string, output Output, runErr error) (Output, error) {

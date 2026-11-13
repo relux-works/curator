@@ -23,6 +23,10 @@ import (
 // os.Executable reports for a real launch shape rather than to assume it.
 var workerInputTransform func(io.Reader) io.Reader
 
+// workerOutputTransform, when set, wraps the test worker's response stream. It
+// is the test-only output seam; the installed worker has none.
+var workerOutputTransform func(*os.File) io.Writer
+
 const identityProbeMode = "-curator-test-identity-probe"
 
 // TestMain gives the test binary the same fixed hidden worker mode the
@@ -34,7 +38,11 @@ func TestMain(m *testing.M) {
 		if workerInputTransform != nil {
 			input = workerInputTransform(input)
 		}
-		os.Exit(RunWorker(input, os.Stdout))
+		output := io.Writer(os.Stdout)
+		if workerOutputTransform != nil {
+			output = workerOutputTransform(os.Stdout)
+		}
+		os.Exit(RunWorker(input, output))
 	}
 	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
 		os.Exit(runIdentityProbe(os.Stdout))

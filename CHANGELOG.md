@@ -23,6 +23,13 @@ All notable implementation changes are recorded here.
   immutable pin verification and atomic named refusals. Source preview needs
   no bootstrap; command goldens cover shared DAG and overlay occurrences.
 
+### Fixed
+
+- Go driver builds keep the first terminal cause through worker teardown: a
+  session budget that elapsed before a later caller cancellation now reports
+  `process_timeout` instead of `process_canceled`. Caller cancellation before
+  the budget still reports `process_canceled`.
+
 ### Documentation
 
 - Propose the offline profile graph CLI contract, `curator-profile-graph/1`

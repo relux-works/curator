@@ -281,6 +281,10 @@ messages in a live session still report
 result when the deadline expires during post-build verification.
 Cleanup cannot turn a live protocol failure into caller cancellation or hide
 an elapsed session budget. Genuine caller cancellation retains its own cause.
+Whichever of budget expiry and caller cancellation ends the session first
+stays the reported cause through cleanup: a budget that elapses before a later
+caller cancellation reports `process_timeout`, and a caller cancellation before
+the budget reports `process_canceled`.
 
 On Linux and macOS, this permits up to 15 minutes of **unbounded aggregate CPU
 and memory use** per compiled command: neither an aggregate memory limit nor an

@@ -60,6 +60,14 @@ type workerClient struct {
 	cancel        context.CancelFunc
 	finished      bool
 	drained       bool
+
+	// causeContext ends exactly once, with whichever terminal cause the
+	// context package observed first: the shared session budget elapsing or
+	// the caller ending. Teardown never cancels it, so cleanup cannot erase
+	// that order before final classification. releaseCause frees its timer
+	// and is called only after the owner has classified the session.
+	causeContext context.Context
+	releaseCause context.CancelFunc
 }
 
 // launchWorker performs steps 3 to 6 of the worker session: it re-verifies the
@@ -94,10 +102,13 @@ func launchWorker(ctx context.Context, plan workerPlan) (_ *workerClient, result
 	runCtx, cancelBudget := context.WithTimeout(ctx, plan.Limits.Timeout)
 	watchCtx, cancelWatch := context.WithTimeout(ctx, plan.Limits.Timeout+workerShutdownGrace)
 	cancel := func() { cancelBudget(); cancelWatch() }
-	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel, callerContext: ctx, runContext: runCtx}
+	budgetDeadline, _ := runCtx.Deadline()
+	causeCtx, releaseCause := context.WithDeadline(ctx, budgetDeadline)
+	client := &workerClient{plan: plan, nonce: nonce, secret: secret, cancel: cancel, callerContext: ctx, runContext: runCtx, causeContext: causeCtx, releaseCause: releaseCause}
 	defer func() {
 		if resultErr != nil {
 			client.teardown()
+			client.releaseCauses()
 		}
 	}()
 
@@ -416,6 +427,16 @@ func (client *workerClient) teardown() {
 	}
 }
 
+// releaseCauses frees the cause-ordering timer. Call it only after the final
+// classification: once released, the cause context no longer records order, so
+// deadlineFailure falls back to the caller, wall-clock and run-context checks.
+func (client *workerClient) releaseCauses() {
+	if client.releaseCause != nil {
+		client.releaseCause()
+	}
+	client.causeContext, client.releaseCause = nil, nil
+}
+
 // Evidence returns the closed capability-evidence-v1 record for this session.
 func (client *workerClient) Evidence() CapabilityEvidence { return client.evidence }
 
@@ -444,6 +465,19 @@ func (client *workerClient) deadlineFailure() error {
 	// cause. Context cancellation causes are stable after their first end.
 	if client.runContext != nil && errors.Is(client.runContext.Err(), context.DeadlineExceeded) {
 		return contextFailure(client.runContext)
+	}
+	// Teardown stops runContext's timer, but not causeContext's. Its first end
+	// orders budget expiry against caller ending for this session: a budget
+	// that elapsed while cleanup or classification was paused stays a timeout
+	// when the caller is canceled only later, and a caller canceled before the
+	// budget stays canceled. What this guarantees is the order in which the
+	// context package observed the two events. It is not a wall-clock
+	// tie-break: a caller canceled after the deadline but before the runtime
+	// fired the budget timer counts as canceled, and a caller Context that
+	// propagates cancellation asynchronously may lag. Those unordered cases
+	// keep the precedence below: caller cause, then the elapsed wall deadline.
+	if err := contextFailure(client.causeContext); err != nil {
+		return err
 	}
 	// Caller cancellation remains a real cause, even if cleanup finishes after
 	// the budget. Our own teardown cancellation is only lifecycle bookkeeping.

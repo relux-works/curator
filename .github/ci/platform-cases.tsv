@@ -1129,3 +1129,4 @@ cmd/curator	TestUmbrellaProviderExitControls	linux,darwin	-	-	exit 0 1 42 pass t
 cmd/curator	TestUmbrellaProviderSignalCleanup	linux,darwin	-	-	exited children refuse late signals; completion and start failure unregister the handler
 cmd/curator	TestUmbrellaProviderTerminal	linux,darwin	-	-	real controlling PTY Ctrl-C and PID-only INT arrive once; stop/continue and foreground restoration work
 internal/godriver	TestWorkerCleanupContextClassification	linux,darwin,windows	-	-	cleanup preserves protocol, deadline and genuine caller cancellation causes
+internal/godriver	TestBuildCauseOrderAfterTeardown	linux,darwin,windows	-	-	public Build keeps budget-before-cancel as timeout and cancel-before-budget as canceled after real-worker teardown
