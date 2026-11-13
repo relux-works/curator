@@ -314,7 +314,7 @@ func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, fa
 	}
 	op, err := req.beginRepairOperation()
 	if err != nil {
-		if isCredentialRefusal(err) {
+		if isCredentialRefusal(err) || storeBoundaryRefusal(err) {
 			return err
 		}
 		return fmt.Errorf("%s: %v", DiagRepairFailed, err)
@@ -352,7 +352,17 @@ func rebuildUntrustedStoreEntry(req *ResolveRequest, expectedLockHash string, fa
 		return fmt.Errorf("%s: revalidate pinned snapshot: %w", DiagRepairFailed, err)
 	}
 	defer cleanup()
-	if err := publishRebuiltStoreEntry(req.Home, member, snapshot, expectedHash, req.boundaryOwnerLookup); err != nil {
+	revalidate := func() error {
+		if err := req.validateActivationCredentialSource(); err != nil {
+			return err
+		}
+		_, err := inspectStoreAvailability(req.Home, currentLock, req.boundaryOwnerLookup)
+		return err
+	}
+	if err := publishRebuiltStoreEntry(req.Home, member, snapshot, expectedHash, req.boundaryOwnerLookup, revalidate); err != nil {
+		if isCredentialRefusal(err) || storeBoundaryRefusal(err) {
+			return err
+		}
 		return fmt.Errorf("%s: rebuild store entry %s/%s: %w", DiagRepairFailed, member.Kind, member.Name, err)
 	}
 	if failure := validateNamedStoreBoundaries(req.Home, currentLock, req.boundaryOwnerLookup); failure != nil {
@@ -392,11 +402,11 @@ func validateNamedStorePinsExcept(home string, lock *contextlock.Lock, skip cont
 	return validateNamedStorePins(home, remaining)
 }
 
-func publishRebuiltStoreEntry(home string, member contextlock.Member, snapshot, expectedHash string, owner pathboundary.OwnerLookup) error {
+func publishRebuiltStoreEntry(home string, member contextlock.Member, snapshot, expectedHash string, owner pathboundary.OwnerLookup, revalidate func() error) error {
 	root := contextstore.Root(home)
 	target := contextstore.GitEntryDir(home, member.Kind, member.Name, member.Commit, skillSnapshotDirectory(member.Kind, member.Directory))
 	parent := filepath.Dir(target)
-	if err := ensureStoreEntryParent(root, parent, owner); err != nil {
+	if err := revalidate(); err != nil {
 		return err
 	}
 	stage, err := os.MkdirTemp(parent, ".curator-rebuild-*")
@@ -424,6 +434,9 @@ func publishRebuiltStoreEntry(home string, member contextlock.Member, snapshot, 
 		return fmt.Errorf("staged snapshot hash %q differs from revalidated hash %q", stageHash, expectedHash)
 	}
 
+	if err := revalidate(); err != nil {
+		return err
+	}
 	var nonce [16]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return err
@@ -447,47 +460,6 @@ func publishRebuiltStoreEntry(home string, member contextlock.Member, snapshot, 
 	}
 	if movedOld {
 		if err := os.RemoveAll(backup); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func ensureStoreEntryParent(root, parent string, owner pathboundary.OwnerLookup) error {
-	rootState, err := stateread.Lstat(root)
-	if err != nil {
-		return err
-	}
-	if rootState.Kind != stateread.KindPresent || rootState.Info == nil {
-		return fmt.Errorf("profile store root is unavailable")
-	}
-	if err := pathboundary.ValidateRootWithOwner(root, boundaryOwner(owner)); err != nil {
-		return err
-	}
-	relative, err := filepath.Rel(root, parent)
-	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
-		return fmt.Errorf("store entry parent %s is outside %s", parent, root)
-	}
-	current := root
-	for _, component := range strings.Split(relative, string(os.PathSeparator)) {
-		current = filepath.Join(current, component)
-		state, err := stateread.Lstat(current)
-		if err != nil {
-			return err
-		}
-		if state.Kind == stateread.KindAbsent {
-			if err := privatedir.Make(current); err != nil && !os.IsExist(err) {
-				return err
-			}
-			state, err = stateread.Lstat(current)
-			if err != nil {
-				return err
-			}
-		}
-		if state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.IsDir() {
-			return fmt.Errorf("store entry parent component %s is not a directory", current)
-		}
-		if err := pathboundary.ValidateRootWithOwner(current, boundaryOwner(owner)); err != nil {
 			return err
 		}
 	}
