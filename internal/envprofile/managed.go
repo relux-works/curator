@@ -2867,19 +2867,8 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return nil, err
 	}
 	if failure := validateNamedStoreBoundaries(req.Home, lock, req.boundaryOwnerLookup); failure != nil {
-		if req.Repair && req.DryRun {
-			return nil, dryRunStoreEntryFailure(failure)
-		}
-		if req.Repair {
-			if req.storeRepairAttempted {
-				return nil, fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure)
-			}
-			if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
-				return nil, err
-			}
-			req.storeRepairAttempted = true
-			return Resolve(req)
-		}
+		// Structural/path violations are tamper evidence, even with repair.
+		// Preserve them and refuse before any source or home mutation.
 		return nil, failure
 	}
 	if err := validateMarkerBoundary(req.Home, profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
@@ -2908,7 +2897,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return nil, err
 	}
 	localChecks, localErr := startupChecks(req.Home, lock)
-	if localErr != nil && (!req.Repair || effectiveLevel < 3) {
+	if localErr != nil {
 		return nil, localErr
 	}
 	// Source repair remains strict at local-verification levels. Permissive
@@ -2964,9 +2953,6 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
 	{
-		if localErr != nil {
-			return nil, localErr
-		}
 		checks := append(append([]startupverification.Observation{}, localChecks...), verdict.contentChecks...)
 		// A requested strict repair may fix home content, but it cannot
 		// manufacture missing profile evidence or accept a source mismatch.

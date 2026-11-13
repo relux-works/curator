@@ -151,7 +151,11 @@ func validateNamedStoreBoundaries(home string, lock *contextlock.Lock, owner pat
 	root := contextstore.Root(home)
 	for _, member := range lock.Members {
 		entry := memberEntryPath(home, member)
-		if err := pathboundary.ValidateWithinWithOwner(root, entry, boundaryOwner(owner)); err != nil {
+		validate := pathboundary.ValidateWithinWithOwner
+		if member.Kind == contextlock.KindContext || member.Kind == contextlock.KindMCP {
+			validate = pathboundary.ValidateSnapshotWithinWithOwner
+		}
+		if err := validate(root, entry, boundaryOwner(owner)); err != nil {
 			return &storeEntryFailure{Member: member, Path: entry, Check: boundaryCheck(err), Err: err}
 		}
 	}

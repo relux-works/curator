@@ -23,9 +23,10 @@ func TestNamedRoutesRejectMissingTarget(t *testing.T) {
 		filepath.Join(root, "missing", "entry"),
 	} {
 		for name, validate := range map[string]func(string, string, OwnerLookup) error{
-			"within": ValidateWithinWithOwner,
-			"route":  ValidateRouteWithOwner,
-			"leaf":   ValidateLeafWithOwner,
+			"within":   ValidateWithinWithOwner,
+			"snapshot": ValidateSnapshotWithinWithOwner,
+			"route":    ValidateRouteWithOwner,
+			"leaf":     ValidateLeafWithOwner,
 		} {
 			err := validate(root, target, DefaultOwnerLookup())
 			var failure *Failure

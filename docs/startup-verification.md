@@ -24,6 +24,21 @@ verified success. Missing executable/input, invalid policy/lock structure,
 unsafe paths, source admission, credential authority, permission policy and
 runtime qualification remain mandatory at every level.
 
+Structural and path failures in the immutable store refuse before any repair,
+including dry-run repair. Diagnostics name the path and violated rule; the
+violating entry remains in place as evidence and no child starts. A payload
+link or special file cannot be silently replaced from a valid Git snapshot.
+Context and MCP snapshot regular files must have exactly one link, including
+links whose other name is outside the snapshot. Failure names `single_link`
+under `environment_store_untrusted`; unavailable link metadata also refuses.
+Unix uses native link metadata; Windows uses a no-follow attributes handle bound
+to the observed file. Directory link counts, operator-source admission and
+managed adapter links retain their separate contracts. Skill payload hardlinks
+retain `skill_integrity_boundary_invalid`.
+After structural checks pass, levels3/4 may restore ordinary regular-file bytes
+from the same recorded pin through the existing repair transaction. This does
+not authorize replacing expected evidence, migrating a lock or changing a pin.
+
 Manifest3 retains manifest2's field and skill-directory grammar and adds the
 optional same `startup_verification` object. Each explicit context minimum must
 be at least the machine level. The strongest selected root, overlay or transitive
@@ -141,11 +156,22 @@ preserves the old selection and lock. Startup never silently migrates a profile.
 |`verification_centre_denied`, `verification_centre_invalid`|Centre refusal; never a fallback|
 |`skill_integrity_evidence_missing`|No frozen expected skill evidence|
 |`skill_integrity_manifest_invalid`, `skill_integrity_unsupported_version`|Malformed or unsupported supplied evidence|
+|`environment_store_untrusted`|Existing immutable-store boundary refusal; path and violated rule are named, including during repair|
 |`skill_integrity_boundary_invalid`|Forbidden skill payload/path|
 |`skill_integrity_mismatch`, `skill_integrity_unavailable`|Typed skill observation supplied to the level policy|
 
 Independent gates retain their existing diagnostics. The launcher forwards Core
 stderr before executing the provider and refuses a nonzero Core resolution.
+
+The structural-before-repair behavior is incompatible with six row expectations
+in the released revision-1 store corpus, covering rebuild planning, replacement
+of structural evidence, repair-path diagnostic wrapping and associated negative
+controls. Those negative controls remain negative; their historical expected
+diagnostics do not redefine the new refusal contract.
+The released corpus remains unchanged and its replay must report those
+incompatibilities. This implementation does not claim full revision-1 store
+conformance. Revision-2 qualification requires its separately accepted, landed
+specification pin and version-aware consumer; a draft proposal is insufficient.
 
 Permissive startup preserves mismatching source evidence even when the launcher
 requests repair. If provisioning would require a legacy identity/lock migration,
