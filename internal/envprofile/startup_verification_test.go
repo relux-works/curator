@@ -326,7 +326,12 @@ func TestStartupBoundaryNeverBecomesWarning(t *testing.T) {
 					req := fx.request("codex_cli")
 					req.Repair, req.DryRun = mode != "observe", mode == "dry-run"
 					req.Policy.StartupVerificationLevel = level
+					repairReached := false
+					req.beforeRepairLock = func() { repairReached = true }
 					result, err := Resolve(req)
+					if repairReached {
+						t.Fatal("fatal boundary reached repair-lock seam")
+					}
 					var failure *storeEntryFailure
 					rightClass := kind == "symlink" && errors.As(err, &failure) && failure.Check == "link_safety" || kind == "hardlink" && skillintegrity.IsCode(err, "skill_integrity_boundary_invalid")
 					namesPath := err != nil && (strings.Contains(err.Error(), plant) || kind == "hardlink" && strings.Contains(err.Error(), filepath.Join(memberEntryPath(fx.home, member), "SKILL.md")))

@@ -46,7 +46,8 @@ type managerReadAudit struct {
 }
 
 // Exceptions are deliberately keyed by file and function and explain why the
-// absent result belongs to an operator-selected input, source tree, or cache.
+// absence predicate preserves the documented input, source, cache or immutable
+// store contract without converting unreadability into absence.
 // Add entries only after reviewing the read's ownership and fallback behavior.
 var reviewedManagerReadAllowlist = reviewedManagerReadExceptions()
 
@@ -57,6 +58,12 @@ func reviewedManagerReadExceptions() map[string]string {
 			exceptions[entry] = reason
 		}
 	}
+	allow("Distinguishes only exact immutable-entry leaf absence after validating and rechecking existing safe ancestors; other Lstat failures refuse, and later selected members are still checked before repair is considered.",
+		"internal/envprofile/store_availability.go:inspectStoreAvailability",
+	)
+	allow("Requires Git alternates and graft metadata to be absent before reading the locked local snapshot; any present object or non-ENOENT metadata failure refuses instead of supplying a default or fetching.",
+		"internal/gitops/snapshot_paths.go:pinnedSnapshotSelection",
+	)
 	allow("Reads an operator-selected hook file to record or compare its current bytes; absence is an input fact and other read failures remain errors.",
 		"cmd/curator/hook.go:cli.cmdHookApprove",
 		"internal/hookapproval/hookapproval.go:Classify",
