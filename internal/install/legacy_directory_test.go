@@ -275,7 +275,7 @@ func legacyEffectiveLockDigest(t *testing.T, e *env) string {
 	}
 	nodes, err := closure.Build(closure.Options{
 		SkillsRoot: e.skillsRoot, Home: e.home, AllowedSources: e.cfg.AllowedSources,
-		FetchedRepos: map[string]bool{},
+		FetchedRepos: map[string]string{},
 	}, projectManifest, map[string]devsub.Substitution{})
 	if err != nil {
 		t.Fatal(err)

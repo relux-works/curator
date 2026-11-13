@@ -138,3 +138,32 @@ func OriginURL(repo string) (originURL string, present bool, err error) {
 	}
 	return values[0], true, nil
 }
+
+// RemoteConfigured reports, without network access, whether the checkout's
+// repository-local configuration (includes expanded) defines any variable of
+// a remote named exactly name. git reads a fetch argument that names such a
+// remote as that remote, not as a location.
+func RemoteConfigured(repo, name string) (bool, error) {
+	if err := EnsureRepo(repo); err != nil {
+		return false, err
+	}
+	out, err := run(repo, "config", "--local", "--includes", "--null", "--name-only", "--get-regexp", `^remote\.`)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, key := range strings.Split(out, "\x00") {
+		// key is remote.<name>.<variable>; the subsection keeps its case.
+		rest, ok := strings.CutPrefix(key, "remote.")
+		if !ok {
+			continue
+		}
+		if dot := strings.LastIndexByte(rest, '.'); dot > 0 && rest[:dot] == name {
+			return true, nil
+		}
+	}
+	return false, nil
+}

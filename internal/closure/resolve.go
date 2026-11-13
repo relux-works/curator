@@ -53,8 +53,9 @@ type DraftResolveConfig struct {
 	// through the shared FetchedRepos map. Explicit resolve/refresh sets
 	// it; frozen install/launch never fetch.
 	Fetch bool
-	// FetchedRepos deduplicates fetches across scopes. Nil allocates one.
-	FetchedRepos map[string]bool
+	// FetchedRepos deduplicates fetches across scopes (see
+	// Options.FetchedRepos). Nil allocates one.
+	FetchedRepos map[string]string
 	// FetchRepo replaces the Git alias tree refresh in pinGitAliases for
 	// tests. It does not reach legacy or transitive checkouts: ensureRepo
 	// refreshes those from the declared URL or the stored origin only.
@@ -121,7 +122,7 @@ func ResolveDraft(cfg DraftResolveConfig) (*DraftPlan, error) {
 	}
 	fetched := cfg.FetchedRepos
 	if fetched == nil {
-		fetched = map[string]bool{}
+		fetched = map[string]string{}
 	}
 	acquired := map[string]*draftAcquired{}
 	gitResolve := cfg.GitResolve
@@ -634,7 +635,7 @@ type gitPin struct {
 // reports them. Fetch (when enabled) runs here, once per alias, so ref
 // resolution observes the fetched refs. The identity check fails a
 // resolver that answers for a different ref than declared.
-func pinGitAliases(cfg DraftResolveConfig, gitResolve func(string, string, string) (gitops.ResolvedRef, error), fetched map[string]bool) (map[string]*gitPin, error) {
+func pinGitAliases(cfg DraftResolveConfig, gitResolve func(string, string, string) (gitops.ResolvedRef, error), fetched map[string]string) (map[string]*gitPin, error) {
 	selected := map[string]bool{}
 	for _, decl := range cfg.Manifest.Skills {
 		if decl.Selector == nil {
@@ -672,11 +673,11 @@ func pinGitAliases(cfg DraftResolveConfig, gitResolve func(string, string, strin
 			// tree the caller already refreshed (for example through the
 			// production alias acquisition) is never fetched twice.
 			key := repoKey(root)
-			if !fetched[key] {
+			if _, seen := fetched[key]; !seen {
 				if err := fetch(root); err != nil {
 					return nil, err
 				}
-				fetched[key] = true
+				fetched[key] = ""
 			}
 		}
 		resolved, err := gitResolve(root, source.Ref.Kind, source.Ref.Value)

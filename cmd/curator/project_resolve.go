@@ -122,7 +122,7 @@ func (c cli) resolveDraftPlan(cfg *config.Config, target projectTarget, projectM
 	// dedup set and pinGitAliases never fetches them twice; legacy and
 	// transitive checkouts refresh in ensureRepo (remote-less checkouts
 	// stay a no-op, a failed fetch fails the attempt before publication).
-	fetched := map[string]bool{}
+	fetched := map[string]string{}
 	for _, root := range roots {
 		closure.MarkRepoFetched(fetched, root)
 	}

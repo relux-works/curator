@@ -798,7 +798,7 @@ func (c cli) cmdInstallMode(args []string, fetch bool) int {
 	if fetch {
 		opts.Operation = install.OperationUpdate
 	}
-	opts.FetchedRepos = map[string]bool{}
+	opts.FetchedRepos = map[string]string{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
 	opts.External.BuildSSH.Resolve = c.operatorBuildSSHResolver(cfg, opts.DryRun)
@@ -1915,7 +1915,7 @@ func (c cli) runGlobalInstallModeWithProfile(cfg *config.Config, args []string, 
 	if fetch {
 		opts.Operation = install.OperationUpdate
 	}
-	opts.FetchedRepos = map[string]bool{}
+	opts.FetchedRepos = map[string]string{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
 	opts.External.BuildSSH.Resolve = c.operatorBuildSSHResolver(cfg, opts.DryRun)

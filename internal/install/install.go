@@ -64,8 +64,9 @@ type Options struct {
 	Verbose      bool
 	Platform     string // "" resolves to the current platform
 	// FetchedRepos deduplicates closure-scoped upgrades across selected
-	// projects. Callers may leave it nil for a single installation.
-	FetchedRepos map[string]bool
+	// projects (see closure.Options.FetchedRepos). Callers may leave it nil
+	// for a single installation.
+	FetchedRepos map[string]string
 	// Context bounds toolchain probing and compilation. Nil means background.
 	Context context.Context
 	// OnLockWait reports a contended operation lock once, without exposing paths.
@@ -532,7 +533,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		}
 	}
 	if opts.FetchedRepos == nil {
-		opts.FetchedRepos = map[string]bool{}
+		opts.FetchedRepos = map[string]string{}
 	}
 	fetchedBefore := copySet(opts.FetchedRepos)
 	var nodes []*closure.Node
@@ -1265,20 +1266,18 @@ func runtimePathEntries(node *closure.Node, binDir, platform string) ([]string, 
 	return entries, nil
 }
 
-func copySet(values map[string]bool) map[string]bool {
+func copySet(values map[string]string) map[string]bool {
 	cloned := make(map[string]bool, len(values))
-	for value, present := range values {
-		if present {
-			cloned[value] = true
-		}
+	for value := range values {
+		cloned[value] = true
 	}
 	return cloned
 }
 
-func newSetEntries(before, after map[string]bool) []string {
+func newSetEntries(before map[string]bool, after map[string]string) []string {
 	var entries []string
-	for value, present := range after {
-		if present && !before[value] {
+	for value := range after {
+		if !before[value] {
 			entries = append(entries, value)
 		}
 	}

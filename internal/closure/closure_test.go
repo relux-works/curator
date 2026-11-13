@@ -526,7 +526,7 @@ func TestFetchExistingIsScopedToReachedClosureAndDeduplicated(t *testing.T) {
 		h.git(dir, "remote", "add", "origin", filepath.Join(upstream, filepath.Base(dir)))
 	}
 
-	fetched := map[string]bool{}
+	fetched := map[string]string{}
 	var calls []string
 	opts := Options{
 		SkillsRoot:    h.skillsRoot,

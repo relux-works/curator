@@ -391,7 +391,7 @@ func (baseline *dryRunBaseline) planEveryProject(
 
 	// One fetch-deduplication set for the whole operation, exactly as the
 	// `--all` caller wires it.
-	fetched := map[string]bool{}
+	fetched := map[string]string{}
 	results := make([]Result, 0, len(ordered))
 	for _, project := range ordered {
 		results = append(results, Project(e.cfg, project, filepath.Base(project), Options{

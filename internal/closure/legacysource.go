@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/relux-works/curator/internal/gitops"
@@ -12,56 +14,108 @@ import (
 )
 
 // refreshCheckout refreshes an existing legacy checkout (skills root or dev
-// checkout) from exactly one endpoint, chosen without network access:
+// checkout) from exactly one endpoint, chosen without network access by
+// bindCheckout. The binding (gate, stored-origin read and comparison) runs
+// for every requirer of the checkout, also when an earlier requirer or scope
+// in the same run already refreshed it; only the fetch itself is skipped,
+// and only when it was already made from the identical endpoint
+// (Options.FetchedRepos). A checkout without an origin is not fetched.
+func refreshCheckout(opts Options, name, declared, chain, repo string) error {
+	endpoint, isDeclared, err := bindCheckout(opts, name, declared, chain, repo)
+	if err != nil {
+		return err
+	}
+	if endpoint == "" {
+		markFetched(opts, repo, "")
+		return nil
+	}
+	if fetchedFrom(opts, repo, endpoint) {
+		return nil
+	}
+	if err := fetchSource(opts, name, chain, repo, endpoint, isDeclared); err != nil {
+		return err
+	}
+	markFetched(opts, repo, endpoint)
+	return nil
+}
+
+// bindCheckout chooses the one endpoint an existing checkout refreshes from,
+// without network access:
 //
 //   - a declared network URL is gated, its canonical identity must equal the
-//     stored origin's, and the declared URL itself is fetched over the
-//     operator transport (Rule A);
+//     stored origin's, and the declared URL itself is the endpoint (Rule A);
 //   - with no declaration, or a declared local path, the stored origin is the
-//     only refresh source: a network origin is gated and fetched over the
-//     operator transport, a local origin is fetched with the isolated
-//     configuration, and a declared local path must name the stored origin's
-//     location or the checkout itself (Rule B).
+//     only refresh source: a network origin is gated, a local origin is
+//     resolved to its absolute physical path, and a declared local path must
+//     name the stored origin's location or the checkout itself (Rule B).
 //
-// A checkout without an origin is not fetched. Other remotes are never
-// contacted, and no checkout remote is rewritten. A mismatch refuses with
-// source_origin_mismatch before any fetch.
-func refreshCheckout(opts Options, name, declared, chain, repo string) error {
+// isDeclared reports that the endpoint is the declaration. An empty endpoint
+// means the checkout has no origin and is not fetched. Other remotes are
+// never consulted, and no checkout remote is rewritten. A mismatch refuses
+// with source_origin_mismatch before any fetch.
+func bindCheckout(opts Options, name, declared, chain, repo string) (endpoint string, isDeclared bool, err error) {
 	declaredID := ""
 	if declared != "" {
 		if err := gateSource(opts, name, declared, chain); err != nil {
-			return err
+			return "", false, err
 		}
 		// gateSource has already parsed the declaration successfully.
 		declaredID, _ = identity.Parse(declared)
 	}
 	origin, hasOrigin, err := gitops.OriginURL(repo)
 	if err != nil {
-		return fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the stored origin: %w", name, repo, chain, err)
+		return "", false, fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the stored origin: %w", name, repo, chain, err)
 	}
 	if !hasOrigin {
-		return nil
+		return "", false, nil
 	}
 	originID, originErr := identity.Parse(origin)
 	switch {
 	case declaredID != "":
 		if originErr != nil || originID != declaredID {
-			return originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
+			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
 		}
-		return fetchSource(opts, name, chain, repo, declared, true)
+		return declared, true, nil
 	case declared != "":
 		if originErr != nil || originID != "" || !sameLocalSource(declared, origin, repo) {
-			return originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
+			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
 		}
-		return fetchSource(opts, name, chain, repo, origin, false)
+		return localOriginEndpoint(name, chain, repo, origin)
+	case originErr != nil || originID != "":
+		if err := gateSource(opts, name, origin, chain); err != nil {
+			return "", false, fmt.Errorf("%w; stored origin of checkout %s", err, repo)
+		}
+		return origin, false, nil
 	default:
-		if originErr != nil || originID != "" {
-			if err := gateSource(opts, name, origin, chain); err != nil {
-				return fmt.Errorf("%w; stored origin of checkout %s", err, repo)
-			}
-		}
-		return fetchSource(opts, name, chain, repo, origin, false)
+		return localOriginEndpoint(name, chain, repo, origin)
 	}
+}
+
+// localOriginEndpoint turns a stored local origin into the endpoint handed
+// to git: its absolute physical path, read from the checkout as git fetch
+// reads a relative origin. git reads a bare relative word such as "mirror",
+// and a file:// URL, as the name of a configured remote before a location.
+// A configuration remote name can never begin with "/", so the absolute
+// POSIX path is unambiguous; a path that does not begin with "/" (a Windows
+// drive path) is refused with source_origin_ambiguous when a remote of that
+// exact name is configured.
+func localOriginEndpoint(name, chain, repo, origin string) (string, bool, error) {
+	path, ok := physicalPath(origin, repo)
+	if !ok {
+		return "", false, fmt.Errorf("failed to fetch %s at %s (via %s): stored local origin %s does not resolve to a filesystem location", name, repo, chain, origin)
+	}
+	if !strings.HasPrefix(path, "/") {
+		configured, err := gitops.RemoteConfigured(repo, path)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the configured remotes: %w", name, repo, chain, err)
+		}
+		if configured {
+			return "", false, fmt.Errorf(
+				"source_origin_ambiguous: stored local origin %s of checkout %s for %s resolves to %s, which is also the name of a configured remote; nothing was fetched; rename that remote (via %s)",
+				origin, repo, name, path, chain)
+		}
+	}
+	return path, false, nil
 }
 
 // fetchSource fetches repo from endpoint through the injected fetch or the
@@ -129,24 +183,42 @@ func identityLabel(id string) string {
 // sameLocalSource reports whether a declared local path names the stored
 // local origin, or the checkout itself. A relative declaration is read from
 // the working directory, as the clone path's git reads it; a relative stored
-// origin is read from the checkout, as git fetch reads it. Paths compare
-// cleaned and absolute, with symlinks resolved where they exist.
+// origin is read from the checkout, as git fetch reads it. Every operand is
+// resolved to its absolute physical path (physicalPath), and two locations
+// that both exist compare by filesystem identity.
 func sameLocalSource(declared, origin, repo string) bool {
-	declaredPath, ok := localSourcePath(declared, "")
+	declaredPath, ok := physicalPath(declared, "")
 	if !ok {
 		return false
 	}
-	originPath, ok := localSourcePath(origin, repo)
-	if !ok {
-		return false
+	if originPath, ok := physicalPath(origin, repo); ok && sameLocation(declaredPath, originPath) {
+		return true
 	}
-	key := repoKey(declaredPath)
-	return key == repoKey(originPath) || key == repoKey(repo)
+	repoPath, ok := physicalPath(repo, "")
+	return ok && sameLocation(declaredPath, repoPath)
 }
 
-// localSourcePath returns the filesystem path a local source names. base
-// anchors a relative path; empty base means the working directory.
-func localSourcePath(raw, base string) (string, bool) {
+// sameLocation compares two physical paths: by os.SameFile when both exist,
+// otherwise by their spelling (case-insensitively on Windows, like repoKey).
+func sameLocation(left, right string) bool {
+	leftInfo, leftErr := os.Stat(left)
+	rightInfo, rightErr := os.Stat(right)
+	if leftErr == nil && rightErr == nil {
+		return os.SameFile(leftInfo, rightInfo)
+	}
+	if leftErr == nil || rightErr == nil {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
+}
+
+// localPathOf returns the filesystem path a local source spells: a file://
+// URL's path, or the raw value. It does not clean the result: ".." must be
+// walked after the symlinks before it (physicalPath).
+func localPathOf(raw string) (string, bool) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return "", false
@@ -169,14 +241,57 @@ func localSourcePath(raw, base string) (string, bool) {
 			return "", false
 		}
 	}
-	if !filepath.IsAbs(value) && base != "" {
-		value = filepath.Join(base, value)
-	}
-	absolute, err := filepath.Abs(value)
-	if err != nil {
+	return value, true
+}
+
+// physicalPath returns the absolute physical path a local source names, the
+// location the filesystem reaches by walking it: every symlink is resolved
+// before a ".." that follows it, so "link/../x" names x beside the link's
+// target, not beside the link. A relative path is anchored at base, or at
+// the working directory when base is empty; a relative base is itself read
+// from the working directory. When the location does not exist, its longest
+// existing prefix is resolved and the rest appended; a ".." in that rest
+// cannot be walked, so the path is refused (ok false).
+func physicalPath(raw, base string) (string, bool) {
+	value, ok := localPathOf(raw)
+	if !ok {
 		return "", false
 	}
-	return filepath.Clean(absolute), true
+	if !filepath.IsAbs(value) {
+		anchor := base
+		if anchor == "" || !filepath.IsAbs(anchor) {
+			working, err := os.Getwd()
+			if err != nil {
+				return "", false
+			}
+			if anchor != "" {
+				working = working + string(filepath.Separator) + anchor
+			}
+			anchor = working
+		}
+		// No filepath.Join: it would clean "link/.." lexically.
+		value = anchor + string(filepath.Separator) + value
+	}
+	if resolved, err := filepath.EvalSymlinks(value); err == nil {
+		return filepath.Clean(resolved), true
+	}
+	volume := filepath.VolumeName(value)
+	parts := strings.FieldsFunc(value[len(volume):], func(r rune) bool { return r == '/' || r == filepath.Separator })
+	for index := len(parts) - 1; index >= 0; index-- {
+		prefix := volume + string(filepath.Separator) + strings.Join(parts[:index], string(filepath.Separator))
+		resolved, err := filepath.EvalSymlinks(prefix)
+		if err != nil {
+			continue
+		}
+		rest := parts[index:]
+		for _, part := range rest {
+			if part == ".." {
+				return "", false
+			}
+		}
+		return filepath.Join(append([]string{resolved}, rest...)...), true
+	}
+	return "", false
 }
 
 // declaredSpelling is the first raw spelling seen for one canonical identity.

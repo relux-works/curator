@@ -45,7 +45,7 @@ func (h *harness) fetchOptions(log *fetchLog, allowed ...string) Options {
 		Home:           h.home,
 		AllowedSources: allowed,
 		FetchExisting:  true,
-		FetchedRepos:   map[string]bool{},
+		FetchedRepos:   map[string]string{},
 		FetchRepo:      log.fetch,
 	}
 }
@@ -289,7 +289,7 @@ func TestExtraRemoteIsNeverContacted(t *testing.T) {
 	t.Run("skills root", func(t *testing.T) {
 		h := newHarness(t)
 		fixture := newRealFetchFixture(t, h, h.skillsRoot)
-		opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, FetchExisting: true, FetchedRepos: map[string]bool{}}
+		opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, FetchExisting: true, FetchedRepos: map[string]string{}}
 		if err := buildOne(opts, decl("tool"), nil); err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestExtraRemoteIsNeverContacted(t *testing.T) {
 		h := newHarness(t)
 		devRoot := testgitenv.ShortTempDir(t)
 		fixture := newRealFetchFixture(t, h, devRoot)
-		opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, DevRoot: devRoot, FetchedRepos: map[string]bool{}}
+		opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, DevRoot: devRoot, FetchedRepos: map[string]string{}}
 		subs := map[string]devsub.Substitution{"tool": {SkillName: "tool", Git: fixture.upstream, RefKind: "tag", RefValue: "v1"}}
 		if err := buildOne(opts, decl("tool"), subs); err != nil {
 			t.Fatal(err)
@@ -314,7 +314,7 @@ func TestExtraRemoteIsNeverContacted(t *testing.T) {
 func TestDeclaredSelfPathRefreshesFromOrigin(t *testing.T) {
 	h := newHarness(t)
 	fixture := newRealFetchFixture(t, h, h.skillsRoot)
-	opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, FetchExisting: true, FetchedRepos: map[string]bool{}}
+	opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, FetchExisting: true, FetchedRepos: map[string]string{}}
 	if err := buildOne(opts, declaredTool(fixture.checkout), nil); err != nil {
 		t.Fatal(err)
 	}
@@ -322,9 +322,10 @@ func TestDeclaredSelfPathRefreshesFromOrigin(t *testing.T) {
 }
 
 // Claim: with a local declaration, the stored origin must be local and name
-// the same location (spelling may differ: file:// or a trailing separator);
-// another local path, or a network origin, refuses with no fetch. The
-// reverse, a network declaration over a local origin, refuses too.
+// the same location (spelling may differ: file:// or a trailing separator),
+// and the fetch is handed the origin's absolute physical path; another local
+// path, or a network origin, refuses with no fetch. The reverse, a network
+// declaration over a local origin, refuses too.
 func TestLocalDeclarationComparesLocalOrigin(t *testing.T) {
 	upstream := t.TempDir()
 	elsewhere := t.TempDir()
@@ -360,8 +361,12 @@ func TestLocalDeclarationComparesLocalOrigin(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if strings.Join(log.endpoints, ",") != testCase.stored {
-				t.Fatalf("fetched endpoints = %v, want the stored origin %s", log.endpoints, testCase.stored)
+			want, err := filepath.EvalSymlinks(testCase.stored)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Join(log.endpoints, ",") != want {
+				t.Fatalf("fetched endpoints = %v, want the stored origin's physical path %s", log.endpoints, want)
 			}
 		})
 	}
@@ -438,7 +443,7 @@ func TestRedirectedFetchRefusesWithCanonicalHint(t *testing.T) {
 			t.Fatalf("err = %v, want %q", err, want)
 		}
 		opts.FetchRepo = (&fetchLog{}).fetch
-		opts.FetchedRepos = map[string]bool{}
+		opts.FetchedRepos = map[string]string{}
 		if err := buildOne(opts, declaredTool(declared), nil); err != nil {
 			t.Fatalf("positive control: %v", err)
 		}
@@ -455,4 +460,284 @@ func TestRedirectedFetchRefusesWithCanonicalHint(t *testing.T) {
 			t.Fatalf("err = %v, want %q", err, want)
 		}
 	})
+}
+
+// Claim: in one run whose scopes share FetchedRepos (the upgrade --all
+// wiring), a later scope that reaches an already refreshed checkout is still
+// gated and bound to its stored origin: a disallowed or mismatching
+// declaration refuses with no further fetch, on the skills-root path and the
+// dev path. A second scope with the identical declaration resolves without
+// fetching again; one with the same identity spelled differently is bound and
+// fetched from its own spelling, because only an identical endpoint is
+// deduplicated.
+func TestEveryScopeIsBoundBeforeTheFetchIsDeduplicated(t *testing.T) {
+	declared := "https://git.example.com/skills/tool.git"
+	allowed := []string{"git.example.com/skills"}
+	cases := []struct {
+		name, second, refusal string
+		endpoints             []string
+	}{
+		{"disallowed declaration", "https://forbidden.example.com/skills/tool.git", "source not allowed for tool", []string{declared}},
+		{"mismatching declaration", "https://git.example.com/skills/other.git", "source_origin_mismatch: ", []string{declared}},
+		{"identical declaration", declared, "", []string{declared}},
+		{"same identity, other spelling", "https://git.example.com/skills/tool", "", []string{declared, "https://git.example.com/skills/tool"}},
+	}
+	for _, testCase := range cases {
+		t.Run("skills root/"+testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.toolCheckout(declared)
+			log := &fetchLog{}
+			opts := h.fetchOptions(log, allowed...)
+			if err := buildOne(opts, declaredTool(declared), nil); err != nil {
+				t.Fatal(err)
+			}
+			err := buildOne(opts, declaredTool(testCase.second), nil)
+			assertSecondScope(t, err, testCase.refusal, log.endpoints, testCase.endpoints)
+		})
+		t.Run("dev checkout/"+testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			dev := newHarness(t)
+			dev.toolCheckout(declared)
+			log := &fetchLog{}
+			opts := h.fetchOptions(log, allowed...)
+			opts.DevRoot = dev.skillsRoot
+			substitute := func(gitURL string) map[string]devsub.Substitution {
+				return map[string]devsub.Substitution{"tool": {SkillName: "tool", Git: gitURL, RefKind: "tag", RefValue: "v1"}}
+			}
+			if err := buildOne(opts, decl("tool"), substitute(declared)); err != nil {
+				t.Fatal(err)
+			}
+			err := buildOne(opts, decl("tool"), substitute(testCase.second))
+			assertSecondScope(t, err, testCase.refusal, log.endpoints, testCase.endpoints)
+		})
+	}
+}
+
+func assertSecondScope(t *testing.T, err error, refusal string, endpoints, want []string) {
+	t.Helper()
+	if refusal == "" && err != nil {
+		t.Fatalf("second scope: %v", err)
+	}
+	if refusal != "" && (err == nil || !strings.HasPrefix(err.Error(), refusal)) {
+		t.Fatalf("second scope err = %v, want %q", err, refusal)
+	}
+	if strings.Join(endpoints, ",") != strings.Join(want, ",") {
+		t.Fatalf("fetched endpoints = %v, want %v", endpoints, want)
+	}
+}
+
+// Claim: a checkout cloned by an earlier scope of the same run is bound like
+// any existing checkout when a later scope reaches it: another local
+// declaration refuses with source_origin_mismatch, the same declaration
+// resolves. Real git, local paths only.
+func TestClonedCheckoutIsBoundForLaterScopes(t *testing.T) {
+	sources := newHarness(t)
+	upstream := sources.skill("tool", nil, nil)
+	elsewhere := sources.skill("elsewhere", nil, nil)
+	for _, testCase := range []struct {
+		name, second string
+		refuse       bool
+	}{{"other local path", elsewhere, true}, {"same local path", upstream, false}} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, FetchExisting: true, FetchedRepos: map[string]string{}}
+			if err := buildOne(opts, declaredTool(upstream), nil); err != nil {
+				t.Fatal(err)
+			}
+			err := buildOne(opts, declaredTool(testCase.second), nil)
+			if !testCase.refuse {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.HasPrefix(err.Error(), "source_origin_mismatch: ") {
+				t.Fatalf("err = %v, want source_origin_mismatch", err)
+			}
+		})
+	}
+}
+
+// Claim: a bare relative stored origin ("mirror") is fetched as the location
+// it names beside the checkout, never as the configured remote of the same
+// name: the location's tag arrives, the remote's tag and remote-tracking refs
+// do not. The same holds for a file:// origin, which git also reads as a
+// remote name when one is configured with that exact name. Real git, local
+// repositories only.
+func TestLocalOriginIsNeverReadAsARemoteName(t *testing.T) {
+	sources := newHarness(t)
+	forbidden := sources.skill("forbidden", nil, nil)
+	sources.git(forbidden, "tag", "only-in-forbidden-remote")
+	forbiddenURL := "file://" + filepath.ToSlash(forbidden)
+	if filepath.VolumeName(forbidden) != "" {
+		forbiddenURL = "file:///" + filepath.ToSlash(forbidden)
+	}
+	for _, testCase := range []struct{ name, origin string }{
+		{"bare relative origin", "mirror"},
+		{"file URL origin", ""},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			checkout := h.skill("tool", nil, nil)
+			mirror := filepath.Join(checkout, "mirror")
+			h.git(checkout, "clone", "-q", "--bare", checkout, mirror)
+			h.git(mirror, "tag", "fresh")
+			origin := testCase.origin
+			if origin == "" {
+				origin = "file://" + filepath.ToSlash(mirror)
+				if filepath.VolumeName(mirror) != "" {
+					origin = "file:///" + filepath.ToSlash(mirror)
+				}
+			}
+			h.git(checkout, "remote", "add", "origin", origin)
+			h.git(checkout, "config", "remote."+origin+".url", forbiddenURL)
+			opts := Options{SkillsRoot: h.skillsRoot, Home: h.home, FetchExisting: true, FetchedRepos: map[string]string{}}
+			if err := buildOne(opts, decl("tool"), nil); err != nil {
+				t.Fatal(err)
+			}
+			tags := h.git(checkout, "tag", "-l")
+			if !strings.Contains(tags, "fresh") || strings.Contains(tags, "only-in-forbidden-remote") {
+				t.Fatalf("tags %q: want the location's fresh tag and not the same-named remote's", tags)
+			}
+			if refs := h.git(checkout, "for-each-ref", "refs/remotes/"+origin); refs != "" {
+				t.Fatalf("the same-named remote was fetched: %q", refs)
+			}
+		})
+	}
+}
+
+// Claim: RemoteConfigured, the guard for local origins whose physical path
+// does not begin with "/" (Windows drive paths), sees a remote configured
+// under exactly that name and nothing else; the binding then refuses with
+// source_origin_ambiguous. Limit: on POSIX the guard branch is not reached
+// (physical paths begin with "/"), so this proves the accessor, not the
+// Windows binding end to end.
+func TestRemoteConfiguredSeesExactRemoteName(t *testing.T) {
+	h := newHarness(t)
+	checkout := h.toolCheckout("https://git.example.com/skills/tool.git")
+	h.git(checkout, "config", `remote.C:\skills\mirror.url`, "https://other.example.com/x.git")
+	for name, want := range map[string]bool{`C:\skills\mirror`: true, `C:\skills`: false, "origin": true, "mirror": false} {
+		got, err := gitops.RemoteConfigured(checkout, name)
+		if err != nil || got != want {
+			t.Fatalf("RemoteConfigured(%q) = %v, %v; want %v", name, got, err, want)
+		}
+	}
+}
+
+// symlinkOrSkip creates link -> target, skipping where symlinks need a
+// privilege the test process lacks.
+func symlinkOrSkip(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+}
+
+// Claim: "entry/../x" is compared as the filesystem walks it, resolving the
+// symlink entry before "..", not as the lexical "x": with entry ->
+// elsewhere/child, a declaration root/entry/../origin.git names
+// root/elsewhere/origin.git. It is refused against an origin at the lexical
+// root/origin.git (no fetch), and accepted against an origin at the physical
+// location, which is fetched by its physical path.
+func TestSymlinkParentIsResolvedBeforeDotDot(t *testing.T) {
+	root := t.TempDir()
+	physicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{filepath.Join(root, "elsewhere", "child"), filepath.Join(root, "elsewhere", "origin.git"), filepath.Join(root, "origin.git")} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	symlinkOrSkip(t, filepath.Join(root, "elsewhere", "child"), filepath.Join(root, "entry"))
+	declared := root + string(filepath.Separator) + "entry" + string(filepath.Separator) + ".." + string(filepath.Separator) + "origin.git"
+	for _, testCase := range []struct {
+		name, stored string
+		refuse       bool
+	}{
+		{"lexical location refuses", filepath.Join(root, "origin.git"), true},
+		{"physical location fetches", filepath.Join(root, "elsewhere", "origin.git"), false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.toolCheckout(testCase.stored)
+			log := &fetchLog{}
+			err := buildOne(h.fetchOptions(log), declaredTool(declared), nil)
+			if testCase.refuse {
+				if err == nil || !strings.HasPrefix(err.Error(), "source_origin_mismatch: ") || len(log.endpoints) != 0 {
+					t.Fatalf("err = %v, endpoints %v; want source_origin_mismatch and no fetch", err, log.endpoints)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := filepath.Join(physicalRoot, "elsewhere", "origin.git")
+			if strings.Join(log.endpoints, ",") != want {
+				t.Fatalf("fetched endpoints = %v, want %s", log.endpoints, want)
+			}
+		})
+	}
+	t.Run("stored origin through a symlink parent", func(t *testing.T) {
+		// The same rule on the origin side, anchored at the checkout.
+		h := newHarness(t)
+		repo := h.toolCheckout("")
+		symlinkOrSkip(t, filepath.Join(root, "elsewhere", "child"), filepath.Join(repo, "link"))
+		h.git(repo, "remote", "add", "origin", "link/../origin.git")
+		log := &fetchLog{}
+		if err := buildOne(h.fetchOptions(log), declaredTool(filepath.Join(root, "elsewhere", "origin.git")), nil); err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(physicalRoot, "elsewhere", "origin.git"); strings.Join(log.endpoints, ",") != want {
+			t.Fatalf("fetched endpoints = %v, want %s", log.endpoints, want)
+		}
+		if err := buildOne(h.fetchOptions(log), declaredTool(filepath.Join(repo, "origin.git")), nil); err == nil || !strings.HasPrefix(err.Error(), "source_origin_mismatch: ") {
+			t.Fatalf("lexical reading of the origin accepted: %v", err)
+		}
+	})
+}
+
+// Claim: with a relative skills_root, a declaration naming the checkout's
+// absolute path is the self-path case and refreshes; a relative declaration
+// of the same checkout does too, and an unrelated absolute path still
+// refuses. All operands compare in one absolute coordinate system.
+func TestRelativeSkillsRootAcceptsSelfPath(t *testing.T) {
+	h := newHarness(t)
+	repo := h.toolCheckout("")
+	upstream := t.TempDir()
+	h.git(repo, "remote", "add", "origin", upstream)
+	t.Chdir(filepath.Dir(h.skillsRoot))
+	relativeRoot := filepath.Base(h.skillsRoot)
+	for _, testCase := range []struct {
+		name, declared string
+		refuse         bool
+	}{
+		{"absolute self path", repo, false},
+		{"relative self path", filepath.Join(relativeRoot, "tool"), false},
+		{"unrelated path", t.TempDir(), true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			log := &fetchLog{}
+			opts := h.fetchOptions(log)
+			opts.SkillsRoot = relativeRoot
+			err := buildOne(opts, declaredTool(testCase.declared), nil)
+			if testCase.refuse {
+				if err == nil || !strings.HasPrefix(err.Error(), "source_origin_mismatch: ") || len(log.endpoints) != 0 {
+					t.Fatalf("err = %v, endpoints %v; want source_origin_mismatch and no fetch", err, log.endpoints)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := filepath.EvalSymlinks(upstream)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Join(log.endpoints, ",") != want {
+				t.Fatalf("fetched endpoints = %v, want %s", log.endpoints, want)
+			}
+		})
+	}
 }

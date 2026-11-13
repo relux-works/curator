@@ -130,9 +130,14 @@ type Options struct {
 	Home           string // machine home for caches
 	AllowedSources []string
 	// FetchExisting updates only repositories reached while building this
-	// closure. FetchedRepos deduplicates work across several selected scopes.
+	// closure. FetchedRepos deduplicates the fetch side effect across several
+	// selected scopes: it maps the key of each checkout refreshed in this run
+	// to the endpoint it was fetched from, or to "" when another lane
+	// refreshed it (MarkRepoFetched) or it had no origin to fetch. Every
+	// requirer of a checkout is still gated and bound to its stored origin;
+	// only a fetch of the identical endpoint is skipped.
 	FetchExisting bool
-	FetchedRepos  map[string]bool
+	FetchedRepos  map[string]string
 	// FetchRepo refreshes one existing checkout from exactly one endpoint:
 	// the declared URL or the stored origin URL, never the checkout's
 	// remotes. It is injectable for deterministic tests. Nil uses git: the
@@ -450,11 +455,10 @@ func ensureRepo(opts Options, item pending) (string, error) {
 		if err := gitops.EnsureRepo(repo); err != nil {
 			return "", fmt.Errorf("local skill path exists but is not a git repository: %s", repo)
 		}
-		if opts.FetchExisting && !alreadyFetched(opts, repo) {
+		if opts.FetchExisting {
 			if err := refreshCheckout(opts, item.name, item.git, item.chain, repo); err != nil {
 				return "", err
 			}
-			markFetched(opts, repo)
 		}
 		return repo, nil
 	}
@@ -475,7 +479,7 @@ func ensureRepo(opts Options, item pending) (string, error) {
 		return "", fmt.Errorf("failed to clone %s from %s: %w", item.name, item.git, err)
 	}
 	if opts.FetchExisting && opts.ScratchRoot == "" {
-		markFetched(opts, destination)
+		markFetched(opts, destination, item.git)
 	}
 	return destination, nil
 }
@@ -494,18 +498,15 @@ func ensureDevRepo(opts Options, name, gitURL, chain string) (string, error) {
 	}
 	repo := filepath.Join(root, name)
 	if _, err := os.Stat(filepath.Join(repo, ".git")); err == nil {
-		if !alreadyFetched(opts, repo) {
-			if err := refreshCheckout(opts, name, gitURL, chain, repo); err != nil {
-				return "", err
-			}
-			markFetched(opts, repo)
+		if err := refreshCheckout(opts, name, gitURL, chain, repo); err != nil {
+			return "", err
 		}
 		return repo, nil
 	}
 	if err := cloneDevRepo(name, gitURL, chain, repo); err != nil {
 		return "", err
 	}
-	markFetched(opts, repo)
+	markFetched(opts, repo, gitURL)
 	return repo, nil
 }
 
@@ -547,27 +548,43 @@ func snapshotFor(opts Options, source, repo, commit string) (string, error) {
 	return target, nil
 }
 
-// MarkRepoFetched records repo as already refreshed in m using the same
-// key ensureRepo consults, so an explicit operation that refreshed a tree
-// through another lane (for example a Git alias acquisition) never
-// fetches it twice. A nil map accepts the mark by doing nothing.
-func MarkRepoFetched(m map[string]bool, repo string) {
-	if m != nil {
-		m[repoKey(repo)] = true
+// MarkRepoFetched records repo as already refreshed through another lane
+// (for example a Git alias acquisition) in m, using the same key the legacy
+// lane consults. The alias lane never fetches a marked tree again. The
+// legacy lane records the endpoint it fetches and skips only a fetch of
+// the identical endpoint, so a tree marked here with no endpoint is still
+// fetched if a legacy requirer reaches it. A nil map accepts the mark by
+// doing nothing.
+func MarkRepoFetched(m map[string]string, repo string) {
+	if m == nil {
+		return
+	}
+	if _, seen := m[repoKey(repo)]; !seen {
+		m[repoKey(repo)] = ""
 	}
 }
 
-func alreadyFetched(opts Options, repo string) bool {
+// fetchedFrom reports whether repo was already fetched from endpoint in this
+// run.
+func fetchedFrom(opts Options, repo, endpoint string) bool {
 	if opts.FetchedRepos == nil {
 		return false
 	}
-	return opts.FetchedRepos[repoKey(repo)]
+	previous, seen := opts.FetchedRepos[repoKey(repo)]
+	return seen && previous == endpoint
 }
 
-func markFetched(opts Options, repo string) {
-	if opts.FetchedRepos != nil {
-		opts.FetchedRepos[repoKey(repo)] = true
+// markFetched records that repo was refreshed from endpoint. An empty
+// endpoint (nothing to fetch) never replaces a recorded one.
+func markFetched(opts Options, repo, endpoint string) {
+	if opts.FetchedRepos == nil {
+		return
 	}
+	key := repoKey(repo)
+	if _, seen := opts.FetchedRepos[key]; seen && endpoint == "" {
+		return
+	}
+	opts.FetchedRepos[key] = endpoint
 }
 
 func repoKey(repo string) string {

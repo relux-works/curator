@@ -146,7 +146,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		}
 	}
 	if opts.FetchedRepos == nil {
-		opts.FetchedRepos = map[string]bool{}
+		opts.FetchedRepos = map[string]string{}
 	}
 	fetchedBefore := copySet(opts.FetchedRepos)
 	nodes, err := closure.Build(closure.Options{
