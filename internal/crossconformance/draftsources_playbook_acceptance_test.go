@@ -63,6 +63,13 @@ func TestDraftSourcesPlaybookCollectionAcceptanceThroughProductionCLI(t *testing
 	assertPlaybookInstalled(t, project, []string{"orchestrator", "developer", "reviewer", "qa"})
 	assertPlaybookStatus(t, gitWrapper, home, configPath, []string{"orchestrator", "developer", "reviewer", "qa"})
 	assertPlaybookAuditCoversLock(t, home, lockV1)
+	// The legacy-lane checkout of the transitive qa dependency stores the
+	// declared URL as its origin, so the refresh below binds and fetches the
+	// declared identity (routed to the local bare repository by the wrapper).
+	qaOrigin := strings.TrimSpace(draftGitOutput(t, filepath.Join(root, "lifecycle", "skills-root", "qa"), "config", "--get", "remote.origin.url"))
+	if qaOrigin != rolesFixtureURL {
+		t.Fatalf("qa checkout origin = %q, want the declared %s", qaOrigin, rolesFixtureURL)
+	}
 	lockV1Bytes, err := os.ReadFile(lockPath)
 	if err != nil {
 		t.Fatal(err)
@@ -249,6 +256,12 @@ func buildRolesFixture(t *testing.T, repoRoot string) (bare, commit string) {
 	return bare, commit
 }
 
+// writePlaybookFixtureGitWrapper writes a git wrapper that routes each
+// declared fixture URL to its local bare repository with a command-line
+// url.<bare>.insteadOf pin. Arguments pass through unchanged, so a clone
+// stores the declared URL as its origin, exactly as a clone from the network
+// would, while every transfer stays local. Command-line configuration
+// survives the draft lane's environment isolation.
 func writePlaybookFixtureGitWrapper(t *testing.T, root, realGit string, remotes map[string]string) string {
 	t.Helper()
 	dir, err := os.MkdirTemp(root, "git-wrapper-")
@@ -261,12 +274,10 @@ func writePlaybookFixtureGitWrapper(t *testing.T, root, realGit string, remotes 
 	}
 	sort.Strings(urls)
 	var script strings.Builder
-	script.WriteString("#!/bin/sh\nargs=\"\"\nfor arg in \"$@\"; do\n  case \"$arg\" in\n")
+	script.WriteString("#!/bin/sh\nexec " + shellQuotePlaybook(realGit))
 	for _, url := range urls {
-		script.WriteString("    " + shellQuotePlaybook(url) + ") arg=" + shellQuotePlaybook("file://"+remotes[url]) + ";;\n")
+		script.WriteString(" -c " + shellQuotePlaybook("url.file://"+remotes[url]+".insteadOf="+url))
 	}
-	script.WriteString("  esac\n  args=\"$args\n$arg\"\ndone\noldifs=$IFS\nIFS='\n'\nset -- $args\nIFS=$oldifs\nexec ")
-	script.WriteString(shellQuotePlaybook(realGit))
 	script.WriteString(" \"$@\"\n")
 	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script.String()), 0o700); err != nil {
 		t.Fatal(err)
