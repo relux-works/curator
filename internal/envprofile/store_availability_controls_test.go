@@ -79,6 +79,8 @@ func TestStartupAbsentEntryDoesNotHideStructure(t *testing.T) {
 
 // A native Git skill retains existing SKILL.md package admission. Its actual
 // provisioning and subsequent no-write startup use its recorded full roster.
+// Removing its recorded SKILL.md must refuse repair at each level without a
+// fragment or manager writes; restoring the same bytes restores the neighbor.
 func TestStartupNativeSkillRecordedRoster(t *testing.T) {
 	fx := writeManagedFixture(t, "example")
 	lock, _, err := contextlock.Read(lockPath(fx.home, fx.profile))
@@ -102,6 +104,11 @@ func TestStartupNativeSkillRecordedRoster(t *testing.T) {
 		t.Fatal(err)
 	}
 	provisionStoreBoundaryHome(t, fx)
+	skillPath := filepath.Join(storeBoundaryEntry(t, fx, contextlock.KindSkill), "SKILL.md")
+	skillBytes, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for level := 1; level <= 4; level++ {
 		req := fx.request("codex_cli")
 		req.Policy.StartupVerificationLevel = level
@@ -112,6 +119,21 @@ func TestStartupNativeSkillRecordedRoster(t *testing.T) {
 		}
 		if hashTreeForTest(t, fx.home) != before {
 			t.Fatalf("native recorded roster level%d wrote state", level)
+		}
+		if err := os.Remove(skillPath); err != nil {
+			t.Fatal(err)
+		}
+		before = hashTreeForTest(t, fx.home)
+		req.Repair = true
+		result, err = Resolve(req)
+		if err == nil || !strings.HasPrefix(err.Error(), "environment_store_untrusted:") || !strings.Contains(err.Error(), "failed regular_types check:") || !strings.Contains(err.Error(), skillPath) || result != nil && len(result.Document) != 0 {
+			t.Fatalf("native missing SKILL.md level%d did not refuse the named payload: %v", level, err)
+		}
+		if hashTreeForTest(t, fx.home) != before {
+			t.Fatalf("native missing SKILL.md level%d repair wrote state", level)
+		}
+		if err := os.WriteFile(skillPath, skillBytes, 0644); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
