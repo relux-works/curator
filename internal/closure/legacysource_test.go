@@ -423,7 +423,7 @@ func TestMixedSpellingRefused(t *testing.T) {
 // the classifier of git's stderr is proven in gitops (no HTTP fixture here).
 func TestRedirectedFetchRefusesWithCanonicalHint(t *testing.T) {
 	target := "https://git.example.com/skills/renamed.git"
-	redirectTo := func(repo, endpoint string) error {
+	redirectTo := func(_, endpoint string) error {
 		return &gitops.RedirectError{Endpoint: endpoint, Target: target}
 	}
 	t.Run("declared", func(t *testing.T) {

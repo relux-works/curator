@@ -533,7 +533,7 @@ func TestFetchExistingIsScopedToReachedClosureAndDeduplicated(t *testing.T) {
 		Home:          h.home,
 		FetchExisting: true,
 		FetchedRepos:  fetched,
-		FetchRepo: func(repo, endpoint string) error {
+		FetchRepo: func(repo, _ string) error {
 			calls = append(calls, filepath.Base(repo))
 			return nil
 		},
