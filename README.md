@@ -419,6 +419,29 @@ Curator conforms to an open specification. Independent implementations include [
 
 Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
 
+### CI coverage
+
+Every PR runs one `macOS smoke` job (native build, vet, and selected regression
+tests; 10-minute job limit). Apply `landing-candidate` before landing to run the
+full 17-job macOS matrix as well; label addition/removal reevaluates CI and PR
+runs cancel older runs on the same ref. Full macOS also runs on pushes to `main`
+and `workflow_dispatch`; `gate/**` pushes keep Linux/Windows coverage. The
+selection supports `merge_group` if a merge queue is enabled later (there is no
+merge-group trigger today). Wait for `macOS policy gate` on the current candidate
+run: it rejects missing, skipped, cancelled or failed required dependencies and
+reports smoke-only PR coverage explicitly. Repository protection/rulesets are
+currently unset; this workflow check does not create a server-side merge rule.
+Release tag signing/notarization and opt-in runner policies are unchanged.
+
+Run `bash .github/ci/macos-smoke.sh` on macOS for the selected tests; JSON evidence
+goes to `.temp/ci-evidence/macos-smoke/`. `TestDefaultTransportInstallScopes`
+retains the path-alias regression fixed in `b3c3dd59` (macOS temporary-directory
+symlinks); `TestClaudeSeedPreparedRename` exercises native seed replacement and
+invalid destinations; `TestExchangePreparationContract` exercises native atomic
+exchange and refusal of invalid plans. Run `python3 .github/ci/macos-policy-selftest.py`
+for gate rejection controls and `go test -count=1 ./tools/ciworkflow/` for workflow
+selection/wiring controls; keep local command logs in `.temp/`.
+
 ### Tools
 
 For managed Claude gateway settings, configure

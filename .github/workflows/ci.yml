@@ -6,6 +6,7 @@ on:
     # for the task-board landing gate; the branch is deleted after the run.
     branches: [main, 'gate/**']
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       candidate_ref:
@@ -76,6 +77,55 @@ env:
   PNPM_PIN: "10.33.0"
 
 jobs:
+  # One native Darwin witness per PR; full suites retain their existing lanes.
+  macos-smoke:
+    name: macOS smoke
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+      - name: Build and vet native Darwin sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go build ./...
+          bash .github/ci/isolated-test.sh go vet ./...
+      - name: Native rename, path aliases and atomic exchange regressions
+        shell: bash
+        run: bash .github/ci/macos-smoke.sh
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-smoke
+          path: .temp/ci-evidence/macos-smoke/
+          if-no-files-found: error
+
+  macos-policy-gate:
+    name: macOS policy gate
+    # Skipped, failed or cancelled dependencies must produce a red gate.
+    if: always()
+    needs: [macos-smoke, go-family-qualification, unix-test-shards, test, envprofile-race, race, gate-selftest, candidate-conformance]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the selected macOS coverage
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python3 .github/ci/macos-policy-gate.py
+
   openssh89-fetch:
     name: OpenSSH 8.9 real fetch (hosted Ubuntu 22.04)
     runs-on: ubuntu-22.04
@@ -311,6 +361,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         go: ['1.25.5', '1.26.0', '1.27.1']
+        exclude: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'landing-candidate'))) && '[]' || '[{"os":"macos-latest"}]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Initialize private Go state
@@ -493,12 +544,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {os: ubuntu-latest, shard: 0}
-          - {os: ubuntu-latest, shard: 1}
-          - {os: ubuntu-latest, shard: 2}
-          - {os: macos-latest, shard: 0}
-          - {os: macos-latest, shard: 1}
+        os: [ubuntu-latest, macos-latest]
+        shard: [0, 1, 2]
+        exclude: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'landing-candidate'))) && '[{"os":"macos-latest","shard":2}]' || '[{"os":"macos-latest"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -594,6 +642,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        exclude: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'landing-candidate'))) && '[]' || '[{"os":"macos-latest"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -953,6 +1002,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        exclude: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'landing-candidate'))) && '[]' || '[{"os":"macos-latest"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1008,6 +1058,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        exclude: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'landing-candidate'))) && '[]' || '[{"os":"macos-latest"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1194,6 +1245,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        exclude: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'landing-candidate'))) && '[]' || '[{"os":"macos-latest"}]') }}
     steps:
       - uses: actions/checkout@v4
 
