@@ -833,8 +833,12 @@ func listTree(repo, tree string) ([]treeEntry, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("git ls-tree failed in %s: %s", repo, strings.TrimSpace(stderr.String()))
 	}
+	return parseTreeListing(repo, stdout.Bytes())
+}
+
+func parseTreeListing(repo string, raw []byte) ([]treeEntry, error) {
 	var entries []treeEntry
-	for _, record := range bytes.Split(stdout.Bytes(), []byte{0}) {
+	for _, record := range bytes.Split(raw, []byte{0}) {
 		if len(record) == 0 {
 			continue
 		}

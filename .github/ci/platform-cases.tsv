@@ -1164,3 +1164,13 @@ internal/envprofile	TestStoreVerificationPinnedCorpusReader	-	linux,darwin,windo
 internal/envprofile	TestStoreVerificationActualReaderDirections	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
 internal/storecompatibility	TestExactMigrationPartitionAndControls	linux,darwin,windows	-	-	exact38-row32/6 migration partition rejects a same-count swapped-ID plant
 internal/storecompatibility	TestReplayEventDoesNotNormalizeDuplicateVerdicts	linux,darwin,windows	-	-	decoded duplicate event keys cannot erase a failing verdict
+
+# Whole-entry availability and mutation-boundary controls.
+internal/envprofile	TestStartupStoreAbsenceClassification	linux,darwin,windows	-	-	all four levels distinguish whole-entry availability from missing recorded payload; each has an intact control
+internal/envprofile	TestStartupRepairRejectsLateStorePlant	linux,darwin,windows	-	-	strict repair preserves late symlink/hardlink plants and passes safe byte-repair controls
+internal/envprofile	TestStartupAbsentEntryDoesNotHideStructure	linux,darwin,windows	-	-	absent leaf cannot conceal an unsafe or absent parent or a later member violation
+internal/envprofile	TestStartupNativeSkillRecordedRoster	linux,darwin,windows	-	-	native Git skill retains package admission and starts from its full recorded roster
+internal/gitops	TestPinnedSnapshotPathsProjection	linux,darwin,windows	-	-	selected roster and projected pin agree with real extraction for SHA1/SHA256
+internal/gitops	TestPinnedSnapshotPathsIsolation	linux,darwin,windows	-	-	ambient Git overrides cannot substitute a repository or supply a missing local object
+internal/gitops	TestPinnedSnapshotPathsRejectsAlternateAndGraft	linux,darwin,windows	-	-	native alternate/graft metadata refuses with a local-repository positive
+internal/gitops	TestPinnedSnapshotPathMetadataControls	linux,darwin,windows	-	-	unsafe paths/types/collisions and metadata/path-count excesses refuse without a partial roster

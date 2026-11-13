@@ -132,6 +132,33 @@ in the profile lock and never writes a manifest into the skill source. Startup
 compares the frozen expected evidence; it never regenerates an expectation from
 drifted installed content.
 
+## Whole-entry availability
+
+A wholly absent selected entry is an availability condition only after an exact
+no-follow leaf-not-found result and safe existing ancestors. Every other
+selected member is checked before repair. Missing intermediate parents,
+dangling links, unknown metadata and a present entry with a missing recorded
+payload remain structural refusals at all levels.
+
+Strict repair at levels 3/4 may recreate an absent Git entry from the same local
+recorded pin under the existing credential and mutation-lock guards. It checks
+all selected structure before recovery, staging and publication; late unsafe
+objects are preserved with a named refusal. Read-only and levels 1/2 never
+recreate the entry. Strict absent-Git dry-run reports
+`would-rebuild-untrusted-store` without writes; strict state/path repair without
+a Git snapshot reports `environment_repair_failed` without writes. The low-level
+missing-named-target validator retains its fatal behavior.
+
+Recorded Git payload presence uses the same selected-tree route as pin hashing,
+including the materialized directory prefix, exact local commit and isolated
+Git environment. It fetches nothing. Unsafe types or portable-path collisions,
+repository alternates/grafts, more than 16 MiB of path metadata or more than
+16,384 paths refuse without a partial roster. Skill payload presence uses the
+verified Git or recorded integrity roster. Existing package admission, including
+the required `SKILL.md`, is unchanged.
+Ordinary regular-file byte restoration remains permitted after structural
+checks; missing recorded files cannot be converted to byte repair.
+
 ## Migration and diagnostics
 
 Older machine, manifest and lock carriers remain readable. Reading and startup
@@ -185,7 +212,7 @@ The separate revision-2 reader is test-only. Explicitly set the absolute
 `CURATOR_STORE_VERIFICATION_ROOT` to the proposal's
 `conformance/environment-store-verification-v2` directory and set
 `CURATOR_STORE_VERIFICATION_MANIFEST_SHA256` to
-`0eb58ed3f554781bbc621c0c35c072f5874b8efb754ec9882b9725bf5d448f38`.
+`61e5d95e02555764d60633aa9d6656e118a7a6c969f10202885218bc7b9d7899`.
 The reader additionally pins the exact case bytes, validates the closed carrier,
 and checks all row/control/predecessor references before returning any case.
 An unset pair is inert; an empty, partial, unknown or mismatched selection
@@ -196,7 +223,7 @@ Run the reader and its controls with
 `go test -p=1 -parallel=1 -count=1 ./internal/envprofile -run '^TestStoreVerification'`.
 For the actual old/new format-direction control, also set
 `CURATOR_CONFORMANCE_ROOT` to the frozen revision-1 root. This command qualifies
-reader behavior only, not the 390 declared runtime/checker row-level executions.
+reader behavior only, not the 474 declared runtime/checker row-level executions.
 The draft is non-canonical; an accepted landed specification pin remains
 required before selecting a canonical revision-2 default.
 
