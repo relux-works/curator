@@ -508,13 +508,23 @@ func TestMissingRepoWithoutGitFails(t *testing.T) {
 	}
 }
 
+// TestFetchExistingIsScopedToReachedClosureAndDeduplicated proves that only
+// checkouts reached by the closure are refreshed, each once across builds
+// sharing FetchedRepos. Each checkout has a stored origin: a checkout without
+// one has no refresh source and is never fetched.
 func TestFetchExistingIsScopedToReachedClosureAndDeduplicated(t *testing.T) {
 	h := newHarness(t)
-	h.skill("provider", []string{"provider-tool"}, nil)
-	h.skill("consumer", nil, map[string]map[string]any{
-		"provider": requirement("provider", "runtime", "provider-tool"),
+	providerDir := h.skill("provider", []string{"provider-tool"}, nil)
+	providerRequirement := requirement("provider", "runtime", "provider-tool")
+	providerRequirement["git"] = providerDir // the checkout itself
+	consumerDir := h.skill("consumer", nil, map[string]map[string]any{
+		"provider": providerRequirement,
 	})
-	h.skill("unrelated", nil, nil)
+	unrelatedDir := h.skill("unrelated", nil, nil)
+	upstream := t.TempDir()
+	for _, dir := range []string{providerDir, consumerDir, unrelatedDir} {
+		h.git(dir, "remote", "add", "origin", filepath.Join(upstream, filepath.Base(dir)))
+	}
 
 	fetched := map[string]bool{}
 	var calls []string
@@ -523,7 +533,7 @@ func TestFetchExistingIsScopedToReachedClosureAndDeduplicated(t *testing.T) {
 		Home:          h.home,
 		FetchExisting: true,
 		FetchedRepos:  fetched,
-		FetchRepo: func(repo string) error {
+		FetchRepo: func(repo, endpoint string) error {
 			calls = append(calls, filepath.Base(repo))
 			return nil
 		},

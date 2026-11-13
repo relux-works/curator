@@ -133,8 +133,12 @@ type Options struct {
 	// closure. FetchedRepos deduplicates work across several selected scopes.
 	FetchExisting bool
 	FetchedRepos  map[string]bool
-	// FetchRepo is injectable for deterministic lifecycle tests. Nil uses git.
-	FetchRepo func(string) error
+	// FetchRepo refreshes one existing checkout from exactly one endpoint:
+	// the declared URL or the stored origin URL, never the checkout's
+	// remotes. It is injectable for deterministic tests. Nil uses git: the
+	// operator transport for a network endpoint (refusing a redirect), the
+	// isolated configuration for a local one.
+	FetchRepo func(repo, endpoint string) error
 	// ScratchRoot makes missing clones and snapshots ephemeral. Existing source
 	// checkouts remain read-only and the persistent cache is not used.
 	ScratchRoot string
@@ -179,9 +183,15 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
 func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.Substitution, draft bool) ([]*Node, error) {
 	nodes := map[string]*Node{}
 	sharedRepositories := map[string]string{}
+	spellings := map[string]declaredSpelling{}
 	for len(queue) > 0 {
 		item := queue[0]
 		queue = queue[1:]
+		if opts.profileAcquire == nil && item.selected == nil {
+			if err := checkSpelling(spellings, item); err != nil {
+				return nil, err
+			}
+		}
 		node, exists := nodes[item.name]
 		if !exists {
 			resolved := item.selected
@@ -336,7 +346,7 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 			if err := gateSource(opts, item.name, substitution.Git, item.chain); err != nil {
 				return nil, err
 			}
-			devRepo, err := ensureDevRepo(opts, item.name, substitution.Git)
+			devRepo, err := ensureDevRepo(opts, item.name, substitution.Git, item.chain)
 			if err != nil {
 				return nil, err
 			}
@@ -441,12 +451,8 @@ func ensureRepo(opts Options, item pending) (string, error) {
 			return "", fmt.Errorf("local skill path exists but is not a git repository: %s", repo)
 		}
 		if opts.FetchExisting && !alreadyFetched(opts, repo) {
-			fetch := opts.FetchRepo
-			if fetch == nil {
-				fetch = gitops.Fetch
-			}
-			if err := fetch(repo); err != nil {
-				return "", fmt.Errorf("failed to fetch %s at %s (via %s): %w", item.name, repo, item.chain, err)
+			if err := refreshCheckout(opts, item.name, item.git, item.chain, repo); err != nil {
+				return "", err
 			}
 			markFetched(opts, repo)
 		}
@@ -462,7 +468,10 @@ func ensureRepo(opts Options, item pending) (string, error) {
 	if opts.ScratchRoot != "" {
 		destination = filepath.Join(opts.ScratchRoot, "repos", filepath.FromSlash(item.source))
 	}
-	if err := gitops.Clone(item.git, destination); err != nil {
+	if err := gitops.CloneRefusingRedirect(item.git, destination); err != nil {
+		if diagnostic := redirectDiagnostic(item.name, item.chain, destination, err, true); diagnostic != nil {
+			return "", diagnostic
+		}
 		return "", fmt.Errorf("failed to clone %s from %s: %w", item.name, item.git, err)
 	}
 	if opts.FetchExisting && opts.ScratchRoot == "" {
@@ -471,10 +480,10 @@ func ensureRepo(opts Options, item pending) (string, error) {
 	return destination, nil
 }
 
-func ensureDevRepo(opts Options, name, gitURL string) (string, error) {
+func ensureDevRepo(opts Options, name, gitURL, chain string) (string, error) {
 	if opts.ScratchRoot != "" {
 		repo := filepath.Join(opts.ScratchRoot, "dev", name)
-		if err := gitops.Clone(gitURL, repo); err != nil {
+		if err := cloneDevRepo(name, gitURL, chain, repo); err != nil {
 			return "", err
 		}
 		return repo, nil
@@ -486,22 +495,27 @@ func ensureDevRepo(opts Options, name, gitURL string) (string, error) {
 	repo := filepath.Join(root, name)
 	if _, err := os.Stat(filepath.Join(repo, ".git")); err == nil {
 		if !alreadyFetched(opts, repo) {
-			fetch := opts.FetchRepo
-			if fetch == nil {
-				fetch = gitops.Fetch
-			}
-			if err := fetch(repo); err != nil {
+			if err := refreshCheckout(opts, name, gitURL, chain, repo); err != nil {
 				return "", err
 			}
 			markFetched(opts, repo)
 		}
 		return repo, nil
 	}
-	if err := gitops.Clone(gitURL, repo); err != nil {
+	if err := cloneDevRepo(name, gitURL, chain, repo); err != nil {
 		return "", err
 	}
 	markFetched(opts, repo)
 	return repo, nil
+}
+
+// cloneDevRepo clones a git substitution, refusing a redirected clone.
+func cloneDevRepo(name, gitURL, chain, repo string) error {
+	err := gitops.CloneRefusingRedirect(gitURL, repo)
+	if diagnostic := redirectDiagnostic(name, chain, repo, err, true); diagnostic != nil {
+		return diagnostic
+	}
+	return err
 }
 
 func snapshotFor(opts Options, source, repo, commit string) (string, error) {
@@ -571,8 +585,8 @@ func repoKey(repo string) string {
 	return key
 }
 
-// gateSource applies the machine allowlist before any network clone
-// (Spec §8.2).
+// gateSource applies the machine allowlist before any network clone or
+// fetch (Spec §8.2).
 func gateSource(opts Options, name, gitURL, chain string) error {
 	id, err := identity.Parse(gitURL)
 	if err != nil {

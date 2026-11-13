@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -157,7 +158,9 @@ func armedDryRunEnv(t *testing.T) *dryRunBaseline {
 	e := newEnv(t)
 
 	// A repository that a real run would fetch: its origin is a working local
-	// upstream, so a fetch would succeed and leave FETCH_HEAD behind.
+	// upstream, so a fetch would succeed and leave remote-tracking refs under
+	// refs/remotes/origin behind (the exact-endpoint refresh writes no
+	// FETCH_HEAD). The fixture starts with none.
 	e.skill("fetchable")
 	upstream := filepath.Join(t.TempDir(), "upstream")
 	e.git(t.TempDir(), "clone", "-q", "--bare", filepath.Join(e.skillsRoot, "fetchable"), upstream)
@@ -572,7 +575,10 @@ func (baseline *dryRunBaseline) effectSurfaces(t *testing.T, effect string) []st
 	lockRoot := filepath.Join(e.home, "state", "locks")
 	switch effect {
 	case "source-fetch":
-		return existingPaths(t, filepath.Join(baseline.fetchable, ".git", "FETCH_HEAD"))
+		// A stored-remote fetch leaves FETCH_HEAD; the exact-endpoint refresh
+		// passes --no-write-fetch-head and leaves remote-tracking refs instead.
+		return append(existingPaths(t, filepath.Join(baseline.fetchable, ".git", "FETCH_HEAD")),
+			originTrackingRefs(t, baseline.fetchable)...)
 	case "source-clone", "source-checkout":
 		// rc.3 calls it a clone and the rc.6 compiled case calls it a checkout.
 		// Both name the persistent destinations a real resolution would
@@ -715,6 +721,24 @@ const (
 
 // existingPaths reports which of these paths exist. A path that cannot be
 // stat'ed at all is reported too: an unreadable surface is not an absent one.
+// originTrackingRefs lists the refs under refs/remotes/origin in repo, loose
+// or packed. A failed listing is reported as a surface, so the binding fails
+// closed.
+func originTrackingRefs(t *testing.T, repo string) []string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", repo, "for-each-ref", "--format=%(refname)", "refs/remotes/origin").CombinedOutput() // #nosec G204 -- fixed argv over a test fixture
+	if err != nil {
+		return []string{repo + ": git for-each-ref: " + err.Error() + ": " + strings.TrimSpace(string(out))}
+	}
+	var refs []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" {
+			refs = append(refs, repo+": "+line)
+		}
+	}
+	return refs
+}
+
 func existingPaths(t *testing.T, paths ...string) []string {
 	t.Helper()
 	var visible []string

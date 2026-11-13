@@ -55,7 +55,10 @@ type DraftResolveConfig struct {
 	Fetch bool
 	// FetchedRepos deduplicates fetches across scopes. Nil allocates one.
 	FetchedRepos map[string]bool
-	FetchRepo    func(string) error
+	// FetchRepo replaces the Git alias tree refresh in pinGitAliases for
+	// tests. It does not reach legacy or transitive checkouts: ensureRepo
+	// refreshes those from the declared URL or the stored origin only.
+	FetchRepo func(string) error
 	// GitResolve resolves one alias tree ref to a commit. Nil uses git.
 	GitResolve func(repoRoot, kind, value string) (gitops.ResolvedRef, error)
 	// StagingParent owns local acquisition staging. Empty uses TempDir default.
@@ -177,7 +180,6 @@ func ResolveDraft(cfg DraftResolveConfig) (*DraftPlan, error) {
 		AllowedSources: cfg.AllowedSources,
 		FetchExisting:  cfg.Fetch,
 		FetchedRepos:   fetched,
-		FetchRepo:      cfg.FetchRepo,
 		ScratchRoot:    "",
 	}
 	nodes, err := BuildExpanded(closureOpts, cfg.Manifest, expansion, AcquireSelection(acquire), nil)

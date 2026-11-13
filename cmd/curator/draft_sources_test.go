@@ -719,14 +719,16 @@ func TestProjectResolveLegacyNetworkGitThroughCLI(t *testing.T) {
 			}
 			repo := filepath.Join(skillsRoot, filepath.FromSlash(source))
 			const declaredURL = "https://fixture.test/review.git"
-			// The checkout's own origin is a local bare repository so the
-			// explicit resolve/refresh fetch stays offline; the manifest's
-			// declared git URL keeps the network-git identity under test.
+			// The explicit resolve/refresh fetch contacts the declared URL,
+			// which the checkout's origin also names; routeFixtureURL routes
+			// it to a local bare repository so the fetch stays offline while
+			// the manifest keeps the network-git identity under test.
 			work := filepath.Join(root, "network-work")
 			bare := filepath.Join(root, "network.git")
 			initCLILegacyRepo(t, work, "review")
 			runGit(t, "", "clone", "--quiet", "--bare", "--", work, bare)
 			runGit(t, "", "clone", "--quiet", "--", bare, repo)
+			routeFixtureURL(t, declaredURL, bare, repo)
 			commit := legacyGitCommit(t, repo, "v1")
 			var payload string
 			if mode == "default" {
@@ -1422,6 +1424,15 @@ func setupLegacyBranchRefresh(t *testing.T, payload string) (configPath, project
 // to succeed there.
 func setupLegacyBranchRefreshWithSkill(t *testing.T, payload string, writeSkill func(t *testing.T, dir, name string)) (configPath, project, home, work, bare, checkout, oldCommit string) {
 	t.Helper()
+	return setupLegacyBranchRefreshRouted(t, payload, writeSkill, "")
+}
+
+// setupLegacyBranchRefreshRouted is setupLegacyBranchRefreshWithSkill for a
+// payload that declares declaredURL: the checkout's origin names that URL and
+// routeFixtureURL serves it from the local bare repository. Empty declaredURL
+// keeps the checkout's local origin.
+func setupLegacyBranchRefreshRouted(t *testing.T, payload string, writeSkill func(t *testing.T, dir, name string), declaredURL string) (configPath, project, home, work, bare, checkout, oldCommit string) {
+	t.Helper()
 	root := testgitenv.ShortTempDir(t)
 	work = filepath.Join(root, "upstream-work")
 	writeSkill(t, work, "review")
@@ -1435,6 +1446,9 @@ func setupLegacyBranchRefreshWithSkill(t *testing.T, payload string, writeSkill 
 	home = filepath.Dir(configPath)
 	checkout = filepath.Join(root, "skills-root", "review")
 	runGit(t, "", "clone", "--quiet", "--", bare, checkout)
+	if declaredURL != "" {
+		routeFixtureURL(t, declaredURL, bare, checkout)
+	}
 	t.Setenv("GIT_TERMINAL_PROMPT", "0")
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
@@ -1539,13 +1553,13 @@ func TestProjectRefreshLegacyConfiguredGitBranchThroughCLI(t *testing.T) {
 
 // TestProjectRefreshLegacyNetworkGitBranchThroughCLI proves the explicit
 // refresh fetches a network-git branch root ({name,branch,git}) whose
-// checkout stayed stale: the declared fixture identity is never contacted
-// (the checkout's own local origin serves the fetch) and the refreshed
-// lock keeps the network-git kind with the new commit and runtime bytes.
+// checkout stayed stale: the declared URL is fetched (routed offline to the
+// local bare repository by routeFixtureURL) and the refreshed lock keeps the
+// network-git kind with the new commit and runtime bytes.
 func TestProjectRefreshLegacyNetworkGitBranchThroughCLI(t *testing.T) {
 	const declaredURL = "https://fixture.test/review.git"
-	configPath, project, home, work, bare, checkout, oldCommit := setupLegacyBranchRefresh(t,
-		`{"schema_version":2,"skills":[{"name":"review","branch":"main","git":"`+declaredURL+`"}]}`)
+	configPath, project, home, work, bare, checkout, oldCommit := setupLegacyBranchRefreshRouted(t,
+		`{"schema_version":2,"skills":[{"name":"review","branch":"main","git":"`+declaredURL+`"}]}`, writeCLIScriptSkill, declaredURL)
 	_ = bare
 	lockBefore, err := sourcelock.Read(filepath.Join(project, "Skillfile.lock.json"))
 	if err != nil {
@@ -1618,6 +1632,7 @@ func TestProjectRefreshTransitiveTagAdvanceThroughCLI(t *testing.T) {
 	configPath, project := setupCLIProject(t, root)
 	checkout := filepath.Join(root, "skills-root", "provider")
 	runGit(t, "", "clone", "--quiet", "--", bare, checkout)
+	routeFixtureURL(t, providerURL, bare, checkout)
 	t.Setenv("GIT_TERMINAL_PROMPT", "0")
 	consumerDir := filepath.Join(project, "pkgs", "review")
 	writeCLIConsumerSkillWithGit(t, consumerDir, "review", providerURL)
@@ -1748,13 +1763,27 @@ func TestProjectRefreshFetchFailurePreservesStateThroughCLI(t *testing.T) {
 // invocation to the real git. It models a failed remote enumeration, not
 // an origin-less repository: Fetch must propagate the failure instead of
 // treating it as a successful empty enumeration.
+// routeFixtureURL makes checkout's stored origin name declaredURL and routes
+// that URL to the local bare repository through a process-scoped
+// url.<bare>.insteadOf entry. The operator transport honours it, so a fetch
+// of the declared URL stays offline; the isolated lanes drop it with the rest
+// of the ambient git configuration.
+func routeFixtureURL(t *testing.T, declaredURL, bare, checkout string) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "url."+filepath.ToSlash(bare)+".insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", declaredURL)
+	runGit(t, checkout, "remote", "set-url", "origin", declaredURL)
+}
+
 func installFailingRemoteGit(t *testing.T, realGit string) {
 	t.Helper()
 	fakeDir := t.TempDir()
 	// Inspect in a subshell so delegation retains the original process setting.
 	script := "#!/bin/sh\nif (\n" +
 		"if [ \"$1\" = \"-c\" ] && [ \"$2\" = \"core.longpaths=true\" ]; then shift 2; fi\n" +
-		"[ \"$1\" = \"remote\" ] && [ \"$#\" = \"1\" ]\n); then\n" +
+		"[ \"$1\" = \"remote\" ] && [ \"$#\" = \"1\" ] ||\n" +
+		"{ [ \"$1\" = \"config\" ] && [ \"$#\" = \"6\" ] && [ \"$6\" = \"remote.origin.url\" ]; }\n); then\n" +
 		"echo \"fake remote enumeration failure\" >&2\nexit 73\nfi\nexec '" + realGit + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(fakeDir, "git"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -1773,10 +1802,12 @@ func installFailingRemoteGit(t *testing.T, realGit string) {
 }
 
 // TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI proves
-// a failed `git remote` enumeration fails the explicit refresh instead of
+// a failed remote enumeration fails the explicit refresh instead of
 // succeeding with a stale lock: the wrapper fails only the enumeration
-// (exit 73) while fetch itself would succeed, so a Fetch that collapses
-// the error into "no remote" would exit 0 and keep the stale lock. The
+// (`git remote`, and the stored origin read `git config --local --includes
+// --null --get-all remote.origin.url`, exit 73) while fetch itself would
+// succeed, so a refresh that collapses the error into "no remote" would
+// exit 0 and keep the stale lock. The
 // refresh must exit nonzero and leave lock, bindings and installed state
 // unchanged.
 func TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI(t *testing.T) {
@@ -1804,7 +1835,8 @@ func TestProjectRefreshRemoteEnumerationFailurePreservesStateThroughCLI(t *testi
 	installFailingRemoteGit(t, realGit)
 	// The fault plant must fire for both argv shapes, while a neighboring valid
 	// command still reaches real Git with its process configuration intact.
-	for _, args := range [][]string{{"remote"}, {"-c", "core.longpaths=true", "remote"}} {
+	originRead := []string{"config", "--local", "--includes", "--null", "--get-all", "remote.origin.url"}
+	for _, args := range [][]string{{"remote"}, {"-c", "core.longpaths=true", "remote"}, originRead, append([]string{"-c", "core.longpaths=true"}, originRead...)} {
 		output, err := exec.Command("git", args...).CombinedOutput()
 		exit, ok := err.(*exec.ExitError)
 		if !ok || exit.ExitCode() != 73 || strings.TrimSpace(string(output)) != "fake remote enumeration failure" {
