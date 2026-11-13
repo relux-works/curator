@@ -178,3 +178,46 @@ requests repair. If provisioning would require a legacy identity/lock migration,
 perform that migration explicitly first; startup does not silently rewrite the
 lock. Composition also requires its observed source generation to remain stable
 through the operation, independently of the selected verification level.
+
+## Store qualification tools
+
+The separate revision-2 reader is test-only. Explicitly set the absolute
+`CURATOR_STORE_VERIFICATION_ROOT` to the proposal's
+`conformance/environment-store-verification-v2` directory and set
+`CURATOR_STORE_VERIFICATION_MANIFEST_SHA256` to
+`0eb58ed3f554781bbc621c0c35c072f5874b8efb754ec9882b9725bf5d448f38`.
+The reader additionally pins the exact case bytes, validates the closed carrier,
+and checks all row/control/predecessor references before returning any case.
+An unset pair is inert; an empty, partial, unknown or mismatched selection
+refuses with the qualification-only `store_verification_corpus_unsupported`.
+This selector is absent from production runtime/configuration paths.
+
+Run the reader and its controls with
+`go test -p=1 -parallel=1 -count=1 ./internal/envprofile -run '^TestStoreVerification'`.
+For the actual old/new format-direction control, also set
+`CURATOR_CONFORMANCE_ROOT` to the frozen revision-1 root. This command qualifies
+reader behavior only, not the 390 declared runtime/checker row-level executions.
+The draft is non-canonical; an accepted landed specification pin remains
+required before selecting a canonical revision-2 default.
+
+The canonical `.github/ci/test-gate.sh` refuses a present store selector or pin,
+including an empty value. Its global `SPEC_PIN` and revision-1 root remain
+unchanged. Controls plant an empty selector and a production reference to prove
+the guards detect those violations.
+
+The historical compatibility tool consumes the complete output of the four
+released `TestStoreBoundary*VectorsDrive*` tests, without editing their archive
+or expected verdicts:
+
+```sh
+go run ./tools/check-store-compatibility -input .temp/store-replay.jsonl
+```
+
+It requires the exact 32 compatible and six incompatible row IDs and each
+incompatibility's intended structural-refusal assertion witness. A same-count
+swap, missing row, skip, bound classification or unrelated setup failure refuses.
+Its JSON explicitly states `full_v1_store_conformance: false`: success proves a
+migration compatibility property. It does not waive a failing canonical suite
+or establish revision-2 runtime conformance. Unit controls run with
+`go test -p=1 -parallel=1 ./internal/storecompatibility ./tools/check-store-compatibility`.
+Keep complete replay streams and reports under `.temp/`.
