@@ -43,6 +43,112 @@ func TestProfileReadPurityEmptyCLI(t *testing.T) {
 	}
 }
 
+// Leaf, parent, trailing-slash, and case-spelled aliases of the builtin are refused before the CLI changes any home entry or journal.
+func TestProfileReadPurityBuiltinLeafAliasesCLI(t *testing.T) {
+	type treeEntry struct {
+		info    os.FileInfo
+		content string
+		link    string
+	}
+	snapshot := func(root string) (map[string]treeEntry, error) {
+		out := map[string]treeEntry{}
+		err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			entry := treeEntry{info: info}
+			if info.Mode().IsRegular() {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				entry.content = string(data)
+			} else if info.Mode()&os.ModeSymlink != 0 {
+				entry.link, walkErr = os.Readlink(path)
+				if walkErr != nil {
+					return walkErr
+				}
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			out[rel] = entry
+			return nil
+		})
+		return out, err
+	}
+	assertSame := func(t *testing.T, before, after map[string]treeEntry) {
+		t.Helper()
+		if len(before) != len(after) {
+			t.Fatalf("manager tree entry count changed: %d -> %d", len(before), len(after))
+		}
+		for path, old := range before {
+			current, ok := after[path]
+			if !ok || !os.SameFile(old.info, current.info) || old.info.Mode() != current.info.Mode() || old.info.Size() != current.info.Size() || !old.info.ModTime().Equal(current.info.ModTime()) || old.content != current.content || old.link != current.link {
+				t.Fatalf("manager tree changed at %q", path)
+			}
+		}
+	}
+	for _, tc := range []struct {
+		name       string
+		removeName string
+		linkName   string
+		parent     bool
+	}{
+		{name: "leaf", removeName: "linked", linkName: "linked"},
+		{name: "leaf-trailing-slash", removeName: "linked/", linkName: "linked"},
+		{name: "case-spelled-leaf", removeName: "DEFAULT", linkName: "DEFAULT"},
+		{name: "parent-link", removeName: "alias/default", parent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source, home := profileHome(t)
+			if code, _, stderr := runProfile(t, source, "profile", "use", "default"); code != exitOK {
+				t.Fatalf("initialize builtin exit=%d stderr=%q", code, stderr)
+			}
+			profiles := filepath.Join(home, "profiles")
+			builtin := filepath.Join(profiles, "default")
+			if tc.parent {
+				if err := os.Symlink(profiles, filepath.Join(profiles, "alias")); err != nil {
+					t.Skipf("parent-link fixture unavailable: %v", err)
+				}
+			} else {
+				alias := filepath.Join(profiles, tc.linkName)
+				if tc.name == "case-spelled-leaf" {
+					if info, err := os.Stat(alias); err == nil {
+						builtinInfo, statErr := os.Stat(builtin)
+						if statErr != nil || !os.SameFile(info, builtinInfo) {
+							t.Fatalf("case-spelled path already exists but is not the builtin: %v", statErr)
+						}
+					} else if !os.IsNotExist(err) {
+						t.Fatal(err)
+					} else if err := os.Symlink(builtin, alias); err != nil {
+						t.Skipf("leaf-link fixture unavailable: %v", err)
+					}
+				} else if err := os.Symlink(builtin, alias); err != nil {
+					t.Skipf("leaf-link fixture unavailable: %v", err)
+				}
+			}
+			before, err := snapshot(home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			code, _, stderr := runProfile(t, source, "profile", "remove", tc.removeName, "--purge")
+			after, err := snapshot(home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertSame(t, before, after)
+			if code != exitFail || !strings.Contains(stderr, "builtin_profile_remove_forbidden") {
+				t.Fatalf("remove code=%d stderr=%q; want exact builtin_profile_remove_forbidden refusal", code, stderr)
+			}
+			if _, err := os.Stat(builtin); err != nil {
+				t.Fatalf("builtin target was not preserved: %v", err)
+			}
+		})
+	}
+}
+
 // Explicit use creates default; listing that initialized profile succeeds
 // without replacing its lock, and the profile record parents stay private.
 func TestProfileReadPurityExplicitInitializationCLI(t *testing.T) {
