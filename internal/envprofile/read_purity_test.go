@@ -431,3 +431,38 @@ func TestReadPurityBuiltinAliases(t *testing.T) {
 		}
 	})
 }
+
+// Removing a non-builtin leaf symlink removes only the alias and keeps its valid target profile.
+func TestRemoveNonBuiltinLeafSymlink(t *testing.T) {
+	home := gitFixtureHome(t)
+	pinHomes(t)
+	if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
+		t.Fatal(err)
+	}
+	installIdleProfile(t, home, "target")
+	if err := SetCurrent(home, DefaultProfile); err != nil {
+		t.Fatal(err)
+	}
+	target := ProfileDir(home, "target")
+	targetBefore, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias := ProfileDir(home, "alias")
+	if err := os.Symlink(target, alias); err != nil {
+		t.Skipf("leaf-link fixture unavailable: %v", err)
+	}
+	if err := Remove(home, "alias", false); err != nil {
+		t.Fatalf("valid non-builtin alias removal failed: %v", err)
+	}
+	if _, err := os.Lstat(alias); !os.IsNotExist(err) {
+		t.Fatalf("alias remains after removal: %v", err)
+	}
+	targetAfter, err := os.Stat(target)
+	if err != nil || !os.SameFile(targetBefore, targetAfter) {
+		t.Fatalf("target profile changed or disappeared: %v", err)
+	}
+	if _, err := readSource(home, "target"); err != nil {
+		t.Fatalf("target profile is no longer readable: %v", err)
+	}
+}

@@ -1521,6 +1521,17 @@ func Remove(home, name string, purge bool) error {
 	if err != nil {
 		return err
 	}
+	// Lstat keeps ordinary path checks from following a leaf link, but a
+	// removable profile name may itself be a link to the builtin directory.
+	// Resolve only for this read-only identity check; unresolved links fail
+	// before operation or purge state can be written.
+	if selected.Kind == stateread.KindPresent && selected.Info != nil && selected.Info.Mode()&os.ModeSymlink != 0 {
+		resolved, err := os.Stat(selectedPath)
+		if err != nil {
+			return err
+		}
+		selected.Info = resolved
+	}
 	builtin, err := stateread.Lstat(builtinPath)
 	if err != nil {
 		return err
