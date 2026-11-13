@@ -24,11 +24,7 @@ func PinnedCommitTree(repo, commit string) (treeID, objectFormat string, err err
 	if err := validateLockedCommit(commit); err != nil {
 		return "", "", err
 	}
-	env, cleanup, err := isolatedGitEnv()
-	if err != nil {
-		return "", "", err
-	}
-	defer cleanup()
+	env := ReadOnlyEnv()
 	// Do not let caller Git overrides or replacement refs supply objects
 	// outside the source repository's own object database.
 	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
@@ -202,11 +198,7 @@ func PinnedDirectorySnapshotTree(repo, commit, directory string) (string, string
 	if err != nil || directory == "" {
 		return tree, format, err
 	}
-	env, cleanup, err := isolatedGitEnv()
-	if err != nil {
-		return "", "", err
-	}
-	defer cleanup()
+	env := ReadOnlyEnv()
 	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
 	tree, err = directoryTree(repo, tree, directory, env)
 	if err != nil {

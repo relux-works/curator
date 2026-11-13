@@ -48,6 +48,7 @@ type gitManager struct {
 	sourceCacheRoot string
 	home            string
 	readOnlyAudit   bool
+	readOnly        bool
 	fetchRaw        map[string]string
 	allowedSources  []string
 	// Non-nil only during new-profile installation or explicit path reinstall.
@@ -57,6 +58,19 @@ type gitManager struct {
 
 func newGitManager(home string) *gitManager {
 	return &gitManager{home: home, fetchRaw: map[string]string{}}
+}
+
+// newReadOnlyGitManager consumes existing local inputs only. It cannot
+// acquire sources, extract temporary snapshots or publish store entries.
+func newReadOnlyGitManager(home string) *gitManager {
+	manager := newGitManager(home)
+	manager.readOnly = true
+	manager.readOnlyAudit = true
+	return manager
+}
+
+func (m *gitManager) readOnlyRefusal(action string) error {
+	return fmt.Errorf("source_resolution_required: %s is unavailable during a read-only operation; acquire inputs through an explicit mutation", action)
 }
 
 // newProjectMCPGitManager isolates project MCP caches from legacy lossy keys.
@@ -114,6 +128,26 @@ func (m *gitManager) repoDir(identity string) string {
 // refused with profile_source_invalid. Empty identities (local sources)
 // bypass the allowlist; an empty allowlist permits all.
 func (m *gitManager) ensureRepo(canonical string) (string, error) {
+	if m.readOnly {
+		if err := m.gateSource(canonical); err != nil {
+			return "", err
+		}
+		dir := m.repoDir(canonical)
+		state, err := stateread.Lstat(dir)
+		if err != nil {
+			return "", err
+		}
+		if state.Kind == stateread.KindAbsent {
+			return "", m.readOnlyRefusal("source acquisition")
+		}
+		if !state.Info.IsDir() || state.Info.Mode()&os.ModeSymlink != 0 {
+			return "", stateread.UnusableError(dir, fmt.Errorf("source cache is not a regular directory"))
+		}
+		if m.sourceCacheRoot != "" {
+			return m.checkedRepo(canonical)
+		}
+		return dir, nil
+	}
 	if err := m.gateSource(canonical); err != nil {
 		return "", err
 	}
@@ -246,6 +280,9 @@ func safeGitDeclaration(raw string) string {
 // untouched, and an identity with no recorded spelling refreshes through its
 // stored remotes as before.
 func (m *gitManager) fetch(canonical string) error {
+	if m.readOnly {
+		return m.readOnlyRefusal("source fetch")
+	}
 	dir, err := m.ensureRepo(canonical)
 	if err != nil {
 		return err
@@ -353,6 +390,9 @@ func (m *gitManager) ResolveTag(_ string, name, source, tag string) (string, err
 
 // Manifest reads the package manifest at a commit, below directory when set.
 func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*contextresolve.Package, error) {
+	if m.readOnly {
+		return nil, m.readOnlyRefusal("manifest extraction")
+	}
 	if !contextpkg.ValidCommit(commit) {
 		return nil, fmt.Errorf("%s: invalid exact commit for %s", DiagSourceInvalid, name)
 	}
@@ -418,6 +458,9 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 // The exact-object fetch retains the profile lane's configured transport, but
 // does not update refs, FETCH_HEAD, submodules or unrelated repositories.
 func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
+	if m.readOnly {
+		return m.readOnlyRefusal("exact pin acquisition")
+	}
 	probe := exec.Command("git", "-C", dir, "cat-file", "--batch-check") // #nosec G204 -- fixed command, manager cache
 	probe.Stdin = strings.NewReader(commit + "\n")
 	var diagnostics strings.Builder
@@ -516,12 +559,18 @@ func (m *gitManager) verifyCandidateInRepo(dir, tag, commit string, allowed []co
 
 func (m *gitManager) verifyObjectSignature(dir, objectType, object string, allowed []contextresolve.Signer) (contextresolve.SignatureEvidence, error) {
 	show := exec.Command("git", "-C", dir, "cat-file", "-p", object) // #nosec G204 -- object comes from the verified local object database
+	if m.readOnly {
+		show.Env = gitops.ReadOnlyEnv()
+	}
 	payload, err := show.Output()
 	if err != nil {
 		return contextresolve.SignatureEvidence{}, fmt.Errorf("read %s signature: %w", objectType, err)
 	}
 	if !hasGitSignature(objectType, payload) {
 		return contextresolve.SignatureEvidence{}, nil
+	}
+	if m.readOnly {
+		return verifyReadOnlyObjectSignature(objectType, payload, allowed)
 	}
 	evidence := contextresolve.SignatureEvidence{Present: true}
 	signatureType := ""
@@ -798,6 +847,9 @@ func (m *gitManager) commitFor(dir, directory string, requirement Requirement) (
 
 // contextManifestAt reads the context manifest at a commit.
 func (m *gitManager) contextManifestAt(dir, commit, directory string) (*contextpkg.Manifest, error) {
+	if m.readOnly {
+		return nil, m.readOnlyRefusal("manifest extraction")
+	}
 	snapshot, err := os.MkdirTemp("", "curator-profile-manifest-*")
 	if err != nil {
 		return nil, err
@@ -881,6 +933,11 @@ func (m *gitManager) entryPath(home string, resolved contextresolve.Resolved) st
 // path. Selected skill snapshots bind both commit and directory in their key;
 // whole snapshots retain the commit key, and state entries retain their hash.
 func (m *gitManager) ensureEntry(home string, resolved contextresolve.Resolved) (string, error) {
+	if m.readOnly {
+		entry, cleanup, err := m.inspectEntry(home, resolved)
+		cleanup()
+		return entry, err
+	}
 	if resolved.Commit != "" {
 		return contextstore.EnsureGitDirectory(home, resolved.Kind, resolved.Name, m.repoDir(resolved.Source), resolved.Commit, skillSnapshotDirectory(resolved.Kind, resolved.Directory))
 	}
@@ -906,6 +963,9 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 		}
 		return entry, func() {}, nil
 	case stateread.KindAbsent:
+		if m.readOnly {
+			return "", func() {}, m.readOnlyRefusal("store entry reconstruction")
+		}
 		// Only proven absence permits an immutable Git snapshot fallback.
 	default:
 		return "", func() {}, stateread.UnusableError(entry, fmt.Errorf("unknown context store state %q", metadata.Kind))

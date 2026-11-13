@@ -240,7 +240,7 @@ home lock after staged builds succeed.
 
 ```bash
 curator profile install <git-url|path> [--range|--tag|--revision] [--as <name>] [--use]
-curator profile list    # installed profiles with locks and current markers
+curator profile list    # installed profiles with locks and current markers; no initialization
 curator profile use <name> [--env <env-id>]  # linked switch with backups and marker
 curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
 curator profile update myprofile --revision <commit>  # repin the same Git URL/directory in place
@@ -253,6 +253,21 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 # <env-id> accepts claude and codex as aliases of claude_code and codex_cli;
 # outputs, markers, fragments, and config keep the canonical id.
 ```
+
+Profile listing, environment status and resolution without `--repair` only read
+existing local state. They do not create the builtin `default` profile, acquire
+sources or recover pending mutations. Repair previews (`--repair --dry-run`)
+also leave state unchanged and report missing local inputs. Initialize or update
+profiles through an explicit mutating operation such as `profile use default`
+(updates retain the existing builtin). Removing `default` refuses with
+`builtin_profile_remove_forbidden` before any mutation.
+
+Source signer status includes signature `verification` (`verified`, `failed` or
+`unavailable`). An enforced failure retains `current=false`; unavailable verification
+prints `unknown` and a verification hint; `env status --check` fails on failed or
+unavailable verification. Local signature checks use inherited pipes and an
+existing public keyring where supported; they do not initialize a GPG home.
+
 
 `--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
 

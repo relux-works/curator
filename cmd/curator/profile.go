@@ -312,6 +312,11 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 	policy.Takeover = *takeover
 	var names []string
 	if *all {
+		// Initialization is an explicit update effect, never a listing effect.
+		if err := envprofile.EnsureDefaultWithPolicy(cfg.Home(), policy); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
 		profiles, err := envprofile.ListWithPolicy(cfg.Home(), policy)
 		if err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)

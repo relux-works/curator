@@ -188,13 +188,16 @@ type ProviderState struct {
 // SourceSignerPosture reports the verification state for one locked Git
 // member's source (environments §12).
 type SourceSignerPosture struct {
-	Profile string `json:"profile"`
-	Kind    string `json:"kind"`
-	Name    string `json:"name"`
-	Source  string `json:"source"`
-	State   string `json:"state"`
-	Signer  string `json:"signer"`
-	Current bool   `json:"current"`
+	Profile      string `json:"profile"`
+	Kind         string `json:"kind"`
+	Name         string `json:"name"`
+	Source       string `json:"source"`
+	State        string `json:"state"`
+	Signer       string `json:"signer"`
+	Current      bool   `json:"current"`
+	Verification string `json:"verification,omitempty"`
+	Diagnostic   string `json:"diagnostic,omitempty"`
+	Hint         string `json:"hint,omitempty"`
 }
 
 // DeclarationScope repeats the §2.3 surfacing rows for the current
@@ -412,7 +415,7 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	status.Diagnostics = append(status.Diagnostics, profileDiagnostics...)
 	status.SourceSignerPosture = sourceSignerPosture(req, infos)
 	for _, row := range status.SourceSignerPosture {
-		if row.State == "enforced" && !row.Current {
+		if row.State == "enforced" && (!row.Current || row.Verification == "failed" || row.Verification == "unavailable") {
 			status.NonCurrent = true
 		}
 	}
@@ -520,7 +523,7 @@ func statusProfilesWithOwner(home string, owner pathboundary.OwnerLookup) ([]Inf
 }
 
 func sourceSignerPosture(req StatusRequest, infos []Info) []SourceSignerPosture {
-	manager := newGitManager(req.Home).withPolicy(req.Policy)
+	manager := newReadOnlyGitManager(req.Home).withPolicy(req.Policy)
 	var rows []SourceSignerPosture
 	for _, info := range infos {
 		if info.Lock == nil {
@@ -548,11 +551,19 @@ func sourceSignerPosture(req StatusRequest, infos []Info) []SourceSignerPosture 
 			tag := lockedMemberTag(manager.repoDir(member.Source), member)
 			evidence, available, verifyErr := manager.VerifyCandidateLocal(member.Source, tag, member.Commit, allowed)
 			if signer, ok := verifiedAllowedSigner(evidence, allowed); ok {
+				row.Verification = "verified"
 				row.Signer = contextresolve.FormatSigner(signer)
 				rows = append(rows, row)
 				continue
 			}
-			if !available && verifyErr == nil {
+			if (!available && verifyErr == nil) || errors.Is(verifyErr, errSignerVerificationUnavailable) {
+				row.Verification = "unavailable"
+				row.Diagnostic = "signer_verification_unavailable"
+				cause := "local source objects are unavailable"
+				if verifyErr != nil {
+					cause = verifyErr.Error()
+				}
+				row.Hint = cause + "; verify through an explicit mutation: curator profile update " + info.Name
 				// §12 distinguishes a pin that cannot be reverified because
 				// local material is absent from a pin that fails verification.
 				// Unknown signer material is not evidence of drift; expose the
@@ -560,6 +571,8 @@ func sourceSignerPosture(req StatusRequest, infos []Info) []SourceSignerPosture 
 				rows = append(rows, row)
 				continue
 			}
+			row.Verification = "failed"
+			// Preserve the established enforced-failure currency verdict.
 			row.Current = false
 			rows = append(rows, row)
 		}
@@ -940,7 +953,7 @@ func droppedSystemModulesOf(home string, lock *contextlock.Lock, policy Policy) 
 	}
 	direct := contextmaterialize.DirectSet(lock)
 	envIDs := registryEnvIDs()
-	manager := newGitManager(home)
+	manager := newReadOnlyGitManager(home)
 	for _, member := range order {
 		if direct[member.Name] || admission.Waived(member.Name) {
 			continue
@@ -1118,7 +1131,7 @@ func declarationScopes(req StatusRequest, installed map[string]bool) ([]Declarat
 	for _, key := range keys {
 		scopes = append(scopes, scope{key, scoped[key]})
 	}
-	manager := newGitManager(req.Home)
+	manager := newReadOnlyGitManager(req.Home)
 	var out []DeclarationScope
 	var warnings []string
 	for _, item := range scopes {
