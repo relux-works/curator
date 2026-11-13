@@ -281,33 +281,135 @@ func TestCompositionStartupPolicyAndGeneration(t *testing.T) {
 	}
 }
 
-// Unsafe payload kinds are mandatory refusals even at permissive levels;
-// verification warnings cannot turn them into a usable launch fragment.
+// A payload link is a fatal boundary at every level, including repair and
+// dry-run repair. Refusal preserves the link, lock and existing home marker;
+// ordinary same-pin byte restoration is covered separately below and at docking.
 func TestStartupBoundaryNeverBecomesWarning(t *testing.T) {
 	requireLinkCapability(t)
-	fx := writeManagedFixture(t, "sample")
-	seedLiveNativeCredentials(t, fx)
-	provision := fx.request("codex_cli")
-	provision.Repair = true
-	if _, err := Resolve(provision); err != nil {
-		t.Fatal(err)
-	}
-	lock, _, err := readLock(fx.home, fx.profile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	member, _ := lock.Find(contextlock.KindSkill, "myskill")
-	if err := os.Symlink("SKILL.md", filepath.Join(memberEntryPath(fx.home, member), "forbidden")); err != nil {
-		t.Fatal(err)
-	}
-	for level := 1; level <= 4; level++ {
-		req := fx.request("codex_cli")
-		req.Policy.StartupVerificationLevel = level
-		result, err := Resolve(req)
-		var failure *storeEntryFailure
-		if !errors.As(err, &failure) || failure.Check != "link_safety" || result != nil && len(result.Document) > 0 {
-			t.Fatalf("level%d: output=%v err=%v", level, result != nil, err)
+	for _, kind := range []string{"symlink", "hardlink"} {
+		for _, mode := range []string{"observe", "repair", "dry-run"} {
+			for level := 1; level <= 4; level++ {
+				t.Run(fmt.Sprintf("%s/%s/level%d", kind, mode, level), func(t *testing.T) {
+					fx := writeManagedFixture(t, "sample")
+					seedLiveNativeCredentials(t, fx)
+					provision := fx.request("codex_cli")
+					provision.Repair = true
+					if _, err := Resolve(provision); err != nil {
+						t.Fatal(err)
+					}
+					lock, _, err := readLock(fx.home, fx.profile)
+					if err != nil {
+						t.Fatal(err)
+					}
+					member, _ := lock.Find(contextlock.KindSkill, "myskill")
+					plant := filepath.Join(memberEntryPath(fx.home, member), "forbidden")
+					if kind == "symlink" {
+						if err := os.Symlink("SKILL.md", plant); err != nil {
+							t.Fatal(err)
+						}
+					} else if err := os.Link(filepath.Join(memberEntryPath(fx.home, member), "SKILL.md"), plant); err != nil {
+						t.Fatal(err)
+					}
+					plantBefore, err := os.Lstat(plant)
+					if err != nil {
+						t.Fatal(err)
+					}
+					paths := []string{lockPath(fx.home, fx.profile), filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name), filepath.Join(memberEntryPath(fx.home, member), "SKILL.md")}
+					before := map[string][]byte{}
+					for _, path := range paths {
+						data, err := os.ReadFile(path)
+						if err != nil {
+							t.Fatal(err)
+						}
+						before[path] = data
+					}
+					req := fx.request("codex_cli")
+					req.Repair, req.DryRun = mode != "observe", mode == "dry-run"
+					req.Policy.StartupVerificationLevel = level
+					result, err := Resolve(req)
+					var failure *storeEntryFailure
+					rightClass := kind == "symlink" && errors.As(err, &failure) && failure.Check == "link_safety" || kind == "hardlink" && skillintegrity.IsCode(err, "skill_integrity_boundary_invalid")
+					namesPath := err != nil && (strings.Contains(err.Error(), plant) || kind == "hardlink" && strings.Contains(err.Error(), filepath.Join(memberEntryPath(fx.home, member), "SKILL.md")))
+					if !rightClass || !namesPath || result != nil && len(result.Document) > 0 {
+						t.Fatalf("output=%v err=%v; expected named fatal payload-link refusal", result != nil, err)
+					}
+					plantAfter, err := os.Lstat(plant)
+					if err != nil || !os.SameFile(plantBefore, plantAfter) {
+						t.Fatalf("refusal erased or replaced the link: %v", err)
+					}
+					if kind == "symlink" {
+						if target, err := os.Readlink(plant); err != nil || target != "SKILL.md" {
+							t.Fatalf("refusal retargeted the link: %v", err)
+						}
+					}
+					for path, want := range before {
+						got, err := os.ReadFile(path)
+						if err != nil || !bytes.Equal(got, want) {
+							t.Fatalf("refusal changed %s: %v", filepath.Base(path), err)
+						}
+					}
+				})
+			}
 		}
+	}
+}
+
+// Strict repair can restore ordinary regular-file bytes from the same Git pin
+// after structural checks; it preserves the profile lock and current marker.
+func TestStrictStartupRepairRestoresRegularBytes(t *testing.T) {
+	requireLinkCapability(t)
+	for _, level := range []int{3, 4} {
+		t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
+			fx := writeManagedFixture(t, "sample")
+			seedLiveNativeCredentials(t, fx)
+			req := fx.request("codex_cli")
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatal(err)
+			}
+			lock, _, err := readLock(fx.home, fx.profile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			member, ok := lock.Find(contextlock.KindMCP, "figma-devmode")
+			if !ok {
+				t.Fatal("missing pinned control member")
+			}
+			path := filepath.Join(memberEntryPath(fx.home, member), "unused", "pin-only.txt")
+			want, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := map[string][]byte{}
+			for _, p := range []string{lockPath(fx.home, fx.profile), filepath.Join(ManagedHomeDir(fx.home, fx.profile, "codex_cli"), envmarker.Name)} {
+				data, err := os.ReadFile(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				before[p] = data
+			}
+			if err := os.WriteFile(path, []byte("changed ordinary bytes\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			req.Policy.StartupVerificationLevel = level
+			result, err := Resolve(req)
+			if err != nil || result == nil || len(result.Document) == 0 {
+				t.Fatalf("same-pin repair refused: %v", err)
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || !bytes.Equal(got, want) {
+				t.Fatalf("same-pin bytes not restored: %v", err)
+			}
+			if failure := validateNamedStorePins(fx.home, lock); failure != nil {
+				t.Fatalf("repair changed the pin: %v", failure)
+			}
+			for p, want := range before {
+				got, err := os.ReadFile(p)
+				if err != nil || !bytes.Equal(got, want) {
+					t.Fatalf("repair changed %s: %v", filepath.Base(p), err)
+				}
+			}
+		})
 	}
 }
 

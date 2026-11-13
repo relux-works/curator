@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -357,7 +358,14 @@ func ValidateLegacyBoundary(root string) error {
 			return nil
 		}
 		_, err = admitEntry(root, path, info, folded)
-		return err
+		if err != nil {
+			var diagnostic *Diagnostic
+			if errors.As(err, &diagnostic) {
+				return failure(diagnostic.Code, fmt.Sprintf("%s: %s", path, diagnostic.Detail))
+			}
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		return nil
 	})
 	return errors.Join(unavailable, err)
 }
