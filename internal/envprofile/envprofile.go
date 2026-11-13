@@ -1509,9 +1509,26 @@ func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
 // under it, which is already atomic at the granularity the manager
 // observes, so no journal is needed for the removal itself.
 func Remove(home, name string, purge bool) error {
-	if name == DefaultProfile {
-		return fmt.Errorf("builtin_profile_remove_forbidden: profile %q is builtin", name)
+	selectedPath := ProfileDir(home, name)
+	builtinPath := ProfileDir(home, DefaultProfile)
+	forbidden := func() error { return fmt.Errorf("builtin_profile_remove_forbidden: profile %q is builtin", name) }
+	if selectedPath == builtinPath {
+		return forbidden()
 	}
+	// Filesystem identity also covers case aliases and aliases through a linked
+	// parent. This preflight reads directory metadata only, before mutation state.
+	selected, err := stateread.Lstat(selectedPath)
+	if err != nil {
+		return err
+	}
+	builtin, err := stateread.Lstat(builtinPath)
+	if err != nil {
+		return err
+	}
+	if selected.Kind == stateread.KindPresent && builtin.Kind == stateread.KindPresent && selected.Info != nil && builtin.Info != nil && selected.Info.IsDir() && builtin.Info.IsDir() && os.SameFile(selected.Info, builtin.Info) {
+		return forbidden()
+	}
+
 	op, err := beginOperation(home)
 	if err != nil {
 		return err
