@@ -35,7 +35,15 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		if !row.Current {
 			current = "non-current"
 		}
+		if row.Verification == "unavailable" {
+			state += " verification=unknown"
+		} else if row.Verification != "" {
+			state += " verification=" + row.Verification
+		}
 		_, _ = fmt.Fprintf(stdout, "source_signers profile %s %s %s %s: %s, %s\n", row.Profile, row.Kind, row.Name, row.Source, state, current)
+		if row.Diagnostic != "" {
+			_, _ = fmt.Fprintf(stdout, "%s: %s\n", row.Diagnostic, row.Hint)
+		}
 	}
 	for _, warning := range status.ShellHookTrustWarnings {
 		_, _ = fmt.Fprintf(stdout, "shell-hook-trust: warning: %s\n", warning)

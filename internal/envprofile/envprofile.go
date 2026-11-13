@@ -256,19 +256,15 @@ func List(home string) ([]Info, error) {
 // ListWithPolicy lists under the machine gates of policy (environments
 // §9.1). The CLI passes the gates of its already-loaded configuration.
 func ListWithPolicy(home string, policy Policy) ([]Info, error) {
-	op, err := beginOperation(home)
-	if err != nil {
+	// Reads neither acquire the mutation lock nor replay pending journals.
+	if err := envauthority.Validate(home); err != nil {
 		return nil, err
 	}
-	defer func() { _ = op.close() }()
-	return listLocked(op, home, policy)
+	return listReadOnly(home)
 }
 
-// listLocked lists under the held operation lock.
-func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
-	if err := ensureDefault(op, home, policy); err != nil {
-		return nil, err
-	}
+// listReadOnly reports installed records without initializing the builtin.
+func listReadOnly(home string) ([]Info, error) {
 	listing, err := stateread.ReadDir(ProfilesDir(home))
 	if err != nil {
 		return nil, err
@@ -1513,6 +1509,9 @@ func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
 // under it, which is already atomic at the granularity the manager
 // observes, so no journal is needed for the removal itself.
 func Remove(home, name string, purge bool) error {
+	if name == DefaultProfile {
+		return fmt.Errorf("builtin_profile_remove_forbidden: profile %q is builtin", name)
+	}
 	op, err := beginOperation(home)
 	if err != nil {
 		return err

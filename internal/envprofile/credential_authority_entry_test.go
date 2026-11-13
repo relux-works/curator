@@ -147,7 +147,7 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 			return invocation{err: e}
 		}},
 
-		{"profile-list", true, func(_ *testing.T, fx *managedFixture, _ string) invocation {
+		{"profile-list", false, func(_ *testing.T, fx *managedFixture, _ string) invocation {
 			_, e := ListWithPolicy(fx.home, Policy{})
 			return invocation{err: e}
 		}},

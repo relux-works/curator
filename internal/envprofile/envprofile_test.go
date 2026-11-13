@@ -627,7 +627,7 @@ func TestInstallTransitiveDirectoryRejectsSecret(t *testing.T) {
 }
 
 // TestEnsureDefaultCreatesLocalProfile checks the §9.4 migration: the first
-// use of the profile surface creates the builtin local default umbrella.
+// explicit initialization creates the builtin local default umbrella.
 func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
 	home := gitFixtureHome(t)
 	if err := EnsureDefault(home); err != nil {
@@ -649,11 +649,8 @@ func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
 	}
 }
 
-// TestDefaultProfileMaterializesOnFreshHome drives the four reviewer-named
-// production paths on an isolated home (review F2): profile list,
-// profile use default, profile sync, and profile use --clear --env <id>.
-// All four must work on a fresh manager home: the default lock pins a real
-// store entry, and the contextless root materializes markers alone.
+// A fresh list stays empty; explicit use initializes a real default store
+// entry, and sync/clear can then materialize the contextless root's markers.
 func TestDefaultProfileMaterializesOnFreshHome(t *testing.T) {
 	home := gitFixtureHome(t)
 	homes := pinHomes(t)
@@ -661,8 +658,8 @@ func TestDefaultProfileMaterializesOnFreshHome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
-	if len(profiles) != 1 || profiles[0].Name != DefaultProfile || profiles[0].Source.Kind != KindLocal {
-		t.Fatalf("profiles %+v", profiles)
+	if len(profiles) != 0 {
+		t.Fatalf("fresh read initialized profiles: %+v", profiles)
 	}
 	if results, err := Use(home, DefaultProfile, "", "", false); err != nil {
 		t.Fatalf("use default: %v (%+v)", err, results)
@@ -782,11 +779,8 @@ func TestMutationLockContention(t *testing.T) {
 	}
 }
 
-// TestIncompleteJournalRecoversOnEntry checks the recovery gate (review
-// F3): a prepared-but-uncommitted record journal left by a crashed
-// operation completes when the next operation begins. Production entry
-// point: List, which recovers journals on lock entry. A mutant that drops
-// the recovery must fail this test.
+// A prepared journal survives a read unchanged, then completes when the
+// next explicit mutation enters the locked recovery path.
 func TestIncompleteJournalRecoversOnEntry(t *testing.T) {
 	home := gitFixtureHome(t)
 	pinHomes(t)
@@ -841,8 +835,14 @@ func TestIncompleteJournalRecoversOnEntry(t *testing.T) {
 	if _, err := List(home); err != nil {
 		t.Fatalf("list after a crashed journal: %v", err)
 	}
+	if current, err := Current(home); err != nil || current != "" {
+		t.Fatalf("read recovered current %q, err %v", current, err)
+	}
+	if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
+		t.Fatal(err)
+	}
 	if current, err := Current(home); err != nil || current != DefaultProfile {
-		t.Fatalf("recovered current %q, err %v", current, err)
+		t.Fatalf("explicit mutation recovered current %q, err %v", current, err)
 	}
 }
 
