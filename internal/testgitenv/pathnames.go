@@ -98,7 +98,7 @@ func RequireGitRepositoryNames(t testing.TB, dir string, names ...string) {
 }
 
 func probeGit(args ...string) (string, error) {
-	output, err := exec.Command("git", args...).CombinedOutput()
+	output, err := exec.Command("git", args...).CombinedOutput() // #nosec G204 -- test-only probe: fixed git executable, closed argument construction over fixture names.
 	return string(output), err
 }
 
