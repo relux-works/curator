@@ -23,7 +23,7 @@ const storeVerificationRootKey = "CURATOR_STORE_VERIFICATION_ROOT"
 const storeVerificationPinKey = "CURATOR_STORE_VERIFICATION_MANIFEST_SHA256"
 const storeVerificationUnsupported = "store_verification_corpus_unsupported"
 const storeVerificationManifestPin = "61e5d95e02555764d60633aa9d6656e118a7a6c969f10202885218bc7b9d7899"
-const storeVerificationCasesPin = "dd969b5d6218bd86c77b6cbf61f29a54dea882e21ecad0505859f8f895ab7e93"
+const storeVerificationCasesPin = "b103291e1dbbf964d7bf5444477f7b0211b834823bf6ea0df2bf4805a81b9ba7"
 const storeVerificationPredecessorPin = "7efa5b09e450162cfb2937f25b3e29fab4699602e0990cfd295a4f695cb60413"
 
 //go:embed testdata/store-verification-v2/cases.schema.json
@@ -211,7 +211,7 @@ func storeVerificationReadPinned(path, pin string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	info, err := f.Stat()
 	if err != nil {
 		return nil, err
