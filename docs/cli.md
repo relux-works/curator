@@ -276,10 +276,20 @@ not fetched and resolves from its local state.
 - With no declared `git` URL, the stored origin is the refresh source. A
   network origin passes the `allowed_sources` gate and is fetched over the
   operator's transport. A local origin (a path or `file://`) is fetched with
-  user and system git configuration isolated.
+  user and system git configuration isolated, by its absolute physical path:
+  a relative origin is read from the checkout, as git reads it. Git is never
+  handed the raw spelling, because git reads a bare word such as `mirror`, or
+  a `file://` URL, as the name of a configured remote before a location.
 - A declared local path must name the stored origin's location, or the
-  checkout itself, compared as cleaned absolute paths with symlinks resolved.
-  The stored origin is then fetched as above.
+  checkout itself. A relative declaration is read from the working directory.
+  Every path is resolved as the filesystem walks it, with each symlink
+  resolved before a `..` that follows it, and two existing locations compare
+  by filesystem identity. The stored origin is then fetched as above.
+
+The choice and its checks run for every requirer of a checkout. When several
+projects are upgraded together (`upgrade --all`), a checkout an earlier
+project already refreshed is still gated and compared for each later
+project; only a second fetch of the identical endpoint is skipped.
 
 Refusals, each made before anything is fetched unless noted:
 
@@ -287,6 +297,9 @@ Refusals, each made before anything is fetched unless noted:
   the declaration, or one side is local and the other a network URL. The
   diagnostic names the declared URL, the stored origin, both identities and
   the checkout. Repoint the checkout's origin or fix the declaration.
+- `source_origin_ambiguous`: on a platform whose absolute paths do not begin
+  with `/` (Windows), a local origin's absolute path is also the name of a
+  configured remote of the checkout. Rename that remote.
 - `source_mixed_spelling`: one resolution declares the same canonical
   identity with two different raw URLs. The diagnostic names both spellings,
   the identity and both requirer chains. Declare one spelling.

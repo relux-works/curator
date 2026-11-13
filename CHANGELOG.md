@@ -52,7 +52,13 @@ All notable implementation changes are recorded here.
   contacted. New refusals: `source_origin_mismatch` (before any fetch),
   `source_mixed_spelling` (one identity declared with two raw URLs in one
   resolution) and `source_url_redirected` (git followed a server redirect
-  on clone or fetch; the hint names the target to declare). The published
+  on clone or fetch; the hint names the target to declare). The gate and
+  the origin comparison run for every requirer, also for a checkout an
+  earlier project of `upgrade --all` already refreshed; only a fetch of the
+  identical endpoint is deduplicated. A local origin is fetched by its
+  absolute physical path, never as a spelling git could read as a remote
+  name (`source_origin_ambiguous` where that cannot be ruled out), and
+  local paths compare with symlinks resolved before `..`. The published
   manager-lifecycle vectors pass unchanged.
 - An existing profile source cache refreshes from the git descriptor the
   operation names, not from the origin stored when the cache was first
