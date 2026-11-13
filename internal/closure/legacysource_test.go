@@ -741,3 +741,44 @@ func TestRelativeSkillsRootAcceptsSelfPath(t *testing.T) {
 		})
 	}
 }
+
+// Claim (R4 audit): the checkout path in the self-path comparison is a
+// filesystem path, never read with source-URL grammar: under a relative
+// skills root named "file:roots", a declaration naming the checkout itself
+// ("./file:roots/tool") refreshes from the stored local origin instead of
+// refusing with source_origin_mismatch because "file:roots/tool" looked
+// like an opaque file: URL. Control: an unrelated declared path still
+// refuses with no fetch. Limit: skipped where the host cannot create a name
+// with ':' (Windows).
+func TestCheckoutPathIsNotReadAsASourceURL(t *testing.T) {
+	parent := testgitenv.ShortTempDir(t)
+	skillsRoot := filepath.Join(parent, "file:roots")
+	if err := os.Mkdir(skillsRoot, 0o755); err != nil {
+		t.Skipf("this host cannot create a directory named %q: %v", filepath.Base(skillsRoot), err)
+	}
+	h := &harness{t: t, skillsRoot: skillsRoot, home: testgitenv.ShortTempDir(t)}
+	repo := h.toolCheckout("")
+	upstream := t.TempDir()
+	h.git(repo, "remote", "add", "origin", upstream)
+	t.Chdir(parent)
+	want, err := filepath.EvalSymlinks(upstream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := &fetchLog{}
+	opts := h.fetchOptions(log)
+	opts.SkillsRoot = "file:roots"
+	if err := buildOne(opts, declaredTool("./file:roots/tool"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(log.endpoints, ",") != want {
+		t.Fatalf("fetched endpoints = %v, want %s", log.endpoints, want)
+	}
+	unrelated := &fetchLog{}
+	opts = h.fetchOptions(unrelated)
+	opts.SkillsRoot = "file:roots"
+	err = buildOne(opts, declaredTool(t.TempDir()), nil)
+	if err == nil || !strings.HasPrefix(err.Error(), "source_origin_mismatch: ") || len(unrelated.endpoints) != 0 {
+		t.Fatalf("control: err = %v, endpoints %v; want source_origin_mismatch and no fetch", err, unrelated.endpoints)
+	}
+}

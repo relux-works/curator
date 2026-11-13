@@ -21,23 +21,50 @@ import (
 // and only when it was already made from the identical endpoint
 // (Options.FetchedRepos). A checkout without an origin is not fetched.
 func refreshCheckout(opts Options, name, declared, chain, repo string) error {
-	endpoint, isDeclared, err := bindCheckout(opts, name, declared, chain, repo)
+	endpoint, err := bindCheckout(opts, name, declared, chain, repo)
 	if err != nil {
 		return err
 	}
-	if endpoint == "" {
+	if endpoint.location == "" {
 		markFetched(opts, repo, "")
 		return nil
 	}
-	if fetchedFrom(opts, repo, endpoint) {
+	if fetchedFrom(opts, repo, endpoint.location) {
 		return nil
 	}
-	if err := fetchSource(opts, name, chain, repo, endpoint, isDeclared); err != nil {
+	if err := fetchSource(opts, name, chain, repo, endpoint); err != nil {
 		return err
 	}
-	markFetched(opts, repo, endpoint)
+	markFetched(opts, repo, endpoint.location)
 	return nil
 }
+
+// boundEndpoint is the one endpoint bindCheckout chose for a checkout, with
+// the local/network classification decided while binding it. The fetch
+// dispatch uses kind as recorded and never reclassifies location: a local
+// location is an absolute physical filesystem path, whose bytes (a literal
+// "%", a final space) are not source-URL grammar.
+type boundEndpoint struct {
+	// location is the network URL or the absolute physical path handed to
+	// git; empty when the checkout has no origin and is not fetched.
+	location string
+	kind     endpointKind
+	// declared reports that location is the declaration, not the stored
+	// origin (it selects the source_url_redirected wording).
+	declared bool
+}
+
+// endpointKind is the transport class bindCheckout decided for an endpoint.
+type endpointKind int
+
+const (
+	// networkEndpoint is fetched on the operator transport, refusing a
+	// redirect (gitops.FetchURLRefusingRedirect).
+	networkEndpoint endpointKind = iota + 1
+	// localEndpoint is an absolute physical path fetched byte for byte on
+	// the isolated lane (gitops.FetchLocalPathIsolated).
+	localEndpoint
+)
 
 // bindCheckout chooses the one endpoint an existing checkout refreshes from,
 // without network access:
@@ -51,52 +78,54 @@ func refreshCheckout(opts Options, name, declared, chain, repo string) error {
 //     local origin spelled with leading or trailing whitespace is refused
 //     (source_path_whitespace), like such a declaration (gateSource).
 //
-// isDeclared reports that the endpoint is the declaration. An empty endpoint
-// means the checkout has no origin and is not fetched. Other remotes are
+// The endpoint carries its classification (boundEndpoint.kind), decided here
+// from the declared and stored spellings, never from the resolved physical
+// path. An empty location means the checkout has no origin and is not
+// fetched. Other remotes are
 // never consulted, and no checkout remote is rewritten. A mismatch refuses
 // with source_origin_mismatch before any fetch.
-func bindCheckout(opts Options, name, declared, chain, repo string) (endpoint string, isDeclared bool, err error) {
+func bindCheckout(opts Options, name, declared, chain, repo string) (boundEndpoint, error) {
 	declaredID := ""
 	if declared != "" {
 		if err := gateSource(opts, name, declared, chain); err != nil {
-			return "", false, err
+			return boundEndpoint{}, err
 		}
 		// gateSource has already parsed the declaration successfully.
 		declaredID, _ = identity.Parse(declared)
 	}
 	origin, hasOrigin, err := gitops.OriginURL(repo)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the stored origin: %w", name, repo, chain, err)
+		return boundEndpoint{}, fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the stored origin: %w", name, repo, chain, err)
 	}
 	if !hasOrigin {
-		return "", false, nil
+		return boundEndpoint{}, nil
 	}
 	originID, originErr := identity.Parse(origin)
 	switch {
 	case declaredID != "":
 		if originErr != nil || originID != declaredID {
-			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
+			return boundEndpoint{}, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
 		}
-		return declared, true, nil
+		return boundEndpoint{location: declared, kind: networkEndpoint, declared: true}, nil
 	case declared != "":
 		if originErr != nil || originID != "" {
-			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
+			return boundEndpoint{}, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
 		}
 		if err := originSpelling(name, chain, repo, origin); err != nil {
-			return "", false, err
+			return boundEndpoint{}, err
 		}
 		if !sameLocalSource(declared, origin, repo) {
-			return "", false, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
+			return boundEndpoint{}, originMismatch(name, declared, declaredID, origin, originID, originErr, repo, chain)
 		}
 		return localOriginEndpoint(name, chain, repo, origin)
 	case originErr != nil || originID != "":
 		if err := gateSource(opts, name, origin, chain); err != nil {
-			return "", false, fmt.Errorf("%w; stored origin of checkout %s", err, repo)
+			return boundEndpoint{}, fmt.Errorf("%w; stored origin of checkout %s", err, repo)
 		}
-		return origin, false, nil
+		return boundEndpoint{location: origin, kind: networkEndpoint}, nil
 	default:
 		if err := originSpelling(name, chain, repo, origin); err != nil {
-			return "", false, err
+			return boundEndpoint{}, err
 		}
 		return localOriginEndpoint(name, chain, repo, origin)
 	}
@@ -131,53 +160,61 @@ func originSpelling(name, chain, repo, origin string) error {
 // POSIX path is unambiguous; a path that does not begin with "/" (a Windows
 // drive path) is refused with source_origin_ambiguous when a remote of that
 // exact name is configured.
-func localOriginEndpoint(name, chain, repo, origin string) (string, bool, error) {
+func localOriginEndpoint(name, chain, repo, origin string) (boundEndpoint, error) {
 	path, ok := physicalPath(origin, repo)
 	if !ok {
-		return "", false, fmt.Errorf("failed to fetch %s at %s (via %s): stored local origin %s does not resolve to a filesystem location", name, repo, chain, origin)
+		return boundEndpoint{}, fmt.Errorf("failed to fetch %s at %s (via %s): stored local origin %s does not resolve to a filesystem location", name, repo, chain, origin)
 	}
 	if !strings.HasPrefix(path, "/") {
 		configured, err := gitops.RemoteConfigured(repo, path)
 		if err != nil {
-			return "", false, fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the configured remotes: %w", name, repo, chain, err)
+			return boundEndpoint{}, fmt.Errorf("failed to fetch %s at %s (via %s): cannot read the configured remotes: %w", name, repo, chain, err)
 		}
 		if configured {
-			return "", false, fmt.Errorf(
+			return boundEndpoint{}, fmt.Errorf(
 				"source_origin_ambiguous: stored local origin %s of checkout %s for %s resolves to %s, which is also the name of a configured remote; nothing was fetched; rename that remote (via %s)",
 				origin, repo, name, path, chain)
 		}
 	}
-	return path, false, nil
+	return boundEndpoint{location: path, kind: localEndpoint}, nil
 }
 
 // fetchSource fetches repo from endpoint through the injected fetch or the
 // production lane, and turns a redirect into source_url_redirected.
-func fetchSource(opts Options, name, chain, repo, endpoint string, declared bool) error {
-	fetch := opts.FetchRepo
-	if fetch == nil {
-		fetch = fetchEndpoint
+func fetchSource(opts Options, name, chain, repo string, endpoint boundEndpoint) error {
+	var err error
+	if opts.FetchRepo != nil {
+		err = opts.FetchRepo(repo, endpoint.location)
+	} else {
+		err = fetchEndpoint(repo, endpoint)
 	}
-	err := fetch(repo, endpoint)
 	if err == nil {
 		return nil
 	}
-	if diagnostic := redirectDiagnostic(name, chain, repo, err, declared); diagnostic != nil {
+	if diagnostic := redirectDiagnostic(name, chain, repo, err, endpoint.declared); diagnostic != nil {
 		return diagnostic
 	}
-	return fmt.Errorf("failed to fetch %s at %s from %s (via %s): %w", name, repo, endpoint, chain, err)
+	return fmt.Errorf("failed to fetch %s at %s from %s (via %s): %w", name, repo, endpoint.location, chain, err)
 }
 
-// fetchEndpoint is the production refresh of one endpoint. A network
-// endpoint uses the operator transport, like the clone path; a local one,
-// always an absolute physical path from localOriginEndpoint, involves no
-// network transport, uses the isolated configuration and is handed to git
-// byte for byte (no trimming: a final space can name another repository).
-// Neither consults the checkout's remotes.
-func fetchEndpoint(repo, endpoint string) error {
-	if id, err := identity.Parse(endpoint); err != nil || id != "" {
-		return gitops.FetchURLRefusingRedirect(repo, endpoint)
+// fetchEndpoint is the production refresh of one bound endpoint, dispatched
+// on the kind bindCheckout recorded; the location is never reparsed with
+// source-URL grammar. A network endpoint uses the operator transport, like
+// the clone path; a local one, always an absolute physical path from
+// localOriginEndpoint, involves no network transport, uses the isolated
+// configuration and is handed to git byte for byte (no trimming, no percent
+// decoding: a final space or a literal "%" is part of a filename). Neither
+// consults the checkout's remotes. An endpoint without a recorded kind is
+// refused, never guessed.
+func fetchEndpoint(repo string, endpoint boundEndpoint) error {
+	switch endpoint.kind {
+	case networkEndpoint:
+		return gitops.FetchURLRefusingRedirect(repo, endpoint.location)
+	case localEndpoint:
+		return gitops.FetchLocalPathIsolated(repo, endpoint.location)
+	default:
+		return fmt.Errorf("refusing to fetch from %s: the endpoint has no recorded transport class", endpoint.location)
 	}
-	return gitops.FetchLocalPathIsolated(repo, endpoint)
 }
 
 // redirectDiagnostic returns source_url_redirected for a *gitops.RedirectError
@@ -228,7 +265,9 @@ func sameLocalSource(declared, origin, repo string) bool {
 	if originPath, ok := physicalPath(origin, repo); ok && sameLocation(declaredPath, originPath) {
 		return true
 	}
-	repoPath, ok := physicalPath(repo, "")
+	// repo is a filesystem path, not a source spelling: it is resolved as
+	// is, never read through localPathOf's file: URL grammar.
+	repoPath, ok := physicalLocation(repo, "")
 	return ok && sameLocation(declaredPath, repoPath)
 }
 
@@ -296,6 +335,16 @@ func localPathOf(raw string) (string, bool) {
 func physicalPath(raw, base string) (string, bool) {
 	value, ok := localPathOf(raw)
 	if !ok {
+		return "", false
+	}
+	return physicalLocation(value, base)
+}
+
+// physicalLocation is physicalPath for a value that is already a filesystem
+// path (no source-URL grammar applies to it): a checkout path, or the path
+// localPathOf read from a spelling.
+func physicalLocation(value, base string) (string, bool) {
+	if value == "" {
 		return "", false
 	}
 	if !filepath.IsAbs(value) {

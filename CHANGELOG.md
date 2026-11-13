@@ -59,7 +59,10 @@ All notable implementation changes are recorded here.
   absolute physical path, never as a spelling git could read as a remote
   name (`source_origin_ambiguous` where that cannot be ruled out) and with
   every byte kept, so a symlink target ending in a space is never fetched as
-  its trimmed sibling, and local paths compare with symlinks resolved before
+  its trimmed sibling. The local/network decision is made once, from the
+  declared and stored spellings: a resolved filename carrying a literal `%`
+  is fetched as a path, never reread as a malformed network URL and
+  refused. Local paths compare with symlinks resolved before
   `..`. A declared local path or stored local origin that begins or ends
   with whitespace refuses with `source_path_whitespace`, also before a
   clone; a `file:` origin without `//` is not read as a location. The published

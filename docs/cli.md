@@ -282,7 +282,10 @@ not fetched and resolves from its local state.
   a `file://` URL, as the name of a configured remote before a location.
   The physical path is handed to git byte for byte: a symlink target whose
   name ends in a space, tab or newline is fetched as named, never as the
-  sibling without that byte.
+  sibling without that byte. The path stays local: whether an endpoint is
+  local or network is decided once, from the stored and declared spellings,
+  so a resolved filename containing `%` is neither decoded nor refused as a
+  malformed URL.
 - A declared local path must name the stored origin's location, or the
   checkout itself. A relative declaration is read from the working directory.
   Every path is resolved as the filesystem walks it, with each symlink
