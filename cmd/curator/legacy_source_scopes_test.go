@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // declareGit writes a schema-1 Skillfile declaring one skill at tag v1 with
@@ -101,11 +102,17 @@ func republishV1(t *testing.T, bare, marker string) {
 // fetches the symlink target: its fresh-intended tag arrives, the sibling's
 // tag does not, and the installed skill is the target's v1 payload, not the
 // sibling's; with no declared source and with the matching file://
-// declaration. Control: an ordinary target name with a distinct sibling
-// behaves the same.
+// declaration. The literal-percent rows (review R3 witness) prove the same
+// for an ordinary alias whose physical target carries a "%": the local
+// endpoint is fetched as a path, not refused as a malformed network URL.
+// Control: an ordinary target name with a distinct sibling behaves the same
+// and never skips; a row this host's git cannot keep distinct skips with
+// the probe's reason.
 func TestUpgradeFetchesTheExactPhysicalOrigin(t *testing.T) {
 	for _, names := range []struct{ name, intended, sibling string }{
 		{"final space", "direct.git ", "direct.git"},
+		{"literal percent", "direct%marker.git", "direct.git"},
+		{"literal percent and final space", "direct%marker.git ", "direct%marker.git"},
 		{"ordinary path control", "direct.git", "other.git"},
 	} {
 		for _, declared := range []bool{false, true} {
@@ -119,12 +126,7 @@ func TestUpgradeFetchesTheExactPhysicalOrigin(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Mkdir(filepath.Join(root, names.intended), 0o755); err != nil {
-					t.Skipf("filesystem refuses %q: %v", names.intended, err)
-				}
-				if err := os.Remove(filepath.Join(root, names.intended)); err != nil {
-					t.Fatal(err)
-				}
+				testgitenv.RequireGitRepositoryNames(t, root, names.intended, names.sibling)
 				for name, marker := range map[string]string{names.intended: "fresh-intended", names.sibling: "only-in-trimmed-sibling"} {
 					bare := filepath.Join(root, name)
 					runGit(t, root, "clone", "-q", "--bare", filepath.Join(root, "upstream", "direct"), bare)

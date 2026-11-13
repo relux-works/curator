@@ -29,12 +29,7 @@ func newSymlinkSiblingFixture(t *testing.T, h *harness, intended, sibling string
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(filepath.Join(root, intended), 0o755); err != nil {
-		t.Skipf("filesystem refuses %q: %v", intended, err)
-	}
-	if err := os.Remove(filepath.Join(root, intended)); err != nil {
-		t.Fatal(err)
-	}
+	testgitenv.RequireGitRepositoryNames(t, root, intended, sibling)
 	checkout := h.skill("tool", nil, nil)
 	for name, tag := range map[string]string{intended: "fresh-intended", sibling: "only-in-trimmed-sibling"} {
 		bare := filepath.Join(root, name)
@@ -64,8 +59,13 @@ func (f symlinkSiblingFixture) assertFetchedIntended(t *testing.T, h *harness) {
 // for byte through the injected fetch) and the production fetch imports the
 // target's tag, never the trimmed sibling's; with no declaration and with
 // the matching file:// declaration. The leading-space and embedded-newline
-// names prove no other component rewrite; the ordinary-name row is the
-// positive control. Limit: real git and local repositories only.
+// names prove no other component rewrite. The percent rows (review R3
+// witness: an ordinary alias whose physical target carries a literal "%")
+// prove the bound local endpoint is fetched as a path, never reclassified
+// with source-URL grammar, decoded or refused, also with a final space.
+// The ordinary-name row is the positive control and never skips; a row
+// this host's git cannot keep distinct skips with the probe's reason.
+// Limit: real git and local repositories only.
 func TestPhysicalOriginKeepsSignificantBytes(t *testing.T) {
 	for _, names := range []struct{ name, intended, sibling string }{
 		{"final space", "origin.git ", "origin.git"},
@@ -73,6 +73,9 @@ func TestPhysicalOriginKeepsSignificantBytes(t *testing.T) {
 		{"final newline", "origin.git\n", "origin.git"},
 		{"leading space in component", " origin.git", "origin.git"},
 		{"embedded newline", "ori\ngin.git", "origin.git"},
+		{"literal percent", "origin%marker.git", "origin.git"},
+		{"literal percent and final space", "origin%marker.git ", "origin%marker.git"},
+		{"percent escape", "origin%20x.git", "origin x.git"},
 		{"ordinary path control", "origin.git", "other.git"},
 	} {
 		for _, declared := range []bool{false, true} {

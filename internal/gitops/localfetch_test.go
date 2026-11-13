@@ -1,16 +1,19 @@
 package gitops
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/testgitenv"
 )
 
 // localSiblingPair creates, under one physical root, a bare repository named
 // intended (whose name carries a significant byte) and a bare sibling named
 // sibling, each with its own witness tag, plus an empty repository to fetch
-// into. It skips where the filesystem refuses the intended name.
+// into. It skips a row whose two names git on this host cannot create as
+// two distinct repositories (testgitenv.RequireGitRepositoryNames); an
+// ordinary-name row never skips.
 func localSiblingPair(t *testing.T, intended, sibling string) (root, target string) {
 	t.Helper()
 	source := makeRepo(t)
@@ -18,12 +21,7 @@ func localSiblingPair(t *testing.T, intended, sibling string) (root, target stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(filepath.Join(root, intended), 0o755); err != nil {
-		t.Skipf("filesystem refuses %q: %v", intended, err)
-	}
-	if err := os.Remove(filepath.Join(root, intended)); err != nil {
-		t.Fatal(err)
-	}
+	testgitenv.RequireGitRepositoryNames(t, root, intended, sibling)
 	for name, tag := range map[string]string{intended: "fresh-intended", sibling: "only-in-trimmed-sibling"} {
 		bare := filepath.Join(root, name)
 		gitRun(t, root, "clone", "-q", "--bare", source, bare)
@@ -38,8 +36,11 @@ func localSiblingPair(t *testing.T, intended, sibling string) (root, target stri
 // for a path ending in a space, tab or newline, or carrying a leading space
 // or newline inside a component, the named repository's witness tag arrives
 // and the sibling's never does. The first three are the cases trimming would
-// turn into the sibling; the last two prove no other component rewrite.
-// Control: an ordinary path with a distinct sibling fetches the named one.
+// turn into the sibling; the next two prove no other component rewrite;
+// the percent rows prove a literal "%" and a "%20" are neither decoded nor
+// refused. Control: an ordinary path with a distinct sibling fetches the
+// named one. Rows this host's git cannot keep distinct skip with the probe's
+// reason; the control never skips.
 func TestFetchLocalPathIsolatedKeepsEveryByte(t *testing.T) {
 	for _, testCase := range []struct{ name, intended, sibling string }{
 		{"final space", "origin.git ", "origin.git"},
@@ -47,6 +48,8 @@ func TestFetchLocalPathIsolatedKeepsEveryByte(t *testing.T) {
 		{"final newline", "origin.git\n", "origin.git"},
 		{"leading space in component", " origin.git", "origin.git"},
 		{"embedded newline", "ori\ngin.git", "origin.git"},
+		{"literal percent", "origin%marker.git", "origin.git"},
+		{"percent escape", "origin%20x.git", "origin x.git"},
 		{"ordinary path control", "origin.git", "other.git"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -65,11 +68,12 @@ func TestFetchLocalPathIsolatedKeepsEveryByte(t *testing.T) {
 // Claim: FetchLocalPathIsolated refuses an empty or relative path (git could
 // read a relative word as a configured remote name) before running git: the
 // target gains no tag even though a repository of that relative name exists
-// beside it.
+// beside it. The fixture uses ordinary names only, so this runs on every
+// platform; "origin.git " is refused as a spelling before git runs.
 func TestFetchLocalPathIsolatedRefusesRelativePaths(t *testing.T) {
-	root, target := localSiblingPair(t, "origin.git ", "origin.git")
+	root, target := localSiblingPair(t, "origin.git", "other.git")
 	t.Chdir(root)
-	for _, path := range []string{"", "origin.git ", "./origin.git", "../origin.git"} {
+	for _, path := range []string{"", "origin.git", "origin.git ", "./origin.git", "../" + filepath.Base(root) + "/origin.git"} {
 		if err := FetchLocalPathIsolated(target, path); err == nil || !strings.Contains(err.Error(), "an absolute filesystem path is required") {
 			t.Fatalf("FetchLocalPathIsolated(%q) = %v, want the absolute-path refusal", path, err)
 		}
