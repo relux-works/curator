@@ -17,6 +17,9 @@ func TestStartupVerificationControls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Removing only localErr handling is not a violation: the earlier
+	// structural scan independently refuses. Plant the shared snapshot
+	// predicate instead so every redundant caller sees the intended defect.
 	for _, plant := range []struct {
 		name, file, before, after, run, failure, message, positive string
 	}{
@@ -24,9 +27,8 @@ func TestStartupVerificationControls(t *testing.T) {
 		{"generation", "composition.go", "} else if !equalStrings(initialGeneration, generation) {", "} else if false && !equalStrings(initialGeneration, generation) {", "TestCompositionStartupPolicyAndGeneration$/^mid-visit-drift$/^1$", "TestCompositionStartupPolicyAndGeneration/mid-visit-drift/1", "interrupted source did not receive the intended refusal: <nil>", ""},
 		{"capture", "materialize_capture.go", "selected.strictStartupInput = true", "selected.strictStartupInput = false", "TestCaptureStartupPolicyRemainsStrict", "TestCaptureStartupPolicyRemainsStrict/true", "capture allowed mismatch: callback=true output=true err=<nil>", ""},
 		{"repair", "startup_verification.go", "if !req.Repair || req.Policy.startupBaseline() < 3 {", "if !req.Repair {", "TestPermissiveResolvePreservesMismatchingEvidence$/^level1$/^repairtrue$", "TestPermissiveResolvePreservesMismatchingEvidence/level1/repairtrue", "startup changed evidence pin-only.txt: <nil>", ""},
-		{"boundary-repair", "managed.go", "// Structural/path violations are tamper evidence, even with repair.\n\t\t// Preserve them and refuse before any source or home mutation.\n\t\treturn nil, failure", "if req.Repair {\n\t\t\tif err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil { return nil, err }\n\t\t\treq.storeRepairAttempted = true\n\t\t\treturn Resolve(req)\n\t\t}\n\t\treturn nil, failure", "(TestStartupBoundaryNeverBecomesWarning|TestStrictStartupRepairRestoresRegularBytes)", "TestStartupBoundaryNeverBecomesWarning/symlink/repair/level1", "output=true err=<nil>; expected named fatal payload-link refusal", "TestStrictStartupRepairRestoresRegularBytes"},
-		{"boundary-local-error", "managed.go", "if localErr != nil {\n\t\treturn nil, localErr\n\t}", "if localErr != nil && (!req.Repair || effectiveLevel < 3) {\n\t\treturn nil, localErr\n\t}", "(TestStartupBoundaryNeverBecomesWarning|TestStrictStartupRepairRestoresRegularBytes)", "TestStartupBoundaryNeverBecomesWarning/hardlink/repair/level3", "output=true err=<nil>; expected named fatal payload-link refusal", "TestStrictStartupRepairRestoresRegularBytes"},
-		{"boundary-snapshot-link", "store_boundary.go", "validate = pathboundary.ValidateSnapshotWithinWithOwner", "validate = pathboundary.ValidateWithinWithOwner", "(TestStartupNonSkillHardlinkBoundary|TestStrictStartupRepairRestoresRegularBytes)", "TestStartupNonSkillHardlinkBoundary/context/observe/level1", "expected named single_link refusal, output=true err=<nil>", "TestStrictStartupRepairRestoresRegularBytes"},
+		{"boundary-repair", "managed.go", "\tabsentStore, err := inspectStoreAvailability(req.Home, lock, req.boundaryOwnerLookup)\n\tif err != nil {\n\t\treturn nil, err\n\t}", "\tabsentStore, err := inspectStoreAvailability(req.Home, lock, req.boundaryOwnerLookup)\n\tif err != nil {\n\t\tif req.Repair {\n\t\t\tvar failure *storeEntryFailure\n\t\t\tif errors.As(err, &failure) { _ = rebuildUntrustedStoreEntry(&req, hash, failure) }\n\t\t}\n\t\treturn nil, err\n\t}", "(TestStartupBoundaryNeverBecomesWarning|TestStrictStartupRepairRestoresRegularBytes)", "TestStartupBoundaryNeverBecomesWarning/symlink/repair/level1", "fatal boundary reached repair-lock seam", "TestStrictStartupRepairRestoresRegularBytes"},
+		{"boundary-snapshot-link", "../pathboundary/pathboundary.go", "return validateWithinWithRegularCheck(root, target, ownerLookup, defaultEntryInfo, singleLink)", "return validateWithinWithRegularCheck(root, target, ownerLookup, defaultEntryInfo, nil)", "(TestStartupNonSkillHardlinkBoundary|TestStrictStartupRepairRestoresRegularBytes)", "TestStartupNonSkillHardlinkBoundary/context/observe/level1", "expected named single_link refusal, output=true err=<nil>", "TestStrictStartupRepairRestoresRegularBytes"},
 	} {
 		t.Run(plant.name, func(t *testing.T) {
 			if plant.name == "capture" || plant.name == "repair" || strings.HasPrefix(plant.name, "boundary-") {
