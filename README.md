@@ -443,10 +443,15 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 Local SSH signer inspection uses OpenSSH `ssh-keygen -Y verify` with inherited
 signer/signature pipes. OpenPGP inspection uses `gpgv` and an already existing
-public keyring; it never initializes `GNUPGHOME`. Run `curator env status --json`
+public keyring; it never initializes `GNUPGHOME`. Windows named pipes reserve
+separate instances for runtime metadata probes and input reads, validate the
+client process, and drain bytes before disconnecting. Test keyring directories
+use the private-directory API, including protected Windows DACLs. Directory
+read-purity witnesses use handle metadata and retain mtime and identity checks.
+Run `curator env status --json`
 to inspect `verification`, or `curator env status --check` to reject failed or
 unavailable evidence. Focused checks are
-`go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|GPGSignaturePipe)'`;
+`go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|GPGSignaturePipe|ReadPurityDirectoryHandleWitness|ReadOnlyGPGKeyringPrivateBoundary|SignaturePipeResultControls|SignaturePipeMetadataProbeAndDrain)'`;
 keep captured test output under `.temp/`.
 
 For managed Claude gateway settings, configure

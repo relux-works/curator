@@ -1,6 +1,8 @@
 package envprofile
 
 import (
+	"bufio"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -30,23 +32,40 @@ func signaturePipeChildEntry() bool {
 	case "verifier-failure":
 		_, _ = fmt.Fprint(os.Stderr, "verifier unavailable\x1b[31m\n")
 		os.Exit(1)
-	case "roundtrip":
+	case "roundtrip", "probe-digest", "probe-policy-line":
 		input, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			os.Exit(3)
 		}
 		parts := []string{string(input)}
-		for _, name := range os.Args[3:] {
+		for index, name := range os.Args[3:] {
+			if os.Args[2] != "roundtrip" {
+				if err := signaturePipeMetadataProbe(name); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "metadata probe: %v", err)
+					os.Exit(8)
+				}
+			}
 			file, err := os.Open(name)
 			if err != nil {
 				os.Exit(4)
 			}
-			data, readErr := io.ReadAll(file)
+			var data []byte
+			var readErr error
+			if os.Args[2] == "probe-policy-line" && index == len(os.Args[3:])-1 {
+				line, err := bufio.NewReader(file).ReadString('\n')
+				data, readErr = []byte(line), err
+			} else {
+				data, readErr = io.ReadAll(file)
+			}
 			closeErr := file.Close()
 			if readErr != nil || closeErr != nil {
 				os.Exit(5)
 			}
-			parts = append(parts, string(data))
+			if os.Args[2] != "roundtrip" {
+				parts = append(parts, fmt.Sprintf("%d:%x", len(data), sha256.Sum256(data)))
+			} else {
+				parts = append(parts, string(data))
+			}
 		}
 		if _, err := fmt.Fprint(os.Stdout, strings.Join(parts, "|")); err != nil {
 			os.Exit(6)
@@ -150,6 +169,15 @@ func TestSignaturePipeChildProtocol(t *testing.T) {
 	out, err := runSignaturePipes(command, []byte("message"), []byte("policy"), []byte("signature"))
 	if err != nil || string(out) != "message|policy|signature" {
 		t.Fatalf("child protocol: %q %v", out, err)
+	}
+	for _, mode := range []string{"probe-digest", "probe-policy-line"} {
+		input, policy := []byte(strings.Repeat("signature", 128*1024)), []byte("policy\n")
+		command := exec.Command(executable, "curator-signature-pipe-child", mode, "/dev/fd/3", "/dev/fd/4")
+		out, err := runSignaturePipes(command, []byte("message"), input, policy)
+		want := fmt.Sprintf("message|%d:%x|%d:%x", len(input), sha256.Sum256(input), len(policy), sha256.Sum256(policy))
+		if err != nil || string(out) != want {
+			t.Fatalf("%s child digest protocol: %q %v", mode, out, err)
+		}
 	}
 	assertReadWitnesses(t, root, before)
 }
