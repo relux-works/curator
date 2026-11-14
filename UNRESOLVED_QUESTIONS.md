@@ -2,7 +2,7 @@
 
 - The verification centre has no accepted production request/response protocol.
   `extensions.grant_service.endpoint` is location metadata only. Until a provider
-  contract is implemented, level4 uses the local3 fallback with a warning.
+  contract is implemented, level 4 uses the local level-3 fallback with a warning.
   [Startup verification](docs/startup-verification.md).
 
 - TASK-261109-8nwurz: Runtime-discovered skill inventory has no admitted safe
