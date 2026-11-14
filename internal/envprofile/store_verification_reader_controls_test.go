@@ -186,10 +186,10 @@ func TestStoreVerificationPinnedCorpusReader(t *testing.T) {
 			controlExecutions += len(row.Levels)
 		}
 	}
-	if implementation != 124 || controls != 6 || executions != 444 || controlExecutions != 22 {
+	if implementation != storeVerificationImplementationCount || controls != storeVerificationControlCount || executions != storeVerificationImplementationLevels || controlExecutions != storeVerificationControlLevels {
 		t.Fatalf("incomplete roster: %d/%d rows, %d/%d levels", implementation, controls, executions, controlExecutions)
 	}
-	t.Log("non-canonical draft reader: 124 implementation/6 checker-control rows, 444/22 declared levels; no runtime executions claimed")
+	t.Log("non-canonical draft reader: 179 implementation/6 checker-control rows, 519/22 declared levels; no runtime executions claimed")
 }
 
 // Actual frozen v1 bytes remain readable by their existing object type. That
@@ -247,7 +247,8 @@ func TestStoreVerificationCanonicalPinnedCorpusReader(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows, selected, err := readStoreVerificationCorpus(storeVerificationLookup(map[string]string{storeVerificationRootKey: root, storeVerificationPinKey: storeVerificationManifestPin}))
-	if err != nil || !selected || len(rows) != 130 {
+	if err != nil || !selected || len(rows) != storeVerificationCaseCount {
 		t.Fatalf("canonical pin requires the landed revision-2 corpus: rows=%d err=%v", len(rows), err)
 	}
+	t.Logf("corpus pin: spec=%s manifest=%s rows=%d", storeVerificationSpecCommit, storeVerificationManifestPin, len(rows))
 }

@@ -206,94 +206,60 @@ perform that migration explicitly first; startup does not silently rewrite the
 lock. Composition also requires its observed source generation to remain stable
 through the operation, independently of the selected verification level.
 
-## Store qualification tools
+## Store verification inputs and runtime coverage
 
-The separate revision-2 reader is test-only. Explicitly set the absolute
-`CURATOR_STORE_VERIFICATION_ROOT` to the proposal's
-`conformance/environment-store-verification-v2` directory and set
-`CURATOR_STORE_VERIFICATION_MANIFEST_SHA256` to
-`490f40a2824621d6902da4a157f09aee245069d6626d87b0f0fdbd8412be691e`.
-The reader additionally pins the exact case bytes, validates the closed carrier,
-and checks all row/control/predecessor references before returning any case.
-An unset pair is inert; an empty, partial, unknown or mismatched selection
-refuses with the qualification-only `store_verification_corpus_unsupported`.
-This selector is absent from production runtime/configuration paths.
+The test-only reader pins the landed curator-spec corpus. Its single pin and
+roster block is in `internal/envprofile/store_verification_reader_test.go`:
+`storeVerificationSpecCommit`, manifest/case digests and declared row counts.
+The embedded closed case schema is copied byte-for-byte from that revision.
+It validates all 185 rows (179 implementation, 6 checker controls), including
+policy inputs, ordered structural failures, optional observation flags/paths,
+and disjoint level-scoped migration successors. These represent 519 and 22
+declared level slots; reading them does not execute those operations.
 
-Run the reader and its controls with
+Canonical CI selects the sibling `conformance/environment-store-verification-v2`
+from the checkout named by `SPEC_PIN`. The four existing `TestStoreBoundary*VectorsDrive*`
+families execute the 38 predecessor successors and their level-scoped siblings,
+at every declared level, using revision-2 expectations. Fixture shapes preserve
+the predecessor's enclosing object, surface, source and home state. The special-file
+row uses a real socket at its original payload path, exercising `regular_types`
+on Windows as well as Unix; the historical replay keeps its FIFO platform bound.
+The runtime roster is precisely the 38 `legacy-*` IDs named by the manifest's
+migration table plus its 17 `level_successors` IDs: 55 rows / 152 level slots
+(49 implementation rows / 130 slots; 6 checker rows / 22 slots). The four
+families contain 31 resolve, 4 dry-run, 16 repair and 4 status rows respectively.
+The remaining 130 implementation rows / 389 slots are metadata-validated only,
+not runtime-qualified. Checker rows
+in these families run real product behavior with their planted violation; this
+is distinct from an exhaustive checker-mutant qualification campaign.
+
+The frozen revision-1 runtime replay lives in `store-v1-compatibility`. It
+retains the immutable corpus and historical expectations, and admits only the
+exact 32 compatible and 6 incompatible row IDs with their intended assertion
+witnesses. Missing, skipped, swapped-ID or different-head evidence refuses.
+Canonical Test/Race verifies that same-head proof, then runs the four families
+against revision 2; it no longer excludes those families from the inventory.
+Other revision-1 families retain the unchanged `conformance/v1` root.
+
+For a separate reader rehearsal, explicitly set the absolute
+`CURATOR_STORE_VERIFICATION_ROOT` and its matching
+`CURATOR_STORE_VERIFICATION_MANIFEST_SHA256` from the central pin block, then run
 `go test -p=1 -parallel=1 -count=1 ./internal/envprofile -run '^TestStoreVerification'`.
-For the actual old/new format-direction control, also set
-`CURATOR_CONFORMANCE_ROOT` to the frozen revision-1 root. This command qualifies
-reader behavior only, not the 466 declared runtime/checker row-level executions.
-The draft is non-canonical; an accepted landed specification pin remains
-required before selecting a canonical revision-2 default.
+Unset selectors are inert; partial, empty or mismatched selectors refuse with
+`store_verification_corpus_unsupported`. Production never reads them. The
+canonical gate refuses either selector, including an empty value.
 
-The canonical `.github/ci/test-gate.sh` refuses a present store selector or pin,
-including an empty value. Its global `SPEC_PIN` remains unchanged in this rework; the landing bump
-is described below. Controls plant an empty selector and a production reference to prove
-the guards detect those violations.
+Run the historical checker with
+`go run ./tools/check-store-compatibility -input .temp/store-replay.jsonl`.
+Keep complete streams and reports under `.temp/`. Its success proves migration
+compatibility, not full revision-1 or revision-2 runtime conformance.
 
-The historical compatibility tool consumes the complete output of the four
-released `TestStoreBoundary*VectorsDrive*` tests, without editing their archive
-or expected verdicts:
-
-```sh
-go run ./tools/check-store-compatibility -input .temp/store-replay.jsonl
-```
-
-It requires the exact 32 compatible and six incompatible row IDs and each
-incompatibility's intended structural-refusal assertion witness. A same-count
-swap, missing row, skip, bound classification or unrelated setup failure refuses.
-Its JSON explicitly states `full_v1_store_conformance: false`: success proves a
-migration compatibility property. It does not waive a failing canonical suite
-or establish revision-2 runtime conformance. Unit controls run with
-`go test -p=1 -parallel=1 ./internal/storecompatibility ./tools/check-store-compatibility`.
-Keep complete replay streams and reports under `.temp/`.
-
-
-### CI migration seam and the landing pin
-
-The `store-v1-compatibility` job replays the four frozen store test families
-against `SPEC_PIN` and checks all 38 row IDs, their exact 32/6 partition and the
-six intended failure witnesses. Its same-run artifact retains the complete
-stream and the source head. Canonical Test/Race and their native shards depend
-on that job. Before delegating those four families, both the gate and inventory
-reader re-check the stream and source head. Missing, malformed, different-head
-or same-count swapped-ID evidence refuses. Other v1 families stay in the gate.
-Standalone and candidate invocations without an explicit compatibility selection
-continue to run all historical families against their own root. They perform no
-delegation or canonical v2 selection. An empty selection, or canonical v2
-selection without proof, refuses before tests.
-This proves migration compatibility, not full revision-1 store conformance.
-
-The updated proposal reader pins curator-spec #223 at
-`7986617bcc880bc2657e253086fe63ccb04e5120`: manifest
-`490f40a2824621d6902da4a157f09aee245069d6626d87b0f0fdbd8412be691e`, cases
-`7e9a8588962f61677f51ea76d35684c41470395938bbf6afe9ef4454b728b58b`.
-The frozen predecessor remains
-`7efa5b09e450162cfb2937f25b3e29fab4699602e0990cfd295a4f695cb60413`.
-There are 130 rows: 124 implementation and 6 checker-control rows, declaring
-444 and 22 level slots respectively. These are reader/carrier checks, not
-execution of the 466 filesystem/checker operations.
-
-After #223 lands, the orchestrator's separate bump must set `SPEC_PIN` to its
-exact signed landing commit. There is no second static workflow manifest-hash
-setting to change; verify the frozen predecessor digest above at that commit.
-The v1 root path remains unchanged:
-it still serves all other families and the immutable historical replay. The
-canonical reader stage derives `conformance/environment-store-verification-v2`
-from that same checkout, with no external selector. Until the pin supplies the
-exact new bytes it fails closed. If landing changes the proposal bytes, re-pin
-the reader, embedded schema and counts and rerun its controls before bumping.
-No canonical revision-2 runtime-conformance claim follows from reader success.
-
-Derived managed-home content is separate from profile/store evidence. At every
-level a read-only resolve reports leading `environment_home_stale` with the
-`--repair` hint; dry-run preserves the drift and explicit repair restores the
-home whenever all local source/store checks pass. Permissive policy never keeps
-a drifted derived home current. Raising the machine above an explicit profile
-minimum retains `startup_verification_weakening`: edit the selected context
-manifests' `startup_verification.level`, then run `curator profile update`.
-
-The under-repair-lock structural check is defense in depth. Current late-plant
-controls prove the later publication recheck refuses the plant; they do not
-individually prove the earlier lock-time check or absence of temporary staging.
+Derived managed-home drift remains separate from profile/store evidence.
+Level 1 without `--repair` starts an existing renderable home, emits the
+`environment_home_stale` warning and `--repair` hint, and retains stale reasons.
+Levels 2–4 refuse with leading `environment_home_stale`; capture remains strict.
+Dry-run preserves drift. Explicit repair restores verified home bytes at every
+level when source/store checks pass. A warning never marks drifted output current.
+Raising the machine above an explicit profile minimum retains
+`startup_verification_weakening`: edit the selected context manifests' minimum,
+then run `curator profile update`.

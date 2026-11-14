@@ -123,8 +123,8 @@ esac
 				}
 				delegated := strings.Contains(string(commands), "-skip ^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive")
 				checked := strings.Contains(string(commands), "run ./tools/check-store-compatibility")
-				if delegated != (control == "valid") || checked != (control == "valid") {
-					t.Fatalf("historical delegation must match explicit proof selection: %s", commands)
+				if delegated || checked != (control == "valid") {
+					t.Fatalf("canonical families must run; historical proof must match explicit selection: %s", commands)
 				}
 				return
 			}
@@ -166,7 +166,7 @@ esac
 
 // The real shell and unchanged ledger gate admit complete native unions and
 // reject the intended missing-child/configuration controls on each platform.
-// Explicit proof enables delegation; an unselected candidate/standalone run
+// Explicit proof selects canonical v2 families; an unselected standalone run
 // keeps all historical families and performs no compatibility admission.
 // Go execution/planning are bounded stand-ins; native CI supplies runtime proof.
 func TestOrdinaryGateUnion(t *testing.T) {
