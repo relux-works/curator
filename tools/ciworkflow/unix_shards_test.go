@@ -46,9 +46,11 @@ func checkUnixShards(data []byte) error {
 		map[string]any{"os": "macos-latest", "shard": 0},
 		map[string]any{"os": "macos-latest", "shard": 1},
 		map[string]any{"os": "macos-latest", "shard": 2},
+		map[string]any{"os": "macos-latest", "shard": 3},
+		map[string]any{"os": "macos-latest", "shard": 4},
 	}
 	if producer.If != "" || producer.Strategy.FailFast || len(producer.Strategy.Matrix) != 1 || !reflect.DeepEqual(producer.Strategy.Matrix["include"], want) {
-		return fmt.Errorf("require exactly three Linux and three macOS jobs on main and PRs, with no package cross product")
+		return fmt.Errorf("require exactly three Linux and five macOS jobs on main and PRs, with no package cross product")
 	}
 	if producer.RunsOn != jobs["test"].RunsOn {
 		return fmt.Errorf("native shard runner routing differs from Test")
@@ -110,7 +112,9 @@ func TestUnixShardsWiring(t *testing.T) {
 	for name, pair := range map[string][2]string{
 		"lost-linux-shard":         {"          - {os: ubuntu-latest, shard: 2}\n", ""},
 		"lost-macos-shard":         {"          - {os: macos-latest, shard: 1}\n", ""},
-		"lost-new-macos-shard":     {"          - {os: macos-latest, shard: 2}\n", ""},
+		"lost-third-macos-shard":   {"          - {os: macos-latest, shard: 2}\n", ""},
+		"lost-fourth-macos-shard":  {"          - {os: macos-latest, shard: 3}\n", ""},
+		"lost-fifth-macos-shard":   {"          - {os: macos-latest, shard: 4}\n", ""},
 		"package-cross-product":    {"          - {os: ubuntu-latest, shard: 2}\n", "          - {os: ubuntu-latest, shard: 2}\n        package: [envprofile, install]\n"},
 		"only-main":                {"  unix-test-shards:\n", "  unix-test-shards:\n    if: github.event_name == 'push'\n"},
 		"lost-admission":           {"CI_UNIX_TEST_SHARDS: .temp/unix-test-shards", "CI_OTHER: .temp/unix-test-shards"},
