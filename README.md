@@ -590,7 +590,7 @@ recurses. Ordinary provisioning and repair preserve existing settings and exclus
 same exclusions to its generated settings. Project and profile instruction files
 remain eligible. Existing homes missing either exclusion require `env resolve
 --repair`. Run the merge and repair checks with
-`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/claudememory ./internal/envprofile -run 'TestMerge|TestClaudeNativeMemory' -count=1`.
+`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/claudememory ./internal/envprofile -run 'TestMerge|TestClaudeNativeMemory|TestClaudeNativeRulesMissingIsStale' -count=1`.
 The optional `TestPinnedClaudeMemoryExclusion` additionally needs Node.js and
 `CURATOR_CLAUDE_MEMORY_SPECIMEN` pointing to the exact Claude Code 2.1.314
 distribution checked by the test. It executes only the extracted memory filter
