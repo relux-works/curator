@@ -2968,6 +2968,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if verdict.passthroughReadFailed {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
+	permissiveExistingHome := false
 	{
 		// Managed homes are derived output. Startup policy applies only to
 		// profile/store evidence; home drift retains the stale/repair contract.
@@ -3002,17 +3003,37 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 					break
 				}
 			}
+			// An absent home or old-lock marker owns the leading read-only or
+			// permissive-repair diagnostic, even alongside a source mismatch.
+			// Current-lock source drift retains its store diagnostic.
+			if !verdict.current && (verdict.marker == nil || verdict.marker.Profile.LockSHA256 != strings.TrimPrefix(hash, "sha256:")) && (!req.Repair || effectiveLevel < 3) {
+				prefix = DiagHomeStale + ": " + prefix
+				details = append(details, "rerun with --repair")
+			}
 			return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: local startup evidence refused: %s", prefix, strings.Join(details, "; "))
 		}
 		if req.Repair && effectiveLevel < 3 && !verdict.current {
 			for _, check := range localChecks {
 				if check.Status == startupverification.Failed {
-					return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: required home cannot be repaired from mismatching evidence", DiagHomeStale)
+					// Level 1 can keep an existing home for this exact lock;
+					// it must neither rebuild mismatching source nor provision
+					// a new/old-lock home from that evidence.
+					if effectiveLevel == 1 && verdict.marker != nil && verdict.plan != nil && verdict.marker.Profile.LockSHA256 == strings.TrimPrefix(hash, "sha256:") {
+						permissiveExistingHome = true
+						break
+					}
+					return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: required home cannot be repaired from mismatching evidence; rerun with --repair after restoring source evidence", DiagHomeStale)
 				}
 			}
 		}
 	}
-	if verdict.current {
+	// Level 1 may launch an existing derived home with an explicit stale warning.
+	// Capture still requires verified input, and missing plans cannot be rendered.
+	launchStaleHome := effectiveLevel == 1 && (!req.Repair || permissiveExistingHome) && !req.strictStartupInput && !verdict.current && verdict.marker != nil && verdict.plan != nil
+	if launchStaleHome {
+		verdict.warnings = append(verdict.warnings, fmt.Sprintf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; ")))
+	}
+	if verdict.current || launchStaleHome {
 		fragment, err := buildFragment(&req, adapter, verdict)
 		if err != nil {
 			return nil, err
@@ -3021,7 +3042,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		if err != nil {
 			return nil, err
 		}
-		return &ResolveResult{Document: document, Warnings: verdict.warnings}, nil
+		return &ResolveResult{Document: document, Warnings: verdict.warnings, StaleReasons: verdict.reasons}, nil
 	}
 	if !req.Repair {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; "))

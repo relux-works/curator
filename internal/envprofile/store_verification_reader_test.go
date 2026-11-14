@@ -22,8 +22,16 @@ import (
 const storeVerificationRootKey = "CURATOR_STORE_VERIFICATION_ROOT"
 const storeVerificationPinKey = "CURATOR_STORE_VERIFICATION_MANIFEST_SHA256"
 const storeVerificationUnsupported = "store_verification_corpus_unsupported"
-const storeVerificationManifestPin = "490f40a2824621d6902da4a157f09aee245069d6626d87b0f0fdbd8412be691e"
-const storeVerificationCasesPin = "7e9a8588962f61677f51ea76d35684c41470395938bbf6afe9ef4454b728b58b"
+
+// Keep the landed corpus identity and roster in this single update location.
+const storeVerificationSpecCommit = "ab6b1b0960473b359c84d96e7c7749b9be6011e0"
+const storeVerificationCaseCount = 185
+const storeVerificationImplementationCount = 179
+const storeVerificationImplementationLevels = 519
+const storeVerificationControlCount = 6
+const storeVerificationControlLevels = 22
+const storeVerificationManifestPin = "00a62299afa6e86d5e403a9655aa6907875393aa9d0398bd03474e1bdb1fb2f1"
+const storeVerificationCasesPin = "51f5e6df986b40a835ba1c1e6e42f00240472984669791e3db79cbf41cc6480a"
 const storeVerificationPredecessorPin = "7efa5b09e450162cfb2937f25b3e29fab4699602e0990cfd295a4f695cb60413"
 
 //go:embed testdata/store-verification-v2/cases.schema.json
@@ -38,6 +46,9 @@ type storeVerificationObservation struct {
 	Rebuilt        bool     `json:"store_rebuilt"`
 	LockUnchanged  bool     `json:"lock_unchanged"`
 	PlantPreserved bool     `json:"plant_preserved"`
+	WarningEmitted *bool    `json:"warning_emitted,omitempty"`
+	RepairHint     *bool    `json:"repair_hint,omitempty"`
+	OffendingPath  string   `json:"offending_path,omitempty"`
 	PathNamed      bool     `json:"path_named"`
 	RuleNamed      bool     `json:"rule_named"`
 }
@@ -45,7 +56,20 @@ type storeVerificationPredecessor struct {
 	Group string `json:"group"`
 	Name  string `json:"name"`
 }
+type storeVerificationPolicy struct {
+	Global   *int     `json:"global_level,omitempty"`
+	Minimums []int    `json:"profile_minimums"`
+	Evidence []string `json:"local_evidence"`
+	Centre   string   `json:"centre"`
+}
+type storeVerificationFailure struct {
+	Member    string `json:"member_kind"`
+	Condition string `json:"condition"`
+	Path      string `json:"path"`
+}
 type storeVerificationCase struct {
+	Policy      *storeVerificationPolicy      `json:"policy,omitempty"`
+	Failures    []storeVerificationFailure    `json:"structural_failures,omitempty"`
 	Schema      string                        `json:"schema"`
 	Capability  string                        `json:"capability"`
 	Revision    int                           `json:"capability_revision"`
@@ -78,14 +102,16 @@ type storeVerificationManifest struct {
 		SHA256 string `json:"sha256"`
 	} `json:"predecessor"`
 	Migration []struct {
-		Group         string  `json:"group"`
-		Name          string  `json:"name"`
-		Disposition   string  `json:"disposition"`
-		OldDiagnostic *string `json:"old_diagnostic"`
-		OldOutcome    *string `json:"old_outcome"`
-		NewDiagnostic *string `json:"new_required_diagnostic"`
-		Successor     string  `json:"successor_case"`
-		Negative      bool    `json:"known_bad_remains_negative"`
+		Levels          []int    `json:"verification_levels"`
+		LevelSuccessors []string `json:"level_successors"`
+		Group           string   `json:"group"`
+		Name            string   `json:"name"`
+		Disposition     string   `json:"disposition"`
+		OldDiagnostic   *string  `json:"old_diagnostic"`
+		OldOutcome      *string  `json:"old_outcome"`
+		NewDiagnostic   *string  `json:"new_required_diagnostic"`
+		Successor       string   `json:"successor_case"`
+		Negative        bool     `json:"known_bad_remains_negative"`
 	} `json:"migration"`
 }
 
@@ -199,7 +225,8 @@ func decodeStoreVerificationCases(raw []byte) ([]storeVerificationCase, error) {
 	}
 	for _, row := range cases {
 		positive, ok := byName[row.Positive]
-		if !ok || positive.Kind != "implementation" || positive.Condition != "intact" || positive.Operation != row.Operation || positive.Member != row.Member {
+		validCondition := positive.Condition == "intact" || (positive.Condition == "verification-policy" && positive.Expected.Fragment && positive.Expected.Current)
+		if !ok || positive.Kind != "implementation" || !validCondition || positive.Operation != row.Operation || positive.Member != row.Member {
 			return bad(errors.New("invalid positive-control reference"))
 		}
 	}
@@ -250,7 +277,7 @@ func readStoreVerificationCorpus(lookup func(string) (string, bool)) ([]storeVer
 	if err := storeVerificationStrict(raw, &m); err != nil {
 		return bad(err)
 	}
-	if m.Schema != "curator.environment-store-corpus/2" || m.Capability != "agent-environments" || m.Revision != 2 || m.Status != "proposal-unreleased" || m.Cases != "vectors/environments-store-boundary.json" || m.Count != 130 || len(m.Migration) != 38 || m.Predecessor.SHA256 != storeVerificationPredecessorPin {
+	if m.Schema != "curator.environment-store-corpus/2" || m.Capability != "agent-environments" || m.Revision != 2 || m.Status != "proposal-unreleased" || m.Cases != "vectors/environments-store-boundary.json" || m.Count != storeVerificationCaseCount || len(m.Migration) != 38 || m.Predecessor.SHA256 != storeVerificationPredecessorPin {
 		return bad(errors.New("unsupported corpus manifest"))
 	}
 	raw, err = storeVerificationReadPinned(filepath.Join(root, filepath.FromSlash(m.Cases)), storeVerificationCasesPin)
@@ -274,6 +301,28 @@ func readStoreVerificationCorpus(lookup func(string) (string, bool)) ([]storeVer
 		row, ok := byName[old.Successor]
 		if seen[key] || !ok || row.Predecessor == nil || row.Predecessor.Group != old.Group || row.Predecessor.Name != old.Name {
 			return bad(errors.New("predecessor roster mismatch"))
+		}
+		if !equalInts(old.Levels, row.Levels) {
+			return bad(errors.New("predecessor level scope mismatch"))
+		}
+		levels := map[int]bool{}
+		for _, level := range row.Levels {
+			levels[level] = true
+		}
+		for _, name := range old.LevelSuccessors {
+			sibling, ok := byName[name]
+			if !ok || sibling.Predecessor != nil || sibling.Operation != row.Operation || sibling.Member != row.Member || sibling.Source != row.Source || sibling.Home != row.Home {
+				return bad(errors.New("invalid level successor"))
+			}
+			for _, level := range sibling.Levels {
+				if levels[level] {
+					return bad(errors.New("overlapping level successor"))
+				}
+				levels[level] = true
+			}
+		}
+		if len(levels) != 4 {
+			return bad(errors.New("incomplete predecessor level coverage"))
 		}
 		seen[key] = true
 	}
@@ -317,4 +366,16 @@ func storeVerificationProductionReferences(root string) ([]string, error) {
 		return nil
 	})
 	return found, err
+}
+
+func equalInts(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

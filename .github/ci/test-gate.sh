@@ -101,8 +101,7 @@ if [ "${CI_STORE_COMPATIBILITY+present}" = present ] || [ "${CI_STORE_V2_CANONIC
  fi
  compat_head="${GITHUB_SHA:-$(git rev-parse HEAD)}"
  "$GO" run ./tools/check-store-compatibility -dir "$CI_STORE_COMPATIBILITY" -commit "$compat_head" >"$EVIDENCE/store-compatibility.json" || exit 1
- echo 'test-gate: four historical store families delegated; verified exact 32/6 by row ID'
- STORE_COMPAT_FLAGS=(-skip '^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive')
+ echo 'test-gate: historical replay verified exact 32/6; four canonical store families run revision-2 successors'
  STORE_COMPAT_ENV=(CI_STORE_V2_CANONICAL=1)
 fi
 
