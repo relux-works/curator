@@ -1150,14 +1150,14 @@ internal/gitops	TestPinnedSnapshotPathsProjection	linux,darwin,windows	-	-	selec
 internal/gitops	TestPinnedSnapshotPathsIsolation	linux,darwin,windows	-	-	ambient Git overrides cannot substitute a repository or supply a missing local object
 internal/gitops	TestPinnedSnapshotPathsRejectsAlternateAndGraft	linux,darwin,windows	-	-	native alternate/graft metadata refuses with a local-repository positive
 internal/gitops	TestPinnedSnapshotPathMetadataControls	linux,darwin,windows	-	-	unsafe paths/types/collisions and metadata/path-count excesses refuse without a partial roster
-internal/envprofile	TestStartupHomeDriftRetainsRepairContract	linux,darwin,windows	-	-	level1 warns and starts a stale home; levels2-4 and capture refuse; dry-run preserves and explicit repair restores verified bytes
+internal/envprofile	TestStartupHomeDriftRetainsRepairContract	linux,darwin,windows	-	-	level 1 warns and starts a stale home; levels 2-4 and capture refuse; dry-run preserves and explicit repair restores verified bytes
 internal/envprofile	TestStoreVerificationCanonicalPinnedCorpusReader	-	linux,darwin,windows	opt-in	canonical stage requires the exact sibling revision-2 corpus at SPEC_PIN; reader coverage only
 internal/skillintegrity	TestExpectedEvidenceClassifiesParseBreakingDrift	linux,darwin,windows	-	-	missing skill and invalid installed declaration are mismatches beside intact and malformed-evidence controls
 internal/storecompatibility	TestArtifactAdmission	linux,darwin,windows	-	-	exact-head replay admission rejects missing evidence and same-count swapped row IDs
 internal/envprofile	TestStoreVerificationLandedFields	linux,darwin,windows	-	-	landed policy and ordered carriers survive decoding; missing and misplaced fields refuse
 internal/envprofile	TestStoreVerificationLandedSchemaControl	linux,darwin,windows	-	-	schema bypass reaches the intended missing-policy rejection assertion
 internal/envprofile	TestStartupHomeStaleLeadsPinFailure	linux,darwin,windows	-	-	old-lock home remains the leading diagnostic alongside pin drift; restored source repairs successfully
-internal/envprofile	TestStartupPermissiveExistingHomePreservesSource	linux,darwin,windows	-	-	level1 existing-home launch preserves mismatching source; old-lock refusal and verified repair are neighbors
+internal/envprofile	TestStartupPermissiveExistingHomePreservesSource	linux,darwin,windows	-	-	level 1 existing-home launch preserves mismatching source; old-lock refusal and verified repair are neighbors
 
 # Windows observation and special-file classification regressions.
 internal/skillintegrity	TestSkillHardlinkObservationKeepsNamedRefusal	linux,darwin,windows	-	-	metadata observation retains a hardlink before named admission refusal; intact neighbors pass
@@ -1166,3 +1166,10 @@ internal/pathboundary	TestSocketIsRegularTypeFailure	linux,darwin,windows	-	-	re
 internal/pathboundary	TestWindowsSocketClassificationControl	windows	-	-	socket reparse misclassification reaches the regular_types assertion
 internal/envprofile	TestStoreVerificationObservationBindsReplacement	linux,darwin,windows	-	-	same-byte replacement cannot borrow earlier directory identity; retained original passes
 internal/envprofile	TestStoreVerificationObservationControl	linux,darwin,windows	-	-	lazy Windows identity or bypassed identity comparison reaches the replacement assertion
+internal/envprofile	TestStoreVerificationRuntimeRosterControl	linux,darwin,windows	-	-	first-row-only runtime selection fails the exact manifest ID and level roster
+internal/envprofile	TestStoreVerificationMigrationCoverage	linux,darwin,windows	-	-	disjoint migration levels pass; scope invalid overlap and incomplete successors refuse
+internal/envprofile	TestStoreVerificationMigrationCoverageControl	linux,darwin,windows	-	-	disabled incomplete-level gate fails its intended assertion
+internal/envprofile	TestStartupCombinedHomeAndSourceDrift	linux,darwin,windows	-	-	combined copied-home and source drift keeps home precedence; verified strict repair restores both
+internal/envprofile	TestStartupCombinedRepairRequiresVerifiedInputs	linux,darwin,windows	-	-	unavailable pinned input refuses home repair at every level without writes or launch
+internal/envprofile	TestStartupCombinedDriftControls	linux,darwin,windows	-	-	decision-specific mutants fail the intended combined-drift assertions
+internal/envprofile	TestStartupSourceOnlySkillDriftKeepsExistingHome	linux,darwin,windows	-	-	intact earlier skill projection remains source-only; retargeted projection receipt refuses
