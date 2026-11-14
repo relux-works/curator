@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -21,7 +22,7 @@ import (
 //go:embed testdata/store-verification-v2/predecessor-fixtures.json
 var storeVerificationFixtureShapes []byte
 
-func canonicalStoreVerificationRows(t *testing.T) []storeVerificationCase {
+func canonicalStoreVerificationRows(t *testing.T) ([]storeVerificationCase, storeVerificationManifest) {
 	t.Helper()
 	if err := storeVerificationCanonicalGuard(os.LookupEnv); err != nil {
 		t.Fatal(err)
@@ -38,7 +39,15 @@ func canonicalStoreVerificationRows(t *testing.T) []storeVerificationCase {
 	if err != nil || !selected {
 		t.Fatalf("canonical store corpus: %v", err)
 	}
-	return rows
+	raw, err := storeVerificationReadPinned(filepath.Join(root, "manifest.json"), storeVerificationManifestPin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest storeVerificationManifest
+	if err := storeVerificationStrict(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	return rows, manifest
 }
 
 // The four existing runtime families execute every predecessor successor and
@@ -46,7 +55,9 @@ func canonicalStoreVerificationRows(t *testing.T) []storeVerificationCase {
 // to plant a required violation is a failure here, never a skip or bound pass.
 func runStoreVerificationSuccessors(t *testing.T, group string) {
 	t.Helper()
-	rows := canonicalStoreVerificationRows(t)
+	rows, manifest := canonicalStoreVerificationRows(t)
+	expected := storeVerificationRuntimeRoster(t, manifest, rows, group)
+	executed := map[string]map[int]bool{}
 	var shapes map[string]storeBoundaryVector
 	if err := json.Unmarshal(storeVerificationFixtureShapes, &shapes); err != nil {
 		t.Fatal(err)
@@ -77,12 +88,21 @@ func runStoreVerificationSuccessors(t *testing.T, group string) {
 		count++
 		t.Run(row.Name, func(t *testing.T) {
 			for _, level := range row.Levels {
-				t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) { driveStoreVerificationSuccessor(t, row, shape, level) })
+				t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
+					if executed[row.Name] == nil {
+						executed[row.Name] = map[int]bool{}
+					}
+					if executed[row.Name][level] {
+						t.Fatal("runtime level executed twice")
+					}
+					executed[row.Name][level] = true
+					driveStoreVerificationSuccessor(t, row, shape, level)
+				})
 			}
 		})
 	}
-	if count == 0 {
-		t.Fatal("canonical family executed no successor rows")
+	if !reflect.DeepEqual(executed, expected) {
+		t.Fatalf("runtime roster mismatch for %s: executed=%v expected=%v", group, executed, expected)
 	}
 	t.Logf("revision-2 runtime rows=%d family=%s", count, group)
 }
@@ -173,6 +193,7 @@ func driveStoreVerificationSuccessor(t *testing.T, row storeVerificationCase, sh
 	var current bool
 	if row.Operation == "status" {
 		request := statusRequest(fx)
+		request.Policy.StartupVerificationLevel = level
 		request.boundaryOwnerLookup = owner
 		status, err := StatusOf(request)
 		if err != nil {
@@ -241,15 +262,22 @@ func driveStoreVerificationSuccessor(t *testing.T, row storeVerificationCase, sh
 			}
 		}
 		statusReq := statusRequest(fx)
+		statusReq.Policy.StartupVerificationLevel = level
 		statusReq.boundaryOwnerLookup = owner
 		statusReq.readStateFile = req.readStateFile
 		status, err := StatusOf(statusReq)
-		if err == nil {
-			for _, home := range status.Homes {
-				if home.Profile == fx.profile && home.Environment == envregistry.CodexCLI {
-					current = home.Current
-				}
+		if err != nil {
+			t.Fatalf("v2 post-operation status failed: %v", err)
+		}
+		found := false
+		for _, home := range status.Homes {
+			if home.Profile == fx.profile && home.Environment == envregistry.CodexCLI {
+				found = true
+				current = home.Current
 			}
+		}
+		if !found {
+			t.Fatal("v2 post-operation status row missing")
 		}
 	}
 	if current != row.Expected.Current {

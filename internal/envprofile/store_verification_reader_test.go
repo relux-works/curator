@@ -291,6 +291,15 @@ func readStoreVerificationCorpus(lookup func(string) (string, bool)) ([]storeVer
 	if len(cases) != m.Count {
 		return bad(errors.New("incomplete case roster"))
 	}
+	if err := validateStoreVerificationMigration(m, cases); err != nil {
+		return bad(err)
+	}
+	return cases, true, nil
+}
+
+// The decode-level seam admits no filesystem fixture and lets controls reach
+// migration checks independently of the immutable manifest hash gate.
+func validateStoreVerificationMigration(m storeVerificationManifest, cases []storeVerificationCase) error {
 	byName := map[string]storeVerificationCase{}
 	for _, row := range cases {
 		byName[row.Name] = row
@@ -300,10 +309,10 @@ func readStoreVerificationCorpus(lookup func(string) (string, bool)) ([]storeVer
 		key := old.Group + "/" + old.Name
 		row, ok := byName[old.Successor]
 		if seen[key] || !ok || row.Predecessor == nil || row.Predecessor.Group != old.Group || row.Predecessor.Name != old.Name {
-			return bad(errors.New("predecessor roster mismatch"))
+			return errors.New("predecessor roster mismatch")
 		}
 		if !equalInts(old.Levels, row.Levels) {
-			return bad(errors.New("predecessor level scope mismatch"))
+			return errors.New("predecessor level scope mismatch")
 		}
 		levels := map[int]bool{}
 		for _, level := range row.Levels {
@@ -312,21 +321,21 @@ func readStoreVerificationCorpus(lookup func(string) (string, bool)) ([]storeVer
 		for _, name := range old.LevelSuccessors {
 			sibling, ok := byName[name]
 			if !ok || sibling.Predecessor != nil || sibling.Operation != row.Operation || sibling.Member != row.Member || sibling.Source != row.Source || sibling.Home != row.Home {
-				return bad(errors.New("invalid level successor"))
+				return errors.New("invalid level successor")
 			}
 			for _, level := range sibling.Levels {
 				if levels[level] {
-					return bad(errors.New("overlapping level successor"))
+					return errors.New("overlapping level successor")
 				}
 				levels[level] = true
 			}
 		}
 		if len(levels) != 4 {
-			return bad(errors.New("incomplete predecessor level coverage"))
+			return errors.New("incomplete predecessor level coverage")
 		}
 		seen[key] = true
 	}
-	return cases, true, nil
+	return nil
 }
 
 func storeVerificationCanonicalGuard(lookup func(string) (string, bool)) error {

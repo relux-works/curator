@@ -268,3 +268,20 @@ level when source/store checks pass. A warning never marks drifted output curren
 Raising the machine above an explicit profile minimum retains
 `startup_verification_weakening`: edit the selected context manifests' minimum,
 then run `curator profile update`.
+
+Current-lock home drift is checked against its recorded surface receipt,
+independently of a new plan assembled from mismatching source bytes. With both
+home-owned and source drift, read-only levels 2-4 lead with
+`environment_home_stale` and the repair hint; level 1 keeps its warning-start.
+Repair at levels 1-2 refuses without home writes or launch until inputs verify.
+Levels 3-4 may rebuild verified Git inputs first, then restore the home before
+launch; unavailable pinned inputs refuse with the home diagnostic leading.
+Source-only drift keeps its existing permissive behavior.
+
+Canonical runtime families assert the exact manifest row IDs and every level
+slot in-test: resolve 31/80, dry-run 4/16, repair 16/40, status 4/16.
+Status requests receive the selected policy level even though their structural
+currency checks are level-invariant. Post-operation status errors or missing
+home rows fail the runtime test instead of implicitly counting as non-current.
+Migration decode controls independently exercise level-scope, invalid sibling,
+overlap and incomplete coverage beyond the immutable manifest pin seam.
