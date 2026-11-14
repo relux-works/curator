@@ -2,6 +2,7 @@ package envprofile
 
 import (
 	"debug/pe"
+	"errors"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -33,7 +34,7 @@ func signatureExecutableFlavour(executable string) (string, error) {
 	}
 	// ImportedLibraries is a stub in the supported Go toolchain. ImportedSymbols
 	// reads the PE import table and returns symbol:DLL pairs.
-	symbols, readErr := file.ImportedSymbols()
+	symbols, readErr := signaturePEImports(file)
 	closeErr := file.Close()
 	if readErr != nil || closeErr != nil {
 		return "", fmt.Errorf("gpg-path-flavour-unknown: import table unreadable")
@@ -45,6 +46,18 @@ func signatureExecutableFlavour(executable string) (string, error) {
 		}
 	}
 	return signatureRuntimeFlavour(libraries), nil
+}
+
+// The supported PE parser uses unchecked import RVAs internally. A corrupt
+// verifier image must remain a named unavailable result, never panic a read.
+func signaturePEImports(file *pe.File) (symbols []string, err error) {
+	defer func() {
+		if recover() != nil {
+			symbols = nil
+			err = errors.New("malformed PE import table")
+		}
+	}()
+	return file.ImportedSymbols()
 }
 
 func signatureRuntimeFlavour(libraries []string) string {

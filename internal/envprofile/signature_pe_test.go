@@ -11,7 +11,7 @@ import (
 )
 
 // Actual PE imports, rather than injected library names, distinguish native,
-// MSYS and Cygwin executables on every test host. Unknown and malformed images
+// MSYS and Cygwin executables on every test host. Unknown-DLL and malformed-header/import fixtures
 // cannot acquire a known runtime. These fixtures do not execute Windows code.
 func testSignaturePEFlavours(t *testing.T) {
 	t.Helper()
@@ -29,6 +29,21 @@ func testSignaturePEFlavours(t *testing.T) {
 			}
 		})
 	}
+	t.Run("pe-malformed-imports", func(t *testing.T) {
+		path := signaturePEFixture(t, "KERNEL32.dll")
+		image, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The import descriptor points beyond the actual section data.
+		binary.LittleEndian.PutUint32(image[512:], 0x1fff)
+		if err := os.WriteFile(path, image, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := signatureExecutableFlavour(path); err == nil || !strings.Contains(err.Error(), "gpg-path-flavour-unknown:") {
+			t.Fatalf("malformed PE imports did not produce named refusal: %v", err)
+		}
+	})
 	t.Run("pe-malformed", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "invalid.exe")
 		if err := os.WriteFile(path, []byte("not a PE executable"), 0700); err != nil {
