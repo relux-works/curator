@@ -54,6 +54,8 @@ assert_contains() {
 	fi
 }
 
+assert 'macOS policy rejects missing, failed, skipped and cancelled coverage' 0 python3 "$HERE/macos-policy-selftest.py"
+
 echo '=== candidate-suite.sh verify-ref: only a full immutable revision is a candidate ==='
 CS="$HERE/candidate-suite.sh"
 assert 'candidate inputs reject revision plus root' 1 bash "$CS" verify-inputs '1234567890abcdef1234567890abcdef12345678' '/candidate/root'
