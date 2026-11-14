@@ -10,7 +10,7 @@ import (
 )
 
 func testOrdinaryGateUnion(t *testing.T, c testLane) {
-	for _, control := range []string{"valid", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
+	for _, control := range []string{"valid", "compatibility-refused", "compatibility-missing", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
 		t.Run(control, func(t *testing.T) {
 			dir := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(dir, ".github/ci"), 0755); err != nil {
@@ -57,6 +57,7 @@ set -eu
 echo "$*" >>commands.txt
 case "$1" in
 run)
+  if [ "$2" = ./tools/check-store-compatibility ]; then [ "$COMPAT_REFUSED" = 0 ] || exit 19; echo checked; exit 0; fi
   [ "$2" = ./tools/envprofilerace ]
   [ "$3" = -lane ] && [ "$4" = "$LANE" ]
   [ "$5" = -mode ] && [ "$6" = merge ]
@@ -76,7 +77,8 @@ esac
 `)
 			cmd := exec.Command("bash", ".github/ci/test-gate.sh", "evidence")
 			cmd.Dir = dir
-			cmd.Env = append(os.Environ(), "GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
+			cmd.Env = append(os.Environ(), "CI_STORE_COMPATIBILITY=compatibility", "GITHUB_SHA="+strings.Repeat("a", 40), "COMPAT_REFUSED=0",
+				"GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir), "CONTROL="+control,
 				"CI_WINDOWS_TEST_SHARDS=", "CI_UNIX_TEST_SHARDS=", "CI_ENVPROFILE_SHARDS=", "GO_TEST_FLAGS=", "GO_TEST_TIMEOUT="+c.timeout, "LANE="+c.lane,
 				"CI_GATE_GOOS="+c.goos, "CI_PLATFORM_CASES=ledger.tsv")
@@ -86,6 +88,10 @@ esac
 			}
 			cmd.Env = append(cmd.Env, key+"=shards")
 			switch control {
+			case "compatibility-refused":
+				cmd.Env = append(cmd.Env, "COMPAT_REFUSED=1")
+			case "compatibility-missing":
+				cmd.Env = append(cmd.Env, "CI_STORE_COMPATIBILITY=")
 			case "mixed-lanes":
 				cmd.Env = append(cmd.Env, "CI_UNIX_TEST_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=shards")
 			case "wrong-timeout":
@@ -103,7 +109,7 @@ esac
 				return
 			}
 			code := 1
-			if control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
+			if control == "compatibility-missing" || control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
 				code = 2
 			}
 			exit, ok := err.(*exec.ExitError)
@@ -117,6 +123,8 @@ esac
 			} else {
 				want := ""
 				switch control {
+				case "compatibility-missing":
+					want = "same-head revision-1 compatibility evidence is required"
 				case "mixed-lanes":
 					want = "ordinary shard lanes are mutually exclusive"
 				case "wrong-timeout", "race-flags", "race-artifacts":

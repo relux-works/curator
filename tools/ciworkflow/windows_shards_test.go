@@ -33,7 +33,7 @@ func checkWindowsShards(data []byte) error {
 			return err
 		}
 		if name == "test" {
-			if job.If != "${{ !cancelled() }}" || !reflect.DeepEqual(job.Needs, []string{"windows-test-shards", "unix-test-shards"}) {
+			if job.If != "${{ !cancelled() }}" || !reflect.DeepEqual(job.Needs, []string{"windows-test-shards", "unix-test-shards", "store-v1-compatibility"}) {
 				return fmt.Errorf("Test must run after Windows shard failure unless cancelled")
 			}
 			download, consume, ordinary := 0, 0, 0
@@ -96,7 +96,7 @@ func TestWindowsShardsWiring(t *testing.T) {
 	for name, pair := range map[string][2]string{
 		"lost-shard":       {"shard: [0, 1, 2, 3]", "shard: [0, 1, 2]"},
 		"success-only":     {"  test:\n    if: ${{ !cancelled() }}", "  test:\n    if: success()"},
-		"wrong-dependency": {"needs: [windows-test-shards, unix-test-shards]", "needs: [envprofile-race, unix-test-shards]"},
+		"wrong-dependency": {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [envprofile-race, unix-test-shards]"},
 		"lost-admission":   {"CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards", "CI_OTHER: .temp/windows-test-shards"},
 		"lost-upload":      {"name: windows-test-shard-${{ matrix.shard }}", "name: windows-test-shard-0"},
 		"lost-selector":    {"-lane windows-test -shard ${{ matrix.shard }}", "-lane windows-test -shard 0"},

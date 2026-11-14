@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/relux-works/curator/internal/storecompatibility"
 	"hash/fnv"
 	"io"
 	"os"
@@ -104,6 +105,24 @@ func nativeInventory(path string, race bool) ([]string, error) {
 	}
 	if len(tests) == 0 {
 		return nil, fmt.Errorf("empty test inventory for %s", path)
+	}
+	if dir := os.Getenv("CI_STORE_COMPATIBILITY"); dir != "" {
+		commit, err := sourceCommit()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := storecompatibility.Admit(dir, commit); err != nil {
+			return nil, err
+		}
+		if path == pkg || path == "./internal/envprofile" {
+			retained := tests[:0]
+			for _, name := range tests {
+				if !storecompatibility.HistoricalTest(name) {
+					retained = append(retained, name)
+				}
+			}
+			tests = retained
+		}
 	}
 	sort.Strings(tests)
 	return tests, nil

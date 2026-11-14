@@ -2969,12 +2969,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", envregistry.DiagPassthroughUnreadable, strings.Join(verdict.reasons, "; "))
 	}
 	{
-		checks := append(append([]startupverification.Observation{}, localChecks...), verdict.contentChecks...)
-		// A requested strict repair may fix home content, but it cannot
-		// manufacture missing profile evidence or accept a source mismatch.
-		if req.Repair && effectiveLevel >= 3 && !verdict.current {
-			checks = localChecks
-		}
+		// Managed homes are derived output. Startup policy applies only to
+		// profile/store evidence; home drift retains the stale/repair contract.
+		checks := localChecks
 		decision, err := startupVerdict(policy, lock, checks)
 		if err != nil {
 			return nil, err
@@ -3006,9 +3003,6 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 				}
 			}
 			return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: local startup evidence refused: %s", prefix, strings.Join(details, "; "))
-		}
-		if len(verdict.reasons) == len(verdict.contentChecks) && (!req.Repair || effectiveLevel < 3 || verdict.current) {
-			verdict.current = true
 		}
 		if req.Repair && effectiveLevel < 3 && !verdict.current {
 			for _, check := range localChecks {

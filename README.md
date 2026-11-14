@@ -466,6 +466,14 @@ logs in the job workspace and refuse absent, renamed or skipped witnesses.
 Run `go test ./tools/ciworkflow -run 'TestRequiredTests|TestReleaseBuild'` for
 checker controls and the release platform-tag exclusion gate.
 
+Canonical Test/Race lanes require the same-head artifact from the separate
+`store-v1-compatibility` job. Revalidate it locally with
+`go run ./tools/check-store-compatibility -dir .temp/store-v1-compatibility -commit <full-head>`;
+then export its absolute directory as `CI_STORE_COMPATIBILITY` before running
+the gate or native shard inventory. The artifact contains `head.txt`, the
+complete `replay.jsonl` and `report.json`. It authorizes routing only the four
+historical store families; counts alone cannot authorize that routing.
+
 `tools/envprofilerace` partitions the native `internal/envprofile` race-build
 list into eight deterministic name-hash shards plus a dedicated shard for the
 measured ownership mutation suite, with exact `-run` selectors. CI runs

@@ -783,3 +783,22 @@ func TestCompositionStartupLevels(t *testing.T) {
 		}
 	}
 }
+
+// Captured-pin drift uses the lock's effective floor, not just the machine's
+// permissive setting. Equality/default neighbors retain the selected policy.
+func TestCompositionCapturedPinEffectiveLevel(t *testing.T) {
+	for _, tc := range []struct{ machine, floor, want int }{{1, 0, 1}, {1, 1, 1}, {1, 3, 3}, {0, 0, 3}, {0, 3, 3}, {4, 3, 0}} {
+		lock := &contextlock.Lock{}
+		if tc.floor != 0 {
+			lock.StartupVerificationLevel = &tc.floor
+		}
+		got, err := compositionVerificationLevel(tc.machine, lock)
+		if tc.want == 0 {
+			if err == nil || !strings.Contains(err.Error(), "startup_verification_weakening") {
+				t.Fatalf("weak floor accepted: %v", err)
+			}
+		} else if err != nil || got != tc.want {
+			t.Fatalf("effective capture level: machine=%d floor=%d got=%d err=%v", tc.machine, tc.floor, got, err)
+		}
+	}
+}

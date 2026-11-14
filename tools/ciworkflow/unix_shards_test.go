@@ -80,7 +80,7 @@ func checkUnixShards(data []byte) error {
 		return fmt.Errorf("Unix run/upload/pin/tool provisioning incomplete")
 	}
 	consumer := jobs["test"]
-	if consumer.If != "${{ !cancelled() }}" || !reflect.DeepEqual(consumer.Needs, []string{"windows-test-shards", "unix-test-shards"}) {
+	if consumer.If != "${{ !cancelled() }}" || !reflect.DeepEqual(consumer.Needs, []string{"windows-test-shards", "unix-test-shards", "store-v1-compatibility"}) {
 		return fmt.Errorf("Test must admit even after a shard dependency failure")
 	}
 	download, consume := 0, 0

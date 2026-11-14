@@ -89,6 +89,17 @@ echo "test-gate: GIT_CONFIG_GLOBAL=$GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM=$GIT_C
 echo "test-gate: conformance root=$ROOT"
 echo ''
 
+# The historical families run only in the separate compatibility job. Refuse
+# delegation until its complete, same-head stream proves the exact row-ID split.
+if [ -z "${CI_STORE_COMPATIBILITY:-}" ]; then
+ echo 'test-gate: same-head revision-1 compatibility evidence is required' >&2
+ exit 2
+fi
+compat_head="${GITHUB_SHA:-$(git rev-parse HEAD)}"
+"$GO" run ./tools/check-store-compatibility -dir "$CI_STORE_COMPATIBILITY" -commit "$compat_head" >"$EVIDENCE/store-compatibility.json" || exit 1
+echo 'test-gate: four historical store families delegated; verified exact 32/6 by row ID'
+STORE_COMPAT_SKIP='^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive'
+
 # --- plan ------------------------------------------------------------------
 bash "$HERE/suite-plan.sh" "$ROOT" "$EVIDENCE"
 PLAN_RC=$?
@@ -175,8 +186,8 @@ fi
 # --- served: the root is exported ------------------------------------------
 if [ -s "$SERVED" ]; then
 	# shellcheck disable=SC2046,SC2086
-	run_stage served env CURATOR_CONFORMANCE_ROOT="$ROOT" \
-		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} $(cat "$SERVED")
+	run_stage served env CI_STORE_V2_CANONICAL=1 CURATOR_CONFORMANCE_ROOT="$ROOT" \
+		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" -skip "$STORE_COMPAT_SKIP" ${GO_TEST_FLAGS:-} $(cat "$SERVED")
 	rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
 else
 	echo 'test-gate: no served packages' >&2

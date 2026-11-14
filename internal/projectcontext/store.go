@@ -60,7 +60,7 @@ type state struct {
 // claimed. Agent approval requires a future manager-grant entry point; there
 // is deliberately no caller-supplied approver or ceiling parameter here.
 type Store struct {
-	// StartupVerificationLevel is the selected machine baseline; zero defaults to3.
+	// StartupVerificationLevel is the selected machine baseline; zero defaults to 3.
 	StartupVerificationLevel int
 	Home                     string
 	Precedence               contextlock.Precedence
