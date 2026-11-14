@@ -223,7 +223,12 @@ families execute the 38 predecessor successors and their level-scoped siblings,
 at every declared level, using revision-2 expectations. Fixture shapes preserve
 the predecessor's enclosing object, surface, source and home state. The special-file
 row uses a real socket at its original payload path, exercising `regular_types`
-on Windows as well as Unix; the historical replay keeps its FIFO platform bound.
+on Windows as well as Unix. Windows' `IO_REPARSE_TAG_AF_UNIX` has no link
+redirect target and is classified by `regular_types`; other reparse tags retain
+their link-safety refusal. The historical replay keeps its FIFO platform bound.
+Runtime observations retain Windows volume/file IDs through no-follow metadata
+handles before the operation. Rebuild assertions require a distinct directory
+identity and restored verified snapshot bytes, rather than a later path lookup.
 The runtime roster is precisely the 38 `legacy-*` IDs named by the manifest's
 migration table plus its 17 `level_successors` IDs: 55 rows / 152 level slots
 (49 implementation rows / 130 slots; 6 checker rows / 22 slots). The four

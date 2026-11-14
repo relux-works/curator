@@ -133,6 +133,8 @@ func driveStoreVerificationSuccessor(t *testing.T, row storeVerificationCase, sh
 	if !storeBoundaryNeedsOwnerFailure(shape) {
 		owner = nil
 	}
+	_, trustedEntry := storeBoundaryRootMemberFor(fx)
+	trustedStore := storeVerificationTree(t, trustedEntry)
 	if shape.Name == "non-regular-component-untrusted" {
 		_, entry := storeBoundaryRootMemberFor(fx)
 		plantStoreVerificationSocket(t, filepath.Join(entry, "context", "pipe"))
@@ -140,7 +142,7 @@ func driveStoreVerificationSuccessor(t *testing.T, row storeVerificationCase, sh
 		t.Fatalf("required plant unavailable: %s", reason)
 	}
 	_, entry := storeBoundaryRootMemberFor(fx)
-	entryBefore, err := os.Lstat(entry)
+	entryBefore, err := storeVerificationFileInfo(entry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +150,7 @@ func driveStoreVerificationSuccessor(t *testing.T, row storeVerificationCase, sh
 	beforeNodes := storeVerificationNodes(t, fx.home)
 	storeBefore := storeVerificationTree(t, entry)
 	storeNodesBefore := storeVerificationNodes(t, entry)
-	lockInfoBefore, err := os.Lstat(lockPath(fx.home, fx.profile))
+	lockInfoBefore, err := storeVerificationFileInfo(lockPath(fx.home, fx.profile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,17 +259,21 @@ func driveStoreVerificationSuccessor(t *testing.T, row storeVerificationCase, sh
 	if err != nil || string(lockAfter) != string(lockBefore) {
 		t.Fatalf("v2 operation changed lock: %v", err)
 	}
-	lockInfoAfter, err := os.Lstat(lockPath(fx.home, fx.profile))
+	lockInfoAfter, err := storeVerificationFileInfo(lockPath(fx.home, fx.profile))
 	if err != nil || !os.SameFile(lockInfoBefore, lockInfoAfter) || !lockInfoBefore.ModTime().Equal(lockInfoAfter.ModTime()) {
 		t.Fatalf("v2 operation replaced or touched lock: %v", err)
 	}
-	entryAfter, err := os.Lstat(entry)
+	entryAfter, err := storeVerificationFileInfo(entry)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rebuilt := !os.SameFile(entryBefore, entryAfter)
+	t.Logf("store rebuild observation: rebuilt=%v expected=%v source=%s level=%d", rebuilt, row.Expected.Rebuilt, source.Kind, level)
 	if rebuilt != row.Expected.Rebuilt {
 		t.Fatalf("v2 rebuilt=%v want %v", rebuilt, row.Expected.Rebuilt)
+	}
+	if rebuilt && storeVerificationTree(t, entry) != trustedStore {
+		t.Fatal("v2 rebuild did not restore verified snapshot bytes")
 	}
 	if len(row.Expected.Writes) == 0 && (hashTreeForTest(t, fx.home) != before || !sameStoreVerificationNodes(beforeNodes, storeVerificationNodes(t, fx.home))) {
 		t.Fatal("v2 read-only/refusal mutated manager state")
@@ -343,7 +349,7 @@ func storeVerificationNodes(t *testing.T, root string) map[string]storeVerificat
 		if err != nil {
 			return err
 		}
-		info, err := os.Lstat(path)
+		info, err := storeVerificationFileInfo(path)
 		if err != nil {
 			return err
 		}
