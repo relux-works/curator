@@ -20,6 +20,9 @@ const mutationRights windows.ACCESS_MASK = windows.GENERIC_WRITE | windows.GENER
 
 const windowsFileDeleteChild windows.ACCESS_MASK = 0x00000040
 
+// IO_REPARSE_TAG_AF_UNIX is not exported by the pinned x/sys version.
+const windowsReparseTagAFUnix uint32 = 0x80000023
+
 func protectTree(root string) error {
 	owner, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
@@ -92,7 +95,7 @@ func isLink(path string, info os.FileInfo) (bool, error) {
 	if info.Mode()&os.ModeSymlink != 0 {
 		return true, nil
 	}
-	handle, err := openNoFollow(path)
+	handle, err := openNoFollowAccess(path, windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES)
 	if err != nil {
 		return false, err
 	}
@@ -101,7 +104,21 @@ func isLink(path string, info os.FileInfo) (bool, error) {
 	if err := windows.GetFileInformationByHandle(handle, &attributes); err != nil {
 		return false, err
 	}
-	return attributes.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0, nil
+	if attributes.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+		return false, nil
+	}
+	// AF_UNIX sockets are reparse points, but have no redirect target to
+	// Readlink. Leave this exact tag to regular_types; unknown reparse tags
+	// retain the existing fail-closed link_safety classification.
+	var tag struct {
+		Attributes uint32
+		ReparseTag uint32
+	}
+	if err := windows.GetFileInformationByHandleEx(handle, windows.FileAttributeTagInfo,
+		(*byte)(unsafe.Pointer(&tag)), uint32(unsafe.Sizeof(tag))); err != nil {
+		return false, err
+	}
+	return tag.ReparseTag != windowsReparseTagAFUnix, nil
 }
 
 func effectiveOwner() (OwnerIdentity, error) {
