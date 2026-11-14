@@ -40,6 +40,8 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 			"^TestReadPuritySignerVerdictsKeepPin$", "TestReadPuritySignerVerdictsKeepPin", "unavailable signer hint was not bounded and escaped", ""},
 		{"unknown-path-runtime", "signature_paths.go", `if flavour != "msys" && flavour != "cygwin" {`, `if false && flavour != "msys" && flavour != "cygwin" {`,
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions", "unknown runtime admitted", "TestSignatureWindowsPathConventions/native"},
+		{"pe-import-error", "signature_paths.go", "if readErr != nil || closeErr != nil {", "if (readErr != nil && false) || closeErr != nil {",
+			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions/pe-malformed-imports", "malformed PE imports did not produce named refusal", "TestSignatureWindowsPathConventions/pe-native"},
 		{"pe-runtime-detection", "signature_paths.go", "file.ImportedSymbols()", "func() ([]string, error) { return nil, nil }()",
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions/pe-native", "PE runtime=", "TestSignatureWindowsPathConventions/native"},
 		{"msys-native-path", "signature_paths.go",
