@@ -266,8 +266,12 @@ profiles through an explicit mutating operation such as `profile use default`
 Source signer status includes signature `verification` (`verified`, `failed` or
 `unavailable`). An enforced failure retains `current=false`; unavailable verification
 prints `unknown` and a verification hint; `env status --check` fails on failed or
-unavailable verification. Local signature checks use inherited pipes and an
-existing public keyring where supported; they do not initialize a GPG home.
+unavailable verification. A verifier exit alone is not a bad-signature verdict:
+process and input-transport failures remain `unavailable`, with bounded, escaped
+verifier output in the hint. Local signature checks use inherited pipes or
+restricted Windows named pipes and an existing public keyring where supported;
+they do not initialize a GPG home. Windows OpenPGP paths follow the detected
+native, MSYS, or Cygwin executable convention; an unknown convention is unavailable.
 
 
 `--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.

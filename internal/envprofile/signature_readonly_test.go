@@ -70,6 +70,7 @@ func TestReadPuritySSHSignatures(t *testing.T) {
 		if splitErr != nil {
 			t.Fatal(splitErr)
 		}
+		t.Logf("%s real SSH %s valid control PASS", runtime.GOOS, objectType)
 		// Alter a signed header, preserving the complete embedded signature.
 		var changed string
 		if objectType == "commit" {
@@ -82,6 +83,7 @@ func TestReadPuritySSHSignatures(t *testing.T) {
 			t.Fatalf("tampered %s signature admitted: %+v, %v", objectType, evidence, err)
 		}
 	}
+	t.Logf("%s real SSH tampered commit/tag controls PASS", runtime.GOOS)
 	manager := newGitManager(home)
 	pinRaw, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
 	if err != nil {
@@ -169,6 +171,9 @@ func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
 	missing := sourceSignerPosture(req, []Info{info})
 	if len(missing) != 1 || missing[0].Verification != "unavailable" || !missing[0].Current || missing[0].Diagnostic != "signer_verification_unavailable" || !strings.Contains(missing[0].Hint, "curator profile update signed") {
 		t.Fatalf("unavailable signer verdict = %+v", missing)
+	}
+	if len(missing[0].Hint) > 1200 || strings.ContainsAny(missing[0].Hint, "\r\n\x1b") {
+		t.Fatalf("unavailable signer hint was not bounded and escaped: %q", missing[0].Hint)
 	}
 	assertReadWitnesses(t, home, before)
 	// The production matrix must not count the same unavailable evidence as green.

@@ -44,7 +44,7 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 			done <- err
 		}(writers[i], input)
 	}
-	output, runErr := command.CombinedOutput()
+	output, runErr := signatureCommandOutput(command)
 	// A verifier may reject without consuming every pipe. Closing the parent's
 	// readers before joining writers also bounds that failure path.
 	for _, reader := range readers {
@@ -54,11 +54,11 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 	for range inputs {
 		writeErr = errors.Join(writeErr, <-done)
 	}
+	if writeErr != nil {
+		return output, fmt.Errorf("%w: verification input pipe: %v (verifier: %v)", errSignerVerificationUnavailable, writeErr, runErr)
+	}
 	if runErr != nil {
 		return output, runErr
-	}
-	if writeErr != nil {
-		return output, fmt.Errorf("verification input pipe: %w", writeErr)
 	}
 	return output, nil
 }

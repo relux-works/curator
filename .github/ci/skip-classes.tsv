@@ -148,3 +148,10 @@ platform-control	^exact mode bits are Unix-specific$	allow	only generated-drift 
 platform-control	^POSIX permission-bit witnesses; Windows DACL controls run separately$	allow	POSIX private-parent and file-mode witnesses run on Unix; Windows executes protected-DACL publication and broadened-ACL refusal controls
 
 platform-control	^symlink fixture requires Unix$	allow	the Codex manager-reader link and file-ancestor controls require the Unix fixture; ordinary metadata cases remain portable
+
+# Signature fixtures report exactly which native prerequisite did not run.
+platform-control	^signature-child-protocol: native descriptor test; Windows named-pipe counterpart runs separately$	allow	Windows executes the same payload-only child through its named-pipe control
+platform-control	^(inherited descriptor backend unavailable|read-only signature input transport unavailable)$	allow	transport-specific controls run on their supported platforms; real signer vectors remain enabled on Windows
+host-capability	^(gpgv unavailable|fixture generator unavailable)$	allow	the real OpenPGP fixture requires both gpg and gpgv; present-tool setup failures remain fatal
+host-capability	^gpg-fixture-agent-cleanup-unavailable: gpgconf missing$	allow	do not start fixture agents without a scoped cleanup tool
+host-capability	^gpg-fixture-path-convention-unavailable: gpg-path-flavour-unknown:	allow	the PE runtime could not be identified; real Windows signer controls still run and no setup failure is called a signature verdict

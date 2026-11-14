@@ -440,6 +440,35 @@ for book_goos in linux darwin windows; do
   done
 done
 
+# Claim: signature fixture skips are explicit and scoped. Their declarations
+# accept supported limits, while a removed declaration or nearby reason fails.
+while IFS="$(printf '\t')" read -r signature_reason signature_pattern; do
+  { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+    ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+    ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+    evout internal/envprofile TestSignatureFixtureCapability "$signature_reason"
+    ev skip internal/envprofile TestSignatureFixtureCapability; } >"$S"
+  assert "declared signature fixture skip passes: $signature_reason" 0 run_gate "$S" env CI_GATE_GOOS=windows
+  assert_contains 'signature fixture skip is explicitly allowed' 'allowed-' "$WORK/gate-ev/skips-observed.tsv"
+  awk -F'\t' -v pattern="$signature_pattern" '$2 != pattern' "$CLASSES" >"$WORK/signature-classes-minus.tsv"
+  assert "missing signature skip declaration refuses: $signature_reason" 1 run_gate "$S" \
+    env CI_GATE_GOOS=windows CI_SKIP_CLASSES="$WORK/signature-classes-minus.tsv"
+  assert_contains 'removed signature declaration fails for the intended skip' 'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+  { ev pass internal/buildcache TestWindowsProtectedStateMatrix
+    ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
+    ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+    evout internal/envprofile TestSignatureFixtureCapability "unexpected: $signature_reason"
+    ev skip internal/envprofile TestSignatureFixtureCapability; } >"$S"
+  assert "nearby signature fixture skip refuses: $signature_reason" 1 run_gate "$S" env CI_GATE_GOOS=windows
+  assert_contains 'nearby signature skip stays unclassified' 'UNCLASSIFIED' "$WORK/gate-ev/skips-observed.tsv"
+done <<'SIGNATURE_SKIPS'
+signature-child-protocol: native descriptor test; Windows named-pipe counterpart runs separately	^signature-child-protocol: native descriptor test; Windows named-pipe counterpart runs separately$
+inherited descriptor backend unavailable	^(inherited descriptor backend unavailable|read-only signature input transport unavailable)$
+gpgv unavailable	^(gpgv unavailable|fixture generator unavailable)$
+gpg-fixture-agent-cleanup-unavailable: gpgconf missing	^gpg-fixture-agent-cleanup-unavailable: gpgconf missing$
+gpg-fixture-path-convention-unavailable: gpg-path-flavour-unknown: import table unreadable	^gpg-fixture-path-convention-unavailable: gpg-path-flavour-unknown:
+SIGNATURE_SKIPS
+
 # Claim: declared project fixture limits pass, while altered reasons stay
 # unclassified. Removing each new declaration must fail on that exact skip.
 for project_reason in \
