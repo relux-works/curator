@@ -110,6 +110,16 @@ func TestSignaturePEImportValidation(t *testing.T) {
 		change func([]byte)
 	}{
 		{"symbol-rva", func(b []byte) { binary.LittleEndian.PutUint64(b[0x280:], 0x3000) }},
+		{"symbol-reserved-bits", func(b []byte) {
+			// Keep all RVAs mapped above bit 31; only the named import's
+			// reserved bit violates PE32+, rather than an incidental EOF.
+			binary.LittleEndian.PutUint32(b[64+4+20+112+pe.IMAGE_DIRECTORY_ENTRY_IMPORT*8:], 0x80001000)
+			binary.LittleEndian.PutUint32(b[64+4+20+240+12:], 0x80001000)
+			binary.LittleEndian.PutUint32(b[0x200:], 0x80001080)
+			binary.LittleEndian.PutUint32(b[0x20c:], 0x80001060)
+			binary.LittleEndian.PutUint32(b[0x210:], 0x80001080)
+			binary.LittleEndian.PutUint64(b[0x280:], 0x800010a0)
+		}},
 		{"symbol-unterminated", func(b []byte) {
 			for i := 0x2a2; i < len(b); i++ {
 				b[i] = 'x'

@@ -53,6 +53,8 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 			"^TestSignatureVerifierProcessFailures$", "TestSignatureVerifierProcessFailures/ssh-unexpected-status", "unexpected SSH exit became a verdict", ""},
 		{"pe-symbol-name-bounds", "signature_pe.go", `if _, err := signaturePEName(file, value+2); err != nil`, `if _, err := signaturePEName(file, value+2); err != nil && false`,
 			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/symbol-unterminated", "unsafe PE symbol-unterminated admitted", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll"},
+		{"pe-name-reserved-bits", "signature_pe.go", `if value > math.MaxInt32 {`, `if value > math.MaxInt32 && false {`,
+			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/symbol-reserved-bits", "unsafe PE symbol-reserved-bits admitted", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll"},
 		{"pe-iat-bounds", "signature_pe.go", `signaturePERead(file, first+index*width, width)`, `signaturePERead(file, lookup+index*width, width)`,
 			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/iat-rva", "unsafe PE iat-rva admitted", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll"},
 		{"pe-ordinal-only", "signature_pe.go", `if !sawNamed {`, `if !sawNamed && false {`,
