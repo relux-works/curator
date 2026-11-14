@@ -32,7 +32,7 @@ func TestNativeHomeReviewNarrowingMutants(t *testing.T) {
 		{"purge-refusal", "switch.go", "native, err := NativeHome(adapter)\n\t\tif err != nil {\n\t\t\treturn err", "native, err := NativeHome(adapter)\n\t\tif err != nil {\n\t\t\tcontinue", "^TestNativeHomeReviewUnreportedFallbackRefuses$", "TestNativeHomeReviewUnreportedFallbackRefuses", "purge hid selector refusal"},
 		{"global-notice", "global.go", "result.Warnings = append(result.Warnings, resolved.Warnings...)", "result.Warnings = nil", "^TestNativeHomeReviewGlobalNotice$", "TestNativeHomeReviewGlobalNotice", "global fallback notice lost"},
 		{"manager-ancestor", "native_home.go", "candidate, err := nativeComparablePath(path)", "if path == managerHome { return false, nil }; candidate, err := nativeComparablePath(path)", "^TestNativeHomeReviewRepair$/^native-ancestor$", "TestNativeHomeReviewRepair/native-ancestor", "named native refusal"},
-		{"absent-case", "native_home.go", "if foldedOverlap {", "if foldedOverlap && false {", "^TestNativeHomeReviewRepair$/^absent-root-case$", "TestNativeHomeReviewRepair/absent-root-case", "named native refusal"},
+		{"absent-case", "native_home.go", "if foldedOverlap {", "if foldedOverlap && false {", "^TestNativeHomeReviewRepair$/^absent-root-case$", "TestNativeHomeReviewRepair/absent-root-case", "absent-root case refusal"},
 		{"muse-bypass", "managed.go", "adapter, ok = museNativeAdapter(), true", "return filepath.Join(req.operatorXDG(), \"muse\"), nil", "^TestNativeHomeReviewRepair$/^muse-managed$", "TestNativeHomeReviewRepair/muse-managed", "Muse shared fallback"},
 	} {
 		t.Run(m.name, func(t *testing.T) {

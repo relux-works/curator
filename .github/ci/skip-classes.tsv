@@ -148,3 +148,8 @@ platform-control	^exact mode bits are Unix-specific$	allow	only generated-drift 
 platform-control	^POSIX permission-bit witnesses; Windows DACL controls run separately$	allow	POSIX private-parent and file-mode witnesses run on Unix; Windows executes protected-DACL publication and broadened-ACL refusal controls
 
 platform-control	^symlink fixture requires Unix$	allow	the Codex manager-reader link and file-ancestor controls require the Unix fixture; ordinary metadata cases remain portable
+
+# Native-home fixtures measure filesystem identity; GOOS alone never decides.
+host-capability	^fixture does not expose this same-directory case alias$	allow	Stat and SameFile do not establish an alias of the managed root; the distinct-directory positive control runs where supported
+host-capability	^fixture does not expose a same-directory manager case alias$	allow	Stat and SameFile do not establish an alias of the manager directory
+host-capability	^fixture aliases these names instead of keeping distinct directories$	allow	Stat and SameFile establish one directory; distinct-directory behavior requires a case-sensitive fixture

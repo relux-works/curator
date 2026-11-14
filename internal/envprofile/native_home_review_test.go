@@ -144,14 +144,16 @@ func TestNativeHomeReviewRepair(t *testing.T) {
 				t.Setenv("CODEX_HOME", selected)
 			}
 			result, err := Resolve(req)
+			// An absent-root case alias must refuse for ambiguous identity, even
+			// where a later lexical containment check would also refuse it.
+			if mode == "absent-root-case" && (err == nil || !strings.Contains(err.Error(), "ambiguous case identity")) {
+				t.Fatalf("absent-root case refusal: %v", err)
+			}
 			if err == nil || !strings.HasPrefix(err.Error(), envregistry.DiagCredentialConflict+":") || !strings.Contains(err.Error(), "run repair with the intended external native home") {
 				t.Fatalf("named native refusal: %v", err)
 			}
 			if strings.HasPrefix(mode, "all-managed") && err.Error() != "environment_credential_conflict: native home "+filepath.Join(os.Getenv("HOME"), ".codex")+" is inside managed environments; run repair with the intended external native home" {
 				t.Fatalf("refusal lacks default path: %v", err)
-			}
-			if mode == "absent-root-case" && !strings.Contains(err.Error(), "ambiguous case identity") {
-				t.Fatalf("absent-root case refusal: %v", err)
 			}
 			if result != nil && (len(result.Document) != 0 || strings.Contains(strings.Join(result.Warnings, "\n"), nativeHomeFallbackNotice)) {
 				t.Fatalf("refusal emitted fragment or fallback-success notice: %+v", result)

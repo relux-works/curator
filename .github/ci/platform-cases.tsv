@@ -1130,3 +1130,28 @@ cmd/curator	TestUmbrellaProviderSignalCleanup	linux,darwin	-	-	exited children r
 cmd/curator	TestUmbrellaProviderTerminal	linux,darwin	-	-	real controlling PTY Ctrl-C and PID-only INT arrive once; stop/continue and foreground restoration work
 internal/godriver	TestWorkerCleanupContextClassification	linux,darwin,windows	-	-	cleanup preserves protocol, deadline and genuine caller cancellation causes
 internal/godriver	TestBuildCauseOrderAfterTeardown	linux,darwin,windows	-	-	public Build keeps budget-before-cancel as timeout and cancel-before-budget as canceled after real-worker teardown
+
+# Native-home regression parents run on every platform. Each conditional child
+# must be observed passing or skipping for the measured filesystem capability.
+internal/envprofile	TestNativeHomeManagedCallerNarrowingMutant	linux,darwin,windows	-	-	managed caller fallback gate has a killed narrowing mutant
+internal/envprofile	TestNativeHomeReviewRepair	linux,darwin,windows	-	-	real repair preserves native selection and refusal boundaries
+internal/envprofile	TestNativeHomeReviewUnreportedFallbackRefuses	linux,darwin,windows	-	-	unreported fallback and purge selection refusals stay visible
+internal/envprofile	TestNativeHomeReviewGlobalNotice	linux,darwin,windows	-	-	global repair retains its native fallback notice
+internal/envprofile	TestNativeHomeReviewNarrowingMutants	linux,darwin,windows	-	-	reviewed native boundaries each kill their narrowing mutant
+internal/envprofile	TestRev2OpenCodeXDGContainsMachineHome	linux,darwin,windows	-	-	external XDG parent containing manager home remains usable
+internal/envprofile	TestRev2OpenCodeXDGVerifyAfterSeedMoves	linux,darwin,windows	-	-	verification refuses an XDG target moved into managed state
+internal/envprofile	TestRev2ImportManagedCallerVisible	linux,darwin,windows	-	-	Import selection failure stays visible before profile publication
+internal/envprofile	TestManagedCallerHomeIsNeverNative	linux,darwin,windows	-	-	managed caller credentials never become native origins
+internal/envprofile	TestManagedCallerDefaultOriginPreserved	linux,darwin,windows	-	-	managed caller preserves the default credential origin
+internal/envprofile	TestManagedCallerChangedCredentialLinkRefuses	linux,darwin,windows	-	-	changed default credential link refuses publication
+internal/envprofile	TestNativeHomeSelectionBoundaries	linux,darwin,windows	-	-	native selection boundaries preserve valid external homes
+internal/envprofile	TestNativeHomeUnsafeSelectionRefuses	linux,darwin,windows	-	-	unsafe native selections refuse without publication
+internal/envprofile	TestManagedCallerCustomOriginConflictRefuses	linux,darwin,windows	-	-	custom origin conflicts refuse without replacing credentials
+internal/envprofile	TestNativeHomePhysicalContainment	linux,darwin,windows	-	-	physical containment measures filesystem case identity
+internal/envprofile	TestNativeHomePhysicalContainment/selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
+internal/envprofile	TestNativeHomePhysicalContainment/selector-missing-child	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
+internal/envprofile	TestNativeHomePhysicalContainment/manager	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
+internal/envprofile	TestNativeHomePhysicalContainment/manager-missing-child	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
+internal/envprofile	TestNativeHomePhysicalContainment/default-without-selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
+internal/envprofile	TestNativeHomePhysicalContainment/default-after-managed-selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
+internal/envprofile	TestNativeHomePhysicalContainment/case-distinct-outside	linux,darwin,windows	linux,darwin,windows	host-capability	distinct case spellings remain external when Stat and SameFile prove distinct directories

@@ -557,6 +557,76 @@ for goos in linux darwin windows; do
 done
 
 echo ''
+echo '=== native-home ledger: measured filesystem capabilities on every runner ==='
+# These controls require the new regression parents and each conditional child
+# to be observed. Synthetic streams prove gate policy, not native host behavior.
+native_parents='TestNativeHomeManagedCallerNarrowingMutant TestNativeHomeReviewRepair TestNativeHomeReviewUnreportedFallbackRefuses TestNativeHomeReviewGlobalNotice TestNativeHomeReviewNarrowingMutants TestRev2OpenCodeXDGContainsMachineHome TestRev2OpenCodeXDGVerifyAfterSeedMoves TestRev2ImportManagedCallerVisible TestManagedCallerHomeIsNeverNative TestManagedCallerDefaultOriginPreserved TestManagedCallerChangedCredentialLinkRefuses TestNativeHomeSelectionBoundaries TestNativeHomeUnsafeSelectionRefuses TestManagedCallerCustomOriginConflictRefuses TestNativeHomePhysicalContainment'
+native_alias_cases='selector selector-missing-child manager manager-missing-child default-without-selector default-after-managed-selector'
+native_row() {
+	awk -F'\t' -v name="$1" -v skips="$2" -v class="$3" '
+		$1 == "internal/envprofile" && $2 == name && $3 == "linux,darwin,windows" && $4 == skips && $5 == class { n++ }
+		END { exit n != 1 }
+	' "$SHIPPED"
+}
+for native_parent in $native_parents; do
+	assert "native-home parent $native_parent must run everywhere" 0 native_row "$native_parent" - -
+done
+for native_child in $native_alias_cases case-distinct-outside; do
+	assert "native-home child $native_child is required with a measured capability exception" 0 \
+		native_row "TestNativeHomePhysicalContainment/$native_child" linux,darwin,windows host-capability
+done
+native_gate() {
+	native_excluded=''; [ "$2" = linux ] && native_excluded='internal/godriver'
+	CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$1" CI_GATE_MODULE="$MODULE_PATH" \
+		CI_EXCLUDED_PKGS="$native_excluded" CI_GATE_GOOS="$2" \
+		bash "$GATE" "$3" "$WORK/native-ev"
+}
+for native_goos in linux darwin windows; do
+	for native_shape in alias manager distinct; do
+		case "$native_shape" in
+		alias) native_children="$native_alias_cases"; native_reason='fixture does not expose this same-directory case alias' ;;
+		manager) native_children='manager manager-missing-child'; native_reason='fixture does not expose a same-directory manager case alias' ;;
+		distinct) native_children='case-distinct-outside'; native_reason='fixture aliases these names instead of keeping distinct directories' ;;
+		esac
+		cp "$WORK/shipped-$native_goos.json" "$WORK/native.json"
+		for native_child in $native_children; do
+			native_case="TestNativeHomePhysicalContainment/$native_child"
+			awk -v name="\"Test\":\"$native_case\"" 'index($0, name) == 0' "$WORK/native.json" >"$WORK/native-next.json"
+			mv "$WORK/native-next.json" "$WORK/native.json"
+			evout internal/envprofile "$native_case" "$native_reason" >>"$WORK/native.json"
+			ev skip internal/envprofile "$native_case" >>"$WORK/native.json"
+		done
+		assert "native-home $native_shape capability skip passes on $native_goos" 0 native_gate "$CLASSES" "$native_goos" "$WORK/native.json"
+		assert_contains "native-home $native_shape skip is recorded on $native_goos" 'host-capability' "$WORK/native-ev/skips-observed.tsv"
+		# Narrowing mutants remove one exact class at a time. A real exit 1 and
+		# UNCLASSIFIED record prove that each new classification is necessary.
+		awk -F'\t' -v reason="^$native_reason\$" '$2 != reason' "$CLASSES" >"$WORK/native-narrow.tsv"
+		assert "native-home $native_shape class deletion is rejected on $native_goos" 1 native_gate "$WORK/native-narrow.tsv" "$native_goos" "$WORK/native.json"
+		assert_contains "native-home $native_shape deletion is unclassified on $native_goos" 'UNCLASSIFIED' "$WORK/native-ev/skips-observed.tsv"
+		sed "s/$native_reason/$native_reason unexpectedly/" "$WORK/native.json" >"$WORK/native-extended.json"
+		assert "native-home $native_shape extended reason is rejected on $native_goos" 1 native_gate "$CLASSES" "$native_goos" "$WORK/native-extended.json"
+		assert_contains "native-home $native_shape extended reason is unclassified on $native_goos" 'UNCLASSIFIED' "$WORK/native-ev/skips-observed.tsv"
+		sed "s/$native_reason/helper process/" "$WORK/native.json" >"$WORK/native-wrong.json"
+		assert "native-home $native_shape wrong class is rejected on $native_goos" 1 native_gate "$CLASSES" "$native_goos" "$WORK/native-wrong.json"
+		assert_contains "native-home $native_shape wrong class reaches the ledger refusal on $native_goos" 'skipped for the wrong reason' "$WORK/out.txt"
+	done
+	for native_required in $native_parents; do
+		awk -v name="\"Test\":\"$native_required" 'index($0, name "\"") == 0 && index($0, name "/") == 0' "$WORK/shipped-$native_goos.json" >"$WORK/native-missing.json"
+		assert "native-home missing $native_required is rejected on $native_goos" 1 native_gate "$CLASSES" "$native_goos" "$WORK/native-missing.json"
+		assert_contains "native-home missing $native_required reaches the omission refusal on $native_goos" 'required case never ran' "$WORK/out.txt"
+	done
+	for native_child in $native_alias_cases case-distinct-outside; do
+		awk -v name="\"Test\":\"TestNativeHomePhysicalContainment/$native_child\"" 'index($0, name) == 0' "$WORK/shipped-$native_goos.json" >"$WORK/native-missing.json"
+		assert "native-home missing conditional $native_child is rejected on $native_goos" 1 native_gate "$CLASSES" "$native_goos" "$WORK/native-missing.json"
+	done
+	# The exception cannot turn a required regression parent into a skip.
+	awk '!index($0, "\"Test\":\"TestNativeHomeReviewRepair\"")' "$WORK/shipped-$native_goos.json" >"$WORK/native-parent-skip.json"
+	evout internal/envprofile TestNativeHomeReviewRepair 'fixture aliases these names instead of keeping distinct directories' >>"$WORK/native-parent-skip.json"
+	ev skip internal/envprofile TestNativeHomeReviewRepair >>"$WORK/native-parent-skip.json"
+	assert "native-home parent capability skip is rejected on $native_goos" 1 native_gate "$CLASSES" "$native_goos" "$WORK/native-parent-skip.json"
+done
+
+echo ''
 echo '=== authority boundary ledger: the POSIX mode witness stays platform-specific ==='
 # The exact Windows reason is allowed; Unix still has to execute the mode-bit
 # witness. Removing its classification must fail as unclassified, not disappear.
