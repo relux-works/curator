@@ -30,8 +30,9 @@ func TestWindowsSkillIdentityRetainedBeforeReplacement(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Keep the replacement receipt unresolved in the lazy-info mutant.
-		// The intact comparison owns a separate observation.
-		neighbor, err := captureEntryInfo(path, entry)
+		// DirEntry.Info caches its receipt on Windows, so use Lstat for
+		// the independent intact comparison.
+		neighbor, err := os.Lstat(path)
 		if err != nil {
 			t.Fatal(err)
 		}
