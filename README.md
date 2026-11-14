@@ -269,7 +269,7 @@ prints `unknown` and a verification hint; `env status --check` fails on failed o
 unavailable verification. A verifier exit alone is not a bad-signature verdict:
 process and input-transport failures remain `unavailable`, with bounded, escaped
 verifier output in the hint. Local signature checks use inherited pipes or
-restricted Windows named pipes and an existing public keyring where supported;
+private temporary regular files on Windows and an existing public keyring where supported;
 they do not initialize a GPG home. Windows OpenPGP paths follow the detected
 native, MSYS, or Cygwin executable convention; an unknown convention is unavailable.
 
@@ -442,16 +442,21 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 ### Tools
 
 Local SSH signer inspection uses OpenSSH `ssh-keygen -Y verify` with inherited
-signer/signature pipes. OpenPGP inspection uses `gpgv` and an already existing
-public keyring; it never initializes `GNUPGHOME`. Windows named pipes reserve
-separate instances for runtime metadata probes and input reads, validate the
-client process, and drain bytes before disconnecting. Test keyring directories
-use the private-directory API, including protected Windows DACLs. Directory
-read-purity witnesses use handle metadata and retain mtime and identity checks.
-Run `curator env status --json`
-to inspect `verification`, or `curator env status --check` to reject failed or
-unavailable evidence. Focused checks are
-`go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|GPGSignaturePipe|ReadPurityDirectoryHandleWitness|ReadOnlyGPGKeyringPrivateBoundary|SignaturePipeResultControls|SignaturePipeMetadataProbeAndDrain)'`;
+signer/signature pipes on Unix. Windows uses ordinary temporary input files in
+an atomically created owner-only directory, including protected DACLs. Inputs
+are removed after every verifier result or launch failure; only the selected
+temp parent's timestamp may change. Managed homes and public keyrings retain
+strict content, identity and timestamp witnesses. OpenPGP inspection uses `gpgv`
+and an existing private public-keyring directory; it never initializes
+`GNUPGHOME`. Windows executable import descriptors, names, ordinal entries and
+IAT bounds are validated before selecting native, MSYS or Cygwin paths.
+Malformed or ordinal-only inventories remain unavailable. Test keyrings use the
+private-directory API. Directory read-purity witnesses use current handle
+metadata and retain mtime and identity checks.
+Run `curator env status --json` to inspect `verification`, or
+`curator env status --check` to reject failed or unavailable evidence.
+Focused checks are
+`go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|ReadPuritySSHNamespaceVerdict|GPGSignaturePipe|ReadPurityDirectoryHandleWitness|ReadOnlyGPGKeyringPrivateBoundary|SignatureFilesRealSSH|SignatureFileTransport|SignaturePEImportValidation|SignatureScratchWitness)'`;
 keep captured test output under `.temp/`.
 
 For managed Claude gateway settings, configure

@@ -20,11 +20,11 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 		t.Fatal(err)
 	}
 	pipeFile, pipeBefore, pipeAfter := "signature_pipes.go", "if writeErr != nil {", "if runErr == nil && writeErr != nil {"
+
 	if runtime.GOOS == "windows" {
-		pipeFile = "signature_pipe_results.go"
-		pipeBefore = "if fatal != nil {"
-		pipeAfter = "if fatal != nil && runErr == nil {"
+		pipeFile, pipeBefore, pipeAfter = "signature_files.go", `return nil, fmt.Errorf("%w: private signature staging: %v", errSignerVerificationUnavailable, err)`, `return nil, fmt.Errorf("private signature staging: %v", err)`
 	}
+
 	plants := []struct{ name, file, before, after, run, fails, message, control string }{
 		{"exit-is-negative", "signature_readonly.go",
 			"func signatureVerifierResult(kind string, output []byte, runErr error) error {\n\tif runErr == nil {", "func signatureVerifierResult(kind string, output []byte, runErr error) error {\n\tif runErr == nil || func() bool { var exit *exec.ExitError; return errors.As(runErr, &exit) }() {",
@@ -42,14 +42,37 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions", "unknown runtime admitted", "TestSignatureWindowsPathConventions/native"},
 		{"pe-import-error", "signature_paths.go", "if readErr != nil || closeErr != nil {", "if (readErr != nil && false) || closeErr != nil {",
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions/pe-malformed-imports", "malformed PE imports did not produce named refusal", "TestSignatureWindowsPathConventions/pe-native"},
-		{"pe-runtime-detection", "signature_paths.go", "file.ImportedSymbols()", "func() ([]string, error) { return nil, nil }()",
+		{"pe-runtime-detection", "signature_paths.go", "return signatureRuntimeFlavour(libraries), nil", "_ = libraries; return signatureRuntimeFlavour(nil), nil",
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions/pe-native", "PE runtime=", "TestSignatureWindowsPathConventions/native"},
 		{"msys-native-path", "signature_paths.go",
 			"return prefix + strings.ToLower(path[:1]) + path[2:], nil", "return path, nil",
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions/msys", "path=", "TestSignatureWindowsPathConventions/native"},
-		{"metadata-is-delivery", "signature_pipe_results.go",
-			"delivered[result.input] = delivered[result.input] || result.delivered", "delivered[result.input] = delivered[result.input] || result.delivered || result.connected",
-			"^TestSignaturePipeResultControls$", "TestSignaturePipeResultControls/metadata-only", "undelivered input became a verdict", "TestSignaturePipeResultControls/consumed"},
+		{"ssh-namespace-negative", "signature_readonly.go", `strings.HasPrefix(line, "Couldn't verify signature: namespace ")`, `false`,
+			"^TestReadPuritySSHNamespaceVerdict$", "TestReadPuritySSHNamespaceVerdict/not-git", "namespace rejection became unavailable/current", "TestReadPuritySSHNamespaceVerdict/git"},
+		{"ssh-negative-status", "signature_readonly.go", `code == 255 || int64(code) == int64(0xffffffff)`, `true`,
+			"^TestSignatureVerifierProcessFailures$", "TestSignatureVerifierProcessFailures/ssh-unexpected-status", "unexpected SSH exit became a verdict", ""},
+		{"pe-symbol-name-bounds", "signature_pe.go", `if _, err := signaturePEName(file, value+2); err != nil`, `if _, err := signaturePEName(file, value+2); err != nil && false`,
+			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/symbol-unterminated", "unsafe PE symbol-unterminated admitted", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll"},
+		{"pe-iat-bounds", "signature_pe.go", `signaturePERead(file, first+index*width, width)`, `signaturePERead(file, lookup+index*width, width)`,
+			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/iat-rva", "unsafe PE iat-rva admitted", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll"},
+		{"pe-ordinal-only", "signature_pe.go", `if !sawNamed {`, `if !sawNamed && false {`,
+			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/ordinal-only", "unsafe PE ordinal-only admitted", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll"},
+		{"pe-ordinal-runtime", "signature_pe.go", `libraries = append(libraries, library)`, `if named { libraries = append(libraries, library) }`,
+			"^TestSignaturePEImportValidation$", "TestSignaturePEImportValidation/mixed-ordinal-msys-2.0.dll", "ordinal runtime lost", ""},
+		{"regular-input-compatibility", "signature_files.go", `args[i] = converted`, `args[i] = ` + "`" + `\\.\pipe\curator-unsupported-signature` + "`" + `; _ = converted`,
+			"^TestSignatureFileTransport$", "TestSignatureFileTransport/private-roundtrip", "private regular file roundtrip failed", "TestSignatureFileTransport/no-input"},
+		{"private-input-creation", "signature_files.go", `privatedir.Create(path, 0600)`, `os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0644)`,
+			"^TestSignatureFileTransport$", "TestSignatureFileTransport/private-roundtrip", "private regular file roundtrip failed", "TestSignatureFileTransport/no-input"},
+		{"private-directory-creation", "signature_files.go", `privatedir.Make(path)`, `os.Mkdir(path, 0755)`,
+			"^TestSignatureFileTransport$", "TestSignatureFileTransport/private-roundtrip", "private regular file roundtrip failed", "TestSignatureFileTransport/no-input"},
+
+		{"private-input-cleanup", "signature_files.go", `os.RemoveAll(root)`, `func(string) error { return nil }(root)`,
+			"^TestSignatureFileTransport$", "TestSignatureFileTransport/private-roundtrip", "signature staging leaked", "TestSignatureFileTransport/no-input"},
+		{"staging-entry-witness", "read_purity_witness_test.go", `len(after) != 1`, `false`,
+			"^TestSignatureScratchWitness$", "TestSignatureScratchWitness/entry", "staging entry plant escaped", "TestSignatureScratchWitness/transient"},
+		{"staging-identity-witness", "read_purity_witness_test.go", `!os.SameFile(old.info, now.info) || old.info.Mode() != now.info.Mode()`, `old.info.Mode() != now.info.Mode()`,
+			"^TestSignatureScratchWitness$", "TestSignatureScratchWitness/identity", "staging identity plant escaped", "TestSignatureScratchWitness/transient"},
+
 		{"keyring-boundary-ignored", "signature_readonly.go",
 			"if err := privatedir.Validate(home); err != nil {", "if err := privatedir.Validate(home); err != nil && false {",
 			"^TestReadOnlyGPGKeyringPrivateBoundary$", "TestReadOnlyGPGKeyringPrivateBoundary", "unsafe keyring boundary admitted", ""},
@@ -63,12 +86,7 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 			"!os.SameFile(old.info, now.info)", "false",
 			"^TestReadPurityDirectoryHandleWitness$", "TestReadPurityDirectoryHandleWitness", "identity plant escaped directory witness", "TestReadPurityDirectoryHandleWitness/manager/state/locks/v1/none"},
 	}
-	if runtime.GOOS == "windows" {
-		plants = append(plants, struct{ name, file, before, after, run, fails, message, control string }{
-			"single-pipe-instance", "signature_pipes_windows.go", "const signaturePipeInstances = 2", "const signaturePipeInstances = 1",
-			"^(TestSignaturePipeMetadataProbeAndDrain|TestSignaturePipeTransportReadOnlyAndCancels)$", "TestSignaturePipeMetadataProbeAndDrain", "metadata probe stole signature input or drain lost bytes", "TestSignaturePipeTransportReadOnlyAndCancels",
-		})
-	}
+
 	for _, plant := range plants {
 		t.Run(plant.name, func(t *testing.T) {
 			original := filepath.Join(root, "internal", "envprofile", plant.file)
