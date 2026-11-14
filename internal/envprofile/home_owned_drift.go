@@ -126,6 +126,9 @@ func recordedSkillSurfaceDrift(req *ResolveRequest, v *verification, surface env
 				return true
 			}
 			identity = "sha256:" + digest
+			if err := verifySkillProjection(req.Home, skillOf{root: target, hash: identity, version: version}); err != nil {
+				return true
+			}
 		} else if info.IsDir() {
 			var err error
 			identity, err = hashing.ContentSHA256WithVersion(full, nil, version)
