@@ -78,18 +78,6 @@ func TestProfileReadPurityBuiltinLeafAliasesCLI(t *testing.T) {
 		})
 		return out, err
 	}
-	assertSame := func(t *testing.T, before, after map[string]treeEntry) {
-		t.Helper()
-		if len(before) != len(after) {
-			t.Fatalf("manager tree entry count changed: %d -> %d", len(before), len(after))
-		}
-		for path, old := range before {
-			current, ok := after[path]
-			if !ok || !os.SameFile(old.info, current.info) || old.info.Mode() != current.info.Mode() || old.info.Size() != current.info.Size() || !old.info.ModTime().Equal(current.info.ModTime()) || old.content != current.content || old.link != current.link {
-				t.Fatalf("manager tree changed at %q", path)
-			}
-		}
-	}
 	for _, tc := range []struct {
 		name       string
 		removeName string
@@ -138,12 +126,22 @@ func TestProfileReadPurityBuiltinLeafAliasesCLI(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertSame(t, before, after)
+			unchanged := len(before) == len(after)
+			for path, old := range before {
+				current, ok := after[path]
+				if !ok || !os.SameFile(old.info, current.info) || old.info.Mode() != current.info.Mode() || old.info.Size() != current.info.Size() || !old.info.ModTime().Equal(current.info.ModTime()) || old.content != current.content || old.link != current.link {
+					unchanged = false
+					break
+				}
+			}
+			if !unchanged {
+				t.Errorf("manager tree changed after builtin removal (entries %d -> %d)", len(before), len(after))
+			}
 			if code != exitFail || !strings.Contains(stderr, "builtin_profile_remove_forbidden") {
-				t.Fatalf("remove code=%d stderr=%q; want exact builtin_profile_remove_forbidden refusal", code, stderr)
+				t.Errorf("remove code=%d stderr=%q; want exact builtin_profile_remove_forbidden refusal", code, stderr)
 			}
 			if _, err := os.Stat(builtin); err != nil {
-				t.Fatalf("builtin target was not preserved: %v", err)
+				t.Errorf("builtin target was not preserved: %v", err)
 			}
 		})
 	}
