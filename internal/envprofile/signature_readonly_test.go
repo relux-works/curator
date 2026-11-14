@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/gitops"
 )
 
 // Real SSH commit/tag signatures verify through the local transport, tampered signed bytes
@@ -140,10 +142,12 @@ func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, Detect: func(envregistry.Adapter) string { return "unknown" }}
-	good := sourceSignerPosture(req, []Info{info})
-	if len(good) != 1 || good[0].Verification != "verified" || !good[0].Current {
-		t.Fatalf("valid signer verdict = %+v", good)
-	}
+	t.Run("present", func(t *testing.T) {
+		good := sourceSignerPosture(req, []Info{info})
+		if len(good) != 1 || good[0].Verification != "verified" || !good[0].Current {
+			t.Fatalf("valid signer verdict = %+v", good)
+		}
+	})
 	// A policy naming another key retains the established enforced-failure verdict.
 	_, wrongPublic := statusSignerKey(t)
 	req.Policy.SourceSigners = map[string][]contextresolve.Signer{"example.com/signed": {{Type: "ssh", Key: wrongPublic}}}
@@ -152,23 +156,32 @@ func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
 		t.Fatalf("failed signer verdict = %+v", failed)
 	}
 	req.Policy = policy
-	git, err := exec.LookPath("git")
+	member := info.Lock.Members[0]
+	cache := newReadOnlyGitManager(home).repoDir(member.Source)
+	readObject := func() ([]byte, error) {
+		cmd := exec.Command("git", "-C", cache, "cat-file", "-p", member.Commit)
+		cmd.Env = gitops.ReadOnlyEnv()
+		return cmd.CombinedOutput()
+	}
+	signed, err := readObject()
+	if err != nil || !hasGitSignature("commit", signed) {
+		t.Fatalf("signed object control: %v\n%s", err, signed)
+	}
+	// Forward to the original Git installation, retaining its executable/DLL
+	// layout on Windows. Only the copied forwarder is visible on PATH.
+	installMissingPinGit(t, "forward", "")
+	forwarder, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatal(err)
 	}
-	onlyGit := t.TempDir()
-	if runtime.GOOS == "windows" {
-		data, err := os.ReadFile(git)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(onlyGit, "git.exe"), data, 0o700); err != nil {
-			t.Fatal(err)
-		}
-	} else if err := os.Symlink(git, filepath.Join(onlyGit, "git")); err != nil {
-		t.Fatal(err)
+	t.Setenv("PATH", filepath.Dir(forwarder))
+	if path, err := exec.LookPath("ssh-keygen"); err == nil || !errors.Is(err, exec.ErrNotFound) {
+		t.Fatalf("missing-verifier fixture exposes ssh-keygen: %q, %v", path, err)
 	}
-	t.Setenv("PATH", onlyGit)
+	if got, err := readObject(); err != nil || !bytes.Equal(got, signed) {
+		t.Fatalf("missing-verifier fixture cannot read exact signed object: %v\n%s", err, got)
+	}
+	t.Logf("%s real Git forwarder reads exact signed object with ssh-keygen absent PASS", runtime.GOOS)
 	before := readWitnesses(t, home)
 	missing := sourceSignerPosture(req, []Info{info})
 	if len(missing) != 1 || missing[0].Verification != "unavailable" || !missing[0].Current || missing[0].Diagnostic != "signer_verification_unavailable" || !strings.Contains(missing[0].Hint, "curator profile update signed") {
@@ -178,6 +191,7 @@ func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
 		t.Fatalf("unavailable signer hint was not bounded and escaped: %q", missing[0].Hint)
 	}
 	assertReadWitnesses(t, home, before)
+	t.Logf("%s missing SSH verifier verdict unavailable/current PASS", runtime.GOOS)
 	// The production matrix must not count the same unavailable evidence as green.
 	status, err := StatusOf(req)
 	if err != nil {
@@ -195,7 +209,7 @@ func TestReadPuritySSHNamespaceVerdict(t *testing.T) {
 	pinHomes(t)
 	private, public := statusSignerKey(t)
 	repo := statusSignerRepo(t, private)
-	if out, err := exec.Command("git", "-C", repo, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "unsigned namespace fixture").CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", "-C", repo, "-c", "user.name=Curator Test", "-c", "user.email=curator@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "unsigned namespace fixture").CombinedOutput(); err != nil {
 		t.Fatalf("unsigned fixture: %v %s", err, out)
 	}
 	commit, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
@@ -259,4 +273,11 @@ func TestReadPuritySSHNamespaceVerdict(t *testing.T) {
 			t.Logf("%s real SSH namespace %s verdict %s PASS", runtime.GOOS, namespace, want)
 		})
 	}
+}
+
+// Empty global/system configuration and a discovery ceiling supply no Git
+// identity. The namespace fixture still reaches both real signer verdicts;
+// the shared negative control first proves implicit identity is refused.
+func TestReadPuritySSHNamespaceWithoutAmbientIdentity(t *testing.T) {
+	runFixturesWithoutAmbientIdentity(t, []string{"TestReadPuritySSHNamespaceVerdict"})
 }

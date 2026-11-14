@@ -332,14 +332,25 @@ func TestReadPurityVendorObservation(t *testing.T) {
 		name += ".exe"
 	}
 	probe := filepath.Join(t.TempDir(), name)
-	if err := os.Link(executable, probe); err != nil {
-		raw, err := os.ReadFile(executable)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(probe, raw, 0700); err != nil {
-			t.Fatal(err)
-		}
+	// A separate file can be removed on Windows while the parent test image
+	// is running; a hard link retains that image's sharing restrictions.
+	raw, err := os.ReadFile(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(probe, raw, 0700); err != nil {
+		t.Fatal(err)
+	}
+	originalInfo, err := os.Stat(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	probeInfo, err := os.Stat(probe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.SameFile(originalInfo, probeInfo) {
+		t.Fatal("vendor tripwire must be an independent executable copy")
 	}
 	marker := filepath.Join(t.TempDir(), "vendor-ran")
 	t.Setenv("CURATOR_TEST_MCP_QUALIFICATION_TRIPWIRE", marker)
@@ -381,6 +392,13 @@ func TestReadPurityVendorObservation(t *testing.T) {
 	if err != nil || string(data) != "called" {
 		t.Fatalf("explicit probe positive did not execute: %v", err)
 	}
+	if err := os.Remove(probe); err != nil {
+		t.Fatalf("vendor tripwire cleanup: %v", err)
+	}
+	if _, err := os.Stat(probe); !os.IsNotExist(err) {
+		t.Fatalf("vendor tripwire survived cleanup: %v", err)
+	}
+	t.Logf("%s independent vendor tripwire ran only explicitly and was removed PASS", runtime.GOOS)
 }
 
 // Fragment construction consumes the credential policy frozen by verification;

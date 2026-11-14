@@ -26,6 +26,15 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 	}
 
 	plants := []struct{ name, file, before, after, run, fails, message, control string }{
+		{"namespace-fixture-identity", "signature_readonly_test.go",
+			`repo, "-c", "user.name=Curator Test", "-c", "user.email=curator@example.test", "-c", "commit.gpgsign=false"`, `repo, "-c", "commit.gpgsign=false"`,
+			"^(TestReadPuritySSHNamespaceWithoutAmbientIdentity|TestReadPuritySSHSignatures)$", "TestReadPuritySSHNamespaceWithoutAmbientIdentity", "Author identity unknown", "TestReadPuritySSHSignatures"},
+		{"missing-verifier-object-reader", "signature_readonly_test.go",
+			`installMissingPinGit(t, "forward", "")`, `installMissingPinGit(t, "probe-failure", "")`,
+			"^TestReadPuritySignerVerdictsKeepPin$", "TestReadPuritySignerVerdictsKeepPin", "missing-verifier fixture cannot read exact signed object", "TestReadPuritySignerVerdictsKeepPin/present"},
+		{"vendor-tripwire-copy", "read_purity_test.go",
+			`os.WriteFile(probe, raw, 0700)`, `func() error { _ = raw; return os.Link(executable, probe) }()`,
+			"^(TestReadPurityVendorObservation|TestReadPurityWitnessControl)$", "TestReadPurityVendorObservation", "vendor tripwire must be an independent executable copy", "TestReadPurityWitnessControl"},
 		{"exit-is-negative", "signature_readonly.go",
 			"func signatureVerifierResult(kind string, output []byte, runErr error) error {\n\tif runErr == nil {", "func signatureVerifierResult(kind string, output []byte, runErr error) error {\n\tif runErr == nil || func() bool { var exit *exec.ExitError; return errors.As(runErr, &exit) }() {",
 			"^TestSignatureVerifierProcessFailures$", "TestSignatureVerifierProcessFailures/SSH", "process failure was not safely unavailable", "TestSignatureVerifierProcessFailures/ssh-policy"},
