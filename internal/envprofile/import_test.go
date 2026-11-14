@@ -530,7 +530,10 @@ func TestImportSkipsManagedRootContext(t *testing.T) {
 	// The managed homes carry markers, so the import must detect no roots.
 	// Drive detectNative directly for the precise assertion, then Import
 	// for the production path.
-	roots, _, losses := detectNative(home, options)
+	roots, _, losses, detectErr := detectNative(home, options)
+	if detectErr != nil {
+		t.Fatal(detectErr)
+	}
 	if len(roots) != 0 {
 		t.Fatalf("managed roots detected: %+v", roots)
 	}
@@ -685,7 +688,10 @@ func TestImportAbsentMarkerDetectsNative(t *testing.T) {
 	seams := pinImportSeams(t)
 	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
 	seedCurrentDefault(t, home)
-	roots, _, losses := detectNative(home, seams.options(Policy{}))
+	roots, _, losses, detectErr := detectNative(home, seams.options(Policy{}))
+	if detectErr != nil {
+		t.Fatal(detectErr)
+	}
 	if len(losses) != 0 {
 		t.Fatalf("absent marker reported losses: %+v", losses)
 	}
@@ -724,7 +730,10 @@ func TestImportCorruptMarkerIsLoss(t *testing.T) {
 		},
 	}
 	seedCurrentDefault(t, home)
-	roots, _, losses := detectNative(home, options)
+	roots, _, losses, detectErr := detectNative(home, options)
+	if detectErr != nil {
+		t.Fatal(detectErr)
+	}
 	if len(roots) != 0 {
 		t.Fatalf("corrupt-marker roots detected: %+v", roots)
 	}
@@ -794,7 +803,10 @@ func TestImportUnreadableMarkerIsLoss(t *testing.T) {
 		},
 	}
 	seedCurrentDefault(t, home)
-	roots, _, losses := detectNative(home, options)
+	roots, _, losses, detectErr := detectNative(home, options)
+	if detectErr != nil {
+		t.Fatal(detectErr)
+	}
 	if len(roots) != 0 {
 		t.Fatalf("unreadable-marker roots detected: %+v", roots)
 	}

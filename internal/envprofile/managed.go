@@ -242,7 +242,7 @@ func (req *ResolveRequest) externalOperatorXDG() (string, error) {
 	if xdg == "" {
 		return "", nil
 	}
-	managed, err := nativePathIsManaged(xdg, req.Home)
+	managed, err := nativePathInsideManaged(xdg, req.Home)
 	if err != nil {
 		return "", nativeHomeRefusal(xdg, err)
 	}

@@ -70,6 +70,16 @@ func nativeHomeSelection(adapter Adapter, managerHome, value string) (string, bo
 }
 
 func nativePathIsManaged(path, managerHome string) (bool, error) {
+	return nativePathManagedBoundary(path, managerHome, true)
+}
+
+// XDG seed parents are containers, not linked origins. They may contain the
+// manager home; every selected child still passes the full overlap check.
+func nativePathInsideManaged(path, managerHome string) (bool, error) {
+	return nativePathManagedBoundary(path, managerHome, false)
+}
+
+func nativePathManagedBoundary(path, managerHome string, refuseAncestor bool) (bool, error) {
 	candidate, err := nativeComparablePath(path)
 	if err != nil {
 		return false, err
@@ -82,12 +92,14 @@ func nativePathIsManaged(path, managerHome string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	contains, err := nativePathContains(candidate, root, rootState.Kind == stateread.KindPresent)
-	if err != nil {
-		return false, err
-	}
-	if contains {
-		return false, fmt.Errorf("native origin contains managed environments")
+	if refuseAncestor {
+		contains, err := nativePathContains(candidate, root, rootState.Kind == stateread.KindPresent)
+		if err != nil {
+			return false, err
+		}
+		if contains {
+			return false, fmt.Errorf("native origin contains managed environments")
+		}
 	}
 	if rootState.Kind == stateread.KindPresent {
 		// EvalSymlinks preserves component case on some filesystems. Compare
@@ -119,7 +131,7 @@ func nativePathIsManaged(path, managerHome string) (bool, error) {
 	}
 	inside := nativeLexicalPrefix(root, candidate)
 	if !inside {
-		foldedOverlap := nativeLexicalPrefix(strings.ToLower(root), strings.ToLower(candidate)) || nativeLexicalPrefix(strings.ToLower(candidate), strings.ToLower(root))
+		foldedOverlap := nativeLexicalPrefix(strings.ToLower(root), strings.ToLower(candidate)) || (refuseAncestor && nativeLexicalPrefix(strings.ToLower(candidate), strings.ToLower(root)))
 		if foldedOverlap {
 			return false, fmt.Errorf("ambiguous case identity below absent managed root")
 		}

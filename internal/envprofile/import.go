@@ -115,9 +115,6 @@ func Import(home string, options ImportOptions) (Info, bool, bool, error) {
 }
 
 func importLocked(op *operation, home string, options ImportOptions) (Info, bool, bool, error) {
-	if err := ensureDefault(op, home, options.Policy); err != nil {
-		return Info{}, false, false, err
-	}
 	name := options.As
 	if name == "" {
 		name = ImportProfileDefault
@@ -128,7 +125,14 @@ func importLocked(op *operation, home string, options ImportOptions) (Info, bool
 	if _, err := readSource(home, name); err == nil {
 		return Info{}, false, false, fmt.Errorf("%s: profile %q is already installed", DiagImportNameTaken, name)
 	}
-	roots, skills, losses := detectNative(home, options)
+	roots, skills, losses, err := detectNative(home, options)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	// Native selection must succeed before creating any profile or store state.
+	if err := ensureDefault(op, home, options.Policy); err != nil {
+		return Info{}, false, false, err
+	}
 	// A mapping skills entry that cannot be represented in the single
 	// requires.skills map is a loss, not a silent collapse (§9.6: one
 	// entry per mapping entry, and the loss list names every loss). Two
@@ -223,13 +227,16 @@ func importSkillsDir(options ImportOptions, id, native string) (string, error) {
 // (environments §9.6): per registered adapter over its native default
 // home, the root-context file and every unledgered skills entry. A
 // surface that is absent is simply not detected.
-func detectNative(home string, options ImportOptions) ([]detectedRoot, []detectedSkill, []ImportLoss) {
+func detectNative(home string, options ImportOptions) ([]detectedRoot, []detectedSkill, []ImportLoss, error) {
 	var roots []detectedRoot
 	var skills []detectedSkill
 	var losses []ImportLoss
 	for _, adapter := range Adapters {
 		native, err := importNativeHome(options, adapter.ID)
-		if err != nil || native == "" {
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if native == "" {
 			continue
 		}
 		rootPath := filepath.Join(native, adapter.Target)
@@ -259,7 +266,7 @@ func detectNative(home string, options ImportOptions) ([]detectedRoot, []detecte
 		}
 		return losses[i].Path < losses[j].Path
 	})
-	return roots, skills, losses
+	return roots, skills, losses, nil
 }
 
 // deduplicateSkills collapses same-named skills across adapters without
