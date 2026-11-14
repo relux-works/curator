@@ -120,6 +120,7 @@ func gpgFixturePath(t *testing.T, executable, path string) string {
 // Native and both POSIX runtime conventions keep spaces and Unicode intact;
 // unknown runtimes and paths without an absolute drive are named refusals.
 func TestSignatureWindowsPathConventions(t *testing.T) {
+	testSignaturePEFlavours(t)
 	for _, tc := range []struct{ flavour, want string }{
 		{"native", `C:\fixture space\unicode-π\keyring`},
 		{"msys", "/c/fixture space/unicode-π/keyring"},

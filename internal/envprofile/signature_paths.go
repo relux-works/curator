@@ -15,6 +15,14 @@ func signatureVerifierPath(executable, path string) (string, error) {
 	if runtime.GOOS != "windows" {
 		return path, nil
 	}
+	flavour, err := signatureExecutableFlavour(executable)
+	if err != nil {
+		return "", err
+	}
+	return signatureWindowsPath(flavour, path)
+}
+
+func signatureExecutableFlavour(executable string) (string, error) {
 	resolved, err := exec.LookPath(executable)
 	if err != nil {
 		return "", err
@@ -23,12 +31,20 @@ func signatureVerifierPath(executable, path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("gpg-path-flavour-unknown: %w", err)
 	}
-	libraries, readErr := file.ImportedLibraries()
+	// ImportedLibraries is a stub in the supported Go toolchain. ImportedSymbols
+	// reads the PE import table and returns symbol:DLL pairs.
+	symbols, readErr := file.ImportedSymbols()
 	closeErr := file.Close()
 	if readErr != nil || closeErr != nil {
 		return "", fmt.Errorf("gpg-path-flavour-unknown: import table unreadable")
 	}
-	return signatureWindowsPath(signatureRuntimeFlavour(libraries), path)
+	var libraries []string
+	for _, symbol := range symbols {
+		if index := strings.LastIndexByte(symbol, ':'); index >= 0 {
+			libraries = append(libraries, symbol[index+1:])
+		}
+	}
+	return signatureRuntimeFlavour(libraries), nil
 }
 
 func signatureRuntimeFlavour(libraries []string) string {
