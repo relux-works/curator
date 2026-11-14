@@ -3040,8 +3040,17 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return nil, homeInputFailure(failure)
 	}
 	needsIdentityRepair := req.Repair && effectiveLevel >= 3 && repairWouldChangeLockHash(lock)
+	// Trusted source evidence permits native-state inspection at every level.
+	// Permissive mismatching evidence must retain its startup warning/refusal
+	// path without entering the native skill verifier.
+	trustedStartupChecks := true
+	for _, check := range localChecks {
+		if check.Status != startupverification.Passed {
+			trustedStartupChecks = false
+		}
+	}
 	var nativeRepairReason string
-	if req.Repair && effectiveLevel >= 3 {
+	if req.Repair && (effectiveLevel >= 3 || trustedStartupChecks) {
 		row, err := nativeSkillsState(req.Home, profile, adapter.ID, req.nativeHome)
 		if err != nil {
 			return nil, err
@@ -3148,6 +3157,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; "))
 	}
 	if req.DryRun {
+		if nativeRepairReason != "" {
+			return &ResolveResult{Warnings: verdict.warnings, StaleReasons: []string{nativeRepairReason}}, fmt.Errorf("%s: %s", DiagHomeStale, nativeRepairReason)
+		}
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: %s", DiagHomeStale, strings.Join(verdict.reasons, "; "))
 	}
 	if effectiveLevel < 3 && repairWouldChangeLockHash(lock) {
