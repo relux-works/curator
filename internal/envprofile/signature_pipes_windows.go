@@ -19,7 +19,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var errSignatureVerifierExited = errors.New("signature verifier exited before consuming verification input")
+const signaturePipeInstances = 2
 
 type signatureInputPipe struct {
 	handle windows.Handle
@@ -78,28 +78,28 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 		return output.data, fmt.Errorf("could not monitor signature verifier process: %w", err)
 	}
 
-	writeResults := make(chan error, len(inputs))
+	writeResults := make(chan signaturePipeResult, len(pipes))
 	for i, pipe := range pipes {
-		go func(pipe *signatureInputPipe, input []byte) {
-			writeResults <- writeSignatureInputPipe(pipe, processHandle, windowsProcessID, input)
-		}(pipe, inputs[i]) // #nosec G602 -- createSignatureInputPipes(len(inputs)) returns exactly one pipe per input.
+		inputIndex := i / signaturePipeInstances
+		go func(pipe *signatureInputPipe, index int, input []byte) {
+			result := serveSignatureInputPipe(pipe, processHandle, windowsProcessID, input)
+			result.input = index
+			writeResults <- result
+		}(pipe, inputIndex, inputs[inputIndex]) // #nosec G602 -- creation returns signaturePipeInstances handles per input.
 	}
 	runErr := command.Wait()
-	var writeErr error
-	for range inputs {
-		writeErr = errors.Join(writeErr, <-writeResults)
+	results := make([]signaturePipeResult, 0, len(pipes))
+	for range pipes {
+		results = append(results, <-writeResults)
 	}
 	processCloseErr := windows.CloseHandle(processHandle)
 	if output.truncated {
 		return output.data, fmt.Errorf("%w: verifier output exceeded capture limit", errSignerVerificationUnavailable)
 	}
-	if writeErr != nil || processCloseErr != nil {
-		return output.data, fmt.Errorf("%w: verification input pipe: %v (verifier: %v)", errSignerVerificationUnavailable, errors.Join(writeErr, processCloseErr), runErr)
+	if processCloseErr != nil {
+		return output.data, fmt.Errorf("%w: close signature verifier monitor: %v", errSignerVerificationUnavailable, processCloseErr)
 	}
-	if runErr != nil {
-		return output.data, runErr
-	}
-	return output.data, nil
+	return output.data, signaturePipeResults(results, len(inputs), runErr)
 }
 
 func signaturePipeArgs(args []string, inputCount int) ([]string, error) {
@@ -171,7 +171,7 @@ func createSignatureInputPipes(count int) ([]*signatureInputPipe, []string, erro
 		return nil, nil, err
 	}
 	prefix := hex.EncodeToString(random[:])
-	pipes := make([]*signatureInputPipe, 0, count)
+	pipes := make([]*signatureInputPipe, 0, count*signaturePipeInstances)
 	names := make([]string, 0, count)
 	for index := 0; index < count; index++ {
 		name := fmt.Sprintf(`\\.\pipe\curator-readonly-signature-%s-%d`, prefix, index)
@@ -180,23 +180,26 @@ func createSignatureInputPipes(count int) ([]*signatureInputPipe, []string, erro
 			closeSignatureInputPipes(pipes)
 			return nil, nil, err
 		}
-		handle, err := windows.CreateNamedPipe(
-			name16,
-			windows.PIPE_ACCESS_OUTBOUND|windows.FILE_FLAG_OVERLAPPED|windows.FILE_FLAG_FIRST_PIPE_INSTANCE,
-			windows.PIPE_TYPE_BYTE|windows.PIPE_READMODE_BYTE|windows.PIPE_WAIT|windows.PIPE_REJECT_REMOTE_CLIENTS,
-			1,
-			64*1024,
-			0,
-			0,
-			attributes,
-		)
-		runtime.KeepAlive(descriptor)
-		runtime.KeepAlive(attributes)
-		if err != nil {
-			closeSignatureInputPipes(pipes)
-			return nil, nil, err
+		// MSYS/Cygwin open paths once for metadata and again for bytes. Keep a
+		// second instance available while the first connection is being probed.
+		for instance := 0; instance < signaturePipeInstances; instance++ {
+			flags := uint32(windows.PIPE_ACCESS_OUTBOUND | windows.FILE_FLAG_OVERLAPPED)
+			if instance == 0 {
+				flags |= windows.FILE_FLAG_FIRST_PIPE_INSTANCE
+			}
+			handle, err := windows.CreateNamedPipe(
+				name16, flags,
+				windows.PIPE_TYPE_BYTE|windows.PIPE_READMODE_BYTE|windows.PIPE_WAIT|windows.PIPE_REJECT_REMOTE_CLIENTS,
+				signaturePipeInstances, 64*1024, 0, 0, attributes,
+			)
+			runtime.KeepAlive(descriptor)
+			runtime.KeepAlive(attributes)
+			if err != nil {
+				closeSignatureInputPipes(pipes)
+				return nil, nil, err
+			}
+			pipes = append(pipes, &signatureInputPipe{handle: handle})
 		}
-		pipes = append(pipes, &signatureInputPipe{handle: handle})
 		names = append(names, name)
 	}
 	return pipes, names, nil
@@ -217,8 +220,7 @@ func (pipe *signatureInputPipe) close() error {
 	return windows.CloseHandle(handle)
 }
 
-func writeSignatureInputPipe(pipe *signatureInputPipe, process windows.Handle, processID uint32, input []byte) (result error) {
-	defer func() { result = errors.Join(result, pipe.close()) }()
+func connectSignatureInputPipe(pipe *signatureInputPipe, process windows.Handle, processID uint32) error {
 	connectEvent, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
 		return fmt.Errorf("create signature pipe event: %w", err)
@@ -247,6 +249,63 @@ func writeSignatureInputPipe(pipe *signatureInputPipe, process windows.Handle, p
 		return errors.New("unexpected process connected to signature input pipe")
 	}
 
+	return nil
+}
+
+// Flush only a connected, PID-checked client. A metadata-only opener closes
+// without draining; retry that instance. A real reader receives EOF only after
+// its bytes have drained, avoiding the CloseHandle/discard race. Process exit
+// closes the verifier's client handles and releases connected flushes; pending
+// connects/writes use the existing process-monitored cancellation.
+func serveSignatureInputPipe(pipe *signatureInputPipe, process windows.Handle, processID uint32, input []byte) (result signaturePipeResult) {
+	defer func() {
+		if err := pipe.close(); err != nil {
+			result.err = errors.Join(result.err, err)
+			result.fatal = true
+		}
+	}()
+	for {
+		err := connectSignatureInputPipe(pipe, process, processID)
+		if err != nil {
+			if errors.Is(err, windows.ERROR_BROKEN_PIPE) || errors.Is(err, windows.ERROR_NO_DATA) || errors.Is(err, windows.ERROR_PIPE_NOT_CONNECTED) {
+				result.connected = true
+				if disconnectErr := windows.DisconnectNamedPipe(pipe.handle); disconnectErr != nil && !errors.Is(disconnectErr, windows.ERROR_PIPE_NOT_CONNECTED) {
+					result.err = disconnectErr
+					result.fatal = true
+					return result
+				}
+				continue
+			}
+			result.err = err
+			result.fatal = !errors.Is(err, errSignatureVerifierExited)
+			return result
+		}
+		result.connected = true
+		err = writeSignatureInputBytes(pipe, process, input)
+		if err == nil {
+			result.written = true
+			err = windows.FlushFileBuffers(pipe.handle)
+		}
+		if err == nil {
+			result.delivered = true
+			return result
+		}
+		disconnectErr := windows.DisconnectNamedPipe(pipe.handle)
+		if disconnectErr != nil && !errors.Is(disconnectErr, windows.ERROR_PIPE_NOT_CONNECTED) {
+			result.err = disconnectErr
+			result.fatal = true
+			return result
+		}
+		if errors.Is(err, windows.ERROR_BROKEN_PIPE) || errors.Is(err, windows.ERROR_NO_DATA) || errors.Is(err, windows.ERROR_PIPE_NOT_CONNECTED) {
+			continue
+		}
+		result.err = err
+		result.fatal = !errors.Is(err, errSignatureVerifierExited)
+		return result
+	}
+}
+
+func writeSignatureInputBytes(pipe *signatureInputPipe, process windows.Handle, input []byte) error {
 	for len(input) > 0 {
 		chunk := input
 		if len(chunk) > 64*1024 {

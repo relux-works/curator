@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // gpgv verifies against a pre-existing public-only keyring through a signature
@@ -55,10 +57,14 @@ func TestGPGSignaturePipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readonly := t.TempDir()
-	if err := os.Chmod(readonly, 0700); err != nil {
+	readonly := filepath.Join(t.TempDir(), "public-only")
+	if err := privatedir.Make(readonly); err != nil {
 		t.Fatal(err)
 	}
+	if err := privatedir.Validate(readonly); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%s public-only keyring private boundary PASS", runtime.GOOS)
 	ring := filepath.Join(readonly, "pubring.gpg")
 	gpgvHome := gpgFixturePath(t, "gpgv", readonly)
 	gpgvRing := gpgFixturePath(t, "gpgv", ring)

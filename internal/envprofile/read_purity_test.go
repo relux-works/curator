@@ -34,6 +34,10 @@ func readWitnesses(t *testing.T, root string) map[string]readWitness {
 		if err != nil {
 			return err
 		}
+		info, err = readWitnessInfo(path, info)
+		if err != nil {
+			return err
+		}
 		item := readWitness{info: info}
 		if info.Mode().IsRegular() {
 			data, err := os.ReadFile(path)
@@ -60,14 +64,40 @@ func readWitnesses(t *testing.T, root string) map[string]readWitness {
 	return out
 }
 
+// directory-handle-snapshot: enumeration can return stale NTFS directory
+// metadata. Read current metadata and identity from the directory handle;
+// retain every comparison, including mtime, rather than exempting paths.
+func readWitnessInfo(path string, info fs.FileInfo) (fs.FileInfo, error) {
+	if !info.IsDir() {
+		// Freeze Windows' otherwise lazy identity before the observed operation.
+		if !os.SameFile(info, info) {
+			return nil, fmt.Errorf("read witness identity unavailable: %s", path)
+		}
+		return info, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	current, statErr := file.Stat()
+	closeErr := file.Close()
+	if statErr != nil {
+		return nil, statErr
+	}
+	return current, closeErr
+}
+
 func checkReadWitnesses(before, after map[string]readWitness) error {
 	if len(before) != len(after) {
 		return fmt.Errorf("read-only witnesses changed: entries %d -> %d", len(before), len(after))
 	}
 	for path, old := range before {
 		now, ok := after[path]
-		if !ok || !os.SameFile(old.info, now.info) || old.info.Mode() != now.info.Mode() || !old.info.ModTime().Equal(now.info.ModTime()) || old.content != now.content || old.link != now.link {
-			return fmt.Errorf("read-only witnesses changed: %s", path)
+		if !ok {
+			return fmt.Errorf("read-only witnesses changed: missing %s", path)
+		}
+		if !os.SameFile(old.info, now.info) || old.info.Mode() != now.info.Mode() || !old.info.ModTime().Equal(now.info.ModTime()) || old.content != now.content || old.link != now.link {
+			return fmt.Errorf("read-only witnesses changed: %s (same-file=%t, mode=%v->%v, mtime=%v->%v, bytes-changed=%t, link-changed=%t)", path, os.SameFile(old.info, now.info), old.info.Mode(), now.info.Mode(), old.info.ModTime(), now.info.ModTime(), old.content != now.content, old.link != now.link)
 		}
 	}
 	return nil

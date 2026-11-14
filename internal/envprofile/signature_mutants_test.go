@@ -21,11 +21,11 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 	}
 	pipeFile, pipeBefore, pipeAfter := "signature_pipes.go", "if writeErr != nil {", "if runErr == nil && writeErr != nil {"
 	if runtime.GOOS == "windows" {
-		pipeFile = "signature_pipes_windows.go"
-		pipeBefore = "if writeErr != nil || processCloseErr != nil {"
-		pipeAfter = "if runErr == nil && (writeErr != nil || processCloseErr != nil) {"
+		pipeFile = "signature_pipe_results.go"
+		pipeBefore = "if fatal != nil {"
+		pipeAfter = "if fatal != nil && runErr == nil {"
 	}
-	for _, plant := range []struct{ name, file, before, after, run, fails, message, control string }{
+	plants := []struct{ name, file, before, after, run, fails, message, control string }{
 		{"exit-is-negative", "signature_readonly.go",
 			"func signatureVerifierResult(kind string, output []byte, runErr error) error {\n\tif runErr == nil {", "func signatureVerifierResult(kind string, output []byte, runErr error) error {\n\tif runErr == nil || func() bool { var exit *exec.ExitError; return errors.As(runErr, &exit) }() {",
 			"^TestSignatureVerifierProcessFailures$", "TestSignatureVerifierProcessFailures/SSH", "process failure was not safely unavailable", "TestSignatureVerifierProcessFailures/ssh-policy"},
@@ -47,7 +47,29 @@ func TestSignatureVerifierNarrowingMutants(t *testing.T) {
 		{"msys-native-path", "signature_paths.go",
 			"return prefix + strings.ToLower(path[:1]) + path[2:], nil", "return path, nil",
 			"^TestSignatureWindowsPathConventions$", "TestSignatureWindowsPathConventions/msys", "path=", "TestSignatureWindowsPathConventions/native"},
-	} {
+		{"metadata-is-delivery", "signature_pipe_results.go",
+			"delivered[result.input] = delivered[result.input] || result.delivered", "delivered[result.input] = delivered[result.input] || result.delivered || result.connected",
+			"^TestSignaturePipeResultControls$", "TestSignaturePipeResultControls/metadata-only", "undelivered input became a verdict", "TestSignaturePipeResultControls/consumed"},
+		{"keyring-boundary-ignored", "signature_readonly.go",
+			"if err := privatedir.Validate(home); err != nil {", "if err := privatedir.Validate(home); err != nil && false {",
+			"^TestReadOnlyGPGKeyringPrivateBoundary$", "TestReadOnlyGPGKeyringPrivateBoundary", "unsafe keyring boundary admitted", ""},
+		{"directory-cached-metadata", "read_purity_test.go",
+			"return current, closeErr", "_ = current; return info, closeErr",
+			"^(TestReadPurityDirectoryHandleWitness|TestReadPurityWitnessControl)$", "TestReadPurityDirectoryHandleWitness", "stale directory enumeration survived handle snapshot", "TestReadPurityWitnessControl"},
+		{"directory-mtime-exemption", "read_purity_test.go",
+			"!old.info.ModTime().Equal(now.info.ModTime())", "(!old.info.IsDir() && !old.info.ModTime().Equal(now.info.ModTime()))",
+			"^TestReadPurityDirectoryHandleWitness$", "TestReadPurityDirectoryHandleWitness", "mtime plant escaped directory witness", "TestReadPurityDirectoryHandleWitness/manager/state/locks/v1/none"},
+		{"witness-identity-exemption", "read_purity_test.go",
+			"!os.SameFile(old.info, now.info)", "false",
+			"^TestReadPurityDirectoryHandleWitness$", "TestReadPurityDirectoryHandleWitness", "identity plant escaped directory witness", "TestReadPurityDirectoryHandleWitness/manager/state/locks/v1/none"},
+	}
+	if runtime.GOOS == "windows" {
+		plants = append(plants, struct{ name, file, before, after, run, fails, message, control string }{
+			"single-pipe-instance", "signature_pipes_windows.go", "const signaturePipeInstances = 2", "const signaturePipeInstances = 1",
+			"^(TestSignaturePipeMetadataProbeAndDrain|TestSignaturePipeTransportReadOnlyAndCancels)$", "TestSignaturePipeMetadataProbeAndDrain", "metadata probe stole signature input or drain lost bytes", "TestSignaturePipeTransportReadOnlyAndCancels",
+		})
+	}
+	for _, plant := range plants {
 		t.Run(plant.name, func(t *testing.T) {
 			original := filepath.Join(root, "internal", "envprofile", plant.file)
 			source, err := os.ReadFile(original)

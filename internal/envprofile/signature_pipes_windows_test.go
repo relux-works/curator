@@ -3,9 +3,12 @@
 package envprofile
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -40,6 +43,37 @@ func TestSignaturePipeTransportReadOnlyAndCancels(t *testing.T) {
 	}
 	t.Log("Windows named-pipe roundtrip and early-exit cancellation PASS")
 	assertReadWitnesses(t, root, before)
+}
+
+// An attributes-only opener must not steal the single input stream. Each
+// signature reader then consumes more than one kernel pipe buffer. Both
+// input digests and the unchanged temp-root witness prove delivery and no disk
+// fallback, including a policy reader that closes after one line. The adjacent
+// real signer test qualifies actual verifier behavior.
+func TestSignaturePipeMetadataProbeAndDrain(t *testing.T) {
+	root := t.TempDir()
+	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(key, root)
+	}
+	before := readWitnesses(t, root)
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := []byte(strings.Repeat("signature", 128*1024))
+	policy := []byte("policy\n")
+	for _, mode := range []string{"probe-digest", "probe-policy-line"} {
+		t.Run(mode, func(t *testing.T) {
+			output, err := runSignaturePipes(signaturePipeTestCommand(executable, "curator-signature-pipe-child", mode, "/dev/fd/3", "/dev/fd/4"), []byte("message"), input, policy)
+			want := fmt.Sprintf("message|%d:%x|%d:%x", len(input), sha256.Sum256(input), len(policy), sha256.Sum256(policy))
+			if err != nil || string(output) != want {
+				t.Fatalf("metadata probe stole signature input or drain lost bytes: %v %q", err, output)
+			}
+			t.Log("Windows metadata probe with full input and policy close control PASS")
+		})
+	}
+	assertReadWitnesses(t, root, before)
+	t.Log("Windows attributes-only probe, full multi-buffer delivery and read-only witness PASS")
 }
 
 // This proves only canonical placeholders that have matching supplied inputs are accepted, with valid placeholders as the control.
