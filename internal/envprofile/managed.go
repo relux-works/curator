@@ -3034,6 +3034,13 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 		if err != nil {
 			return err
 		}
+		// Preserve the settings owner's opt-in refusal before the exclusion
+		// preflight, including its nonregular-file diagnostic. This plan only
+		// reads; the publication plan is prepared again after recovery.
+		settingsPlan := homePlan{adapter: adapter, homeDir: ManagedHomeDir(req.Home, req.Profile, req.EnvID)}
+		if err := settingsPlan.prepareClaudeSettings(req); err != nil {
+			return err
+		}
 		// The manager home exists under the acquired lock, but environments/
 		// may be absent on first provisioning. Validate from the existing
 		// ancestor without creating directories just to read an absent seed.

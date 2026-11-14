@@ -478,9 +478,12 @@ curator env config show claude_settings_mode.example
 curator env config unset claude_settings_mode.example
 ```
 
-With `read-only`, repair/provisioning creates an absent `settings.json` containing
-`{}\n`. Existing `settings.json`, `cowork_settings.json` and legacy `.config.json`
-retain their exact bytes and become regular files with mode `0400` on Unix.
+With `read-only`, repair/provisioning creates an absent `settings.json` with the
+required native-memory exclusion. Existing `settings.json` retains unrelated
+values and exclusions; only a missing native-memory exclusion is added. The
+exclusion publisher preserves the file's existing mode. Permission repair makes
+it and present `cowork_settings.json` and legacy `.config.json` regular `0400`
+files on Unix; those optional files retain their exact bytes.
 Absent optional files are not created. Owner-only read access fits the home's
 existing `0700`, single-owner boundary; no group/other access is added. Present
 symlinks, directories and special files refuse with
