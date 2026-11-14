@@ -73,7 +73,7 @@ func TestSignatureVerifierProcessFailures(t *testing.T) {
 	negativeCommand := exec.Command(executable, "curator-signature-pipe-child", "negative-signature")
 	negativeOutput, negativeErr := runSignaturePipes(negativeCommand, nil)
 	var negativeExit *exec.ExitError
-	if !errors.As(negativeErr, &negativeExit) || !negativeExit.ProcessState.Exited() {
+	if !errors.As(negativeErr, &negativeExit) || !negativeExit.Exited() {
 		t.Fatalf("negative process prerequisite: %v", negativeErr)
 	}
 	if err := signatureVerifierResult("SSH", negativeOutput, negativeErr); err != nil {

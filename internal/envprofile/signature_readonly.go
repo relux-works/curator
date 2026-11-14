@@ -151,7 +151,7 @@ func signatureVerifierResult(kind string, output []byte, runErr error) error {
 	// A C verifier returning -1 is exit 255 on Unix and 0xffffffff on
 	// Windows. Match its negative evidence, not one OS's truncated status.
 	var exit *exec.ExitError
-	if !errors.Is(runErr, errSignerVerificationUnavailable) && errors.As(runErr, &exit) && exit.ProcessState.Exited() && signatureNegativeVerdict(kind, output) {
+	if !errors.Is(runErr, errSignerVerificationUnavailable) && errors.As(runErr, &exit) && exit.Exited() && signatureNegativeVerdict(kind, output) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s verifier could not complete (%s); output=%s", errSignerVerificationUnavailable, kind, signatureDiagnostic([]byte(runErr.Error())), signatureDiagnostic(output))
