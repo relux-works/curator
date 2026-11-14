@@ -19,6 +19,9 @@ func signaturePipeChildEntry() bool {
 		return false
 	}
 	switch os.Args[2] {
+	case "negative-signature":
+		_, _ = fmt.Fprint(os.Stderr, "Could not verify signature.\n")
+		os.Exit(-1)
 	case "large-output":
 		_, _ = fmt.Fprint(os.Stderr, strings.Repeat("x", 128*1024))
 		os.Exit(0)
@@ -67,6 +70,16 @@ func TestSignatureVerifierProcessFailures(t *testing.T) {
 	if !errors.As(runErr, &exit) || exit.ExitCode() != 1 {
 		t.Fatalf("process prerequisite: %v", runErr)
 	}
+	negativeCommand := exec.Command(executable, "curator-signature-pipe-child", "negative-signature")
+	negativeOutput, negativeErr := runSignaturePipes(negativeCommand, nil)
+	var negativeExit *exec.ExitError
+	if !errors.As(negativeErr, &negativeExit) || !negativeExit.ProcessState.Exited() {
+		t.Fatalf("negative process prerequisite: %v", negativeErr)
+	}
+	if err := signatureVerifierResult("SSH", negativeOutput, negativeErr); err != nil {
+		t.Fatalf("normal negative status %d was not a negative verdict: %v", negativeExit.ExitCode(), err)
+	}
+	t.Logf("%s normal C-style negative process status=%d control PASS", runtime.GOOS, negativeExit.ExitCode())
 	failedInput := exec.Command(executable, "curator-signature-pipe-child", "verifier-failure", "/dev/fd/3")
 	inputOutput, inputErr := runSignaturePipes(failedInput, nil, make([]byte, 1024*1024))
 
