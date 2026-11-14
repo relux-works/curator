@@ -15,10 +15,11 @@ func TestStoreVerificationObservationBindsReplacement(t *testing.T) {
 	if err := os.Mkdir(path, 0700); err != nil {
 		t.Fatal(err)
 	}
-	before := storeVerificationNodes(t, path)
-	if !sameStoreVerificationNodes(before, storeVerificationNodes(t, path)) {
+	neighbor := storeVerificationNodes(t, path)
+	if !sameStoreVerificationNodes(neighbor, storeVerificationNodes(t, path)) {
 		t.Fatal("intact observation neighbor refused")
 	}
+	before := storeVerificationNodes(t, path)
 	info := before[path].info
 	saved := filepath.Join(root, "saved")
 	if err := os.Rename(path, saved); err != nil {

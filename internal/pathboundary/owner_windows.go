@@ -115,7 +115,7 @@ func isLink(path string, info os.FileInfo) (bool, error) {
 		ReparseTag uint32
 	}
 	if err := windows.GetFileInformationByHandleEx(handle, windows.FileAttributeTagInfo,
-		(*byte)(unsafe.Pointer(&tag)), uint32(unsafe.Sizeof(tag))); err != nil {
+		(*byte)(unsafe.Pointer(&tag)), uint32(unsafe.Sizeof(tag))); err != nil { // #nosec G103 -- fixed FILE_ATTRIBUTE_TAG_INFO layout
 		return false, err
 	}
 	return tag.ReparseTag != windowsReparseTagAFUnix, nil
