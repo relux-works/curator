@@ -3153,7 +3153,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if effectiveLevel < 3 && repairWouldChangeLockHash(lock) {
 		return &ResolveResult{Warnings: verdict.warnings, StaleReasons: verdict.reasons}, fmt.Errorf("%s: explicit profile migration is required before permissive home provisioning", DiagRepairNeedsLockMigration)
 	}
-	result, err := repairUnderLock(&req, adapter, source)
+	result, err = repairUnderLock(&req, adapter, source)
 	if result != nil {
 		result.Warnings = append(result.Warnings, verdict.warnings...)
 	}
