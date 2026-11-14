@@ -283,5 +283,7 @@ slot in-test: resolve 31/80, dry-run 4/16, repair 16/40, status 4/16.
 Status requests receive the selected policy level even though their structural
 currency checks are level-invariant. Post-operation status errors or missing
 home rows fail the runtime test instead of implicitly counting as non-current.
+Fault-injection controls require those two observations to reach their named
+assertions; row and level omission controls exercise the exact roster guard.
 Migration decode controls independently exercise level-scope, invalid sibling,
 overlap and incomplete coverage beyond the immutable manifest pin seam.
