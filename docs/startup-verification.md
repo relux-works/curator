@@ -259,6 +259,10 @@ stream and the source head. Canonical Test/Race and their native shards depend
 on that job. Before delegating those four families, both the gate and inventory
 reader re-check the stream and source head. Missing, malformed, different-head
 or same-count swapped-ID evidence refuses. Other v1 families stay in the gate.
+Standalone and candidate invocations without an explicit compatibility selection
+continue to run all historical families against their own root. They perform no
+delegation or canonical v2 selection. An empty selection, or canonical v2
+selection without proof, refuses before tests.
 This proves migration compatibility, not full revision-1 store conformance.
 
 The updated proposal reader pins curator-spec #223 at
