@@ -61,6 +61,7 @@ set -eu
 printf '%s\n' "$*" >>"$FIXTURE_ROOT/commands.txt"
 case "$1" in
 run)
+  if [ "$2" = ./tools/check-store-compatibility ]; then [ "$COMPAT_REFUSED" = 0 ] || exit 19; echo checked; exit 0; fi
   [ "$2" = ./tools/envprofilerace ]
   [ "$3" = -mode ] && [ "$4" = merge ]
   [ "$5" = -dir ] && [ "$6" = shards ] && [ "$7" = -out ]
@@ -83,6 +84,7 @@ esac
 			cmd.Dir = dir
 			// This fixture intentionally replaces its own gate inputs and Go launcher.
 			cmd.Env = append(os.Environ(),
+				"CI_STORE_COMPATIBILITY=compatibility", "GITHUB_SHA="+strings.Repeat("a", 40), "COMPAT_REFUSED=0",
 				"GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir),
 				"CI_ENVPROFILE_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=", "CI_UNIX_TEST_SHARDS=", "GO_TEST_FLAGS=-race", "GO_TEST_TIMEOUT=60m",

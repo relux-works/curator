@@ -46,7 +46,7 @@ func (c cli) cmdProjectContext(verb string, args []string) int {
 		return code
 	}
 	policy := envprofile.PolicyFromConfig(cfg).Precedence()
-	store := projectcontext.Store{Home: cfg.Home(), Precedence: contextlock.Precedence{Winner: policy.Winner, Placement: policy.Placement}}
+	store := projectcontext.Store{Home: cfg.Home(), StartupVerificationLevel: cfg.StartupVerification.Level, Precedence: contextlock.Precedence{Winner: policy.Winner, Placement: policy.Placement}}
 	var result any
 	switch verb {
 	case "register":

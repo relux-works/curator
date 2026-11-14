@@ -5,9 +5,9 @@ keys and remote grant-service wire formats are outside this interface.
 
 ## Policy
 
-The optional machine carrier11 member is `"startup_verification":{"level":3}`.
-Omission selects3 without rewriting existing configuration. The object is closed:
-`level` is required and must be an integer token from1 through4. Null, strings,
+The optional machine carrier 11 member is `"startup_verification":{"level":3}`.
+Omission selects 3 without rewriting existing configuration. The object is closed:
+`level` is required and must be an integer token from 1 through 4. Null, strings,
 booleans, fractions, exponents, duplicate keys and unknown fields refuse. System
 policy can lock the entire `startup_verification` member.
 
@@ -16,7 +16,7 @@ policy can lock the entire `startup_verification` member.
 |1|Failed or unavailable verification warns and permits startup|No centre requirement|
 |2|A definite mismatch refuses; unavailable evidence warns|No centre requirement|
 |3 (default)|Every required local check must complete and pass|No centre requirement|
-|4|The same local requirement as3|A denial or invalid answer refuses; absent/unreachable service falls back to3 with a warning|
+|4|The same local requirement as 3|A denial or invalid answer refuses; absent/unreachable service falls back to 3 with a warning|
 
 Every applicable check runs before aggregation. A later unavailable observation
 cannot erase an earlier mismatch. Permitted degraded startup does not claim
@@ -35,14 +35,14 @@ Unix uses native link metadata; Windows uses a no-follow attributes handle bound
 to the observed file. Directory link counts, operator-source admission and
 managed adapter links retain their separate contracts. Skill payload hardlinks
 retain `skill_integrity_boundary_invalid`.
-After structural checks pass, levels3/4 may restore ordinary regular-file bytes
+After structural checks pass, levels 3/4 may restore ordinary regular-file bytes
 from the same recorded pin through the existing repair transaction. This does
 not authorize replacing expected evidence, migrating a lock or changing a pin.
 
-Manifest3 retains manifest2's field and skill-directory grammar and adds the
+Manifest 3 retains manifest 2's field and skill-directory grammar and adds the
 optional same `startup_verification` object. Each explicit context minimum must
 be at least the machine level. The strongest selected root, overlay or transitive
-context minimum applies. Lock6 binds that minimum, so editing a source manifest
+context minimum applies. Lock 6 binds that minimum, so editing a source manifest
 requires explicit profile recomposition. No per-launch environment or argv
 switch can lower the baseline.
 
@@ -69,26 +69,26 @@ The closed read projection has schema `curator.startup-verification/1`, required
 
 ## Verification centre location
 
-Carrier11 optionally admits
+Carrier 11 optionally admits
 `"extensions":{"grant_service":{"endpoint":"https://verification.example.test/"}}`.
 This is location metadata only. The endpoint is an absolute HTTPS locator of at
-most4096 UTF-8 bytes, with a valid DNS hostname or literal IP. Credentials,
+most 4096 UTF-8 bytes, with a valid DNS hostname or literal IP. Credentials,
 queries (including a forced empty query), fragments, raw whitespace, controls,
 backslashes, dot segments, invalid escapes and invalid/empty ports refuse.
-Encoded routing bytes are preserved. Bracket IPv6 literals. An absent member is
+Encoded routing bytes are preserved. IPv6 literals must be bracketed. An absent member is
 omitted; null, an empty object and unknown members refuse.
 
 Parsing or reading this reference performs no network or secret-store access.
-A configured location without an implemented provider is unavailable, so level4
-uses the documented local3 fallback and warning. This metadata does not enter
+A configured location without an implemented provider is unavailable, so level 4
+uses the documented local 3 fallback and warning. This metadata does not enter
 `curator.launcher-config/1` or change the launch fragment format.
 
 ## Complete skill evidence
 
-Lock6 extends lock4 and does not enable lock5 skill-plan adoption. Its required
+Lock 6 extends lock 4 and does not enable lock 5 skill-plan adoption. Its required
 `skill_integrity` array contains one entry per selected skill, in lock member
 order. An entry contains `manifest` and `manifest_sha256`. The latter is SHA-256
-of the manifest's CCJ-1 bytes, spelled `sha256:` plus64 lowercase hex digits.
+of the manifest's CCJ-1 bytes, spelled `sha256:` plus 64 lowercase hex digits.
 
 Legacy root-addressed skills retain the existing declaration validation without
 retroactive frontmatter requirements. Selected-directory skills retain their
@@ -107,14 +107,14 @@ Every manifest field is required:
 |`files`|Complete bytewise-sorted regular-file roster|
 
 Each file binds required `path`, `size`, `executable` and `sha256`. Paths use the
-existing portable relative-path grammar, at most4096 Unicode codepoints, with
+existing portable relative-path grammar, at most 4096 Unicode codepoints, with
 no duplicates or case collisions. Size is a nonnegative integer. Every regular
 file is included, including reference assets and runtime scripts; there are no
 content exclusions. Payload symlinks, hardlinks, special files and nested Git
 metadata refuse. Adapter links into a verified store are a separate surface.
 
-One shared capture budget covers the closure:16384 regular files,64MiB of file
-bytes and30 seconds. Evidence JSON and lock6 JSON each have a64MiB limit.
+One shared capture budget covers the closure:16384 regular files, 64 MiB of file
+bytes and 30 seconds. Evidence JSON and lock 6 JSON each have a 64 MiB limit.
 Structural budget violations refuse. Interrupted/unreadable checks are
 unavailable. Captured file identity and metadata are rechecked before accepting
 the observation.
@@ -162,14 +162,14 @@ checks; missing recorded files cannot be converted to byte repair.
 ## Migration and diagnostics
 
 Older machine, manifest and lock carriers remain readable. Reading and startup
-do not rewrite them. A native-only legacy profile can satisfy default3 using
-its existing complete pinned Git tree or admitted full state-hash2 snapshot.
+do not rewrite them. A native-only legacy profile can satisfy default 3 using
+its existing complete pinned Git tree or admitted full state-hash 2 snapshot.
 No new cap or executable-metadata claim is retroactively added to that legacy
-algorithm. Existing version1 NUL refusals remain mandatory.
+algorithm. Existing version 1 NUL refusals remain mandatory.
 
 A legacy manifestless skill has no recorded synthesized evidence. It is
-unavailable:1/2 warn,3/4 refuse. Explicit `curator profile update <profile>` can
-create lock6 evidence transactionally. Preserved-pin migration must retain the
+unavailable: 1/2 warn, 3/4 refuse. Explicit `curator profile update <profile>` can
+create lock 6 evidence transactionally. Preserved-pin migration must retain the
 exact original pins; a resolving pin change is an ordinary update. Failure
 preserves the old selection and lock. Startup never silently migrates a profile.
 
@@ -179,7 +179,7 @@ preserves the old selection and lock. Startup never silently migrates a profile.
 |`startup_verification_weakening`|A profile minimum is below the machine baseline|
 |`startup_verification_failed`|A completed local check contradicts its expectation|
 |`startup_verification_unavailable`|A required local check did not complete|
-|`verification_centre_unavailable`|Level4 falls back to local3, with warning|
+|`verification_centre_unavailable`|Level 4 falls back to local 3, with warning|
 |`verification_centre_denied`, `verification_centre_invalid`|Centre refusal; never a fallback|
 |`skill_integrity_evidence_missing`|No frozen expected skill evidence|
 |`skill_integrity_manifest_invalid`, `skill_integrity_unsupported_version`|Malformed or unsupported supplied evidence|
@@ -212,7 +212,7 @@ The separate revision-2 reader is test-only. Explicitly set the absolute
 `CURATOR_STORE_VERIFICATION_ROOT` to the proposal's
 `conformance/environment-store-verification-v2` directory and set
 `CURATOR_STORE_VERIFICATION_MANIFEST_SHA256` to
-`61e5d95e02555764d60633aa9d6656e118a7a6c969f10202885218bc7b9d7899`.
+`490f40a2824621d6902da4a157f09aee245069d6626d87b0f0fdbd8412be691e`.
 The reader additionally pins the exact case bytes, validates the closed carrier,
 and checks all row/control/predecessor references before returning any case.
 An unset pair is inert; an empty, partial, unknown or mismatched selection
@@ -223,13 +223,13 @@ Run the reader and its controls with
 `go test -p=1 -parallel=1 -count=1 ./internal/envprofile -run '^TestStoreVerification'`.
 For the actual old/new format-direction control, also set
 `CURATOR_CONFORMANCE_ROOT` to the frozen revision-1 root. This command qualifies
-reader behavior only, not the 474 declared runtime/checker row-level executions.
+reader behavior only, not the 466 declared runtime/checker row-level executions.
 The draft is non-canonical; an accepted landed specification pin remains
 required before selecting a canonical revision-2 default.
 
 The canonical `.github/ci/test-gate.sh` refuses a present store selector or pin,
-including an empty value. Its global `SPEC_PIN` and revision-1 root remain
-unchanged. Controls plant an empty selector and a production reference to prove
+including an empty value. Its global `SPEC_PIN` remains unchanged in this rework; the landing bump
+is described below. Controls plant an empty selector and a production reference to prove
 the guards detect those violations.
 
 The historical compatibility tool consumes the complete output of the four
@@ -248,3 +248,48 @@ migration compatibility property. It does not waive a failing canonical suite
 or establish revision-2 runtime conformance. Unit controls run with
 `go test -p=1 -parallel=1 ./internal/storecompatibility ./tools/check-store-compatibility`.
 Keep complete replay streams and reports under `.temp/`.
+
+
+### CI migration seam and the landing pin
+
+The `store-v1-compatibility` job replays the four frozen store test families
+against `SPEC_PIN` and checks all 38 row IDs, their exact 32/6 partition and the
+six intended failure witnesses. Its same-run artifact retains the complete
+stream and the source head. Canonical Test/Race and their native shards depend
+on that job. Before delegating those four families, both the gate and inventory
+reader re-check the stream and source head. Missing, malformed, different-head
+or same-count swapped-ID evidence refuses. Other v1 families stay in the gate.
+This proves migration compatibility, not full revision-1 store conformance.
+
+The updated proposal reader pins curator-spec #223 at
+`7986617bcc880bc2657e253086fe63ccb04e5120`: manifest
+`490f40a2824621d6902da4a157f09aee245069d6626d87b0f0fdbd8412be691e`, cases
+`7e9a8588962f61677f51ea76d35684c41470395938bbf6afe9ef4454b728b58b`.
+The frozen predecessor remains
+`7efa5b09e450162cfb2937f25b3e29fab4699602e0990cfd295a4f695cb60413`.
+There are 130 rows: 124 implementation and 6 checker-control rows, declaring
+444 and 22 level slots respectively. These are reader/carrier checks, not
+execution of the 466 filesystem/checker operations.
+
+After #223 lands, the orchestrator's separate bump must set `SPEC_PIN` to its
+exact signed landing commit. There is no second static workflow manifest-hash
+setting to change; verify the frozen predecessor digest above at that commit.
+The v1 root path remains unchanged:
+it still serves all other families and the immutable historical replay. The
+canonical reader stage derives `conformance/environment-store-verification-v2`
+from that same checkout, with no external selector. Until the pin supplies the
+exact new bytes it fails closed. If landing changes the proposal bytes, re-pin
+the reader, embedded schema and counts and rerun its controls before bumping.
+No canonical revision-2 runtime-conformance claim follows from reader success.
+
+Derived managed-home content is separate from profile/store evidence. At every
+level a read-only resolve reports leading `environment_home_stale` with the
+`--repair` hint; dry-run preserves the drift and explicit repair restores the
+home whenever all local source/store checks pass. Permissive policy never keeps
+a drifted derived home current. Raising the machine above an explicit profile
+minimum retains `startup_verification_weakening`: edit the selected context
+manifests' `startup_verification.level`, then run `curator profile update`.
+
+The under-repair-lock structural check is defense in depth. Current late-plant
+controls prove the later publication recheck refuses the plant; they do not
+individually prove the earlier lock-time check or absence of temporary staging.

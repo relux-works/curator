@@ -22,8 +22,8 @@ import (
 const storeVerificationRootKey = "CURATOR_STORE_VERIFICATION_ROOT"
 const storeVerificationPinKey = "CURATOR_STORE_VERIFICATION_MANIFEST_SHA256"
 const storeVerificationUnsupported = "store_verification_corpus_unsupported"
-const storeVerificationManifestPin = "61e5d95e02555764d60633aa9d6656e118a7a6c969f10202885218bc7b9d7899"
-const storeVerificationCasesPin = "b103291e1dbbf964d7bf5444477f7b0211b834823bf6ea0df2bf4805a81b9ba7"
+const storeVerificationManifestPin = "490f40a2824621d6902da4a157f09aee245069d6626d87b0f0fdbd8412be691e"
+const storeVerificationCasesPin = "7e9a8588962f61677f51ea76d35684c41470395938bbf6afe9ef4454b728b58b"
 const storeVerificationPredecessorPin = "7efa5b09e450162cfb2937f25b3e29fab4699602e0990cfd295a4f695cb60413"
 
 //go:embed testdata/store-verification-v2/cases.schema.json
@@ -250,7 +250,7 @@ func readStoreVerificationCorpus(lookup func(string) (string, bool)) ([]storeVer
 	if err := storeVerificationStrict(raw, &m); err != nil {
 		return bad(err)
 	}
-	if m.Schema != "curator.environment-store-corpus/2" || m.Capability != "agent-environments" || m.Revision != 2 || m.Status != "proposal-unreleased" || m.Cases != "vectors/environments-store-boundary.json" || m.Count != 134 || len(m.Migration) != 38 || m.Predecessor.SHA256 != storeVerificationPredecessorPin {
+	if m.Schema != "curator.environment-store-corpus/2" || m.Capability != "agent-environments" || m.Revision != 2 || m.Status != "proposal-unreleased" || m.Cases != "vectors/environments-store-boundary.json" || m.Count != 130 || len(m.Migration) != 38 || m.Predecessor.SHA256 != storeVerificationPredecessorPin {
 		return bad(errors.New("unsupported corpus manifest"))
 	}
 	raw, err = storeVerificationReadPinned(filepath.Join(root, filepath.FromSlash(m.Cases)), storeVerificationCasesPin)

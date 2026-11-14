@@ -1162,7 +1162,7 @@ internal/envprofile	TestStoreVerificationCanonicalSelectorGuard	linux,darwin,win
 internal/envprofile	TestStoreVerificationProductionNonreference	linux,darwin,windows	-	-	production source has no selector reference and a planted read is detected
 internal/envprofile	TestStoreVerificationPinnedCorpusReader	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
 internal/envprofile	TestStoreVerificationActualReaderDirections	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
-internal/storecompatibility	TestExactMigrationPartitionAndControls	linux,darwin,windows	-	-	exact38-row32/6 migration partition rejects a same-count swapped-ID plant
+internal/storecompatibility	TestExactMigrationPartitionAndControls	linux,darwin,windows	-	-	exact 38-row 32/6 migration partition rejects a same-count swapped-ID plant
 internal/storecompatibility	TestReplayEventDoesNotNormalizeDuplicateVerdicts	linux,darwin,windows	-	-	decoded duplicate event keys cannot erase a failing verdict
 
 # Whole-entry availability and mutation-boundary controls.
@@ -1174,3 +1174,7 @@ internal/gitops	TestPinnedSnapshotPathsProjection	linux,darwin,windows	-	-	selec
 internal/gitops	TestPinnedSnapshotPathsIsolation	linux,darwin,windows	-	-	ambient Git overrides cannot substitute a repository or supply a missing local object
 internal/gitops	TestPinnedSnapshotPathsRejectsAlternateAndGraft	linux,darwin,windows	-	-	native alternate/graft metadata refuses with a local-repository positive
 internal/gitops	TestPinnedSnapshotPathMetadataControls	linux,darwin,windows	-	-	unsafe paths/types/collisions and metadata/path-count excesses refuse without a partial roster
+internal/envprofile	TestStartupHomeDriftRetainsRepairContract	linux,darwin,windows	-	-	derived home drift is stale at every level; dry-run preserves and explicit repair restores verified bytes
+internal/envprofile	TestStoreVerificationCanonicalPinnedCorpusReader	-	linux,darwin,windows	opt-in	canonical stage requires the exact sibling revision-2 corpus at SPEC_PIN; reader coverage only
+internal/skillintegrity	TestExpectedEvidenceClassifiesParseBreakingDrift	linux,darwin,windows	-	-	missing skill and invalid installed declaration are mismatches beside intact and malformed-evidence controls
+internal/storecompatibility	TestArtifactAdmission	linux,darwin,windows	-	-	exact-head replay admission rejects missing evidence and same-count swapped row IDs
