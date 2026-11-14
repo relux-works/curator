@@ -1,6 +1,9 @@
 package envprofile
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 // Expected IDs come independently from the pinned manifest, while executed
 // IDs/levels are recorded only inside the actual runtime child invocations.
@@ -36,8 +39,12 @@ func storeVerificationRuntimeRoster(t *testing.T, m storeVerificationManifest, r
 	return expected
 }
 
-// Dropping all but the first row must fail the exact runtime roster guard.
+// In canonical mode, dropping rows or levels must fail the exact runtime
+// roster guard. Outside that mode this external-corpus control is opt-in.
 func TestStoreVerificationRuntimeRosterControl(t *testing.T) {
+	if os.Getenv("CI_STORE_V2_CANONICAL") != "1" {
+		t.Skip("canonical runtime roster control requires CI_STORE_V2_CANONICAL=1")
+	}
 	t.Run("row", func(t *testing.T) {
 		runObservationControl(t, "store_verification_runtime_test.go", `if name == "" {`, `if name == "" || count >= 1 {`, "TestStoreBoundaryStatusVectorsDriveStatus", "runtime roster mismatch")
 	})
