@@ -34,6 +34,8 @@ func TestNativeHomeReviewNarrowingMutants(t *testing.T) {
 		{"manager-ancestor", "native_home.go", "candidate, err := nativeComparablePath(path)", "if path == managerHome { return false, nil }; candidate, err := nativeComparablePath(path)", "^TestNativeHomeReviewRepair$/^native-ancestor$", "TestNativeHomeReviewRepair/native-ancestor", "named native refusal"},
 		{"absent-case", "native_home.go", "if foldedOverlap {", "if foldedOverlap && false {", "^TestNativeHomeReviewRepair$/^absent-root-case$", "TestNativeHomeReviewRepair/absent-root-case", "absent-root case refusal"},
 		{"muse-bypass", "managed.go", "adapter, ok = museNativeAdapter(), true", "return filepath.Join(req.operatorXDG(), \"muse\"), nil", "^TestNativeHomeReviewRepair$/^muse-managed$", "TestNativeHomeReviewRepair/muse-managed", "Muse shared fallback"},
+		{"repair-low-level-native", "managed.go", "if req.Repair && (effectiveLevel >= 3 || trustedStartupChecks) {", "if req.Repair && (effectiveLevel >= 3 || trustedStartupChecks && false) {", "^TestManagedCallerCustomOriginConflictRefuses$/^level1$/^missing-native-default$", "TestManagedCallerCustomOriginConflictRefuses/level1/missing-native-default", "absent default must retain the earlier exact refusal"},
+		{"repair-dry-run-diagnostic", "managed.go", "if req.DryRun {\n\t\tif nativeRepairReason != \"\" {", "if req.DryRun {\n\t\tif nativeRepairReason != \"\" && false {", "^TestManagedCallerCustomOriginConflictRefuses$/^level1$/^missing-native-default$", "TestManagedCallerCustomOriginConflictRefuses/level1/missing-native-default", "absent default must retain the earlier exact refusal"},
 	} {
 		t.Run(m.name, func(t *testing.T) {
 			original := filepath.Join(root, "internal", "envprofile", m.file)
