@@ -81,4 +81,105 @@ func TestStartupObjectMainParity(t *testing.T) {
 			}
 		}
 	}
+	t.Run("broken-repository", startupBrokenRepositoryParity)
+}
+
+// Main has no level policy and repeats its default route under the five labels.
+// The rework runs actual L0-L4. Both retain pin_hash and byte/identity receipts;
+// the rework additionally gives home_stale precedence for home/combined drift.
+func startupBrokenRepositoryParity(t *testing.T) {
+	for _, name := range []string{"HEAD", "objects"} {
+		for level := 0; level <= 4; level++ {
+			t.Run(fmt.Sprintf("%s/level%d", name, level), func(t *testing.T) {
+				t.Parallel()
+				for _, drift := range []string{"none", "home", "source", "combined"} {
+					for _, mode := range []string{"observe", "dry-run", "repair"} {
+						t.Run(drift+"/"+mode, func(t *testing.T) {
+							fx := storeBoundaryFixture(t, "current", true)
+							req := fx.request(envregistry.ClaudeCode)
+							req.Repair = true
+							if _, err := Resolve(req); err != nil {
+								t.Fatal(err)
+							}
+							field := reflect.ValueOf(&req.Policy).Elem().FieldByName("StartupVerificationLevel")
+							current := field.IsValid()
+							if current {
+								field.SetInt(int64(level))
+							}
+							req.Repair = false
+							if result, err := Resolve(req); err != nil || result == nil || len(result.Document) == 0 {
+								t.Fatalf("main-parity intact repository neighbor: %v", err)
+							}
+							member, entry := storeBoundaryRootMemberFor(fx)
+							repo := newGitManager(fx.home).repoDir(member.Source)
+							owned := drift == "home" || drift == "combined"
+							if owned {
+								path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, envregistry.ClaudeCode), "CLAUDE.md")
+								if err := os.WriteFile(path, []byte("home drift\n"), 0600); err != nil {
+									t.Fatal(err)
+								}
+							}
+							if drift == "source" || drift == "combined" {
+								if err := os.WriteFile(filepath.Join(entry, "context", "s.md"), []byte("source drift\n"), 0600); err != nil {
+									t.Fatal(err)
+								}
+							}
+							if err := os.RemoveAll(filepath.Join(repo, ".git", name)); err != nil {
+								t.Fatal(err)
+							}
+							before := hashTreeForTest(t, fx.home)
+							nodes := startupParityIdentities(t, fx.home)
+							req.Repair, req.DryRun = mode != "observe", mode == "dry-run"
+							result, err := Resolve(req)
+							if err == nil || !strings.Contains(err.Error(), "pin_hash") || strings.Contains(err.Error(), "regular_types") || result != nil && len(result.Document) != 0 {
+								t.Fatalf("main-parity invalid repository pin refusal: %v", err)
+							}
+							if current && owned && (!strings.HasPrefix(err.Error(), "environment_home_stale:") || !strings.Contains(err.Error(), "--repair")) {
+								t.Fatalf("main-parity invalid repository hid home diagnostic: %v", err)
+							}
+							after := startupParityIdentities(t, fx.home)
+							if hashTreeForTest(t, fx.home) != before || len(nodes) != len(after) {
+								t.Fatal("main-parity invalid repository wrote state")
+							}
+							for path, original := range nodes {
+								if now, ok := after[path]; !ok || !os.SameFile(original, now) || original.Mode() != now.Mode() || original.ModTime() != now.ModTime() {
+									t.Fatalf("main-parity invalid repository replaced state %q", path)
+								}
+							}
+						})
+					}
+				}
+			})
+		}
+	}
+}
+
+func startupParityIdentities(t *testing.T, root string) map[string]os.FileInfo {
+	t.Helper()
+	result := map[string]os.FileInfo{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Mode().IsRegular() || info.IsDir() {
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			info, err = file.Stat()
+			closeErr := file.Close()
+			if err != nil {
+				return err
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+		}
+		result[path] = info
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
 }

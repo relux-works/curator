@@ -36,9 +36,13 @@ func startupBlobID(t *testing.T, repo, commit string) string {
 // Fresh fixtures cover every level/mode/drift combination; intact neighbors
 // prove launch, and receipts plus bytes prove refusal does not mutate state.
 func TestStartupObjectAvailabilityMatrix(t *testing.T) {
-	for _, loss := range []string{"blob", "commit", "cache"} {
+	for _, loss := range []string{"blob", "commit", "cache", "head-missing", "objects-missing"} {
 		t.Run(loss, func(t *testing.T) {
-			for level := 1; level <= 4; level++ {
+			firstLevel := 1
+			if loss == "head-missing" || loss == "objects-missing" {
+				firstLevel = 0
+			}
+			for level := firstLevel; level <= 4; level++ {
 				t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
 					// Each level owns every fixture path and changes no process environment.
 					t.Parallel()
@@ -78,6 +82,14 @@ func TestStartupObjectAvailabilityMatrix(t *testing.T) {
 									removeStartupGitObject(t, repo, startupBlobID(t, repo, member.Commit))
 								case "commit":
 									removeStartupGitObject(t, repo, member.Commit)
+								case "head-missing", "objects-missing":
+									name := "HEAD"
+									if loss == "objects-missing" {
+										name = "objects"
+									}
+									if err := os.RemoveAll(filepath.Join(repo, ".git", name)); err != nil {
+										t.Fatal(err)
+									}
 								case "cache":
 									if err := os.RemoveAll(repo); err != nil {
 										t.Fatal(err)
@@ -184,6 +196,7 @@ func TestStartupObjectAvailabilityControls(t *testing.T) {
 		{"blob-independent-roster", "../gitops/snapshot_paths.go", "sized.Write(meta)", "if _, err := runWithEnv(repo, env, \"cat-file\", \"-s\", strings.Fields(string(meta))[2]); err != nil { return nil, objectUnavailable(\"blob\", err) }; sized.Write(meta)", "TestStartupObjectAvailabilityMatrix/blob/level1/none/observe", "available store refused after blob loss"},
 		{"late-home-wrap", "managed.go", "if pinnedCommitObjectUnavailable(failure) {\n\t\t\treturn nil, homeInputFailure(failure)\n\t\t}", "if pinnedCommitObjectUnavailable(failure) {\n\t\t\treturn nil, failure\n\t\t}", "TestStartupObjectLossBetweenInspectionAndPins/true", "late object loss lost leading diagnostic"},
 		{"early-home-wrap", "managed.go", "return nil, homeInputsFailure(owned, err)", "_ = owned; return nil, err", "TestStartupObjectAvailabilityMatrix/cache/level1/home/observe", "object loss hid home diagnostic"},
+		{"invalid-repository", "../gitops/snapshot_paths.go", "return \"\", \"\", objectUnavailable(\"repository\", err)", "return \"\", \"\", err", "TestStartupObjectAvailabilityMatrix/head-missing/level0/none/observe", "object availability became structure"},
 		{"typed-pin-class", "store_availability.go", "if errors.As(err, &unavailable) {", "if false && errors.As(err, &unavailable) {", "TestStartupObjectAvailabilityMatrix/cache/level1/none/observe", "object availability became structure"},
 	} {
 		t.Run(p.name, func(t *testing.T) { runObservationControl(t, p.file, p.before, p.after, p.test, p.witness) })

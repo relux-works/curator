@@ -1203,3 +1203,5 @@ internal/envprofile	TestStartupObjectLossBetweenInspectionAndPins	linux,darwin,w
 internal/envprofile	TestStartupObjectAvailabilityControls	linux,darwin,windows	-	-	Object availability regressions reach their named negative assertions
 internal/envprofile	TestStartupObjectMainParity	linux,darwin,windows	-	-	Missing blobs and repository caches retain main parity
 internal/gitops	TestPinnedPathsObjectAvailability	linux,darwin,windows	-	-	Tree metadata roster is blob independent and object loss has a typed class
+internal/gitops	TestPinnedCommitTreeRepositoryAvailability	linux,darwin,windows	-	-	Direct commit-tree reads classify invalid HEAD and objects metadata as repository availability
+internal/gitops	TestPinnedObjectAvailabilityControls	linux,darwin,windows	-	-	Three typed-return narrowing mutants reach their exact availability assertions

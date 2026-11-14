@@ -31,7 +31,7 @@ func pinnedSnapshotSelection(repo, commit, directory string) (string, string, er
 	for _, metadata := range []string{"objects/info/alternates", "info/grafts"} {
 		path, err := runWithEnv(repo, env, "rev-parse", "--git-path", metadata)
 		if err != nil {
-			return "", "", err
+			return "", "", objectUnavailable("repository", err)
 		}
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(repo, path)
