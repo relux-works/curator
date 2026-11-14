@@ -39,14 +39,21 @@ func storeVerificationRuntimeRoster(t *testing.T, m storeVerificationManifest, r
 	return expected
 }
 
-// In canonical mode, dropping rows or levels must fail the exact runtime
-// roster guard. Outside that mode this external-corpus control is opt-in.
+// In canonical mode, dropped rows/levels and failed or absent post-operation
+// status observations reach their exact guard assertions. Outside that mode
+// these external-corpus controls are opt-in.
 func TestStoreVerificationRuntimeRosterControl(t *testing.T) {
 	if os.Getenv("CI_STORE_V2_CANONICAL") != "1" {
 		t.Skip("canonical runtime roster control requires CI_STORE_V2_CANONICAL=1")
 	}
 	t.Run("row", func(t *testing.T) {
 		runObservationControl(t, "store_verification_runtime_test.go", `if name == "" {`, `if name == "" || count >= 1 {`, "TestStoreBoundaryStatusVectorsDriveStatus", "runtime roster mismatch")
+	})
+	t.Run("post-status-error", func(t *testing.T) {
+		runObservationControl(t, "store_verification_runtime_test.go", "status, err := StatusOf(statusReq)", "status, err := StatusOf(statusReq); err = fmt.Errorf(\"known post-status failure\")", "TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan", "v2 post-operation status failed: known post-status failure")
+	})
+	t.Run("post-status-missing", func(t *testing.T) {
+		runObservationControl(t, "store_verification_runtime_test.go", "status, err := StatusOf(statusReq)", "status, err := StatusOf(statusReq); status.Homes = nil", "TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan", "v2 post-operation status row missing")
 	})
 	t.Run("level", func(t *testing.T) {
 		runObservationControl(t, "store_verification_runtime_test.go", "for _, level := range row.Levels {", "for _, level := range row.Levels[:1] {", "TestStoreBoundaryStatusVectorsDriveStatus", "runtime roster mismatch")

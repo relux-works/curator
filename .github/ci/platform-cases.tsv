@@ -1190,7 +1190,7 @@ internal/pathboundary	TestSocketIsRegularTypeFailure	linux,darwin,windows	-	-	re
 internal/pathboundary	TestWindowsSocketClassificationControl	windows	-	-	socket reparse misclassification reaches the regular_types assertion
 internal/envprofile	TestStoreVerificationObservationBindsReplacement	linux,darwin,windows	-	-	same-byte replacement cannot borrow earlier directory identity; retained original passes
 internal/envprofile	TestStoreVerificationObservationControl	linux,darwin,windows	-	-	lazy Windows identity or bypassed identity comparison reaches the replacement assertion
-internal/envprofile	TestStoreVerificationRuntimeRosterControl	-	linux,darwin,windows	opt-in	first-row-only runtime selection fails the exact manifest ID and level roster
+internal/envprofile	TestStoreVerificationRuntimeRosterControl	-	linux,darwin,windows	opt-in	row and level omissions or failed and missing post-status observations reach their named runtime guards
 internal/envprofile	TestStoreVerificationMigrationCoverage	linux,darwin,windows	-	-	disjoint migration levels pass; scope invalid overlap and incomplete successors refuse
 internal/envprofile	TestStoreVerificationMigrationCoverageControl	linux,darwin,windows	-	-	disabled incomplete-level gate fails its intended assertion
 internal/envprofile	TestStartupCombinedHomeAndSourceDrift	linux,darwin,windows	-	-	combined copied-home and source drift keeps home precedence; verified strict repair restores both
