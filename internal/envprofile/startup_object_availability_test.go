@@ -180,9 +180,9 @@ func TestStartupObjectLossBetweenInspectionAndPins(t *testing.T) {
 // Narrowing each new gate must fail at its intended assertion, not setup.
 func TestStartupObjectAvailabilityControls(t *testing.T) {
 	for _, p := range []struct{ name, file, before, after, test, witness string }{
-		{"blob-independent-roster", "../gitops/snapshot_paths.go", "\"ls-tree\", \"-r\", \"-z\"", "\"ls-tree\", \"-r\", \"-l\", \"-z\"", "TestStartupObjectAvailabilityMatrix/blob/level1/none/observe", "available store refused after blob loss"},
+		{"blob-independent-roster", "../gitops/snapshot_paths.go", "sized.Write(meta)", "if _, err := runWithEnv(repo, env, \"cat-file\", \"-s\", strings.Fields(string(meta))[2]); err != nil { return nil, objectUnavailable(\"blob\", err) }; sized.Write(meta)", "TestStartupObjectAvailabilityMatrix/blob/level1/none/observe", "available store refused after blob loss"},
 		{"late-home-wrap", "managed.go", "if pinnedCommitObjectUnavailable(failure) {\n\t\t\treturn nil, homeInputFailure(failure)\n\t\t}", "if pinnedCommitObjectUnavailable(failure) {\n\t\t\treturn nil, failure\n\t\t}", "TestStartupObjectLossBetweenInspectionAndPins/true", "late object loss lost leading diagnostic"},
-		{"early-home-wrap", "managed.go", "return nil, homeInputsFailure(owned, err)", "return nil, err", "TestStartupObjectAvailabilityMatrix/cache/level1/home/observe", "object loss hid home diagnostic"},
+		{"early-home-wrap", "managed.go", "return nil, homeInputsFailure(owned, err)", "_ = owned; return nil, err", "TestStartupObjectAvailabilityMatrix/cache/level1/home/observe", "object loss hid home diagnostic"},
 		{"typed-pin-class", "store_availability.go", "if errors.As(err, &unavailable) {", "if false && errors.As(err, &unavailable) {", "TestStartupObjectAvailabilityMatrix/cache/level1/none/observe", "object availability became structure"},
 	} {
 		t.Run(p.name, func(t *testing.T) { runObservationControl(t, p.file, p.before, p.after, p.test, p.witness) })
