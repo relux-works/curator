@@ -120,9 +120,14 @@ are gone. A release-entrypoint gate forbids `curator_test_platform` in release
 configuration, and default-build tests prove its environment selector inert.
 The test-only `curator_cold_repository` tag exposes no release-binary input.
 
-The ordinary macOS lane uses three inventory-partitioned shards, matching Linux,
-with the existing 1800s per-package admission margin and 60m hard timeout.
-The two-shard envprofile shard 0 grew from 1066.581s to 1869.810s: new native-home
-narrowing controls contributed 221.25s and combined-drift controls 74.16s; shared
-pre-existing tests also ran slower. Repartitioning retains every native test and
-all mutation controls; merge admission still requires the exact inventory union.
+The ordinary macOS lane uses five inventory-partitioned shards; Linux retains
+three. The 1800s per-package admission margin and 60m hard timeout are unchanged.
+The previous three-shard envprofile times were 1753.169s, 1348.396s and 1433.161s
+at the accepted head, with a second identical-tree run showing substantial
+runner variation. Replaying the slower measurements through the unchanged
+FNV-1a-64 selector gives a 1541.88s maximum with four shards and 1245.65s with
+five, before additional invalid-repository controls. Five is the smallest
+count below the 1440s delivery target. Final-head hosted measurements must also
+include those controls and confirm all 647 envprofile parents exactly once.
+Repartitioning retains every native test and mutation control; merge admission
+still requires the exact inventory union.
