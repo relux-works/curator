@@ -14,8 +14,14 @@ import (
 
 // Settings remain runtime-owned; the manager merges only its native-memory
 // exclusion. Never read the native settings or memory file to produce it.
-func prepareClaudeSettings(root, homeRel string) (*claudeSeedPlan, error) {
-	input, present, err := readClaudeSettingsInput(root, homeRel)
+type claudeSettingsPlan struct {
+	input, payload []byte
+	present        bool
+	mode           os.FileMode
+}
+
+func prepareClaudeSettings(root, homeRel string) (*claudeSettingsPlan, error) {
+	input, present, mode, err := readClaudeSettingsInput(root, homeRel)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +36,7 @@ func prepareClaudeSettings(root, homeRel string) (*claudeSeedPlan, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", envregistry.DiagSeedUnreadable, err)
 	}
-	plan := &claudeSeedPlan{input: input, present: present}
+	plan := &claudeSettingsPlan{input: input, present: present, mode: mode}
 	if !bytes.Equal(payload, input) {
 		plan.payload = payload
 	}
@@ -55,9 +61,12 @@ func publishClaudeSettings(root, homeRel string) error {
 			return err
 		}
 		temp := file.Name()
-		err = file.Chmod(managedAuthoredFileMode)
+		_, err = file.Write(plan.payload)
 		if err == nil {
-			_, err = file.Write(plan.payload)
+			// This publisher owns only the exclusion. Preserve the existing
+			// mode, including a read-only policy applied by another owner.
+			// Chmod follows the write so writing cannot clear special bits.
+			err = file.Chmod(plan.mode)
 		}
 		if err == nil {
 			err = file.Sync()
@@ -68,15 +77,15 @@ func publishClaudeSettings(root, homeRel string) error {
 		}
 		if err != nil {
 			_ = os.Remove(temp)
-			return err
+			return fmt.Errorf("%s: stage managed Claude settings without changing mode: %w", envregistry.DiagSeedUnreadable, err)
 		}
 		rename, release, err := prepareClaudeSeedRename(temp, full)
 		if err != nil {
 			_ = os.Remove(temp)
 			return err
 		}
-		input, present, readErr := readClaudeSettingsInput(root, homeRel)
-		if readErr != nil || present != plan.present || !bytes.Equal(input, plan.input) {
+		input, present, mode, readErr := readClaudeSettingsInput(root, homeRel)
+		if readErr != nil || present != plan.present || mode != plan.mode || !bytes.Equal(input, plan.input) {
 			release()
 			_ = os.Remove(temp)
 			if readErr != nil {
@@ -92,21 +101,24 @@ func publishClaudeSettings(root, homeRel string) error {
 	return fmt.Errorf("%s: managed Claude settings changed during all 3 publication checks", envregistry.DiagSeedUnreadable)
 }
 
-func readClaudeSettingsInput(root, homeRel string) ([]byte, bool, error) {
+func readClaudeSettingsInput(root, homeRel string) ([]byte, bool, os.FileMode, error) {
 	input, present, err := readManagedRegular(root, managedJoin(homeRel, "settings.json"))
-	if err != nil || present {
-		return input, present, err
+	if err != nil {
+		return nil, false, 0, err
 	}
 	full, err := managedPath(root, managedJoin(homeRel, "settings.json"), false)
 	if err != nil {
-		return nil, false, err
+		return nil, false, 0, err
 	}
 	state, err := stateread.Lstat(full)
 	if err != nil {
-		return nil, false, err
+		return nil, false, 0, err
 	}
-	if state.Kind != stateread.KindAbsent {
-		return nil, false, fmt.Errorf("%s: managed Claude settings are not a regular file", envregistry.DiagSeedUnreadable)
+	if !present && state.Kind == stateread.KindAbsent {
+		return nil, false, managedAuthoredFileMode, nil
 	}
-	return nil, false, nil
+	if !present || state.Kind != stateread.KindPresent || state.Info == nil || !state.Info.Mode().IsRegular() {
+		return nil, false, 0, fmt.Errorf("%s: managed Claude settings are not a stable regular file", envregistry.DiagSeedUnreadable)
+	}
+	return input, true, state.Info.Mode(), nil
 }

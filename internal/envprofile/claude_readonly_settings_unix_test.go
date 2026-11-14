@@ -3,6 +3,7 @@
 package envprofile
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -91,7 +92,7 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 	enableClaudeReadOnly(&req)
 	for _, path := range claudeSettingsPaths {
 		full := filepath.Join(home, path)
-		if err := os.WriteFile(full, []byte("{\"operator\":1}\n"), 0o600); err != nil {
+		if err := os.WriteFile(full, claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":1}\n")), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -147,7 +148,7 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 		}
 		assertManagedMode(t, full, 0o400)
 		data, err := io.ReadAll(old)
-		if err != nil || string(data) != "{\"operator\":1}\n" {
+		if err != nil || string(data) != string(claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":1}\n"))) {
 			t.Fatalf("old bytes changed: %q %v", data, err)
 		}
 		// Exercise a content update through the same atomic writer used by repair.
@@ -155,14 +156,14 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := atomicManagedFile(EnvRoot(fx.home), rel, []byte("{\"operator\":2}\n"), claudeReadOnlySettingsMode); err != nil {
+		if err := atomicManagedFile(EnvRoot(fx.home), rel, claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":2}\n")), claudeReadOnlySettingsMode); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Resolve(req); err != nil {
 			t.Fatal(err)
 		}
 		data, err = os.ReadFile(full)
-		if err != nil || string(data) != "{\"operator\":2}\n" {
+		if err != nil || string(data) != string(claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":2}\n"))) {
 			t.Fatalf("updated bytes lost: %q %v", data, err)
 		}
 		assertManagedMode(t, full, 0o400)
@@ -203,7 +204,11 @@ func TestClaudeReadOnlySettingsScope(t *testing.T) {
 				}
 				home := ManagedHomeDir(fx.home, fx.profile, id)
 				path := filepath.Join(home, "settings.json")
-				if err := os.WriteFile(path, []byte("{\"operator\":true}\n"), 0o600); err != nil {
+				payload := []byte("{\"operator\":true}\n")
+				if id == envregistry.ClaudeCode {
+					payload = claudeSettingsFixtureBytes(t, "settings.json", payload)
+				}
+				if err := os.WriteFile(path, payload, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				profile := fx.profile
@@ -221,7 +226,7 @@ func TestClaudeReadOnlySettingsScope(t *testing.T) {
 				}
 				assertManagedMode(t, path, 0o600)
 				data, err := os.ReadFile(path)
-				if err != nil || string(data) != "{\"operator\":true}\n" {
+				if err != nil || string(data) != string(payload) {
 					t.Fatal("unrelated settings changed", err)
 				}
 				if id == envregistry.ClaudeCode {
@@ -257,6 +262,11 @@ func TestClaudeReadOnlySettingsNonregular(t *testing.T) {
 					t.Fatal(err)
 				}
 				full := filepath.Join(home, path)
+				if path == "settings.json" {
+					if err := os.Remove(full); err != nil {
+						t.Fatal(err)
+					}
+				}
 				switch kind {
 				case "link":
 					if err := os.Symlink(target, full); err != nil {
@@ -267,7 +277,7 @@ func TestClaudeReadOnlySettingsNonregular(t *testing.T) {
 						t.Fatal(err)
 					}
 				case "regular":
-					if err := os.WriteFile(full, []byte("{}\n"), 0o444); err != nil {
+					if err := os.WriteFile(full, claudeSettingsFixtureBytes(t, path, []byte("{}\n")), 0o444); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -311,7 +321,7 @@ func TestClaudeReadOnlySettingsWriteBits(t *testing.T) {
 	home := ManagedHomeDir(fx.home, fx.profile, req.EnvID)
 	for _, path := range claudeSettingsPaths {
 		full := filepath.Join(home, path)
-		if err := atomicManagedFile(EnvRoot(fx.home), mustSettingsRel(t, fx.home, full), []byte("{}\n"), 0o444); err != nil {
+		if err := atomicManagedFile(EnvRoot(fx.home), mustSettingsRel(t, fx.home, full), claudeSettingsFixtureBytes(t, path, []byte("{}\n")), 0o444); err != nil {
 			t.Fatal(err)
 		}
 		readOnly := req
@@ -343,4 +353,30 @@ func mustSettingsRel(t *testing.T, home, full string) string {
 		t.Fatal(err)
 	}
 	return rel
+}
+
+// Permission witnesses start with the independently specified native exclusion
+// already satisfied; optional settings have no native-memory ownership clause.
+func claudeSettingsFixtureBytes(t *testing.T, path string, input []byte) []byte {
+	t.Helper()
+	if path != "settings.json" {
+		return input
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(input, &object); err != nil {
+		t.Fatal(err)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	object["claudeMdExcludes"], err = json.Marshal([]string{filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := json.Marshal(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(result, '\n')
 }
