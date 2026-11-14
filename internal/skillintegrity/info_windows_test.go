@@ -29,7 +29,13 @@ func TestWindowsSkillIdentityRetainedBeforeReplacement(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !singleLink(path, info) {
+		// Keep the replacement receipt unresolved in the lazy-info mutant.
+		// The intact comparison owns a separate observation.
+		neighbor, err := captureEntryInfo(path, entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !singleLink(path, neighbor) {
 			t.Fatal("intact identity neighbor refused")
 		}
 		bytes, err := os.ReadFile(path)
