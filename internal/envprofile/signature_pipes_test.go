@@ -37,7 +37,8 @@ func TestSignaturePipes(t *testing.T) {
 	}{{"valid", "signed bytes\n", "fixture", true}, {"tampered", "changed bytes\n", "fixture", false}, {"wrong-principal", "signed bytes\n", "other", false}} {
 		t.Run(tc.name, func(t *testing.T) {
 
-			_, err := runSignaturePipes("ssh-keygen", []string{"-Y", "verify", "-f", "/dev/fd/3", "-I", tc.principal, "-n", "git", "-s", "/dev/fd/4"}, []byte(tc.message), allowed, signature)
+			command := exec.Command("ssh-keygen", "-Y", "verify", "-f", "/dev/fd/3", "-I", tc.principal, "-n", "git", "-s", "/dev/fd/4")
+			_, err := runSignaturePipes(command, []byte(tc.message), allowed, signature)
 
 			if (err == nil) != tc.valid {
 				t.Fatalf("verification = %v, valid=%v", err, tc.valid)
@@ -45,7 +46,7 @@ func TestSignaturePipes(t *testing.T) {
 		})
 	}
 	// Failed exec must also release pipe goroutines, even above pipe capacity.
-	if _, err := runSignaturePipes("/missing-verifier", nil, nil, make([]byte, 1024*1024)); err == nil {
+	if _, err := runSignaturePipes(exec.Command("/missing-verifier"), nil, make([]byte, 1024*1024)); err == nil {
 		t.Fatal("missing verifier accepted")
 	}
 }

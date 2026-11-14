@@ -25,8 +25,8 @@ func verifyReadOnlyObjectSignature(objectType string, payload []byte, allowed []
 		// the caller's already-read object remains the same recorded pin.
 		return evidence, nil
 	}
-	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
-		return evidence, fmt.Errorf("%w: inherited signature descriptors are unavailable on this platform", errSignerVerificationUnavailable)
+	if runtime.GOOS == "plan9" {
+		return evidence, fmt.Errorf("%w: read-only signature input transport is unavailable on this platform", errSignerVerificationUnavailable)
 	}
 	if bytes.Contains(signature, []byte("-----BEGIN SSH SIGNATURE-----")) {
 		// Armor inspection is informational; only the verifier can admit a signer.
@@ -49,7 +49,8 @@ func verifyReadOnlyObjectSignature(objectType string, payload []byte, allowed []
 				continue
 			}
 			policy := []byte(principal + " " + fields[0] + " " + fields[1] + "\n")
-			_, err := runSignaturePipes("ssh-keygen", []string{"-Y", "verify", "-f", "/dev/fd/3", "-I", principal, "-n", "git", "-s", "/dev/fd/4"}, data, policy, signature)
+			command := exec.Command("ssh-keygen", "-Y", "verify", "-f", "/dev/fd/3", "-I", principal, "-n", "git", "-s", "/dev/fd/4") // #nosec G204 -- literal verifier and argv-only principal; no shell is invoked
+			_, err := runSignaturePipes(command, data, policy, signature)
 			if err != nil {
 				var exit *exec.ExitError
 				if !errors.As(err, &exit) {
@@ -74,7 +75,8 @@ func verifyReadOnlyObjectSignature(objectType string, payload []byte, allowed []
 	if _, err := exec.LookPath("gpgv"); err != nil {
 		return evidence, fmt.Errorf("%w: read-only OpenPGP verifier is unavailable", errSignerVerificationUnavailable)
 	}
-	output, verifyErr := runSignaturePipes("gpgv", []string{"--homedir", home, "--keyring", keyring, "--status-fd", "1", "--", "/dev/fd/3", "-"}, data, signature)
+	command := exec.Command("gpgv", "--homedir", home, "--keyring", keyring, "--status-fd", "1", "--", "/dev/fd/3", "-") // #nosec G204 -- literal verifier and argv-only paths; no shell is invoked
+	output, verifyErr := runSignaturePipes(command, data, signature)
 	if verifyErr != nil {
 		var exit *exec.ExitError
 		if !errors.As(verifyErr, &exit) {

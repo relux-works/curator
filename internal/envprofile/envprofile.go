@@ -253,9 +253,10 @@ func List(home string) ([]Info, error) {
 	return ListWithPolicy(home, policy)
 }
 
-// ListWithPolicy lists under the machine gates of policy (environments
-// §9.1). The CLI passes the gates of its already-loaded configuration.
-func ListWithPolicy(home string, policy Policy) ([]Info, error) {
+// ListWithPolicy reports installed profiles without initializing the builtin.
+// Its policy argument is retained for the existing caller contract; listing
+// does not apply source-signature policy to installed profile records.
+func ListWithPolicy(home string, _ Policy) ([]Info, error) {
 	// Reads neither acquire the mutation lock nor replay pending journals.
 	if err := envauthority.Validate(home); err != nil {
 		return nil, err

@@ -12,8 +12,8 @@ import (
 // gpgv verifies against a pre-existing public-only keyring through a signature
 // pipe; the read phase neither invokes gpg nor initializes a keyring.
 func TestGPGSignaturePipe(t *testing.T) {
-	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
-		t.Skip("inherited descriptor backend unavailable")
+	if runtime.GOOS == "plan9" {
+		t.Skip("read-only signature input transport unavailable")
 	}
 	if _, err := exec.LookPath("gpgv"); err != nil {
 		t.Skip("gpgv unavailable")
@@ -23,8 +23,8 @@ func TestGPGSignaturePipe(t *testing.T) {
 	}
 	home := t.TempDir()
 	gen := exec.Command("gpg", "--homedir", home, "--batch", "--pinentry-mode", "loopback", "--passphrase", "", "--quick-generate-key", "fixture@example.test", "ed25519", "sign", "0")
-	if _, err := gen.CombinedOutput(); err != nil {
-		t.Fatalf("fixture generation: %v", err)
+	if output, err := gen.CombinedOutput(); err != nil {
+		t.Fatalf("fixture generation: %v\n%s", err, output)
 	}
 	signer := exec.Command("gpg", "--homedir", home, "--batch", "--pinentry-mode", "loopback", "--passphrase", "", "--armor", "--detach-sign")
 	signer.Stdin = strings.NewReader("signed bytes\n")
@@ -62,7 +62,8 @@ func TestGPGSignaturePipe(t *testing.T) {
 	}{{"valid", "signed bytes\n", true}, {"tampered", "changed bytes\n", false}} {
 		t.Run(tc.name, func(t *testing.T) {
 
-			out, err := runSignaturePipes("gpgv", []string{"--homedir", readonly, "--keyring", ring, "--status-fd", "1", "--", "/dev/fd/3", "-"}, []byte(tc.message), signature)
+			command := exec.Command("gpgv", "--homedir", readonly, "--keyring", ring, "--status-fd", "1", "--", "/dev/fd/3", "-")
+			out, err := runSignaturePipes(command, []byte(tc.message), signature)
 
 			if (err == nil) != tc.valid {
 				t.Fatalf("gpgv = %v valid=%v", err, tc.valid)
