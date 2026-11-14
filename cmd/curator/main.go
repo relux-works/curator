@@ -1530,6 +1530,9 @@ func (c cli) cmdSkillCheck(args []string) int {
 	dir := projectRootArg(positional)
 	issues := skillcheck.Validate(dir, *localeValue)
 	if *jsonOut {
+		if issues == nil {
+			issues = []skillcheck.Issue{}
+		}
 		payload, _ := json.MarshalIndent(issues, "", "  ")
 		_, _ = fmt.Fprintln(c.stdout, string(payload))
 	} else {
