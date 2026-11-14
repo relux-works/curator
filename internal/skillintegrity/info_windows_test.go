@@ -48,8 +48,17 @@ func TestWindowsSkillIdentityRetainedBeforeReplacement(t *testing.T) {
 			t.Fatal(err)
 		}
 		writeFixture(t, root, "SKILL.md", bytes, 0644)
-		if singleLink(path, info) {
+		// Compare receipts with no open payload handle. A path-backed
+		// receipt must not borrow the new object at its original path.
+		after, err := os.Lstat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if os.SameFile(info, after) {
 			t.Fatal("replacement borrowed earlier identity")
+		}
+		if singleLink(path, info) {
+			t.Fatal("replacement satisfied the original link observation")
 		}
 		if !singleLink(old, info) {
 			t.Fatal("retained original identity refused")
@@ -59,8 +68,10 @@ func TestWindowsSkillIdentityRetainedBeforeReplacement(t *testing.T) {
 	t.Fatal("fixture entry missing")
 }
 
-// A lazy path-backed observation must fail at the replacement assertion, not
-// through setup/build failure. The same test verifies the intact neighbor.
+// An explicitly lazy path-backed capture must fail at the replacement
+// assertion, not through setup/build failure. DirEntry.Info may already carry
+// a file ID on NTFS, so returning it is not a reliable narrowing plant. The
+// same witness verifies the intact and retained-original neighbors.
 func TestWindowsSkillIdentityControl(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
@@ -77,7 +88,7 @@ func TestWindowsSkillIdentityControl(t *testing.T) {
 	}
 	dir := t.TempDir()
 	replacement := filepath.Join(dir, "identity.go")
-	if err := os.WriteFile(replacement, []byte(strings.Replace(text, "return f.Stat()", "return entry.Info()", 1)), 0600); err != nil {
+	if err := os.WriteFile(replacement, []byte(strings.Replace(text, "return f.Stat()", "return os.Lstat(path)", 1)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{source: replacement}})
@@ -95,4 +106,5 @@ func TestWindowsSkillIdentityControl(t *testing.T) {
 	if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "--- FAIL: TestWindowsSkillIdentityRetainedBeforeReplacement ") || !strings.Contains(string(output), "replacement borrowed earlier identity") {
 		t.Fatalf("identity control missed intended assertion: %v\n%s", err, output)
 	}
+	t.Log("narrowing control reached TestWindowsSkillIdentityRetainedBeforeReplacement: replacement borrowed earlier identity")
 }
