@@ -10,7 +10,7 @@ import (
 )
 
 func testOrdinaryGateUnion(t *testing.T, c testLane) {
-	for _, control := range []string{"valid", "compatibility-refused", "compatibility-missing", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
+	for _, control := range []string{"valid", "unselected-compatibility", "canonical-missing-proof", "compatibility-refused", "compatibility-missing", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
 		t.Run(control, func(t *testing.T) {
 			dir := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(dir, ".github/ci"), 0755); err != nil {
@@ -88,6 +88,17 @@ esac
 			}
 			cmd.Env = append(cmd.Env, key+"=shards")
 			switch control {
+			case "unselected-compatibility", "canonical-missing-proof":
+				clean := cmd.Env[:0]
+				for _, entry := range cmd.Env {
+					if !strings.HasPrefix(entry, "CI_STORE_COMPATIBILITY=") && !strings.HasPrefix(entry, "CI_STORE_V2_CANONICAL=") {
+						clean = append(clean, entry)
+					}
+				}
+				cmd.Env = clean
+				if control == "canonical-missing-proof" {
+					cmd.Env = append(cmd.Env, "CI_STORE_V2_CANONICAL=1")
+				}
 			case "compatibility-refused":
 				cmd.Env = append(cmd.Env, "COMPAT_REFUSED=1")
 			case "compatibility-missing":
@@ -102,14 +113,23 @@ esac
 				cmd.Env = append(cmd.Env, "CI_ENVPROFILE_SHARDS=shards")
 			}
 			out, err := cmd.CombinedOutput()
-			if control == "valid" {
+			if control == "valid" || control == "unselected-compatibility" {
 				if err != nil || !strings.Contains(string(out), "platform-case gate: ok") {
 					t.Fatalf("valid native union: %v\n%s", err, out)
+				}
+				commands, err := os.ReadFile(filepath.Join(dir, "commands.txt"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				delegated := strings.Contains(string(commands), "-skip ^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive")
+				checked := strings.Contains(string(commands), "run ./tools/check-store-compatibility")
+				if delegated != (control == "valid") || checked != (control == "valid") {
+					t.Fatalf("historical delegation must match explicit proof selection: %s", commands)
 				}
 				return
 			}
 			code := 1
-			if control == "compatibility-missing" || control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
+			if control == "compatibility-missing" || control == "canonical-missing-proof" || control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
 				code = 2
 			}
 			exit, ok := err.(*exec.ExitError)
@@ -123,7 +143,7 @@ esac
 			} else {
 				want := ""
 				switch control {
-				case "compatibility-missing":
+				case "compatibility-missing", "canonical-missing-proof":
 					want = "same-head revision-1 compatibility evidence is required"
 				case "mixed-lanes":
 					want = "ordinary shard lanes are mutually exclusive"
@@ -146,6 +166,8 @@ esac
 
 // The real shell and unchanged ledger gate admit complete native unions and
 // reject the intended missing-child/configuration controls on each platform.
+// Explicit proof enables delegation; an unselected candidate/standalone run
+// keeps all historical families and performs no compatibility admission.
 // Go execution/planning are bounded stand-ins; native CI supplies runtime proof.
 func TestOrdinaryGateUnion(t *testing.T) {
 	for _, goos := range []string{"windows", "linux", "darwin"} {
