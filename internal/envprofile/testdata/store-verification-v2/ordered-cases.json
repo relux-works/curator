@@ -1,0 +1,146 @@
+[
+  {
+    "schema": "curator.environment-store-case/2",
+    "capability": "agent-environments",
+    "capability_revision": 2,
+    "name": "control-resolve-context-intact",
+    "case_kind": "implementation",
+    "operation": "resolve",
+    "condition": "intact",
+    "member_kind": "context",
+    "source_kind": "git",
+    "home_state": "current",
+    "verification_levels": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "expected": {
+      "diagnostic": "",
+      "failing_check": "",
+      "fragment_emitted": true,
+      "row_current": true,
+      "writes": [],
+      "store_rebuilt": false,
+      "lock_unchanged": true,
+      "plant_preserved": false,
+      "path_named": false,
+      "rule_named": false
+    },
+    "positive_control": "control-resolve-context-intact",
+    "predecessor": null,
+    "forbidden_observations": [
+      {
+        "name": "rejects-valid-neighbor",
+        "observation": {
+          "diagnostic": "environment_store_untrusted",
+          "failing_check": "",
+          "fragment_emitted": false,
+          "row_current": false,
+          "writes": [],
+          "store_rebuilt": false,
+          "lock_unchanged": true,
+          "plant_preserved": false,
+          "path_named": false,
+          "rule_named": false
+        }
+      }
+    ]
+  },
+  {
+    "schema": "curator.environment-store-case/2",
+    "capability": "agent-environments",
+    "capability_revision": 2,
+    "name": "precedence-context-first",
+    "case_kind": "implementation",
+    "operation": "resolve",
+    "condition": "multiple-structural",
+    "member_kind": "context",
+    "source_kind": "git",
+    "home_state": "current",
+    "verification_levels": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "expected": {
+      "diagnostic": "environment_store_untrusted",
+      "failing_check": "ownership",
+      "fragment_emitted": false,
+      "row_current": false,
+      "writes": [],
+      "store_rebuilt": false,
+      "lock_unchanged": true,
+      "plant_preserved": true,
+      "path_named": true,
+      "rule_named": true,
+      "offending_path": "context/payload"
+    },
+    "positive_control": "control-resolve-context-intact",
+    "predecessor": null,
+    "forbidden_observations": [
+      {
+        "name": "opposite-launch-verdict",
+        "observation": {
+          "diagnostic": "environment_store_untrusted",
+          "failing_check": "ownership",
+          "fragment_emitted": true,
+          "row_current": false,
+          "writes": [],
+          "store_rebuilt": false,
+          "lock_unchanged": true,
+          "plant_preserved": true,
+          "path_named": true,
+          "rule_named": true,
+          "offending_path": "context/payload"
+        }
+      },
+      {
+        "name": "later-member-wins",
+        "observation": {
+          "diagnostic": "environment_store_untrusted",
+          "failing_check": "ownership",
+          "fragment_emitted": false,
+          "row_current": false,
+          "writes": [],
+          "store_rebuilt": false,
+          "lock_unchanged": true,
+          "plant_preserved": true,
+          "path_named": true,
+          "rule_named": true,
+          "offending_path": "skill/payload"
+        }
+      },
+      {
+        "name": "wrong-member-diagnostic-class",
+        "observation": {
+          "diagnostic": "skill_integrity_boundary_invalid",
+          "failing_check": "ownership",
+          "fragment_emitted": false,
+          "row_current": false,
+          "writes": [],
+          "store_rebuilt": false,
+          "lock_unchanged": true,
+          "plant_preserved": true,
+          "path_named": true,
+          "rule_named": true,
+          "offending_path": "context/payload"
+        }
+      }
+    ],
+    "structural_failures": [
+      {
+        "member_kind": "context",
+        "condition": "ownership",
+        "path": "context/payload"
+      },
+      {
+        "member_kind": "skill",
+        "condition": "hardlink",
+        "path": "skill/payload"
+      }
+    ]
+  }
+]
