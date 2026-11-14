@@ -106,7 +106,8 @@ func TestStartupObjectAvailabilityMatrix(t *testing.T) {
 										t.Fatalf("object availability became structure: %v", err)
 									}
 									if owned {
-										if !strings.HasPrefix(err.Error(), DiagHomeStale+":") || !(loss == "blob" && drift == "home" && mode == "dry-run") && !strings.Contains(err.Error(), "--repair") {
+										hintRequired := loss != "blob" || drift != "home" || mode != "dry-run"
+										if !strings.HasPrefix(err.Error(), DiagHomeStale+":") || hintRequired && !strings.Contains(err.Error(), "--repair") {
 											t.Fatalf("object loss hid home diagnostic: %v", err)
 										}
 									} else if loss != "blob" && (!strings.Contains(err.Error(), "pin_hash") || !strings.Contains(err.Error(), "pinned commit object unavailable")) {
