@@ -30,7 +30,7 @@ func ordinaryConfig(lane, goos string) (testLane, error) {
 		case "linux":
 			return testLane{goos, lane, "60m", 3, 1800}, nil
 		case "darwin":
-			return testLane{goos, lane, "60m", 2, 1800}, nil
+			return testLane{goos, lane, "60m", 3, 1800}, nil
 		}
 	}
 	return testLane{}, fmt.Errorf("%s lane does not support native %s", lane, goos)
@@ -67,7 +67,7 @@ func (c testLane) partition(tests map[string][]string) (map[string][][]string, e
 			seen[name] = true
 			h := fnv.New64a()
 			_, _ = h.Write([]byte(name))
-			// #nosec G115 -- Native configurations fix the positive shard count to 2, 3 or 4.
+			// #nosec G115 -- Native configurations fix the positive shard count to 3 or 4.
 			i := int(h.Sum64() % uint64(c.shards))
 			shards[i] = append(shards[i], name)
 		}
