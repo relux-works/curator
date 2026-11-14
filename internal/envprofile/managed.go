@@ -152,6 +152,9 @@ type ResolveRequest struct {
 	preserveLockHash  string
 	// beforeRepairLock is a race-injection seam; production leaves it nil.
 	beforeRepairLock func()
+	// afterStoreInspection injects object disappearance between structure and
+	// pin revalidation. Production leaves this race seam nil.
+	afterStoreInspection func()
 }
 
 // ResolveResult is the outcome: exactly one of Document and StaleErr is
@@ -2955,7 +2958,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	absentStore, err := inspectStoreAvailability(req.Home, lock, req.boundaryOwnerLookup)
 	if err != nil {
 		var failure *storeEntryFailure
-		if req.Repair && errors.As(err, &failure) && pinnedCommitObjectUnavailable(failure) {
+		if errors.As(err, &failure) && pinnedCommitObjectUnavailable(failure) {
 			owned := homeOwnedDrift(&req, verifyHomeContent(&req, adapter, source, lock, hash))
 			return nil, homeInputsFailure(owned, err)
 		}
@@ -3002,6 +3005,9 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		}
 		req.storeRepairAttempted = true
 		return Resolve(req)
+	}
+	if req.afterStoreInspection != nil {
+		req.afterStoreInspection()
 	}
 	localChecks, localErr := startupChecks(req.Home, lock)
 	if localErr != nil {
@@ -3140,7 +3146,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	// Capture still requires verified input, and missing plans cannot be rendered.
 	launchStaleHome := effectiveLevel == 1 && (!req.Repair || permissiveExistingHome) && !req.strictStartupInput && !verdict.current && verdict.marker != nil && verdict.plan != nil
 	if launchStaleHome {
-		verdict.warnings = append(verdict.warnings, fmt.Sprintf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; ")))
+		verdict.warnings = append([]string{fmt.Sprintf("%s: %s; rerun with --repair", DiagHomeStale, strings.Join(verdict.reasons, "; "))}, verdict.warnings...)
 	}
 	if verdict.current || launchStaleHome {
 		fragment, err := buildFragment(&req, adapter, verdict)

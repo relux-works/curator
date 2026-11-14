@@ -19,7 +19,7 @@ import (
 // repository's existing object database. It never fetches or consults refs.
 func PinnedCommitTree(repo, commit string) (treeID, objectFormat string, err error) {
 	if err := EnsureRepo(repo); err != nil {
-		return "", "", err
+		return "", "", objectUnavailable("commit", err)
 	}
 	if err := validateLockedCommit(commit); err != nil {
 		return "", "", err
@@ -34,21 +34,21 @@ func PinnedCommitTree(repo, commit string) (treeID, objectFormat string, err err
 	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
 	objectFormat, err = runWithEnv(repo, env, "rev-parse", "--show-object-format")
 	if err != nil {
-		return "", "", fmt.Errorf("read pinned repository object format: %w", err)
+		return "", "", objectUnavailable("repository", err)
 	}
 	if (objectFormat == "sha1" && len(commit) != 40) || (objectFormat == "sha256" && len(commit) != 64) {
 		return "", "", fmt.Errorf("commit object ID does not match repository object format %s", objectFormat)
 	}
 	resolved, err := runWithEnv(repo, env, "rev-parse", "--verify", commit+"^{commit}")
 	if err != nil {
-		return "", "", fmt.Errorf("pinned commit object unavailable: could not resolve %s^{commit}: %w", commit, err)
+		return "", "", objectUnavailable("commit", err)
 	}
 	if !strings.EqualFold(resolved, commit) {
 		return "", "", fmt.Errorf("pinned commit object unavailable: repository resolved %s as %s", commit, resolved)
 	}
 	treeID, err = runWithEnv(repo, env, "rev-parse", "--verify", commit+"^{tree}")
 	if err != nil {
-		return "", "", fmt.Errorf("pinned commit tree unavailable: could not resolve %s^{tree}: %w", commit, err)
+		return "", "", objectUnavailable("tree", err)
 	}
 	return treeID, objectFormat, nil
 }

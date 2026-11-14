@@ -80,7 +80,7 @@ func TestStartupCombinedHomeAndSourceDrift(t *testing.T) {
 								}
 							}
 						}
-						if err != nil || result == nil || len(result.Document) == 0 || !strings.Contains(warning, "--repair") {
+						if err != nil || result == nil || len(result.Document) == 0 || len(result.Warnings) == 0 || result.Warnings[0] != warning || !strings.Contains(warning, "--repair") {
 							t.Fatalf("combined read-only warning lost: %v", err)
 						}
 					} else if err == nil || !strings.HasPrefix(err.Error(), DiagHomeStale+":") || !strings.Contains(err.Error(), "--repair") || result != nil && len(result.Document) != 0 {
@@ -150,6 +150,7 @@ func TestStartupCombinedRepairRequiresVerifiedInputs(t *testing.T) {
 // child's intact neighbor preserved. A compile/setup failure never qualifies.
 func TestStartupCombinedDriftControls(t *testing.T) {
 	for _, p := range []struct{ name, file, before, after, test, witness string }{
+		{"warning-order", "managed.go", "verdict.warnings = append([]string{fmt.Sprintf(\"%s: %s; rerun with --repair\", DiagHomeStale, strings.Join(verdict.reasons, \"; \"))}, verdict.warnings...)", "verdict.warnings = append(verdict.warnings, fmt.Sprintf(\"%s: %s; rerun with --repair\", DiagHomeStale, strings.Join(verdict.reasons, \"; \")))", "TestStartupCombinedHomeAndSourceDrift/level1/observe", "combined read-only warning lost"},
 		{"skill-content", "home_owned_drift.go", "if err := verifySkillProjection(req.Home, skillOf{root: target, hash: identity, version: version}); err != nil {", "if err := verifySkillProjection(req.Home, skillOf{root: target, hash: identity, version: version}); false && err != nil {", "TestStartupSourceOnlySkillDriftKeepsExistingHome", "changed original projection launched"},
 		{"skill-receipt", "home_owned_drift.go", "return err != nil || actual != surface.ContentSHA256", "return false && (err != nil || actual != surface.ContentSHA256)", "TestStartupSourceOnlySkillDriftKeepsExistingHome", "retargeted skill receipt launched"},
 		{"receipt", "home_owned_drift.go", "if complete {", "if false && complete {", "TestStartupCombinedHomeAndSourceDrift/level1/repair", "combined repair lost leading stale refusal or launched"},

@@ -1197,3 +1197,9 @@ internal/envprofile	TestStartupCombinedHomeAndSourceDrift	linux,darwin,windows	-
 internal/envprofile	TestStartupCombinedRepairRequiresVerifiedInputs	linux,darwin,windows	-	-	unavailable pinned input refuses home repair at every level without writes or launch
 internal/envprofile	TestStartupCombinedDriftControls	linux,darwin,windows	-	-	decision-specific mutants fail the intended combined-drift assertions
 internal/envprofile	TestStartupSourceOnlySkillDriftKeepsExistingHome	linux,darwin,windows	-	-	intact earlier skill projection remains source-only; retargeted projection receipt refuses
+
+internal/envprofile	TestStartupObjectAvailabilityMatrix	linux,darwin,windows	-	-	Git object loss is availability across levels, drift and modes; home diagnostics lead
+internal/envprofile	TestStartupObjectLossBetweenInspectionAndPins	linux,darwin,windows	-	-	Late object loss preserves the home diagnostic without writes or launch
+internal/envprofile	TestStartupObjectAvailabilityControls	linux,darwin,windows	-	-	Object availability regressions reach their named negative assertions
+internal/envprofile	TestStartupObjectMainParity	linux,darwin,windows	-	-	Missing blobs and repository caches retain main parity
+internal/gitops	TestPinnedPathsObjectAvailability	linux,darwin,windows	-	-	Tree metadata roster is blob independent and object loss has a typed class

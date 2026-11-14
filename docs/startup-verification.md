@@ -275,7 +275,10 @@ home-owned and source drift, read-only levels 2-4 lead with
 `environment_home_stale` and the repair hint; level 1 keeps its warning-start.
 Repair at levels 1-2 refuses without home writes or launch until inputs verify.
 Levels 3-4 may rebuild verified Git inputs first, then restore the home before
-launch; unavailable pinned inputs refuse with the home diagnostic leading.
+launch. Missing blob payloads do not invalidate an intact stored tree: the
+structural roster reads tree metadata without sizes. An unavailable commit,
+tree or repository is pin availability, never structural `regular_types`;
+home-owned drift keeps the home diagnostic leading when inputs cannot verify.
 Source-only drift keeps its existing permissive behavior.
 
 Canonical runtime families assert the exact manifest row IDs and every level

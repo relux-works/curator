@@ -20,7 +20,7 @@ const maxPinnedPaths = 16384
 // It resolves no ref and reads no sibling of a selected directory.
 func pinnedSnapshotSelection(repo, commit, directory string) (string, string, error) {
 	if err := EnsureRepo(repo); err != nil {
-		return "", "", err
+		return "", "", objectUnavailable("commit", err)
 	}
 	env, cleanup, err := isolatedGitEnv()
 	if err != nil {
@@ -83,7 +83,7 @@ func PinnedDirectorySnapshotPaths(repo, commit, directory string) ([]string, err
 	}
 	defer cleanup()
 	env = append(env, "GIT_NO_REPLACE_OBJECTS=1")
-	cmd := gitCommand("-C", repo, "ls-tree", "-r", "-l", "-z", "--full-tree", tree)
+	cmd := gitCommand("-C", repo, "ls-tree", "-r", "-z", "--full-tree", tree)
 	cmd.Env = env
 	var stdout pinnedListingBuffer
 	var stderr bytes.Buffer
@@ -95,9 +95,25 @@ func PinnedDirectorySnapshotPaths(repo, commit, directory string) ([]string, err
 		return nil, errors.New("pinned snapshot path metadata exceeds 16 MiB")
 	}
 	if err := runErr; err != nil {
-		return nil, fmt.Errorf("pinned snapshot path listing: %w", err)
+		return nil, objectUnavailable("tree", err)
 	}
-	entries, err := parseTreeListing(repo, stdout.Bytes())
+	// ls-tree without -l reads tree metadata only. Blob availability is not
+	// required to establish the recorded regular-file roster or the tree pin.
+	var sized bytes.Buffer
+	for _, record := range bytes.Split(stdout.Bytes(), []byte{0}) {
+		if len(record) == 0 {
+			continue
+		}
+		meta, path, ok := bytes.Cut(record, []byte{'\t'})
+		if !ok {
+			return nil, fmt.Errorf("malformed pinned path record")
+		}
+		sized.Write(meta)
+		sized.WriteString(" 0\t")
+		sized.Write(path)
+		sized.WriteByte(0)
+	}
+	entries, err := parseTreeListing(repo, sized.Bytes())
 	if err != nil {
 		return nil, err
 	}

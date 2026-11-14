@@ -64,7 +64,7 @@ func directoryTree(repo, tree, directory string, env []string) (string, error) {
 		}
 		out, err := cmd.Output()
 		if err != nil {
-			return "", fmt.Errorf("read selected directory tree: %w", err)
+			return "", objectUnavailable("tree", err)
 		}
 		found := false
 		for _, record := range bytes.Split(out, []byte{0}) {
