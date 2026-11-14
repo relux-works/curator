@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/relux-works/curator/internal/contextresolve"
@@ -50,14 +51,12 @@ func verifyReadOnlyObjectSignature(objectType string, payload []byte, allowed []
 			}
 			policy := []byte(principal + " " + fields[0] + " " + fields[1] + "\n")
 			command := exec.Command("ssh-keygen", "-Y", "verify", "-f", "/dev/fd/3", "-I", principal, "-n", "git", "-s", "/dev/fd/4") // #nosec G204 -- literal verifier and argv-only principal; no shell is invoked
-			_, err := runSignaturePipes(command, data, policy, signature)
+			output, runErr := runSignaturePipes(command, data, policy, signature)
+			err := signatureVerifierResult("SSH", output, runErr)
 			if err != nil {
-				var exit *exec.ExitError
-				if !errors.As(err, &exit) {
-					return evidence, fmt.Errorf("%w: SSH verification could not execute", errSignerVerificationUnavailable)
-				}
+				return evidence, err
 			}
-			if err == nil {
+			if runErr == nil {
 				evidence.Valid = true
 				evidence.Signer = signer
 				return evidence, nil
@@ -75,13 +74,18 @@ func verifyReadOnlyObjectSignature(objectType string, payload []byte, allowed []
 	if _, err := exec.LookPath("gpgv"); err != nil {
 		return evidence, fmt.Errorf("%w: read-only OpenPGP verifier is unavailable", errSignerVerificationUnavailable)
 	}
+	home, err = signatureVerifierPath("gpgv", home)
+	if err != nil {
+		return evidence, fmt.Errorf("%w: %v", errSignerVerificationUnavailable, err)
+	}
+	keyring, err = signatureVerifierPath("gpgv", keyring)
+	if err != nil {
+		return evidence, fmt.Errorf("%w: %v", errSignerVerificationUnavailable, err)
+	}
 	command := exec.Command("gpgv", "--homedir", home, "--keyring", keyring, "--status-fd", "1", "--", "/dev/fd/3", "-") // #nosec G204 -- literal verifier and argv-only paths; no shell is invoked
 	output, verifyErr := runSignaturePipes(command, data, signature)
-	if verifyErr != nil {
-		var exit *exec.ExitError
-		if !errors.As(verifyErr, &exit) {
-			return evidence, fmt.Errorf("%w: OpenPGP verification could not execute", errSignerVerificationUnavailable)
-		}
+	if err := signatureVerifierResult("OpenPGP", output, verifyErr); err != nil {
+		return evidence, err
 	}
 	for _, line := range strings.Split(string(output), "\n") {
 		fields := strings.Fields(line)
@@ -135,4 +139,60 @@ func readOnlyGPGKeyring() (home, keyring string, err error) {
 		return home, candidate, nil
 	}
 	return "", "", fmt.Errorf("%w: no existing OpenPGP public keyring", errSignerVerificationUnavailable)
+}
+
+// Exit status alone cannot distinguish a bad signature from unreadable input,
+// unsupported options, or a failed verifier. Only recognized negative evidence
+// from a completed transport is a cryptographic verdict.
+func signatureVerifierResult(kind string, output []byte, runErr error) error {
+	if runErr == nil {
+		return nil
+	}
+	var exit *exec.ExitError
+	if !errors.Is(runErr, errSignerVerificationUnavailable) && errors.As(runErr, &exit) && (exit.ExitCode() == 1 || (kind == "SSH" && exit.ExitCode() == 255)) && signatureNegativeVerdict(kind, output) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s verifier could not complete (%s); output=%s", errSignerVerificationUnavailable, kind, signatureDiagnostic([]byte(runErr.Error())), signatureDiagnostic(output))
+}
+
+func signatureNegativeVerdict(kind string, output []byte) bool {
+	if kind == "SSH" {
+		text := strings.ReplaceAll(string(output), "\r\n", "\n")
+		// A policy/key mismatch emits only the final line. A cryptographic
+		// mismatch emits its specific error followed by the same final line.
+		return text == "Could not verify signature.\n" || text == "Signature verification failed: incorrect signature\nCould not verify signature.\n"
+	}
+	bad := false
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != "[GNUPG:]" {
+			continue
+		}
+		switch fields[1] {
+		case "NO_PUBKEY", "ERRSIG", "FAILURE", "ERROR":
+			return false
+		case "BADSIG":
+			bad = true
+		}
+	}
+	return bad
+}
+
+// Bound the escaped diagnostic itself, including quotes, so control bytes
+// cannot inject terminal lines or expand a bounded input into unbounded output.
+func signatureDiagnostic(data []byte) string {
+	const limit = 1024
+	var text strings.Builder
+	text.WriteByte('"')
+	for _, char := range string(data) {
+		escaped := strconv.QuoteToASCII(string(char))
+		escaped = escaped[1 : len(escaped)-1]
+		if text.Len()+len(escaped)+5 > limit {
+			text.WriteString("...")
+			break
+		}
+		text.WriteString(escaped)
+	}
+	text.WriteByte('"')
+	return text.String()
 }

@@ -40,7 +40,7 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 	command.Env = gitops.ReadOnlyEnv()
 	command.Stdin = bytes.NewReader(payload)
 	if len(inputs) == 0 {
-		return command.CombinedOutput()
+		return signatureCommandOutput(command)
 	}
 
 	pipes, names, err := createSignatureInputPipes(len(inputs))
@@ -55,7 +55,7 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 		}
 	}
 
-	var output bytes.Buffer
+	var output signatureOutput
 	command.Stdout = &output
 	command.Stderr = &output
 	if err := command.Start(); err != nil {
@@ -67,7 +67,7 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 		_ = command.Process.Kill()
 		_ = command.Wait()
 		closeSignatureInputPipes(pipes)
-		return output.Bytes(), errors.New("signature verifier process ID is outside the Windows range")
+		return output.data, errors.New("signature verifier process ID is outside the Windows range")
 	}
 	windowsProcessID := uint32(processID)
 	processHandle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, windowsProcessID)
@@ -75,7 +75,7 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 		_ = command.Process.Kill()
 		_ = command.Wait()
 		closeSignatureInputPipes(pipes)
-		return output.Bytes(), fmt.Errorf("could not monitor signature verifier process: %w", err)
+		return output.data, fmt.Errorf("could not monitor signature verifier process: %w", err)
 	}
 
 	writeResults := make(chan error, len(inputs))
@@ -90,13 +90,16 @@ func runSignaturePipes(command *exec.Cmd, payload []byte, inputs ...[]byte) ([]b
 		writeErr = errors.Join(writeErr, <-writeResults)
 	}
 	processCloseErr := windows.CloseHandle(processHandle)
-	if runErr != nil {
-		return output.Bytes(), runErr
+	if output.truncated {
+		return output.data, fmt.Errorf("%w: verifier output exceeded capture limit", errSignerVerificationUnavailable)
 	}
 	if writeErr != nil || processCloseErr != nil {
-		return output.Bytes(), fmt.Errorf("verification input pipe: %w", errors.Join(writeErr, processCloseErr))
+		return output.data, fmt.Errorf("%w: verification input pipe: %v (verifier: %v)", errSignerVerificationUnavailable, errors.Join(writeErr, processCloseErr), runErr)
 	}
-	return output.Bytes(), nil
+	if runErr != nil {
+		return output.data, runErr
+	}
+	return output.data, nil
 }
 
 func signaturePipeArgs(args []string, inputCount int) ([]string, error) {

@@ -563,7 +563,7 @@ func sourceSignerPosture(req StatusRequest, infos []Info) []SourceSignerPosture 
 				row.Diagnostic = "signer_verification_unavailable"
 				cause := "local source objects are unavailable"
 				if verifyErr != nil {
-					cause = verifyErr.Error()
+					cause = signatureDiagnostic([]byte(verifyErr.Error()))
 				}
 				row.Hint = cause + "; verify through an explicit mutation: curator profile update " + info.Name
 				// §12 distinguishes a pin that cannot be reverified because
