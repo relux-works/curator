@@ -17,8 +17,8 @@ import (
 // fail, and the mutating verifier remains usable. No private material is read
 // during the status phase; fixture key creation is completed beforehand.
 func TestReadPuritySSHSignatures(t *testing.T) {
-	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
-		t.Skip("inherited descriptor backend unavailable")
+	if runtime.GOOS == "plan9" {
+		t.Skip("read-only signature input transport unavailable")
 	}
 	pinHomes(t)
 	private, public := statusSignerKey(t)
@@ -71,7 +71,7 @@ func TestReadPuritySSHSignatures(t *testing.T) {
 			t.Fatal(splitErr)
 		}
 		// Alter a signed header, preserving the complete embedded signature.
-		changed := strings.Replace(string(payload), "fixture-impossible", "unused", 1)
+		var changed string
 		if objectType == "commit" {
 			changed = strings.Replace(string(payload), "tree ", "tree 0", 1)
 		} else {
@@ -121,8 +121,8 @@ func TestReadPurityGPGUnavailable(t *testing.T) {
 // An unchanged signed pin with a missing verifier retains pin currency and
 // reports unavailable explicitly; enforced failures retain their false verdict.
 func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
-	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
-		t.Skip("inherited descriptor backend unavailable")
+	if runtime.GOOS == "plan9" {
+		t.Skip("read-only signature input transport unavailable")
 	}
 	pinHomes(t)
 	private, public := statusSignerKey(t)
@@ -153,7 +153,15 @@ func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
 		t.Fatal(err)
 	}
 	onlyGit := t.TempDir()
-	if err := os.Symlink(git, filepath.Join(onlyGit, "git")); err != nil {
+	if runtime.GOOS == "windows" {
+		data, err := os.ReadFile(git)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(onlyGit, "git.exe"), data, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	} else if err := os.Symlink(git, filepath.Join(onlyGit, "git")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", onlyGit)
