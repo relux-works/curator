@@ -599,10 +599,11 @@ contribution. Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcon
 and the documented `CURATOR_PROJECT_CLAUDE_MUTANTS=1` lane; store logs in `.temp/`.
 The typed certification report keeps unsupported strict tuples refused.
 Claude homes also program `claudeMdExcludes` with the absolute native
-`.claude/CLAUDE.md` path under the operator's home. Ordinary provisioning and
-repair preserve existing settings and exclusions; project composition adds the
-same exclusion to its generated settings. Project and profile instruction files
-remain eligible. Existing homes missing the exclusion require `env resolve
+`.claude/CLAUDE.md` path and `.claude/rules/**` subtree under the operator's
+home. Both paths quote literal glob metacharacters; the rules suffix alone
+recurses. Ordinary provisioning and repair preserve existing settings and exclusions; project composition adds the
+same exclusions to its generated settings. Project and profile instruction files
+remain eligible. Existing homes missing either exclusion require `env resolve
 --repair`. Run the merge and repair checks with
 `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/claudememory ./internal/envprofile -run 'TestMerge|TestClaudeNativeMemory' -count=1`.
 The optional `TestPinnedClaudeMemoryExclusion` additionally needs Node.js and

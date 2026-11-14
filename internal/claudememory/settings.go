@@ -25,8 +25,9 @@ func NativeFile() (string, error) {
 }
 
 // Merge preserves existing settings and exclusions, adding only the native
-// memory path. A satisfied document is returned byte-identical. Invalid input
-// is never replaced with defaults. Number lexemes in unrelated values survive.
+// memory file and native rules subtree. A satisfied document is returned
+// byte-identical. Invalid input is never replaced with defaults. Number lexemes
+// in unrelated values survive.
 func Merge(payload []byte, nativeFile string) ([]byte, error) {
 	if !filepath.IsAbs(nativeFile) {
 		return nil, fmt.Errorf("native Claude memory path must be absolute")
@@ -54,13 +55,23 @@ func Merge(payload []byte, nativeFile string) ([]byte, error) {
 			excludes = append(excludes, path)
 		}
 	}
+	nativeRules := literalPattern(filepath.ToSlash(filepath.Join(filepath.Dir(nativeFile), "rules"))) + "/**"
 	nativeFile = literalPattern(filepath.ToSlash(nativeFile))
-	for _, path := range excludes {
-		if path == nativeFile {
-			return payload, nil
+	required := []string{nativeFile, nativeRules}
+	changed := false
+	for _, requiredPath := range required {
+		found := false
+		for _, path := range excludes {
+			found = found || path == requiredPath
+		}
+		if !found {
+			excludes = append(excludes, requiredPath)
+			changed = true
 		}
 	}
-	excludes = append(excludes, nativeFile)
+	if !changed {
+		return payload, nil
+	}
 	encoded, err := json.Marshal(excludes)
 	if err != nil {
 		return nil, err

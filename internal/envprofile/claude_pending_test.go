@@ -16,9 +16,11 @@ import (
 // Real durable prepared intent, real manager lock, and public Resolve. No
 // fabricated recovery inventory. atime/ctime and recovery-directory mtime are
 // not asserted; untouched regular entries retain identity/mode/mtime/bytes.
+// Malformed settings must refuse before pending recovery changes any entry;
+// unchanged valid settings permit real recovery in both home forms.
 func TestReviewPendingJournal(t *testing.T) {
 	for _, form := range []string{envregistry.FormReferenced, envregistry.FormMonolithic} {
-		for _, variant := range []string{"early-invalid", "late-invalid", "late-array", "late-tail", "unchanged"} {
+		for _, variant := range []string{"early-invalid", "settings-invalid", "late-invalid", "late-array", "late-tail", "unchanged"} {
 			t.Run(form+"/"+variant, func(t *testing.T) {
 				invalidPayload := []byte(`{"broken":`)
 				if variant == "late-array" {
@@ -37,6 +39,11 @@ func TestReviewPendingJournal(t *testing.T) {
 				// all other payloads alone and not cause a new repair publication.
 				if variant == "early-invalid" {
 					if err := os.WriteFile(seed, []byte(`{"broken":`), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if variant == "settings-invalid" {
+					if err := os.WriteFile(filepath.Join(filepath.Dir(seed), "settings.json"), []byte(`{"broken":`), 0600); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -91,7 +98,7 @@ func TestReviewPendingJournal(t *testing.T) {
 					t.Fatal(hookErr)
 				}
 				after := claudeRefusalSnapshot(t, fx.home)
-				if variant == "early-invalid" {
+				if variant == "early-invalid" || variant == "settings-invalid" {
 					if resolveErr == nil || !strings.Contains(resolveErr.Error(), envregistry.DiagSeedUnreadable) {
 						t.Errorf("wrong early refusal: %v", resolveErr)
 					}

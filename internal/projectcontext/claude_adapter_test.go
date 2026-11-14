@@ -299,7 +299,7 @@ func testClaudeManagerControls(t *testing.T, want string) {
 	if string(settings.Permissions) != `{"allow":["Read"],"defaultMode":"dontAsk","deny":["Write","mcp__*"]}` {
 		t.Fatal("manager policy not programmed")
 	}
-	if !reflect.DeepEqual(settings.Excludes, []string{want}) {
+	if !reflect.DeepEqual(settings.Excludes, []string{want, strings.TrimSuffix(want, "CLAUDE.md") + "rules/**"}) {
 		t.Fatal("native memory exclusion not programmed")
 	}
 	if p.Record.PolicySHA256 == granted.Record.PolicySHA256 || p.Record.MaterializationSHA256 == granted.Record.MaterializationSHA256 {

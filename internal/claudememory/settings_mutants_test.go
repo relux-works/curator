@@ -14,7 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
-// Omitting the sole owned exclusion must fail the independent literal scope
+// Omitting both owned exclusions must fail the independent literal scope
 // assertion, while malformed-input refusal still passes. Build failures cannot
 // count as a detected omission.
 func TestNativeMemoryExclusionNarrowingMutant(t *testing.T) {
@@ -26,7 +26,7 @@ func TestNativeMemoryExclusionNarrowingMutant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const anchor = "excludes = append(excludes, nativeFile)"
+	const anchor = "excludes = append(excludes, requiredPath)"
 	if strings.Count(string(data), anchor) != 1 {
 		t.Fatal("native exclusion mutation anchor is not unique")
 	}

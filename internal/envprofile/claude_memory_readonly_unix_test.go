@@ -56,7 +56,7 @@ func TestClaudeNativeMemoryReadOnlySettings(t *testing.T) {
 					t.Fatal(err)
 				}
 				want := filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))
-				if !got.Operator || len(got.Excludes) != 2 || got.Excludes[0] != "**/vendor/CLAUDE.md" || got.Excludes[1] != want {
+				if !got.Operator || len(got.Excludes) != 3 || got.Excludes[0] != "**/vendor/CLAUDE.md" || got.Excludes[1] != want || got.Excludes[2] != filepath.ToSlash(filepath.Join(home, ".claude", "rules"))+"/**" {
 					t.Fatalf("repair lost unrelated settings or the exact native exclusion: %+v", got)
 				}
 				req.Repair = false
