@@ -18,6 +18,7 @@ import (
 	sourceidentity "github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/startupverification"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -40,6 +41,18 @@ type compositionPlan struct {
 	RuntimeEntries  []string
 	BuildKeys       []string
 	ConcurrentState bool
+}
+
+// The capture-time comparison uses the same effective policy as the initial
+// closure check, including the protected lock floor and zero-value default.
+func compositionVerificationLevel(machine int, lock *contextlock.Lock) (int, error) {
+	if machine == 0 {
+		machine = startupverification.DefaultLevel
+	}
+	if lock.StartupVerificationLevel != nil {
+		return startupverification.EffectiveLevel(machine, *lock.StartupVerificationLevel)
+	}
+	return startupverification.EffectiveLevel(machine)
 }
 
 // PreviewComposition performs only protected input reads. It acquires no lease
@@ -124,7 +137,11 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 				return e
 			}
 			if strings.TrimPrefix(h, "sha256:") != m.StateHash {
-				if verificationPolicy.StartupVerificationLevel != 1 {
+				effective, policyErr := compositionVerificationLevel(verificationPolicy.StartupVerificationLevel, lock)
+				if policyErr != nil {
+					return policyErr
+				}
+				if effective != 1 {
 					return fail("project_context_drift", "captured profile member differs from pin")
 				}
 			}

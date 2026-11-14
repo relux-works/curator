@@ -409,13 +409,57 @@ jobs:
             go test -count=1 -timeout=10m -v ./internal/install \
               -run '^TestProjectBin(Unreadable(Ledger|Unrelated)|WindowsShareDenialBackupIntent|StaleMarkerManifest)$'
 
+  store-v1-compatibility:
+    name: Frozen revision-1 store compatibility (exact 32/6 by ID)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Replay the immutable 38-row archive and check every row ID
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: |
+          set -euo pipefail
+          evidence="$PWD/.temp/store-v1-compatibility"
+          mkdir -p "$evidence"
+          printf '%s\n' "$GITHUB_SHA" >"$evidence/head.txt"
+          set +e
+          bash .github/ci/isolated-test.sh go test -json -count=1 -timeout=10m \
+            -run '^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive' \
+            ./internal/envprofile >"$evidence/replay.jsonl"
+          replay_rc=$?
+          set -e
+          test "$replay_rc" = 1
+          go run ./tools/check-store-compatibility -dir "$evidence" -commit "$GITHUB_SHA" >"$evidence/report.json"
+          bash .github/ci/isolated-test.sh go test -count=1 ./internal/storecompatibility
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: store-v1-compatibility
+          path: .temp/store-v1-compatibility/
+          if-no-files-found: error
+
   windows-test-shards:
+    needs: [store-v1-compatibility]
     name: Windows tests (shard ${{ matrix.shard }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3]
+    env:
+      CI_STORE_COMPATIBILITY: ${{ github.workspace }}/.temp/store-v1-compatibility
+      CI_STORE_V2_CANONICAL: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -426,6 +470,11 @@ jobs:
           repository: relux-works/curator-spec
           ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
+      - name: Download exact-head historical compatibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: store-v1-compatibility
+          path: .temp/store-v1-compatibility
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -488,6 +537,7 @@ jobs:
 
   # Three Linux and two macOS jobs share all three packages; no package matrix.
   unix-test-shards:
+    needs: [store-v1-compatibility]
     name: Unix tests (${{ matrix.os }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
     strategy:
@@ -499,6 +549,9 @@ jobs:
           - {os: ubuntu-latest, shard: 2}
           - {os: macos-latest, shard: 0}
           - {os: macos-latest, shard: 1}
+    env:
+      CI_STORE_COMPATIBILITY: ${{ github.workspace }}/.temp/store-v1-compatibility
+      CI_STORE_V2_CANONICAL: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -513,6 +566,11 @@ jobs:
           repository: relux-works/curator-spec
           ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
+      - name: Download exact-head historical compatibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: store-v1-compatibility
+          path: .temp/store-v1-compatibility
       - uses: actions/setup-go@v5
         with:
           cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
@@ -582,7 +640,7 @@ jobs:
 
   test:
     if: ${{ !cancelled() }}
-    needs: [windows-test-shards, unix-test-shards]
+    needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]
     name: Test (${{ matrix.os }})
     # Linux entries run on the repository's self-hosted Linux runners when the
     # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
@@ -594,6 +652,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      CI_STORE_COMPATIBILITY: ${{ github.workspace }}/.temp/store-v1-compatibility
+      CI_STORE_V2_CANONICAL: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -610,6 +671,11 @@ jobs:
           repository: relux-works/curator-spec
           ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
+      - name: Download exact-head historical compatibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: store-v1-compatibility
+          path: .temp/store-v1-compatibility
 
       - uses: actions/setup-go@v5
         with:
@@ -946,6 +1012,7 @@ jobs:
   # The Race job verifies actual completed events, then runs the unchanged
   # platform-case gate over their union and the other packages' JSON.
   envprofile-race:
+    needs: [store-v1-compatibility]
     name: Envprofile race (${{ matrix.os }}, shard ${{ matrix.shard }})
     runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
     strategy:
@@ -953,6 +1020,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    env:
+      CI_STORE_COMPATIBILITY: ${{ github.workspace }}/.temp/store-v1-compatibility
+      CI_STORE_V2_CANONICAL: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -967,6 +1037,11 @@ jobs:
           repository: relux-works/curator-spec
           ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
+      - name: Download exact-head historical compatibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: store-v1-compatibility
+          path: .temp/store-v1-compatibility
       - uses: actions/setup-go@v5
         with:
           cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
@@ -996,7 +1071,7 @@ jobs:
     # A failed dependency must produce a red required Race check, not a
     # skipped check that GitHub treats as successful. Respect PR cancellation.
     if: ${{ !cancelled() }}
-    needs: envprofile-race
+    needs: [envprofile-race, store-v1-compatibility]
     name: Race (${{ matrix.os }})
     # Snapshot publication refuses ACL-bearing retained ancestry. Qualified
     # self-hosted Linux runners meet this boundary; the hosted Linux image
@@ -1008,6 +1083,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+    env:
+      CI_STORE_COMPATIBILITY: ${{ github.workspace }}/.temp/store-v1-compatibility
+      CI_STORE_V2_CANONICAL: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1024,6 +1102,11 @@ jobs:
           repository: relux-works/curator-spec
           ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
+      - name: Download exact-head historical compatibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: store-v1-compatibility
+          path: .temp/store-v1-compatibility
 
       - uses: actions/setup-go@v5
         with:

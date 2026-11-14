@@ -10,7 +10,9 @@ import (
 )
 
 // os.FileInfo does not expose the Windows hardlink count. Inspect the handle
-// without traversing reparse points and bind the observation to that same file.
+// without traversing reparse points. The caller must supply handle-backed
+// identity if it needs to compare the earlier object; path-backed FileInfo
+// loads identity lazily on Windows and is not an earlier identity receipt.
 func singleLink(path string, info os.FileInfo) bool {
 	f, err := openCaptureFile(path)
 	if err != nil {

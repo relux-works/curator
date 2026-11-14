@@ -147,3 +147,41 @@ func TestCaptureContinuesAfterUnavailableRead(t *testing.T) {
 		})
 	}
 }
+
+// Valid expected evidence distinguishes installed parse-breaking drift from bad
+// supplied evidence. Missing SKILL and invalid native bytes are mismatches;
+// the unmodified native neighbor verifies and malformed expectations refuse.
+func TestExpectedEvidenceClassifiesParseBreakingDrift(t *testing.T) {
+	for _, mode := range []string{"intact", "missing-skill", "invalid-native", "invalid-expectation"} {
+		t.Run(mode, func(t *testing.T) {
+			root, id := fixture(t)
+			writeFixture(t, root, "agent-skill.json", []byte(syntheticDeclaration), 0644)
+			expected, err := Build(context.Background(), root, id, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := ""
+			switch mode {
+			case "missing-skill":
+				if err := os.Remove(filepath.Join(root, "SKILL.md")); err != nil {
+					t.Fatal(err)
+				}
+				want = "skill_integrity_mismatch"
+			case "invalid-native":
+				writeFixture(t, root, "agent-skill.json", []byte("invalid declaration"), 0644)
+				want = "skill_integrity_mismatch"
+			case "invalid-expectation":
+				expected.Manifest.Schema = "unsupported"
+				want = "skill_integrity_unsupported_version"
+			}
+			err = Verify(context.Background(), root, id, expected, nil)
+			if want == "" {
+				if err != nil {
+					t.Fatalf("intact neighbor: %v", err)
+				}
+			} else if !IsCode(err, want) {
+				t.Fatalf("installed drift classification: want %s: %v", want, err)
+			}
+		})
+	}
+}

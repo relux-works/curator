@@ -3,6 +3,8 @@ package storecompatibility
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -123,5 +125,53 @@ func TestReplayEventDoesNotNormalizeDuplicateVerdicts(t *testing.T) {
 		if _, err := decodeEvent([]byte(raw)); err == nil || !strings.Contains(err.Error(), "duplicate event key") {
 			t.Fatalf("duplicate verdict plant: %v", err)
 		}
+	}
+}
+
+// Canonical delegation requires the full current-head stream. A copied success
+// report, wrong head, absent stream and same-count row swap cannot authorize it.
+func TestArtifactAdmission(t *testing.T) {
+	for _, mode := range []string{"valid", "wrong-head", "missing-stream", "swapped-ID-same-count"} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			head := strings.Repeat("a", 40)
+			if err := os.WriteFile(filepath.Join(dir, "head.txt"), []byte(head+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			events := validReplay()
+			if mode == "swapped-ID-same-count" {
+				a, b := -1, -1
+				for i, e := range events {
+					if strings.Contains(e.Test, "/") {
+						if a < 0 && e.Action == "pass" {
+							a = i
+						}
+						if b < 0 && e.Action == "fail" {
+							b = i
+						}
+					}
+				}
+				events[a].Action, events[b].Action = "fail", "pass"
+			}
+			if mode != "missing-stream" {
+				if err := os.WriteFile(filepath.Join(dir, "replay.jsonl"), encodeReplay(events).Bytes(), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "wrong-head" {
+				head = strings.Repeat("b", 40)
+			}
+			_, err := Admit(dir, head)
+			if mode == "valid" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil {
+				t.Fatal("invalid compatibility artifact admitted")
+			}
+			if mode == "swapped-ID-same-count" && !strings.Contains(err.Error(), "compatible case failed") {
+				t.Fatalf("unrelated swap failure: %v", err)
+			}
+		})
 	}
 }

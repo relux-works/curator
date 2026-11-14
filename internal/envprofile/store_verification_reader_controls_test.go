@@ -28,8 +28,10 @@ func TestStoreVerificationReaderClosedCarrier(t *testing.T) {
 		return bytes.Replace(valid, []byte(from), []byte(to), 1)
 	}
 	tests := map[string][]byte{
-		"old-object": []byte(`{"resolve_cases":[]}`),
-		"empty":      []byte(`[]`), "null": []byte(`null`),
+		"inadmissible-mcp-local":  bytes.ReplaceAll(replace(`"member_kind": "context"`, `"member_kind": "mcp"`), []byte(`"source_kind": "git"`), []byte(`"source_kind": "local"`)),
+		"inadmissible-skill-path": bytes.ReplaceAll(replace(`"member_kind": "context"`, `"member_kind": "skill"`), []byte(`"source_kind": "git"`), []byte(`"source_kind": "path"`)),
+		"old-object":              []byte(`{"resolve_cases":[]}`),
+		"empty":                   []byte(`[]`), "null": []byte(`null`),
 		"unknown-version":    replace(`"curator.environment-store-case/2"`, `"curator.environment-store-case/3"`),
 		"unknown-capability": replace(`"agent-environments"`, `"unknown"`),
 		"revision-null":      replace(`"capability_revision": 2`, `"capability_revision": null`),
@@ -51,6 +53,13 @@ func TestStoreVerificationReaderClosedCarrier(t *testing.T) {
 		"invalid-utf8":       replace(`"agent-environments"`, string([]byte{'"', 0xff, '"'})),
 		"excess-depth":       []byte(strings.Repeat("[", 34) + "0" + strings.Repeat("]", 34)),
 		"excess-bytes":       bytes.Repeat([]byte(" "), (4<<20)+1),
+	}
+	// The tightened member/source constraint retains path-backed contexts and
+	// Git-backed skills/MCPs beside the two inadmissible cross-products above.
+	for _, raw := range [][]byte{replace(`"source_kind": "git"`, `"source_kind": "path"`), replace(`"member_kind": "context"`, `"member_kind": "mcp"`), replace(`"member_kind": "context"`, `"member_kind": "skill"`)} {
+		if rows, err := decodeStoreVerificationCases(raw); err != nil || len(rows) != 1 {
+			t.Fatalf("admitted source neighbor: rows=%d err=%v", len(rows), err)
+		}
 	}
 	var duplicate []json.RawMessage
 	if err := json.Unmarshal(valid, &duplicate); err != nil {
@@ -177,10 +186,10 @@ func TestStoreVerificationPinnedCorpusReader(t *testing.T) {
 			controlExecutions += len(row.Levels)
 		}
 	}
-	if implementation != 128 || controls != 6 || executions != 452 || controlExecutions != 22 {
+	if implementation != 124 || controls != 6 || executions != 444 || controlExecutions != 22 {
 		t.Fatalf("incomplete roster: %d/%d rows, %d/%d levels", implementation, controls, executions, controlExecutions)
 	}
-	t.Log("non-canonical draft reader:128 implementation/6 checker-control rows,452/22 declared levels; no runtime executions claimed")
+	t.Log("non-canonical draft reader: 124 implementation/6 checker-control rows, 444/22 declared levels; no runtime executions claimed")
 }
 
 // Actual frozen v1 bytes remain readable by their existing object type. That
@@ -219,5 +228,26 @@ func TestStoreVerificationActualReaderDirections(t *testing.T) {
 	legacy = storeBoundaryVectors{}
 	if err := json.Unmarshal(raw, &legacy); err == nil {
 		t.Fatal("actual old object reader admitted revision-2 array")
+	}
+}
+
+// The canonical stage selects only the sibling corpus from SPEC_PIN's checkout,
+// never an environment-selected alternative. It checks carriers and declared
+// coverage; this reader does not execute the revision-2 filesystem operations.
+func TestStoreVerificationCanonicalPinnedCorpusReader(t *testing.T) {
+	if os.Getenv("CI_STORE_V2_CANONICAL") != "1" {
+		t.Skip("canonical store reader stage is not selected")
+	}
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Fatal("canonical store reader requires the SPEC_PIN root")
+	}
+	root, err := filepath.Abs(filepath.Join(root, "..", "environment-store-verification-v2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, selected, err := readStoreVerificationCorpus(storeVerificationLookup(map[string]string{storeVerificationRootKey: root, storeVerificationPinKey: storeVerificationManifestPin}))
+	if err != nil || !selected || len(rows) != 130 {
+		t.Fatalf("canonical pin requires the landed revision-2 corpus: rows=%d err=%v", len(rows), err)
 	}
 }

@@ -211,6 +211,11 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 		}
 		return Entry{}, err
 	}
+	// Supplied evidence was validated by Verify before capture. A completed
+	// changed roster/content is installed drift, even when it no longer parses.
+	if expected != nil && observedMismatch(c.files, expected.Files, true) {
+		return Entry{}, failure("skill_integrity_mismatch", "installed skill differs from expected evidence")
+	}
 	reader := c.reader(root)
 	// The existing resolver deliberately retains the legacy root-addressed
 	// skill contract. Selected-directory skills use section-3 frontmatter;
@@ -262,8 +267,11 @@ func captureTree(ctx context.Context, root string, budget *Budget) (*capture, er
 			observations = append(observations, failure("skill_integrity_unavailable", "skill tree cannot be observed"))
 			return nil
 		}
-		info, err := dir.Info()
+		info, err := captureEntryInfo(path, dir)
 		if err != nil {
+			if IsCode(err, "skill_integrity_boundary_invalid") {
+				return err
+			}
 			observations = append(observations, failure("skill_integrity_unavailable", "skill entry cannot be observed"))
 			return nil
 		}
@@ -352,8 +360,11 @@ func ValidateLegacyBoundary(root string) error {
 			unavailable = failure("skill_integrity_unavailable", "snapshot entry cannot be observed")
 			return nil
 		}
-		info, err := entry.Info()
+		info, err := captureEntryInfo(path, entry)
 		if err != nil {
+			if IsCode(err, "skill_integrity_boundary_invalid") {
+				return err
+			}
 			unavailable = failure("skill_integrity_unavailable", "snapshot metadata cannot be observed")
 			return nil
 		}
@@ -387,8 +398,11 @@ func (c *capture) revalidate(ctx context.Context, root string, budget *Budget) e
 			unavailable, complete = true, false
 			return nil
 		}
-		info, err := entry.Info()
+		info, err := captureEntryInfo(path, entry)
 		if err != nil {
+			if IsCode(err, "skill_integrity_boundary_invalid") {
+				return err
+			}
 			unavailable, complete = true, false
 			return nil
 		}

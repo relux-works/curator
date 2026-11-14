@@ -67,7 +67,7 @@ func EffectiveLevel(baseline int, floors ...int) (int, error) {
 			return 0, Invalid("profile level must be an integer from 1 to 4")
 		}
 		if floor < baseline {
-			return 0, &Diagnostic{Code: "startup_verification_weakening", Detail: "profile minimum is below machine level"}
+			return 0, &Diagnostic{Code: "startup_verification_weakening", Detail: "profile minimum is below machine level; raise startup_verification.level in the selected context manifests, then run profile update"}
 		}
 		if floor > level {
 			level = floor

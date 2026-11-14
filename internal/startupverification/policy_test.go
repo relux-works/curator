@@ -1,6 +1,7 @@
 package startupverification
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -85,5 +86,17 @@ func TestInvalidPolicyAndFloors(t *testing.T) {
 		} else if d, ok := err.(*Diagnostic); !ok || d.Code != tc.code {
 			t.Fatalf("floor %v: %v", tc, err)
 		}
+	}
+}
+
+// Hardening below an explicit profile minimum preserves the refusal contract;
+// remediation names the editable manifests and recomposition, beside equality.
+func TestFloorHardeningRemediation(t *testing.T) {
+	if level, err := EffectiveLevel(4, 4); err != nil || level != 4 {
+		t.Fatalf("equal neighbor: %d %v", level, err)
+	}
+	_, err := EffectiveLevel(4, 3)
+	if err == nil || !strings.HasPrefix(err.Error(), "startup_verification_weakening:") || !strings.Contains(err.Error(), "selected context manifests") || !strings.Contains(err.Error(), "profile update") {
+		t.Fatalf("hardening remediation lost: %v", err)
 	}
 }
