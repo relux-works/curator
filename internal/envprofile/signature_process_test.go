@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Dispatch before m.Run and fixture setup: the transport protocol contains only
@@ -32,14 +34,19 @@ func signaturePipeChildEntry() bool {
 	case "verifier-failure":
 		_, _ = fmt.Fprint(os.Stderr, "verifier unavailable\x1b[31m\n")
 		os.Exit(1)
-	case "roundtrip", "probe-digest", "probe-policy-line":
+	case "roundtrip", "private-roundtrip", "probe-digest", "probe-policy-line":
 		input, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			os.Exit(3)
 		}
 		parts := []string{string(input)}
 		for index, name := range os.Args[3:] {
-			if os.Args[2] != "roundtrip" {
+			if os.Args[2] == "private-roundtrip" {
+				if privatedir.Validate(filepath.Dir(name)) != nil || privatedir.ValidateFile(name) != nil {
+					os.Exit(9)
+				}
+			}
+			if strings.HasPrefix(os.Args[2], "probe-") {
 				if err := signaturePipeMetadataProbe(name); err != nil {
 					_, _ = fmt.Fprintf(os.Stderr, "metadata probe: %v", err)
 					os.Exit(8)
@@ -61,7 +68,7 @@ func signaturePipeChildEntry() bool {
 			if readErr != nil || closeErr != nil {
 				os.Exit(5)
 			}
-			if os.Args[2] != "roundtrip" {
+			if strings.HasPrefix(os.Args[2], "probe-") {
 				parts = append(parts, fmt.Sprintf("%d:%x", len(data), sha256.Sum256(data)))
 			} else {
 				parts = append(parts, string(data))
@@ -99,8 +106,26 @@ func TestSignatureVerifierProcessFailures(t *testing.T) {
 		t.Fatalf("normal negative status %d was not a negative verdict: %v", negativeExit.ExitCode(), err)
 	}
 	t.Logf("%s normal C-style negative process status=%d control PASS", runtime.GOOS, negativeExit.ExitCode())
+	t.Run("ssh-unexpected-status", func(t *testing.T) {
+		if err := signatureVerifierResult("SSH", negativeOutput, runErr); !errors.Is(err, errSignerVerificationUnavailable) {
+			t.Fatalf("unexpected SSH exit became a verdict: %v", err)
+		}
+	})
 	failedInput := exec.Command(executable, "curator-signature-pipe-child", "verifier-failure", "/dev/fd/3")
-	inputOutput, inputErr := runSignaturePipes(failedInput, nil, make([]byte, 1024*1024))
+	var inputOutput []byte
+	var inputErr error
+	if runtime.GOOS == "windows" {
+		tmp := filepath.Join(t.TempDir(), "missing")
+		for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+			t.Setenv(name, tmp)
+		}
+		inputOutput, inputErr = runSignaturePipes(failedInput, nil, make([]byte, 1024*1024))
+		if failedInput.Process != nil {
+			t.Fatal("verifier ran after staging failure")
+		}
+	} else {
+		inputOutput, inputErr = runSignaturePipes(failedInput, nil, make([]byte, 1024*1024))
+	}
 
 	for _, kind := range []string{"SSH", "OpenPGP"} {
 		t.Run(kind, func(t *testing.T) {
@@ -119,6 +144,9 @@ func TestSignatureVerifierProcessFailures(t *testing.T) {
 	}{
 		{"ssh-policy", "SSH", "Could not verify signature.\n", true},
 		{"ssh-cryptographic", "SSH", "Signature verification failed: incorrect signature\nCould not verify signature.\n", true},
+		{"ssh-namespace", "SSH", "Couldn't verify signature: namespace does not match\nCould not verify signature.\n", true},
+		{"ssh-namespace-with-operational-error", "SSH", "Couldn't read signature file: denied\nCouldn't verify signature: namespace does not match\nCould not verify signature.\n", false},
+		{"ssh-internal-error", "SSH", "Couldn't verify signature: allocation failed\nCould not verify signature.\n", false},
 		{"ssh-input", "SSH", "Couldn't read signature file: No such file\nCould not verify signature.\n", false},
 		{"gpg-cryptographic", "OpenPGP", "[GNUPG:] BADSIG ABC fixture\n", true},
 		{"gpg-missing-key", "OpenPGP", "[GNUPG:] ERRSIG ABC 1 2\n[GNUPG:] NO_PUBKEY ABC\n", false},
@@ -126,13 +154,13 @@ func TestSignatureVerifierProcessFailures(t *testing.T) {
 		{"gpg-input", "OpenPGP", "cannot open signature\n", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := signatureVerifierResult(tc.kind, []byte(tc.output), runErr)
+			err := signatureVerifierResult(tc.kind, []byte(tc.output), negativeErr)
 			if (err == nil) != tc.negative {
 				t.Fatalf("verifier verdict negative=%v: %v", tc.negative, err)
 			}
 		})
 	}
-	if !errors.Is(inputErr, errSignerVerificationUnavailable) || !strings.Contains(string(inputOutput), "verifier unavailable") {
+	if !errors.Is(inputErr, errSignerVerificationUnavailable) || (runtime.GOOS != "windows" && !strings.Contains(string(inputOutput), "verifier unavailable")) {
 		t.Fatalf("input transport did not dominate process exit: %v %q", inputErr, inputOutput)
 	}
 	if err := signatureVerifierResult("SSH", []byte("Could not verify signature.\n"), errors.Join(errSignerVerificationUnavailable, runErr)); !errors.Is(err, errSignerVerificationUnavailable) {
@@ -151,10 +179,10 @@ func TestSignatureVerifierProcessFailures(t *testing.T) {
 }
 
 // The no-fixture child is payload-only through the native descriptor transport;
-// the Windows named-pipe counterpart exercises the same child entry.
+// the Windows private-file counterpart exercises the same child entry.
 func TestSignaturePipeChildProtocol(t *testing.T) {
 	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
-		t.Skip("signature-child-protocol: native descriptor test; Windows named-pipe counterpart runs separately")
+		t.Skip("signature-child-protocol: native descriptor test; Windows private-file counterpart runs separately")
 	}
 	root := t.TempDir()
 	t.Setenv("TMPDIR", root)

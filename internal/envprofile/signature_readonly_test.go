@@ -13,7 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/envregistry"
 )
 
-// Real SSH commit/tag signatures verify through pipes, tampered signed bytes
+// Real SSH commit/tag signatures verify through the local transport, tampered signed bytes
 // fail, and the mutating verifier remains usable. No private material is read
 // during the status phase; fixture key creation is completed beforehand.
 func TestReadPuritySSHSignatures(t *testing.T) {
@@ -31,7 +31,9 @@ func TestReadPuritySSHSignatures(t *testing.T) {
 		t.Fatal(err)
 	}
 	scratch := t.TempDir()
-	t.Setenv("TMPDIR", scratch)
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, scratch)
+	}
 	before := readWitnesses(t, home)
 	tempBefore := readWitnesses(t, scratch)
 	status, err := StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, Detect: func(envregistry.Adapter) string { return "unknown" }})
@@ -51,7 +53,7 @@ func TestReadPuritySSHSignatures(t *testing.T) {
 		t.Fatal("signed profile absent from posture")
 	}
 	assertReadWitnesses(t, home, before)
-	assertReadWitnesses(t, scratch, tempBefore)
+	assertSignatureScratch(t, scratch, tempBefore)
 	for _, objectType := range []string{"commit", "tag"} {
 		object := "HEAD"
 		if objectType == "tag" {
@@ -183,5 +185,78 @@ func TestReadPuritySignerVerdictsKeepPin(t *testing.T) {
 	}
 	if !status.NonCurrent {
 		t.Fatal("unavailable verification counted as green")
+	}
+}
+
+// A real allowed tag over an unsigned commit is current only for the Git
+// namespace. A valid signature in another namespace is failed/non-current,
+// rather than operationally unavailable; managed-state witnesses stay intact.
+func TestReadPuritySSHNamespaceVerdict(t *testing.T) {
+	pinHomes(t)
+	private, public := statusSignerKey(t)
+	repo := statusSignerRepo(t, private)
+	if out, err := exec.Command("git", "-C", repo, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "unsigned namespace fixture").CombinedOutput(); err != nil {
+		t.Fatalf("unsigned fixture: %v %s", err, out)
+	}
+	commit, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tag, err := exec.Command("git", "-C", repo, "cat-file", "-p", "v1.0.0").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _, err := splitGitSignedPayload("tag", tag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(string(data), "\n")
+	lines[0] = "object " + strings.TrimSpace(string(commit))
+	data = []byte(strings.Join(lines, "\n"))
+	ids := newGitIdentities(t)
+	remote := ids.serve(repo, "https://example.com/namespace")
+	for _, namespace := range []string{"git", "not-git"} {
+		t.Run(namespace, func(t *testing.T) {
+			name := "v1.0.0"
+			body := append([]byte(nil), data...)
+			signer := exec.Command("ssh-keygen", "-Y", "sign", "-n", namespace, "-f", private)
+			signer.Stdin = strings.NewReader(string(body))
+			signature, err := signer.Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			object := exec.Command("git", "-C", repo, "hash-object", "-t", "tag", "-w", "--stdin")
+			object.Stdin = strings.NewReader(string(append(body, signature...)))
+			oid, err := object.Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out, err := exec.Command("git", "-C", repo, "update-ref", "refs/tags/"+name, strings.TrimSpace(string(oid))).CombinedOutput(); err != nil {
+				t.Fatalf("tag fixture: %v %s", err, out)
+			}
+			home := gitFixtureHome(t)
+			if _, _, _, err := Install(home, InstallOptions{Operand: remote, Tag: name}); err != nil {
+				t.Fatal(err)
+			}
+			before := readWitnesses(t, home)
+			policy := Policy{SourceSigners: map[string][]contextresolve.Signer{"example.com/namespace": {{Type: "ssh", Key: public}}}}
+			status, err := StatusOf(StatusRequest{Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, Detect: func(envregistry.Adapter) string { return "unknown" }})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(status.SourceSignerPosture) != 1 {
+				t.Fatalf("posture rows: %+v", status.SourceSignerPosture)
+			}
+			row := status.SourceSignerPosture[0]
+			want := "verified"
+			if namespace != "git" {
+				want = "failed"
+			}
+			if row.Verification != want || row.Current != (namespace == "git") {
+				t.Fatalf("namespace rejection became unavailable/current: %+v want %s", row, want)
+			}
+			assertReadWitnesses(t, home, before)
+			t.Logf("%s real SSH namespace %s verdict %s PASS", runtime.GOOS, namespace, want)
+		})
 	}
 }

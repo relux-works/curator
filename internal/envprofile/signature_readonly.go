@@ -151,18 +151,35 @@ func signatureVerifierResult(kind string, output []byte, runErr error) error {
 	// A C verifier returning -1 is exit 255 on Unix and 0xffffffff on
 	// Windows. Match its negative evidence, not one OS's truncated status.
 	var exit *exec.ExitError
-	if !errors.Is(runErr, errSignerVerificationUnavailable) && errors.As(runErr, &exit) && exit.Exited() && signatureNegativeVerdict(kind, output) {
+	if !errors.Is(runErr, errSignerVerificationUnavailable) && errors.As(runErr, &exit) && exit.Exited() && (kind != "SSH" || signatureSSHNegativeExit(exit.ExitCode())) && signatureNegativeVerdict(kind, output) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s verifier could not complete (%s); output=%s", errSignerVerificationUnavailable, kind, signatureDiagnostic([]byte(runErr.Error())), signatureDiagnostic(output))
 }
 
+func signatureSSHNegativeExit(code int) bool {
+	return code == 255 || int64(code) == int64(0xffffffff)
+}
+
 func signatureNegativeVerdict(kind string, output []byte) bool {
 	if kind == "SSH" {
-		text := strings.ReplaceAll(string(output), "\r\n", "\n")
-		// A policy/key mismatch emits only the final line. A cryptographic
-		// mismatch emits its specific error followed by the same final line.
-		return text == "Could not verify signature.\n" || text == "Signature verification failed: incorrect signature\nCould not verify signature.\n"
+		// OpenSSH returns -1 for a completed rejection (255 on Unix,
+		// 0xffffffff on Windows). Its terminal outcome may be accompanied by
+		// cryptographic or namespace diagnostics; do not compare the entire
+		// output to a fixed transcript. Unknown/operational records refuse.
+		lines := strings.Split(strings.TrimSuffix(strings.ReplaceAll(string(output), "\r\n", "\n"), "\n"), "\n")
+		if len(lines) == 0 || lines[len(lines)-1] != "Could not verify signature." {
+			return false
+		}
+		for _, line := range lines[:len(lines)-1] {
+			switch {
+			case strings.HasPrefix(line, "Signature verification failed: incorrect signature"):
+			case strings.HasPrefix(line, "Couldn't verify signature: namespace "):
+			default:
+				return false
+			}
+		}
+		return true
 	}
 	bad := false
 	for _, line := range strings.Split(string(output), "\n") {

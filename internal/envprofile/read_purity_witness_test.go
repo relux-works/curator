@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -154,4 +155,75 @@ func TestReadOnlyGPGKeyringPrivateBoundary(t *testing.T) {
 	}
 	assertReadWitnesses(t, root, before)
 	t.Logf("%s private/adversarial keyring boundary controls PASS", runtime.GOOS)
+}
+
+// windows-ephemeral-signature-inputs permits only the selected empty temp
+// parent's mtime change when staging is created/removed. Identity/mode and
+// membership remain strict. Managed-state/keyring witnesses use the full rule.
+func assertSignatureScratch(t *testing.T, root string, before map[string]readWitness) {
+	t.Helper()
+	after := readWitnesses(t, root)
+	if runtime.GOOS == "windows" {
+		if err := checkSignatureScratch(before, after); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if err := checkReadWitnesses(before, after); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Only the empty staging parent's timestamp is exempt. The unchanged control
+// and transient create/remove pass; persistent entries and replacement fail.
+func TestSignatureScratchWitness(t *testing.T) {
+	for _, plant := range []string{"none", "transient", "entry", "identity"} {
+		t.Run(plant, func(t *testing.T) {
+			parent := t.TempDir()
+			root := filepath.Join(parent, "staging")
+			if err := os.Mkdir(root, 0700); err != nil {
+				t.Fatal(err)
+			}
+			before := readWitnesses(t, root)
+			switch plant {
+			case "transient", "entry":
+				file := filepath.Join(root, "input")
+				if err := os.WriteFile(file, []byte("public bytes"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if plant == "transient" {
+					if err := os.Remove(file); err != nil {
+						t.Fatal(err)
+					}
+				}
+			case "identity":
+				if err := os.Rename(root, filepath.Join(parent, "old")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(root, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := checkSignatureScratch(before, readWitnesses(t, root))
+			if plant == "none" || plant == "transient" {
+				if err != nil {
+					t.Fatalf("staging positive control: %v", err)
+				}
+			} else if err == nil {
+				t.Fatalf("staging %s plant escaped", plant)
+			}
+		})
+	}
+}
+
+func checkSignatureScratch(before, after map[string]readWitness) error {
+	old, oldOK := before["."]
+	now, nowOK := after["."]
+	if len(before) != 1 || len(after) != 1 || !oldOK || !nowOK {
+		return fmt.Errorf("signature staging or a foreign entry remains")
+	}
+	if !os.SameFile(old.info, now.info) || old.info.Mode() != now.info.Mode() {
+		return fmt.Errorf("signature temp parent identity/mode changed")
+	}
+	return nil
 }

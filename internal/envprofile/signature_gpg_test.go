@@ -12,7 +12,7 @@ import (
 )
 
 // gpgv verifies against a pre-existing public-only keyring through a signature
-// pipe; the read phase neither invokes gpg nor initializes a keyring.
+// transport; the read phase neither invokes gpg nor initializes a keyring.
 func TestGPGSignaturePipe(t *testing.T) {
 	if runtime.GOOS == "plan9" {
 		t.Skip("read-only signature input transport unavailable")
@@ -73,6 +73,26 @@ func TestGPGSignaturePipe(t *testing.T) {
 	}
 	t.Setenv("GNUPGHOME", readonly)
 	witness := readWitnesses(t, readonly)
+	// The Windows regular-file backend is also exercised with real gpgv on
+	// portable hosts: valid bytes pass, altered bytes are a negative verdict,
+	// and the pre-existing public-only keyring remains unchanged.
+	for _, tc := range []struct {
+		name, message string
+		valid         bool
+	}{
+		{"regular-file-valid", "signed bytes\n", true},
+		{"regular-file-tampered", "changed bytes\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command := exec.Command("gpgv", "--homedir", gpgvHome, "--keyring", gpgvRing, "--status-fd", "1", "/dev/fd/3", "-")
+			output, runErr := runSignatureFiles(command, []byte(tc.message), signature)
+			if err := signatureVerifierResult("OpenPGP", output, runErr); err != nil || (runErr == nil) != tc.valid {
+				t.Fatalf("regular-file GPG verdict valid=%v: %v %v %s", tc.valid, runErr, err, output)
+			}
+			assertReadWitnesses(t, readonly, witness)
+		})
+	}
+
 	payload := append([]byte("signed bytes\n"), signature...)
 	evidence, err := verifyReadOnlyObjectSignature("tag", payload, nil)
 	if err != nil || !evidence.Valid || evidence.Signer.Type != "gpg" {
