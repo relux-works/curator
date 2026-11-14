@@ -46,8 +46,18 @@ func TestSignatureFileTransport(t *testing.T) {
 				if err != nil || string(out) != "message|policy|signature" {
 					t.Fatalf("private regular file roundtrip failed: %q %v", out, err)
 				}
-			} else if err == nil {
-				t.Fatal("failed verifier became success")
+			} else {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || !exit.Exited() || errors.Is(err, errSignerVerificationUnavailable) {
+					t.Fatalf("expected completed verifier exit: %v", err)
+				}
+				if tc.name == "no-input" {
+					if !signatureSSHNegativeExit(exit.ExitCode()) || signatureVerifierResult("SSH", out, err) != nil {
+						t.Fatalf("no-input negative control did not complete: %v %s", err, out)
+					}
+				} else if exit.ExitCode() != 1 || !strings.Contains(string(out), "verifier unavailable") {
+					t.Fatalf("early exit control did not complete: %v %s", err, out)
+				}
 			}
 			entries, e := os.ReadDir(root)
 			if e != nil || len(entries) != 0 {

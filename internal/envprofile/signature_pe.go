@@ -159,6 +159,9 @@ func signaturePEThunks(file *pe.File, lookup, first, width uint64) (bool, error)
 			}
 			continue
 		}
+		if value > math.MaxInt32 {
+			return false, errors.New("invalid named import RVA")
+		}
 		named = true
 		if _, err := signaturePERead(file, value, 2); err != nil {
 			return false, err
