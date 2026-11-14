@@ -207,7 +207,7 @@ func TestOrdinaryNativeLanes(t *testing.T) {
 	}{
 		{"windows-test", "windows", "120m", 4, 3600},
 		{"unix-test", "linux", "60m", 3, 1800},
-		{"unix-test", "darwin", "60m", 2, 1800},
+		{"unix-test", "darwin", "60m", 3, 1800},
 	} {
 		t.Run(tc.goos, func(t *testing.T) {
 			c, err := ordinaryConfig(tc.lane, tc.goos)

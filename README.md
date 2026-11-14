@@ -518,7 +518,7 @@ JSON still reaches the unchanged platform gate in `test-evidence-windows-latest`
 All race selectors retain their previous behavior.
 
 The `-lane unix-test` mode reuses that same ordinary-test discovery, hash selector,
-execution and admission engine for Linux (three shards) and macOS (two shards).
+execution and admission engine for Linux (three shards) and macOS (three shards).
 It runs the same three packages at the unchanged `60m` timeout and admits only
 package times strictly below `1800s`. Run
 `go run ./tools/envprofilerace -lane unix-test -shard 0 -dir .temp/ci-evidence/unix-shard`

@@ -119,3 +119,10 @@ Ctrl-C, termination and deadline witnesses check all acknowledged descendants
 are gone. A release-entrypoint gate forbids `curator_test_platform` in release
 configuration, and default-build tests prove its environment selector inert.
 The test-only `curator_cold_repository` tag exposes no release-binary input.
+
+The ordinary macOS lane uses three inventory-partitioned shards, matching Linux,
+with the existing 1800s per-package admission margin and 60m hard timeout.
+The two-shard envprofile shard 0 grew from 1066.581s to 1869.810s: new native-home
+narrowing controls contributed 221.25s and combined-drift controls 74.16s; shared
+pre-existing tests also ran slower. Repartitioning retains every native test and
+all mutation controls; merge admission still requires the exact inventory union.
