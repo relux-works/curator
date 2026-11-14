@@ -10,6 +10,9 @@ import (
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/pathboundary"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // Current-lock copied-home drift is independent of source pin drift. Read-only
@@ -147,6 +150,7 @@ func TestStartupCombinedRepairRequiresVerifiedInputs(t *testing.T) {
 // child's intact neighbor preserved. A compile/setup failure never qualifies.
 func TestStartupCombinedDriftControls(t *testing.T) {
 	for _, p := range []struct{ name, file, before, after, test, witness string }{
+		{"skill-content", "home_owned_drift.go", "if err := verifySkillProjection(req.Home, skillOf{root: target, hash: identity, version: version}); err != nil {", "if err := verifySkillProjection(req.Home, skillOf{root: target, hash: identity, version: version}); false && err != nil {", "TestStartupSourceOnlySkillDriftKeepsExistingHome", "changed original projection launched"},
 		{"skill-receipt", "home_owned_drift.go", "return err != nil || actual != surface.ContentSHA256", "return false && (err != nil || actual != surface.ContentSHA256)", "TestStartupSourceOnlySkillDriftKeepsExistingHome", "retargeted skill receipt launched"},
 		{"receipt", "home_owned_drift.go", "if complete {", "if false && complete {", "TestStartupCombinedHomeAndSourceDrift/level1/repair", "combined repair lost leading stale refusal or launched"},
 		{"read-only", "managed.go", "|| ownedHomeDrift)", ")", "TestStartupCombinedHomeAndSourceDrift/level2/observe", "combined observe lost leading stale refusal or launched"},
@@ -209,7 +213,26 @@ func TestStartupSourceOnlySkillDriftKeepsExistingHome(t *testing.T) {
 	if err := os.Remove(link); err != nil {
 		t.Fatal(err)
 	}
-	wrong := filepath.Join(filepath.Dir(target), strings.Repeat("0", 64))
+	// Retarget to another fully valid projection, so only marker receipt
+	// binding can reject it; a missing-target failure cannot satisfy this case.
+	alternate := []byte("# alternate projection\n")
+	digest, err := hashing.ContentSHA256Files(map[string][]byte{"SKILL.md": alternate}, lock.ContentHashVersion())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrong := filepath.Join(filepath.Dir(target), hashing.Normalize(digest))
+	if err := privatedir.MakeAll(wrong); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wrong, "SKILL.md"), alternate, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := pathboundary.ProtectTree(wrong); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifySkillProjection(fx.home, skillOf{root: wrong, hash: digest, version: lock.ContentHashVersion()}); err != nil {
+		t.Fatalf("alternate projection setup: %v", err)
+	}
 	if err := os.Symlink(wrong, link); err != nil {
 		t.Fatal(err)
 	}
@@ -232,5 +255,29 @@ func TestStartupSourceOnlySkillDriftKeepsExistingHome(t *testing.T) {
 	if err != nil || result == nil || len(result.Document) == 0 {
 		t.Fatalf("restored skill link neighbor refused: %v", err)
 	}
-
+	// The original target's name alone is not a receipt of its current bytes.
+	projected := filepath.Join(target, "SKILL.md")
+	original, err := os.ReadFile(projected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(projected, []byte("projection drift\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before = hashTreeForTest(t, fx.home)
+	nodes = storeVerificationNodes(t, fx.home)
+	result, err = Resolve(req)
+	if err == nil || !strings.HasPrefix(err.Error(), DiagHomeStale+":") || result != nil && len(result.Document) != 0 {
+		t.Fatalf("changed original projection launched: %v", err)
+	}
+	if hashTreeForTest(t, fx.home) != before || !sameStoreVerificationNodes(nodes, storeVerificationNodes(t, fx.home)) {
+		t.Fatal("projection refusal wrote state")
+	}
+	if err := os.WriteFile(projected, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	result, err = Resolve(req)
+	if err != nil || result == nil || len(result.Document) == 0 {
+		t.Fatalf("restored projection neighbor refused: %v", err)
+	}
 }
