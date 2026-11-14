@@ -2954,6 +2954,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	}
 	absentStore, err := inspectStoreAvailability(req.Home, lock, req.boundaryOwnerLookup)
 	if err != nil {
+		var failure *storeEntryFailure
+		if req.Repair && errors.As(err, &failure) && pinnedCommitObjectUnavailable(failure) {
+			owned := homeOwnedDrift(&req, verifyHomeContent(&req, adapter, source, lock, hash))
+			return nil, homeInputsFailure(owned, err)
+		}
 		return nil, err
 	}
 	if err := validateMarkerBoundary(req.Home, profile, req.EnvID, req.boundaryOwnerLookup); err != nil {
@@ -3002,28 +3007,37 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 	if localErr != nil {
 		return nil, localErr
 	}
+	ownedHomeDrift := false
+	for _, check := range localChecks {
+		if check.Status != startupverification.Passed {
+			ownedHomeDrift = homeOwnedDrift(&req, verifyHomeContent(&req, adapter, source, lock, hash))
+			break
+		}
+	}
+	homeInputFailure := func(err error) error { return homeInputsFailure(ownedHomeDrift, err) }
+
 	// Source repair remains strict at local-verification levels. Permissive
 	// startup observes and warns without replacing mismatching store evidence.
 	pinRequest := req
 	pinRequest.Policy.StartupVerificationLevel = effectiveLevel
 	if failure := validateNamedStorePinsForRepair(pinRequest, lock); failure != nil {
 		if pinnedCommitObjectUnavailable(failure) {
-			return nil, failure
+			return nil, homeInputFailure(failure)
 		}
 		if req.Repair && req.DryRun {
-			return nil, dryRunStoreEntryFailure(failure)
+			return nil, homeInputFailure(dryRunStoreEntryFailure(failure))
 		}
 		if req.Repair {
 			if req.storeRepairAttempted {
-				return nil, fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure)
+				return nil, homeInputFailure(fmt.Errorf("%s: store entry remained untrusted after repair: %w", DiagRepairFailed, failure))
 			}
 			if err := rebuildUntrustedStoreEntry(&req, hash, failure); err != nil {
-				return nil, err
+				return nil, homeInputFailure(err)
 			}
 			req.storeRepairAttempted = true
 			return Resolve(req)
 		}
-		return nil, failure
+		return nil, homeInputFailure(failure)
 	}
 	needsIdentityRepair := req.Repair && effectiveLevel >= 3 && repairWouldChangeLockHash(lock)
 	var nativeRepairReason string
@@ -3089,10 +3103,10 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 					break
 				}
 			}
-			// An absent home or old-lock marker owns the leading read-only or
-			// permissive-repair diagnostic, even alongside a source mismatch.
-			// Current-lock source drift retains its store diagnostic.
-			if !verdict.current && (verdict.marker == nil || verdict.marker.Profile.LockSHA256 != strings.TrimPrefix(hash, "sha256:")) && (!req.Repair || effectiveLevel < 3) {
+			// Home-owned drift, an absent home or an old-lock marker owns the
+			// leading diagnostic alongside a source mismatch. Source-only drift
+			// of an otherwise intact current-lock home keeps its store prefix.
+			if !verdict.current && (verdict.marker == nil || verdict.marker.Profile.LockSHA256 != strings.TrimPrefix(hash, "sha256:") || ownedHomeDrift) && (!req.Repair || effectiveLevel < 3) {
 				prefix = DiagHomeStale + ": " + prefix
 				details = append(details, "rerun with --repair")
 			}
@@ -3100,11 +3114,11 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		}
 		if req.Repair && effectiveLevel < 3 && !verdict.current {
 			for _, check := range localChecks {
-				if check.Status == startupverification.Failed {
+				if check.Status == startupverification.Failed || ownedHomeDrift && check.Status != startupverification.Passed {
 					// Level 1 can keep an existing home for this exact lock;
 					// it must neither rebuild mismatching source nor provision
 					// a new/old-lock home from that evidence.
-					if effectiveLevel == 1 && verdict.marker != nil && verdict.plan != nil && verdict.marker.Profile.LockSHA256 == strings.TrimPrefix(hash, "sha256:") {
+					if effectiveLevel == 1 && verdict.marker != nil && verdict.plan != nil && verdict.marker.Profile.LockSHA256 == strings.TrimPrefix(hash, "sha256:") && !ownedHomeDrift {
 						permissiveExistingHome = true
 						break
 					}
