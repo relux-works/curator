@@ -114,15 +114,6 @@ func nativeInventory(path string, race bool) ([]string, error) {
 		if _, err := storecompatibility.Admit(dir, commit); err != nil {
 			return nil, err
 		}
-		if path == pkg || path == "./internal/envprofile" {
-			retained := tests[:0]
-			for _, name := range tests {
-				if !storecompatibility.HistoricalTest(name) {
-					retained = append(retained, name)
-				}
-			}
-			tests = retained
-		}
 	}
 	sort.Strings(tests)
 	return tests, nil

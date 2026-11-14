@@ -1174,7 +1174,11 @@ internal/gitops	TestPinnedSnapshotPathsProjection	linux,darwin,windows	-	-	selec
 internal/gitops	TestPinnedSnapshotPathsIsolation	linux,darwin,windows	-	-	ambient Git overrides cannot substitute a repository or supply a missing local object
 internal/gitops	TestPinnedSnapshotPathsRejectsAlternateAndGraft	linux,darwin,windows	-	-	native alternate/graft metadata refuses with a local-repository positive
 internal/gitops	TestPinnedSnapshotPathMetadataControls	linux,darwin,windows	-	-	unsafe paths/types/collisions and metadata/path-count excesses refuse without a partial roster
-internal/envprofile	TestStartupHomeDriftRetainsRepairContract	linux,darwin,windows	-	-	derived home drift is stale at every level; dry-run preserves and explicit repair restores verified bytes
+internal/envprofile	TestStartupHomeDriftRetainsRepairContract	linux,darwin,windows	-	-	level1 warns and starts a stale home; levels2-4 and capture refuse; dry-run preserves and explicit repair restores verified bytes
 internal/envprofile	TestStoreVerificationCanonicalPinnedCorpusReader	-	linux,darwin,windows	opt-in	canonical stage requires the exact sibling revision-2 corpus at SPEC_PIN; reader coverage only
 internal/skillintegrity	TestExpectedEvidenceClassifiesParseBreakingDrift	linux,darwin,windows	-	-	missing skill and invalid installed declaration are mismatches beside intact and malformed-evidence controls
 internal/storecompatibility	TestArtifactAdmission	linux,darwin,windows	-	-	exact-head replay admission rejects missing evidence and same-count swapped row IDs
+internal/envprofile	TestStoreVerificationLandedFields	linux,darwin,windows	-	-	landed policy and ordered carriers survive decoding; missing and misplaced fields refuse
+internal/envprofile	TestStoreVerificationLandedSchemaControl	linux,darwin,windows	-	-	schema bypass reaches the intended missing-policy rejection assertion
+internal/envprofile	TestStartupHomeStaleLeadsPinFailure	linux,darwin,windows	-	-	old-lock home remains the leading diagnostic alongside pin drift; restored source repairs successfully
+internal/envprofile	TestStartupPermissiveExistingHomePreservesSource	linux,darwin,windows	-	-	level1 existing-home launch preserves mismatching source; old-lock refusal and verified repair are neighbors

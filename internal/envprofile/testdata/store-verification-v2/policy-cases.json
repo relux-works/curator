@@ -1,0 +1,58 @@
+[
+  {
+    "schema": "curator.environment-store-case/2",
+    "capability": "agent-environments",
+    "capability_revision": 2,
+    "name": "policy-level1-pass",
+    "case_kind": "implementation",
+    "operation": "resolve",
+    "condition": "verification-policy",
+    "member_kind": "context",
+    "source_kind": "git",
+    "home_state": "current",
+    "verification_levels": [
+      1
+    ],
+    "expected": {
+      "diagnostic": "",
+      "failing_check": "",
+      "fragment_emitted": true,
+      "row_current": true,
+      "writes": [],
+      "store_rebuilt": false,
+      "lock_unchanged": true,
+      "plant_preserved": false,
+      "path_named": false,
+      "rule_named": false,
+      "warning_emitted": false
+    },
+    "positive_control": "policy-level1-pass",
+    "predecessor": null,
+    "forbidden_observations": [
+      {
+        "name": "opposite-launch-verdict",
+        "observation": {
+          "diagnostic": "",
+          "failing_check": "",
+          "fragment_emitted": false,
+          "row_current": true,
+          "writes": [],
+          "store_rebuilt": false,
+          "lock_unchanged": true,
+          "plant_preserved": false,
+          "path_named": false,
+          "rule_named": false,
+          "warning_emitted": false
+        }
+      }
+    ],
+    "policy": {
+      "profile_minimums": [],
+      "local_evidence": [
+        "pass"
+      ],
+      "centre": "confirmed",
+      "global_level": 1
+    }
+  }
+]

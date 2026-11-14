@@ -87,6 +87,10 @@ func TestResolveRepairKeepsEnclosingStoreRootFailureClass(t *testing.T) {
 }
 
 func TestStoreBoundaryResolveVectorsDriveResolve(t *testing.T) {
+	if os.Getenv("CI_STORE_V2_CANONICAL") == "1" {
+		runStoreVerificationSuccessors(t, "resolve_cases")
+		return
+	}
 	vectors := readStoreBoundaryVectors(t)
 	conformancecoverage.RunOutcomes(t, "environments-store-boundary/resolve_cases", vectors.Resolve,
 		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
@@ -95,6 +99,10 @@ func TestStoreBoundaryResolveVectorsDriveResolve(t *testing.T) {
 }
 
 func TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan(t *testing.T) {
+	if os.Getenv("CI_STORE_V2_CANONICAL") == "1" {
+		runStoreVerificationSuccessors(t, "dry_run_cases")
+		return
+	}
 	vectors := readStoreBoundaryVectors(t)
 	conformancecoverage.RunOutcomes(t, "environments-store-boundary/dry_run_cases", vectors.DryRun,
 		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
@@ -103,6 +111,10 @@ func TestStoreBoundaryDryRunVectorsDriveResolveRepairPlan(t *testing.T) {
 }
 
 func TestStoreBoundaryRepairVectorsDriveResolveRepair(t *testing.T) {
+	if os.Getenv("CI_STORE_V2_CANONICAL") == "1" {
+		runStoreVerificationSuccessors(t, "repair_cases")
+		return
+	}
 	vectors := readStoreBoundaryVectors(t)
 	conformancecoverage.RunOutcomes(t, "environments-store-boundary/repair_cases", vectors.Repair,
 		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {
@@ -111,6 +123,10 @@ func TestStoreBoundaryRepairVectorsDriveResolveRepair(t *testing.T) {
 }
 
 func TestStoreBoundaryStatusVectorsDriveStatus(t *testing.T) {
+	if os.Getenv("CI_STORE_V2_CANONICAL") == "1" {
+		runStoreVerificationSuccessors(t, "status_cases")
+		return
+	}
 	vectors := readStoreBoundaryVectors(t)
 	conformancecoverage.RunOutcomes(t, "environments-store-boundary/status_cases", vectors.Status,
 		func(tc storeBoundaryVector) string { return tc.Name }, func(caseT *testing.T, tc storeBoundaryVector) conformancecoverage.Observation {

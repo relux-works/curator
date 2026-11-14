@@ -1,0 +1,278 @@
+{
+  "resolve_cases/intact-resolve-emits-fragment": {
+    "home": "current",
+    "name": "intact-resolve-emits-fragment",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/swapped-system-prompt-bytes-untrusted": {
+    "home": "current",
+    "name": "swapped-system-prompt-bytes-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "system-prompt"
+  },
+  "resolve_cases/swapped-root-context-bytes-untrusted": {
+    "home": "current",
+    "name": "swapped-root-context-bytes-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "root-context"
+  },
+  "resolve_cases/symlinked-entry-root-untrusted": {
+    "home": "current",
+    "name": "symlinked-entry-root-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/wrong-ownership-untrusted": {
+    "home": "current",
+    "name": "wrong-ownership-untrusted",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "resolve_cases/wrong-permissions-untrusted": {
+    "home": "current",
+    "name": "wrong-permissions-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/containment-escape-untrusted": {
+    "home": "current",
+    "name": "containment-escape-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/non-regular-component-untrusted": {
+    "home": "current",
+    "name": "non-regular-component-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/lock-file-wrong-owner-untrusted": {
+    "home": "current",
+    "name": "lock-file-wrong-owner-untrusted",
+    "object": "lock-file",
+    "ownership": false,
+    "surface": null
+  },
+  "resolve_cases/marker-symlink-untrusted": {
+    "home": "current",
+    "name": "marker-symlink-untrusted",
+    "object": "marker-file",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/environments-root-wrong-owner-untrusted": {
+    "home": "current",
+    "name": "environments-root-wrong-owner-untrusted",
+    "object": "environments-root",
+    "ownership": false,
+    "surface": null
+  },
+  "resolve_cases/store-root-symlinked-untrusted": {
+    "home": "current",
+    "name": "store-root-symlinked-untrusted",
+    "object": "store-root",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/intact-updated-store-old-marker-stale": {
+    "home": "stale-old-marker",
+    "name": "intact-updated-store-old-marker-stale",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/swapped-updated-store-old-marker-untrusted": {
+    "home": "stale-old-marker",
+    "name": "swapped-updated-store-old-marker-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "system-prompt"
+  },
+  "resolve_cases/unprovisioned-intact-stale": {
+    "home": "unprovisioned",
+    "name": "unprovisioned-intact-stale",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/unprovisioned-swapped-untrusted": {
+    "home": "unprovisioned",
+    "name": "unprovisioned-swapped-untrusted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "root-context"
+  },
+  "resolve_cases/unreadable-marker-non-current": {
+    "home": "unreadable-marker",
+    "name": "unreadable-marker-non-current",
+    "object": "marker-file",
+    "ownership": true,
+    "surface": null
+  },
+  "resolve_cases/swapped-bytes-emits-fragment": {
+    "home": "current",
+    "name": "swapped-bytes-emits-fragment",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "system-prompt"
+  },
+  "resolve_cases/untrusted-reported-current": {
+    "home": "current",
+    "name": "untrusted-reported-current",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "resolve_cases/untrusted-without-diagnostic": {
+    "home": "current",
+    "name": "untrusted-without-diagnostic",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "dry_run_cases/dry-run-untrusted-reports-would-rebuild": {
+    "home": "current",
+    "name": "dry-run-untrusted-reports-would-rebuild",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "dry_run_cases/dry-run-intact-plans-nothing": {
+    "home": "current",
+    "name": "dry-run-intact-plans-nothing",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "dry_run_cases/dry-run-enclosing-no-rebuild": {
+    "home": "current",
+    "name": "dry-run-enclosing-no-rebuild",
+    "object": "store-root",
+    "ownership": false,
+    "surface": null
+  },
+  "dry_run_cases/dry-run-mutates": {
+    "home": "current",
+    "name": "dry-run-mutates",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "repair_cases/repair-rebuilds-git-entry-from-snapshot": {
+    "entry_kind": "git",
+    "home": "current",
+    "name": "repair-rebuilds-git-entry-from-snapshot",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "system-prompt"
+  },
+  "repair_cases/repair-path-entry-cannot-rebuild": {
+    "entry_kind": "path",
+    "home": "current",
+    "name": "repair-path-entry-cannot-rebuild",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "repair_cases/repair-local-entry-cannot-rebuild": {
+    "entry_kind": "local",
+    "home": "current",
+    "name": "repair-local-entry-cannot-rebuild",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "repair_cases/repair-rebuilds-entry-boundary-failure": {
+    "entry_kind": "git",
+    "home": "current",
+    "name": "repair-rebuilds-entry-boundary-failure",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "repair_cases/repair-enclosing-refuses-no-rebuild": {
+    "entry_kind": "git",
+    "home": "current",
+    "name": "repair-enclosing-refuses-no-rebuild",
+    "object": "store-root",
+    "ownership": false,
+    "surface": null
+  },
+  "repair_cases/repair-stale-old-marker-succeeds": {
+    "entry_kind": "git",
+    "home": "stale-old-marker",
+    "name": "repair-stale-old-marker-succeeds",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "repair_cases/repair-swapped-old-marker-never-adopted": {
+    "entry_kind": "git",
+    "home": "stale-old-marker",
+    "name": "repair-swapped-old-marker-never-adopted",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "system-prompt"
+  },
+  "repair_cases/repair-unprovisioned-intact-provisions": {
+    "entry_kind": "git",
+    "home": "unprovisioned",
+    "name": "repair-unprovisioned-intact-provisions",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "repair_cases/repair-unprovisioned-swapped-rebuilds": {
+    "entry_kind": "git",
+    "home": "unprovisioned",
+    "name": "repair-unprovisioned-swapped-rebuilds",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": "root-context"
+  },
+  "repair_cases/repair-reapplies-untrusted": {
+    "entry_kind": "git",
+    "home": "current",
+    "name": "repair-reapplies-untrusted",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "status_cases/status-intact-current": {
+    "home": "current",
+    "name": "status-intact-current",
+    "object": "store-entry",
+    "ownership": true,
+    "surface": null
+  },
+  "status_cases/status-names-failing-check": {
+    "home": "current",
+    "name": "status-names-failing-check",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  },
+  "status_cases/status-enclosing-names-boundary": {
+    "home": "current",
+    "name": "status-enclosing-names-boundary",
+    "object": "store-root",
+    "ownership": false,
+    "surface": null
+  },
+  "status_cases/status-hides-failing-check": {
+    "home": "current",
+    "name": "status-hides-failing-check",
+    "object": "store-entry",
+    "ownership": false,
+    "surface": null
+  }
+}

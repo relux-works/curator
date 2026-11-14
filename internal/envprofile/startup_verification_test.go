@@ -660,9 +660,9 @@ func TestStartupPreservesContextPathContract(t *testing.T) {
 	}
 }
 
-// Home output is derived: even permissive policy reports stale before repair,
-// dry-run preserves the changed bytes, and explicit repair restores the verified
-// source bytes. Intact neighbors remain launchable at every level.
+// Derived-home drift warns and starts only at level 1 without repair. Levels
+// 2-4 and capture refuse; dry-run preserves bytes, and explicit repair restores
+// verified source bytes. Intact neighbors remain launchable at every level.
 func TestStartupHomeDriftRetainsRepairContract(t *testing.T) {
 	requireLinkCapability(t)
 	for _, level := range []int{1, 2, 3, 4} {
@@ -676,7 +676,7 @@ func TestStartupHomeDriftRetainsRepairContract(t *testing.T) {
 			}
 			req.Policy.StartupVerificationLevel = level
 			req.Repair = false
-			if result, err := Resolve(req); err != nil || result == nil {
+			if result, err := Resolve(req); err != nil || result == nil || len(result.Document) == 0 || len(result.StaleReasons) != 0 {
 				t.Fatalf("intact neighbor: %v", err)
 			}
 			path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "claude_code"), "CLAUDE.md")
@@ -691,13 +691,26 @@ func TestStartupHomeDriftRetainsRepairContract(t *testing.T) {
 			if err := os.WriteFile(path, changed, 0600); err != nil {
 				t.Fatal(err)
 			}
-			for _, mode := range []string{"observe", "dry-run", "repair"} {
+			for _, mode := range []string{"observe", "capture", "dry-run", "repair"} {
 				t.Run(mode, func(t *testing.T) {
-					req.Repair = mode != "observe"
+					req.Repair = mode == "dry-run" || mode == "repair"
 					req.DryRun = mode == "dry-run"
+					req.strictStartupInput = mode == "capture"
 					result, err := Resolve(req)
 					if mode != "repair" {
-						if err == nil || !strings.HasPrefix(err.Error(), "environment_home_stale:") || (mode == "observe" && !strings.Contains(err.Error(), "--repair")) || (result != nil && len(result.Document) != 0) {
+						if level == 1 && mode == "observe" {
+							warning := ""
+							if result != nil {
+								for _, value := range result.Warnings {
+									if strings.HasPrefix(value, "environment_home_stale:") {
+										warning = value
+									}
+								}
+							}
+							if err != nil || result == nil || len(result.Document) == 0 || len(result.StaleReasons) == 0 || !strings.Contains(warning, "--repair") {
+								t.Fatalf("home drift warning-start lost: output=%v warning=%q err=%v", result != nil, warning, err)
+							}
+						} else if err == nil || !strings.HasPrefix(err.Error(), "environment_home_stale:") || strings.Contains(err.Error(), "local startup evidence refused") || (mode == "observe" && !strings.Contains(err.Error(), "--repair")) || (result != nil && len(result.Document) != 0) {
 							t.Fatalf("home drift lost leading stale diagnostic: output=%v err=%v", result != nil, err)
 						}
 						got, readErr := os.ReadFile(path)
@@ -714,6 +727,95 @@ func TestStartupHomeDriftRetainsRepairContract(t *testing.T) {
 						}
 					}
 				})
+			}
+		})
+	}
+}
+
+// A read-only stale home owns the leading diagnostic even when its installed
+// pin also mismatches. Restoring the installed bytes keeps the stale-home
+// refusal; explicit repair from verified evidence then produces a fragment.
+func TestStartupHomeStaleLeadsPinFailure(t *testing.T) {
+	for _, level := range []int{2, 3, 4} {
+		t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
+			fx := storeBoundaryFixture(t, "current", false)
+			changeStoreBoundaryLock(t, fx)
+			_, entry := storeBoundaryRootMemberFor(fx)
+			path := filepath.Join(entry, "context", "s.md")
+			original, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("drift\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			req := fx.request(envregistry.CodexCLI)
+			req.Policy.StartupVerificationLevel = level
+			result, err := Resolve(req)
+			if err == nil || !strings.HasPrefix(err.Error(), DiagHomeStale+":") || !strings.Contains(err.Error(), envregistry.DiagStoreUntrusted+":") || !strings.Contains(err.Error(), "--repair") || (result != nil && len(result.Document) != 0) {
+				t.Fatalf("stale-home diagnostic priority lost: %v", err)
+			}
+			if err := os.WriteFile(path, original, 0600); err != nil {
+				t.Fatal(err)
+			}
+			result, err = Resolve(req)
+			if err == nil || !strings.HasPrefix(err.Error(), DiagHomeStale+":") || (result != nil && len(result.Document) != 0) {
+				t.Fatalf("verified-source stale neighbor: %v", err)
+			}
+			req.Repair = true
+			result, err = Resolve(req)
+			if err != nil || result == nil || len(result.Document) == 0 {
+				t.Fatalf("verified repair neighbor: %v", err)
+			}
+		})
+	}
+}
+
+// Level-1 repair may launch a current-lock home with source warnings while
+// preserving every source/home node. An old-lock home refuses instead; restored
+// source is a positive neighbor for ordinary explicit home repair.
+func TestStartupPermissiveExistingHomePreservesSource(t *testing.T) {
+	for _, old := range []bool{false, true} {
+		name := "current"
+		if old {
+			name = "old-lock"
+		}
+		t.Run(name, func(t *testing.T) {
+			fx := storeBoundaryFixture(t, "current", true)
+			if old {
+				changeStoreBoundaryLock(t, fx)
+			}
+			_, entry := storeBoundaryRootMemberFor(fx)
+			path := filepath.Join(entry, "context", "s.md")
+			original, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("drift\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			before := hashTreeForTest(t, fx.home)
+			nodes := storeVerificationNodes(t, fx.home)
+			req := fx.request(envregistry.CodexCLI)
+			req.Repair = true
+			req.Policy.StartupVerificationLevel = 1
+			result, err := Resolve(req)
+			if old {
+				if err == nil || !strings.HasPrefix(err.Error(), DiagHomeStale+":") || (result != nil && len(result.Document) != 0) {
+					t.Fatalf("old-lock mismatching source launched: %v", err)
+				}
+			} else if err != nil || result == nil || len(result.Document) == 0 || len(result.Warnings) == 0 || len(result.StaleReasons) == 0 {
+				t.Fatalf("existing-home warning-start lost: %v", err)
+			}
+			if hashTreeForTest(t, fx.home) != before || !sameStoreVerificationNodes(nodes, storeVerificationNodes(t, fx.home)) {
+				t.Fatal("permissive launch/refusal rewrote mismatching evidence")
+			}
+			if err := os.WriteFile(path, original, 0600); err != nil {
+				t.Fatal(err)
+			}
+			result, err = Resolve(req)
+			if err != nil || result == nil || len(result.Document) == 0 || len(result.StaleReasons) != 0 {
+				t.Fatalf("verified source repair neighbor: %v", err)
 			}
 		})
 	}
