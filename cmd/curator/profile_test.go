@@ -661,14 +661,13 @@ func TestProfileInstallFileOperandIsRefused(t *testing.T) {
 // TestProfileListMigrationHonoursSystemPolicy checks F10/F15 through run():
 // the CLI threads its already-loaded machine configuration into the builtin
 // default migration on every command that reaches it, so a global skill
-// outside the system-locked allowed_sources refuses `profile list`, `use`,
+// outside the system-locked allowed_sources refuses explicit `use`,
 // `sync` and `update` instead of migrating. The refusal precedes any clone,
 // so no git fixture is needed. A mutant that drops PolicyFromConfig from
 // the use or sync call sites (M-D) admits the migration there and must fail
 // the corresponding subtest.
 func TestProfileListMigrationHonoursSystemPolicy(t *testing.T) {
 	for _, command := range [][]string{
-		{"profile", "list"},
 		{"profile", "use", "default"},
 		{"profile", "sync"},
 		{"profile", "update", "default"},

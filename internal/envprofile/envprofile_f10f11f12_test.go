@@ -135,7 +135,7 @@ func TestMigrationSucceedsWhenSystemPolicyPermits(t *testing.T) {
 	}
 }
 
-// TestMigrationHonoursConfigPathOverride checks F10 through List with the
+// TestMigrationHonoursConfigPathOverride checks F10 through explicit initialization with the
 // operator configuration at a non-config.json file name: the gates in
 // CURATOR_CONFIG apply even though <home>/config.json does not exist. A
 // mutant that reads <home>/config.json directly sees no file, maps the
@@ -148,12 +148,12 @@ func TestMigrationHonoursConfigPathOverride(t *testing.T) {
 			`"allowed_sources":["github.com/relux-works"]}`+"\n")
 	t.Setenv("CURATOR_CONFIG", filepath.Join(home, "curator.json"))
 	t.Setenv("CURATOR_SYSTEM_CONFIG", "")
-	_, err := List(home)
+	err := EnsureDefault(home)
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
-		t.Fatalf("list err = %v, want %s", err, DiagSourceInvalid)
+		t.Fatalf("initialization err = %v, want %s", err, DiagSourceInvalid)
 	}
 	if !strings.Contains(err.Error(), "allowed sources") {
-		t.Fatalf("list err = %v, want the allowlist reason", err)
+		t.Fatalf("initialization err = %v, want the allowlist reason", err)
 	}
 }
 
@@ -267,10 +267,10 @@ func TestSourceAllowlistRejectsAdjacentPathSegment(t *testing.T) {
 	policy := Policy{AllowedSources: []string{"example.com/org"}}
 	_, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: policy})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
-		t.Fatalf("allowlist err = %v, want %s", err, DiagSourceInvalid)
+		t.Fatalf("allowinitialization err = %v, want %s", err, DiagSourceInvalid)
 	}
 	if !strings.Contains(err.Error(), "allowed sources") {
-		t.Fatalf("allowlist err = %v, want the allowlist reason", err)
+		t.Fatalf("allowinitialization err = %v, want the allowlist reason", err)
 	}
 	if entries, readErr := os.ReadDir(filepath.Join(home, "profile-repos")); readErr == nil && len(entries) != 0 {
 		t.Fatalf("blocked install cloned: %v", entries)

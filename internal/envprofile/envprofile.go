@@ -253,22 +253,19 @@ func List(home string) ([]Info, error) {
 	return ListWithPolicy(home, policy)
 }
 
-// ListWithPolicy lists under the machine gates of policy (environments
-// §9.1). The CLI passes the gates of its already-loaded configuration.
-func ListWithPolicy(home string, policy Policy) ([]Info, error) {
-	op, err := beginOperation(home)
-	if err != nil {
+// ListWithPolicy reports installed profiles without initializing the builtin.
+// Its policy argument is retained for the existing caller contract; listing
+// does not apply source-signature policy to installed profile records.
+func ListWithPolicy(home string, _ Policy) ([]Info, error) {
+	// Reads neither acquire the mutation lock nor replay pending journals.
+	if err := envauthority.Validate(home); err != nil {
 		return nil, err
 	}
-	defer func() { _ = op.close() }()
-	return listLocked(op, home, policy)
+	return listReadOnly(home)
 }
 
-// listLocked lists under the held operation lock.
-func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
-	if err := ensureDefault(op, home, policy); err != nil {
-		return nil, err
-	}
+// listReadOnly reports installed records without initializing the builtin.
+func listReadOnly(home string) ([]Info, error) {
 	listing, err := stateread.ReadDir(ProfilesDir(home))
 	if err != nil {
 		return nil, err
@@ -1513,6 +1510,37 @@ func fetchLockedSources(manager *gitManager, lock *contextlock.Lock) error {
 // under it, which is already atomic at the granularity the manager
 // observes, so no journal is needed for the removal itself.
 func Remove(home, name string, purge bool) error {
+	selectedPath := ProfileDir(home, name)
+	builtinPath := ProfileDir(home, DefaultProfile)
+	forbidden := func() error { return fmt.Errorf("builtin_profile_remove_forbidden: profile %q is builtin", name) }
+	if selectedPath == builtinPath {
+		return forbidden()
+	}
+	// Filesystem identity also covers case aliases and aliases through a linked
+	// parent. This preflight reads directory metadata only, before mutation state.
+	selected, err := stateread.Lstat(selectedPath)
+	if err != nil {
+		return err
+	}
+	// Lstat keeps ordinary path checks from following a leaf link, but a
+	// removable profile name may itself be a link to the builtin directory.
+	// Resolve only for this read-only identity check; unresolved links fail
+	// before operation or purge state can be written.
+	if selected.Kind == stateread.KindPresent && selected.Info != nil && selected.Info.Mode()&os.ModeSymlink != 0 {
+		resolved, err := os.Stat(selectedPath)
+		if err != nil {
+			return err
+		}
+		selected.Info = resolved
+	}
+	builtin, err := stateread.Lstat(builtinPath)
+	if err != nil {
+		return err
+	}
+	if selected.Kind == stateread.KindPresent && builtin.Kind == stateread.KindPresent && selected.Info != nil && builtin.Info != nil && selected.Info.IsDir() && builtin.Info.IsDir() && os.SameFile(selected.Info, builtin.Info) {
+		return forbidden()
+	}
+
 	op, err := beginOperation(home)
 	if err != nil {
 		return err

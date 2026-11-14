@@ -154,3 +154,10 @@ platform-control	^symlink fixture requires Unix$	allow	the Codex manager-reader 
 host-capability	^fixture does not expose this same-directory case alias$	allow	Stat and SameFile do not establish an alias of the managed root; the distinct-directory positive control runs where supported
 host-capability	^fixture does not expose a same-directory manager case alias$	allow	Stat and SameFile do not establish an alias of the manager directory
 host-capability	^fixture aliases these names instead of keeping distinct directories$	allow	Stat and SameFile establish one directory; distinct-directory behavior requires a case-sensitive fixture
+
+# Signature fixtures report exactly which native prerequisite did not run.
+platform-control	^signature-child-protocol: native descriptor test; Windows named-pipe counterpart runs separately$	allow	Windows executes the same payload-only child through its named-pipe control
+platform-control	^(inherited descriptor backend unavailable|read-only signature input transport unavailable)$	allow	transport-specific controls run on their supported platforms; real signer vectors remain enabled on Windows
+host-capability	^(gpgv unavailable|fixture generator unavailable)$	allow	the real OpenPGP fixture requires both gpg and gpgv; present-tool setup failures remain fatal
+host-capability	^gpg-fixture-agent-cleanup-unavailable: gpgconf missing$	allow	do not start fixture agents without a scoped cleanup tool
+host-capability	^gpg-fixture-path-convention-unavailable: gpg-path-flavour-unknown:	allow	the PE runtime could not be identified; real Windows signer controls still run and no setup failure is called a signature verdict

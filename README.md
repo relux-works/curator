@@ -240,7 +240,7 @@ home lock after staged builds succeed.
 
 ```bash
 curator profile install <git-url|path> [--range|--tag|--revision] [--as <name>] [--use]
-curator profile list    # installed profiles with locks and current markers
+curator profile list    # installed profiles with locks and current markers; no initialization
 curator profile use <name> [--env <env-id>]  # linked switch with backups and marker
 curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
 curator profile update myprofile --revision <commit>  # repin the same Git URL/directory in place
@@ -253,6 +253,26 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 # <env-id> accepts claude and codex as aliases of claude_code and codex_cli;
 # outputs, markers, fragments, and config keep the canonical id.
 ```
+
+Profile listing, environment status and resolution without `--repair` only read
+existing local state. They do not create the builtin `default` profile, acquire
+sources, run implicit vendor release probes or recover pending mutations.
+Unobserved vendor releases remain `unknown`. Repair previews (`--repair --dry-run`)
+also leave state unchanged and report missing local inputs. Initialize or update
+profiles through an explicit mutating operation such as `profile use default`
+(updates retain the existing builtin). Removing `default` refuses with
+`builtin_profile_remove_forbidden` before any mutation.
+
+Source signer status includes signature `verification` (`verified`, `failed` or
+`unavailable`). An enforced failure retains `current=false`; unavailable verification
+prints `unknown` and a verification hint; `env status --check` fails on failed or
+unavailable verification. A verifier exit alone is not a bad-signature verdict:
+process and input-transport failures remain `unavailable`, with bounded, escaped
+verifier output in the hint. Local signature checks use inherited pipes or
+private temporary regular files on Windows and an existing public keyring where supported;
+they do not initialize a GPG home. Windows OpenPGP paths follow the detected
+native, MSYS, or Cygwin executable convention; an unknown convention is unavailable.
+
 
 `--preserve-lock` requires `--repair`. It refuses before locking or writing when repair would change the lock hash, including v1-to-v2 identity migration. Rerun without `--preserve-lock` to migrate explicitly. Otherwise repair preserves the lock bytes; a changed lock detected after acquisition refuses with `environment_repair_failed`. Current homes still resolve without a repair lock.
 
@@ -435,6 +455,24 @@ Curator conforms to an open specification. Independent implementations include [
 Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
 
 ### Tools
+
+Local SSH signer inspection uses OpenSSH `ssh-keygen -Y verify` with inherited
+signer/signature pipes on Unix. Windows uses ordinary temporary input files in
+an atomically created owner-only directory, including protected DACLs. Inputs
+are removed after every verifier result or launch failure; only the selected
+temp parent's timestamp may change. Managed homes and public keyrings retain
+strict content, identity and timestamp witnesses. OpenPGP inspection uses `gpgv`
+and an existing private public-keyring directory; it never initializes
+`GNUPGHOME`. Windows executable import descriptors, names, ordinal entries and
+IAT bounds are validated before selecting native, MSYS or Cygwin paths.
+Malformed or ordinal-only inventories remain unavailable. Test keyrings use the
+private-directory API. Directory read-purity witnesses use current handle
+metadata and retain mtime and identity checks.
+Run `curator env status --json` to inspect `verification`, or
+`curator env status --check` to reject failed or unavailable evidence.
+Focused checks are
+`go test ./internal/envprofile -run 'Test(ReadPuritySSHSignatures|ReadPuritySSHNamespaceVerdict|GPGSignaturePipe|ReadPurityDirectoryHandleWitness|ReadOnlyGPGKeyringPrivateBoundary|SignatureFilesRealSSH|SignatureFileTransport|SignaturePEImportValidation|SignatureScratchWitness)'`;
+keep captured test output under `.temp/`.
 
 For managed Claude gateway settings, configure
 `curator env config set claude_settings_mode.<profile> read-only`, then run

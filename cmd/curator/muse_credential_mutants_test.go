@@ -18,7 +18,7 @@ import (
 // not the separately required real hosted-consumer override plant.
 func TestMuseCredentialPolicyNarrowingMutants(t *testing.T) {
 	mutants := []struct{ name, file, before, after, pkg, test string }{
-		{"fragment-reobserves-muse-release", "internal/envprofile/managed.go", "policy := plan.credentialPolicy", "policy := plan.credentialPolicy\nif adapter.ID == envregistry.Muse { var err error; policy, err = req.resolveCredentialPolicy(adapter); if err != nil { return nil, err } }", "./internal/envprofile", "TestMaterializeCaptureAndStatusNeverProbeVendor/muse-file-shared"},
+		{"fragment-reobserves-muse-release", "internal/envprofile/managed.go", "policy := plan.credentialPolicy", "policy := plan.credentialPolicy\nif adapter.ID == envregistry.Muse { var err error; policy, err = req.resolveCredentialPolicy(adapter); if err != nil { return nil, err } }", "./internal/envprofile", "TestReadPurityFragmentUsesCredentialObservation"},
 		{"muse-keychain-admitted", "internal/envprofile/credential_policy.go", "selection == envregistry.CredentialStoreNative || adapter.ID == envregistry.Muse && selection == envregistry.CredentialStoreFile", "selection == envregistry.CredentialStoreNative || adapter.ID == envregistry.Muse && (selection == envregistry.CredentialStoreFile || selection == envregistry.CredentialStoreKeychain)", "./internal/envprofile", "TestMuseCredentialPolicyMatrix/keychain/shared"},
 		{"missing-shared-source-admitted", "internal/envprofile/muse.go", "return conflict(\"native credential target is absent; run TBH_CREDENTIAL_BACKEND=file muse login in the native XDG environment before resolving shared Muse\")", "return museAuthState{live: true}", "./internal/envprofile", "TestMuseMissingNativeFilePolicy/shared"},
 		{"isolated-muse-native-link", "internal/envprofile/credential_policy.go", "if p.isolation == envregistry.IsolationIsolated {", "if p.isolation == envregistry.IsolationIsolated && adapter.ID != envregistry.Muse {", "./internal/envprofile", "TestMuseCredentialPolicyMatrix/file/isolated"},
@@ -36,7 +36,7 @@ func TestMuseCredentialPolicyNarrowingMutants(t *testing.T) {
 	for _, mutant := range mutants {
 		t.Run(mutant.name, func(t *testing.T) {
 			if runtime.GOOS == "windows" && mutant.name == "fragment-reobserves-muse-release" {
-				t.Skip("shell sentinel is Unix-only")
+				t.Skip("shared-home mutation control uses the existing Unix fixture lane")
 			}
 			if runtime.GOOS == "windows" && mutant.name == "denied-root-admitted" {
 				t.Skip("POSIX mode-bit unreadability: chmod cannot establish Windows ACL denial")

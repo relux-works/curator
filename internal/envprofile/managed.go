@@ -99,6 +99,8 @@ func ManagedHomeDir(home, profile, envID string) string {
 
 // ResolveRequest is one env resolve or repair operation.
 type ResolveRequest struct {
+	// readOnly consumes observations and never starts an implicit vendor probe.
+	readOnly  bool
 	Home      string
 	Profile   string
 	EnvID     string
@@ -115,8 +117,8 @@ type ResolveRequest struct {
 	// precedence primitives that drive emission order and the composition
 	// policy. The zero value resolves with the pair default.
 	Policy Policy
-	// Detect maps an adapter to its detected tool release, or "unknown".
-	// Nil means probe the machine read-only.
+	// Detect supplies an existing tool-release observation, or "unknown".
+	// Without one, reads/previews report unknown; explicit mutations may probe.
 	Detect func(adapter envregistry.Adapter) string
 	// NativeHomeOf resolves native homes; nil means the process homes.
 	// A test seam: production never sets it.
@@ -207,6 +209,9 @@ func (req *ResolveRequest) nativeHome(id string) (string, error) {
 func (req *ResolveRequest) detected(adapter envregistry.Adapter) string {
 	if req.Detect != nil {
 		return req.Detect(adapter)
+	}
+	if req.readOnly {
+		return "unknown"
 	}
 	return detectRelease(adapter.Probe)
 }
@@ -385,7 +390,7 @@ func assembleHomeObserved(req *ResolveRequest, source Source, lock *contextlock.
 	if err := validateProfilePathSources(req.Profile, source, req.Policy); err != nil {
 		return nil, err
 	}
-	manager := newGitManager(req.Home)
+	manager := newReadOnlyGitManager(req.Home)
 	packages, err := loadMaterial(req.Home, manager, lock)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)
@@ -622,7 +627,7 @@ func splitModulePath(path string) (string, string) {
 // storeModuleLink resolves the immutable store file a referenced module
 // links into.
 func storeModuleLink(req *ResolveRequest, lock *contextlock.Lock, member, module string) (string, error) {
-	manager := newGitManager(req.Home)
+	manager := newReadOnlyGitManager(req.Home)
 	found, ok := lock.Find(contextlock.KindContext, member)
 	if !ok {
 		return "", fmt.Errorf("%s: lock carries no context member %s", DiagRepairFailed, member)
@@ -2147,7 +2152,7 @@ func verifyHomeObserved(req *ResolveRequest, adapter envregistry.Adapter, source
 			verdict.reasons = append(verdict.reasons, fmt.Sprintf("managed directory permissions: %v", err))
 		}
 	}
-	manager := newGitManager(req.Home)
+	manager := newReadOnlyGitManager(req.Home)
 	servers, err := mcpsOf(req.Home, manager, lock)
 	if err != nil {
 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("mcp members: %v", err))
@@ -2862,6 +2867,7 @@ func resolveVerified(req ResolveRequest, verify func(*ResolveRequest, envregistr
 		}
 		result.Warnings = append(result.Warnings, nativeHomeFallbackNotice)
 	}()
+	req.readOnly = !req.Repair || req.DryRun
 	if req.PreserveLock && !req.Repair {
 		return nil, fmt.Errorf("usage: env resolve --preserve-lock requires --repair")
 	}

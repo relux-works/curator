@@ -291,7 +291,7 @@ func (op *operation) publishCombined(files map[string][]byte, boundaries *stagin
 	}
 	for _, item := range changes {
 		live := item.path
-		if err := os.MkdirAll(filepath.Dir(live), 0o755); err != nil {
+		if err := privatedir.MakeAll(filepath.Dir(live)); err != nil {
 			return err
 		}
 		preimage, err := transaction.DigestTarget(transaction.KindBytes, live)
