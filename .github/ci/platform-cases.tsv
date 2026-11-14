@@ -1182,3 +1182,11 @@ internal/envprofile	TestStoreVerificationLandedFields	linux,darwin,windows	-	-	l
 internal/envprofile	TestStoreVerificationLandedSchemaControl	linux,darwin,windows	-	-	schema bypass reaches the intended missing-policy rejection assertion
 internal/envprofile	TestStartupHomeStaleLeadsPinFailure	linux,darwin,windows	-	-	old-lock home remains the leading diagnostic alongside pin drift; restored source repairs successfully
 internal/envprofile	TestStartupPermissiveExistingHomePreservesSource	linux,darwin,windows	-	-	level1 existing-home launch preserves mismatching source; old-lock refusal and verified repair are neighbors
+
+# Windows observation and special-file classification regressions.
+internal/skillintegrity	TestSkillHardlinkObservationKeepsNamedRefusal	linux,darwin,windows	-	-	metadata observation retains a hardlink before named admission refusal; intact neighbors pass
+internal/skillintegrity	TestSkillHardlinkObservationControl	linux,darwin,windows	-	-	regressed observation or link admission reaches the intended hardlink assertion
+internal/pathboundary	TestSocketIsRegularTypeFailure	linux,darwin,windows	-	-	real AF_UNIX socket fails regular_types beside ordinary-file and symlink controls
+internal/pathboundary	TestWindowsSocketClassificationControl	windows	-	-	socket reparse misclassification reaches the regular_types assertion
+internal/envprofile	TestStoreVerificationObservationBindsReplacement	linux,darwin,windows	-	-	same-byte replacement cannot borrow earlier directory identity; retained original passes
+internal/envprofile	TestStoreVerificationObservationControl	linux,darwin,windows	-	-	lazy Windows identity or bypassed identity comparison reaches the replacement assertion

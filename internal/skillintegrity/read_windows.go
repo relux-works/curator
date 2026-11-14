@@ -24,17 +24,27 @@ func singleLink(path string, info os.FileInfo) bool {
 }
 
 func openCaptureFile(path string) (*os.File, error) {
+	return openSkillFile(path, windows.GENERIC_READ, true)
+}
+
+// Identity observation must retain multiply linked files too: admission owns
+// their named refusal. Metadata access does not require payload read rights.
+func openCaptureMetadata(path string) (*os.File, error) {
+	return openSkillFile(path, windows.FILE_READ_ATTRIBUTES, false)
+}
+
+func openSkillFile(path string, access uint32, requireSingleLink bool) (*os.File, error) {
 	name, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return nil, err
 	}
-	handle, err := windows.CreateFile(name, windows.GENERIC_READ, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
+	handle, err := windows.CreateFile(name, access, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
 	if err != nil {
 		return nil, err
 	}
 	var info windows.ByHandleFileInformation
 	kind, kindErr := windows.GetFileType(handle)
-	if err := windows.GetFileInformationByHandle(handle, &info); err != nil || kindErr != nil || kind != windows.FILE_TYPE_DISK || info.NumberOfLinks != 1 || info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 {
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil || kindErr != nil || kind != windows.FILE_TYPE_DISK || (requireSingleLink && info.NumberOfLinks != 1) || info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 {
 		_ = windows.CloseHandle(handle)
 		return nil, errors.New("skill_integrity_boundary_invalid: payload must be a single-link regular file")
 	}

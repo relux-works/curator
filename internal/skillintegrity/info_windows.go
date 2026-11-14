@@ -14,7 +14,7 @@ func captureEntryInfo(path string, entry fs.DirEntry) (os.FileInfo, error) {
 	if err != nil || !info.Mode().IsRegular() {
 		return info, err
 	}
-	f, err := openCaptureFile(path)
+	f, err := openCaptureMetadata(path)
 	if err != nil {
 		return nil, failure("skill_integrity_boundary_invalid", "file identity could not be retained")
 	}
