@@ -18,6 +18,7 @@ import (
 	sourceidentity "github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/startupverification"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -40,6 +41,18 @@ type compositionPlan struct {
 	RuntimeEntries  []string
 	BuildKeys       []string
 	ConcurrentState bool
+}
+
+// The capture-time comparison uses the same effective policy as the initial
+// closure check, including the protected lock floor and zero-value default.
+func compositionVerificationLevel(machine int, lock *contextlock.Lock) (int, error) {
+	if machine == 0 {
+		machine = startupverification.DefaultLevel
+	}
+	if lock.StartupVerificationLevel != nil {
+		return startupverification.EffectiveLevel(machine, *lock.StartupVerificationLevel)
+	}
+	return startupverification.EffectiveLevel(machine)
 }
 
 // PreviewComposition performs only protected input reads. It acquires no lease
@@ -102,7 +115,8 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 	var baseLock *contextlock.Lock
 	runtimeEntries := map[string]bool{}
 	home := filepath.Dir(op.root)
-	err = envprofile.VisitCompositionProfile(home, r.Record.Profile.Name, r.Record.Profile.LockSHA256, func(lock *contextlock.Lock, m contextlock.Member, root string) error {
+	verificationPolicy := envprofile.Policy{StartupVerificationLevel: op.startupVerificationLevel}
+	profileWarnings, err := envprofile.VisitCompositionProfileWithPolicy(home, r.Record.Profile.Name, r.Record.Profile.LockSHA256, verificationPolicy, func(lock *contextlock.Lock, m contextlock.Member, root string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -119,8 +133,17 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		// State pins bind captured bytes as well as the surrounding store read.
 		if m.StateHash != "" && (m.Directory == "" || m.Directory == ".") {
 			h, e := hashing.ContentSHA256Files(capt.Bytes, lock.ContentHashVersion())
-			if e != nil || strings.TrimPrefix(h, "sha256:") != m.StateHash {
-				return fail("project_context_drift", "captured profile member differs from pin")
+			if e != nil {
+				return e
+			}
+			if strings.TrimPrefix(h, "sha256:") != m.StateHash {
+				effective, policyErr := compositionVerificationLevel(verificationPolicy.StartupVerificationLevel, lock)
+				if policyErr != nil {
+					return policyErr
+				}
+				if effective != 1 {
+					return fail("project_context_drift", "captured profile member differs from pin")
+				}
 			}
 		}
 		if m.Kind == "skill" && m.Commit != "" {
@@ -165,6 +188,8 @@ func (op *operation) compose(ctx context.Context, req ComposeRequest) (compositi
 		}
 		return nil
 	})
+
+	out.Warnings = append(out.Warnings, profileWarnings...)
 	if err != nil {
 		return result, fail("project_context_drift", "selected profile closure is unavailable or changed: "+err.Error())
 	}

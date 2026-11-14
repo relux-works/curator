@@ -10,7 +10,7 @@ import (
 )
 
 func testOrdinaryGateUnion(t *testing.T, c testLane) {
-	for _, control := range []string{"valid", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
+	for _, control := range []string{"valid", "unselected-compatibility", "canonical-missing-proof", "compatibility-refused", "compatibility-missing", "merge-refused", "unserved", "missing-required-subcase", "mixed-lanes", "wrong-timeout", "race-flags", "race-artifacts"} {
 		t.Run(control, func(t *testing.T) {
 			dir := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(dir, ".github/ci"), 0755); err != nil {
@@ -57,6 +57,7 @@ set -eu
 echo "$*" >>commands.txt
 case "$1" in
 run)
+  if [ "$2" = ./tools/check-store-compatibility ]; then [ "$COMPAT_REFUSED" = 0 ] || exit 19; echo checked; exit 0; fi
   [ "$2" = ./tools/envprofilerace ]
   [ "$3" = -lane ] && [ "$4" = "$LANE" ]
   [ "$5" = -mode ] && [ "$6" = merge ]
@@ -76,7 +77,8 @@ esac
 `)
 			cmd := exec.Command("bash", ".github/ci/test-gate.sh", "evidence")
 			cmd.Dir = dir
-			cmd.Env = append(os.Environ(), "GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
+			cmd.Env = append(os.Environ(), "CI_STORE_COMPATIBILITY=compatibility", "GITHUB_SHA="+strings.Repeat("a", 40), "COMPAT_REFUSED=0",
+				"GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir), "CONTROL="+control,
 				"CI_WINDOWS_TEST_SHARDS=", "CI_UNIX_TEST_SHARDS=", "CI_ENVPROFILE_SHARDS=", "GO_TEST_FLAGS=", "GO_TEST_TIMEOUT="+c.timeout, "LANE="+c.lane,
 				"CI_GATE_GOOS="+c.goos, "CI_PLATFORM_CASES=ledger.tsv")
@@ -86,6 +88,21 @@ esac
 			}
 			cmd.Env = append(cmd.Env, key+"=shards")
 			switch control {
+			case "unselected-compatibility", "canonical-missing-proof":
+				clean := cmd.Env[:0]
+				for _, entry := range cmd.Env {
+					if !strings.HasPrefix(entry, "CI_STORE_COMPATIBILITY=") && !strings.HasPrefix(entry, "CI_STORE_V2_CANONICAL=") {
+						clean = append(clean, entry)
+					}
+				}
+				cmd.Env = clean
+				if control == "canonical-missing-proof" {
+					cmd.Env = append(cmd.Env, "CI_STORE_V2_CANONICAL=1")
+				}
+			case "compatibility-refused":
+				cmd.Env = append(cmd.Env, "COMPAT_REFUSED=1")
+			case "compatibility-missing":
+				cmd.Env = append(cmd.Env, "CI_STORE_COMPATIBILITY=")
 			case "mixed-lanes":
 				cmd.Env = append(cmd.Env, "CI_UNIX_TEST_SHARDS=shards", "CI_WINDOWS_TEST_SHARDS=shards")
 			case "wrong-timeout":
@@ -96,14 +113,23 @@ esac
 				cmd.Env = append(cmd.Env, "CI_ENVPROFILE_SHARDS=shards")
 			}
 			out, err := cmd.CombinedOutput()
-			if control == "valid" {
+			if control == "valid" || control == "unselected-compatibility" {
 				if err != nil || !strings.Contains(string(out), "platform-case gate: ok") {
 					t.Fatalf("valid native union: %v\n%s", err, out)
+				}
+				commands, err := os.ReadFile(filepath.Join(dir, "commands.txt"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				delegated := strings.Contains(string(commands), "-skip ^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive")
+				checked := strings.Contains(string(commands), "run ./tools/check-store-compatibility")
+				if delegated || checked != (control == "valid") {
+					t.Fatalf("canonical families must run; historical proof must match explicit selection: %s", commands)
 				}
 				return
 			}
 			code := 1
-			if control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
+			if control == "compatibility-missing" || control == "canonical-missing-proof" || control == "unserved" || control == "mixed-lanes" || control == "wrong-timeout" || control == "race-flags" || control == "race-artifacts" {
 				code = 2
 			}
 			exit, ok := err.(*exec.ExitError)
@@ -117,6 +143,8 @@ esac
 			} else {
 				want := ""
 				switch control {
+				case "compatibility-missing", "canonical-missing-proof":
+					want = "same-head revision-1 compatibility evidence is required"
 				case "mixed-lanes":
 					want = "ordinary shard lanes are mutually exclusive"
 				case "wrong-timeout", "race-flags", "race-artifacts":
@@ -138,6 +166,8 @@ esac
 
 // The real shell and unchanged ledger gate admit complete native unions and
 // reject the intended missing-child/configuration controls on each platform.
+// Explicit proof selects canonical v2 families; an unselected standalone run
+// keeps all historical families and performs no compatibility admission.
 // Go execution/planning are bounded stand-ins; native CI supplies runtime proof.
 func TestOrdinaryGateUnion(t *testing.T) {
 	for _, goos := range []string{"windows", "linux", "darwin"} {

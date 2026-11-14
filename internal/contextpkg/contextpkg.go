@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/startupverification"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -31,6 +32,9 @@ const (
 	SchemaVersion   = 1
 	MaxWeight       = 2147483647
 )
+
+// StartupVerificationSchemaVersion extends manifest2 with a startup minimum.
+const StartupVerificationSchemaVersion = 3
 
 // Diagnostic codes (environments §2.1, §3.1).
 const (
@@ -103,11 +107,12 @@ func (m Module) Applies(environment string) bool {
 
 // Manifest is a validated agent-context.json.
 type Manifest struct {
-	SchemaVersion int
-	Name          string
-	Version       string
-	Weight        int64
-	Weights       map[string]int64
+	StartupVerificationLevel *int
+	SchemaVersion            int
+	Name                     string
+	Version                  string
+	Weight                   int64
+	Weights                  map[string]int64
 	// HasContext is true when the "context" member is present; a package
 	// without it is a pure umbrella and declares no root-context surface.
 	HasContext bool
@@ -173,13 +178,16 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 		return nil, err
 	}
 	schema, ok := object["schema_version"].(json.Number)
-	if !ok || (schema.String() != "1" && schema.String() != "2") {
-		return nil, invalid(DiagManifestInvalid, "schema_version must be 1 or 2")
+	if !ok || (schema.String() != "1" && schema.String() != "2" && schema.String() != strconv.Itoa(StartupVerificationSchemaVersion)) {
+		return nil, invalid(DiagManifestInvalid, "unsupported schema_version")
 	}
 	version, _ := strconv.Atoi(schema.String())
 	allowed := []string{"schema_version", "name", "version", "weight", "weights", "context", "requires"}
-	if version == 2 {
+	if version >= 2 {
 		allowed = append(allowed, "codex_settings")
+	}
+	if version == StartupVerificationSchemaVersion {
+		allowed = append(allowed, "startup_verification")
 	}
 	if err := requireKeys(object, DiagManifestInvalid, "", allowed...); err != nil {
 		return nil, err
@@ -191,6 +199,13 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 		}
 	}
 	manifest := &Manifest{SchemaVersion: version}
+	if raw, present := object["startup_verification"]; present {
+		level, err := startupverification.ParseLevelObject(raw)
+		if err != nil {
+			return nil, err
+		}
+		manifest.StartupVerificationLevel = &level
+	}
 	if manifest.Name, err = requireIdentifier(object, "name", DiagManifestInvalid); err != nil {
 		return nil, err
 	}
@@ -323,7 +338,7 @@ func parseRequirements(raw any, family string, schemaVersion int) (map[string]Re
 			allowed = append(allowed, "directory", "weight")
 		case "skills":
 			allowed = append(allowed, "mode", "commands")
-			if schemaVersion == 2 {
+			if schemaVersion >= 2 {
 				allowed = append(allowed, "directory")
 			}
 		case "mcp":

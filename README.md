@@ -135,6 +135,13 @@ and [§5](https://github.com/relux-works/curator-spec/blob/23435129ebc4c29e5b7f7
 
 ## Execution assurance
 
+Startup policy and complete external-skill evidence are specified in
+[Startup verification](docs/startup-verification.md). Read the effective machine
+selection with `curator config startup-verification --json`; edits use
+`curator config startup-verification --level 3`.
+Unsafe immutable-store paths refuse at every level, including `--repair`;
+strict repair can restore ordinary bytes only after structural checks pass.
+
 Compiled builds default to portable execution mode using an authenticated manager/worker session. Verified execution mode (`execution.mode: verified`) is an explicit non-fallback selection: because this release ships no platform provider, a missing, unhealthy, incompatible, or drifted provider fails closed rather than falling back to portable execution. Portable, verified, legacy assurance-blind, cross-provider, and capability-drifted cache entries occupy disjoint cache key identities, and every adopted or published artifact carries the exact build-session receipt used at dispatch. Language source-closure adapters (Rust, SwiftPM, npm, pnpm, Yarn Classic, and Modern Yarn) bind ecosystem toolchains and resolve immutable source snapshots. See [docs/authoring-language-adapters.md](docs/authoring-language-adapters.md) for adapter authoring contracts and [docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md) for cross-adapter conformance.
 
 ## Compiled-command status, diagnostics, and repair
@@ -436,6 +443,12 @@ Curator uses an in-repository task board in `.task-board/`. Automated gates run 
 
 ### Tools
 
+The draft store qualification reader and historical compatibility checker are
+documented in [startup verification](docs/startup-verification.md#store-qualification-tools).
+Run `go test -p=1 -parallel=1 ./internal/storecompatibility` for the exact-partition
+controls; `go run ./tools/check-store-compatibility -input .temp/store-replay.jsonl`
+checks an actual complete replay stream. Save reports under `.temp/`.
+
 For managed Claude gateway settings, configure
 `curator env config set claude_settings_mode.<profile> read-only`, then run
 `curator env resolve claude_code --profile <profile> --repair`. The managed-home
@@ -467,6 +480,14 @@ records in a `go test -json` log. Filtered cold-repository CI steps keep their
 logs in the job workspace and refuse absent, renamed or skipped witnesses.
 Run `go test ./tools/ciworkflow -run 'TestRequiredTests|TestReleaseBuild'` for
 checker controls and the release platform-tag exclusion gate.
+
+Canonical Test/Race lanes require the same-head artifact from the separate
+`store-v1-compatibility` job. Revalidate it locally with
+`go run ./tools/check-store-compatibility -dir .temp/store-v1-compatibility -commit <full-head>`;
+then export its absolute directory as `CI_STORE_COMPATIBILITY` before running
+the gate or native shard inventory. The artifact contains `head.txt`, the
+complete `replay.jsonl` and `report.json`. It authorizes routing only the four
+historical store families; counts alone cannot authorize that routing.
 
 `tools/envprofilerace` partitions the native `internal/envprofile` race-build
 list into eight deterministic name-hash shards plus a dedicated shard for the

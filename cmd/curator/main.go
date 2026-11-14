@@ -2515,6 +2515,7 @@ const configUsage = `curator config: inspect and edit the machine configuration
 Usage:
   curator config show                  print the effective configuration
   curator config launcher              print selected launcher metadata as JSON
+  curator config startup-verification [--json | --level 1..4]
   curator config claude-auth <plan|apply|restore>
                                        safely edit OAuth metadata references
   curator config build-ssh <subcommand>
@@ -2576,6 +2577,8 @@ func (c cli) cmdConfig(args []string) int {
 			return exitUsage
 		}
 		return c.cmdConfigLauncher()
+	case "startup-verification":
+		return c.cmdConfigStartupVerification(args[1:])
 	case "build-ssh":
 		return c.cmdConfigBuildSSH(args[1:])
 	case "build-https":

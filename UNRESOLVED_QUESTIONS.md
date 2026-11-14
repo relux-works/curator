@@ -1,5 +1,10 @@
 # Unresolved questions
 
+- The verification centre has no accepted production request/response protocol.
+  `extensions.grant_service.endpoint` is location metadata only. Until a provider
+  contract is implemented, level4 uses the local3 fallback with a warning.
+  [Startup verification](docs/startup-verification.md).
+
 - TASK-261109-8nwurz: Runtime-discovered skill inventory has no admitted safe
   source yet. The producer reports locked skills and explicit uncertainty;
   budgets and declared-but-unread references follow the confirmed v1 decisions.

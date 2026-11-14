@@ -23,6 +23,8 @@ const (
 	CheckRegular = "regular_types"
 	// CheckLinkSafety names the no-symlink boundary check.
 	CheckLinkSafety = "link_safety"
+	// CheckSingleLink names the immutable regular-file link-count check.
+	CheckSingleLink = "single_link"
 )
 
 // Failure identifies the first boundary check that could not be proven.
@@ -165,11 +167,24 @@ func ValidateWithinWithOwner(root, target string, ownerLookup OwnerLookup) error
 	return validateWithinWithOwnerAndEntryInfo(root, target, ownerLookup, defaultEntryInfo)
 }
 
+// ValidateSnapshotWithinWithOwner adds the immutable-snapshot requirement that
+// every regular file has exactly one link. It leaves directory link counts and
+// the separate operator-source admission contract unchanged.
+func ValidateSnapshotWithinWithOwner(root, target string, ownerLookup OwnerLookup) error {
+	return validateWithinWithRegularCheck(root, target, ownerLookup, defaultEntryInfo, singleLink)
+}
+
+type regularFileCheck func(path string, info os.FileInfo) error
+
 // validateWithinWithOwnerAndEntryInfo walks the named route with lstat and
 // fails closed on any missing component: root and target are named by the
 // caller (lock, marker, store entry). Only children discovered by the tree
 // walk below target may vanish (see validateTree).
 func validateWithinWithOwnerAndEntryInfo(root, target string, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
+	return validateWithinWithRegularCheck(root, target, ownerLookup, entryInfo, nil)
+}
+
+func validateWithinWithRegularCheck(root, target string, ownerLookup OwnerLookup, entryInfo entryInfoLookup, regularCheck regularFileCheck) error {
 	if ownerLookup == nil {
 		return &Failure{Root: root, Path: target, Check: CheckOwnership, Reason: "owner lookup is unavailable"}
 	}
@@ -194,7 +209,7 @@ func validateWithinWithOwnerAndEntryInfo(root, target string, ownerLookup OwnerL
 		return &Failure{Root: absolute, Path: targetAbsolute, Check: CheckContainment, Reason: "component does not resolve below the declared directory", Cause: err}
 	}
 	if relative == "." {
-		return validateTree(absolute, absolute, operator, ownerLookup, entryInfo)
+		return validateTreeWithRegularCheck(absolute, absolute, operator, ownerLookup, entryInfo, regularCheck)
 	}
 	current := absolute
 	parts := strings.Split(relative, string(os.PathSeparator))
@@ -223,18 +238,33 @@ func validateWithinWithOwnerAndEntryInfo(root, target string, ownerLookup OwnerL
 		if index < len(parts)-1 && !info.IsDir() {
 			return &Failure{Root: absolute, Path: current, Check: CheckContainment, Reason: "path component is not a directory"}
 		}
+		if regularCheck != nil && info.Mode().IsRegular() {
+			info, err = snapshotFileInfo(current, info)
+			if err != nil {
+				return &Failure{Root: absolute, Path: current, Check: CheckSingleLink, Cause: err}
+			}
+		}
 		if err := checkNode(absolute, current, info, operator, ownerLookup); err != nil {
 			return err
+		}
+		if regularCheck != nil && info.Mode().IsRegular() {
+			if err := regularCheck(current, info); err != nil {
+				return &Failure{Root: absolute, Path: current, Check: CheckSingleLink, Cause: err}
+			}
 		}
 		targetInfo = info
 	}
 	if targetInfo != nil && targetInfo.IsDir() {
-		return validateTree(absolute, current, operator, ownerLookup, entryInfo)
+		return validateTreeWithRegularCheck(absolute, current, operator, ownerLookup, entryInfo, regularCheck)
 	}
 	return nil
 }
 
 func validateTree(root, target string, operator OwnerIdentity, ownerLookup OwnerLookup, entryInfo entryInfoLookup) error {
+	return validateTreeWithRegularCheck(root, target, operator, ownerLookup, entryInfo, nil)
+}
+
+func validateTreeWithRegularCheck(root, target string, operator OwnerIdentity, ownerLookup OwnerLookup, entryInfo entryInfoLookup, regularCheck regularFileCheck) error {
 	return filepath.WalkDir(target, func(path string, entry fs.DirEntry, walkErr error) error {
 		// vanished applies environments §4 to every per-entry probe (lstat,
 		// link, ownership/DACL, and the directory open for recursion): an
@@ -288,6 +318,15 @@ func validateTree(root, target string, operator OwnerIdentity, ownerLookup Owner
 			}
 			return &Failure{Root: root, Path: path, Check: CheckLinkSafety, Reason: "symbolic link below the declared directory"}
 		}
+		if regularCheck != nil && info.Mode().IsRegular() {
+			info, err = snapshotFileInfo(path, info)
+			if err != nil {
+				if result, gone := vanished(err); gone {
+					return result
+				}
+				return &Failure{Root: root, Path: path, Check: CheckSingleLink, Cause: err}
+			}
+		}
 		if err := checkNode(root, path, info, operator, ownerLookup); err != nil {
 			var failure *Failure
 			if errors.As(err, &failure) && failure.Cause != nil {
@@ -299,6 +338,14 @@ func validateTree(root, target string, operator OwnerIdentity, ownerLookup Owner
 		}
 		if !info.IsDir() && !info.Mode().IsRegular() {
 			return &Failure{Root: root, Path: path, Check: CheckRegular, Reason: "component is neither a directory nor a regular file"}
+		}
+		if regularCheck != nil && info.Mode().IsRegular() {
+			if err := regularCheck(path, info); err != nil {
+				if result, gone := vanished(err); gone {
+					return result
+				}
+				return &Failure{Root: root, Path: path, Check: CheckSingleLink, Cause: err}
+			}
 		}
 		return nil
 	})

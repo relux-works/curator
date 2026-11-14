@@ -727,3 +727,78 @@ func (c compositionContentionContext) Done() <-chan struct{} {
 	c.cancel()
 	return c.Context.Done()
 }
+
+// The composition API applies the selected machine baseline end to end. An
+// intact source works at every level; an initial byte contradiction is allowed
+// only at1 with a warning, preserving the source and protected lock bytes.
+func TestCompositionStartupLevels(t *testing.T) {
+	f := compositionFixture(t, "codex_cli", nil)
+	packageApproved(t, f, false)
+	req := compositionRequest(f)
+	_, lock, err := profile(f.store.Home, "base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	module := filepath.Join(contextstore.EntryDir(f.store.Home, "context", "base", lock.Members[0].StateHash), "context/entry.md")
+	original, err := os.ReadFile(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(f.store.Home, "profiles/base/lock.json")
+	lockBytes, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, changed := range []bool{false, true} {
+		want := original
+		if changed {
+			want = []byte("Changed profile instructions.\n")
+		}
+		write(t, module, string(want))
+		for _, level := range []int{1, 2, 3, 4} {
+			t.Run(fmt.Sprintf("changed%v/level%d", changed, level), func(t *testing.T) {
+				selected := f.store
+				selected.StartupVerificationLevel = level
+				preview, err := selected.PreviewComposition(context.Background(), req)
+				if changed && level != 1 {
+					required(t, err, "project_context_drift")
+					if len(preview.Files) != 0 {
+						t.Fatal("refused composition returned files")
+					}
+				} else {
+					if err != nil || len(preview.Files) == 0 {
+						t.Fatalf("composition refused: %v", err)
+					}
+					if (changed || level == 4) && len(preview.Warnings) == 0 {
+						t.Fatal("verification warning lost")
+					}
+				}
+				for path, expected := range map[string][]byte{module: want, lockPath: lockBytes} {
+					actual, e := os.ReadFile(path)
+					if e != nil || !bytes.Equal(actual, expected) {
+						t.Fatal("composition changed evidence")
+					}
+				}
+			})
+		}
+	}
+}
+
+// Captured-pin drift uses the lock's effective floor, not just the machine's
+// permissive setting. Equality/default neighbors retain the selected policy.
+func TestCompositionCapturedPinEffectiveLevel(t *testing.T) {
+	for _, tc := range []struct{ machine, floor, want int }{{1, 0, 1}, {1, 1, 1}, {1, 3, 3}, {0, 0, 3}, {0, 3, 3}, {4, 3, 0}} {
+		lock := &contextlock.Lock{}
+		if tc.floor != 0 {
+			lock.StartupVerificationLevel = &tc.floor
+		}
+		got, err := compositionVerificationLevel(tc.machine, lock)
+		if tc.want == 0 {
+			if err == nil || !strings.Contains(err.Error(), "startup_verification_weakening") {
+				t.Fatalf("weak floor accepted: %v", err)
+			}
+		} else if err != nil || got != tc.want {
+			t.Fatalf("effective capture level: machine=%d floor=%d got=%d err=%v", tc.machine, tc.floor, got, err)
+		}
+	}
+}

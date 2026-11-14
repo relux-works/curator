@@ -22,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/pkgversion"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -931,11 +932,17 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 	default:
 		return "", func() {}, stateread.UnusableError(repo, fmt.Errorf("unknown cached source state %q", repoMetadata.Kind))
 	}
-	snapshot, err := os.MkdirTemp("", "curator-profile-inspect-*")
+	snapshot, err := privatedir.TempStaging("", "curator-profile-inspect-*")
 	if err != nil {
 		return "", func() {}, err
 	}
 	if err := extractMemberSnapshot(repo, resolved.Commit, resolved.Kind, resolved.Directory, snapshot); err != nil {
+		_ = os.RemoveAll(snapshot)
+		return "", func() {}, err
+	}
+	// Qualify only this newly extracted inspection tree. Existing source and
+	// store entries retain their permissions and must pass their own boundary.
+	if err := privatedir.ProtectTree(snapshot); err != nil {
 		_ = os.RemoveAll(snapshot)
 		return "", func() {}, err
 	}
@@ -949,7 +956,7 @@ func (m *gitManager) inspectEntry(home string, resolved contextresolve.Resolved)
 // Malformed network and file:// sources also pass through here and are
 // rejected at that Identity boundary with profile_source_invalid.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
-	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
+	pkg := &contextresolve.Package{SchemaVersion: manifest.SchemaVersion, Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights, StartupVerificationLevel: manifest.StartupVerificationLevel}
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{

@@ -44,6 +44,13 @@ GO="${GO:-go}"
 GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-60m}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
+# Presence, including an empty value, cannot replace the canonical gate with
+# the separate explicitly pinned store-qualification rehearsal.
+if [ "${CURATOR_STORE_VERIFICATION_ROOT+present}" = present ] || [ "${CURATOR_STORE_VERIFICATION_MANIFEST_SHA256+present}" = present ]; then
+	echo 'test-gate: canonical conformance refuses store qualification selectors.' >&2
+	exit 2
+fi
+
 if [ "$#" -ne 1 ]; then
 	echo 'test-gate: usage: test-gate.sh <evidence-dir>' >&2
 	exit 2
@@ -81,6 +88,22 @@ echo "test-gate: flags=${GO_TEST_FLAGS:-<none>} timeout=$GO_TEST_TIMEOUT"
 echo "test-gate: GIT_CONFIG_GLOBAL=$GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM=$GIT_CONFIG_NOSYSTEM"
 echo "test-gate: conformance root=$ROOT"
 echo ''
+
+# Default CI explicitly selects delegation. A standalone/candidate invocation
+# without that selection still executes every historical family against its own
+# root. No family is excluded until the complete same-head replay is admitted.
+STORE_COMPAT_FLAGS=()
+STORE_COMPAT_ENV=()
+if [ "${CI_STORE_COMPATIBILITY+present}" = present ] || [ "${CI_STORE_V2_CANONICAL:-}" = 1 ]; then
+ if [ -z "${CI_STORE_COMPATIBILITY:-}" ]; then
+  echo 'test-gate: same-head revision-1 compatibility evidence is required' >&2
+  exit 2
+ fi
+ compat_head="${GITHUB_SHA:-$(git rev-parse HEAD)}"
+ "$GO" run ./tools/check-store-compatibility -dir "$CI_STORE_COMPATIBILITY" -commit "$compat_head" >"$EVIDENCE/store-compatibility.json" || exit 1
+ echo 'test-gate: historical replay verified exact 32/6; four canonical store families run revision-2 successors'
+ STORE_COMPAT_ENV=(CI_STORE_V2_CANONICAL=1)
+fi
 
 # --- plan ------------------------------------------------------------------
 bash "$HERE/suite-plan.sh" "$ROOT" "$EVIDENCE"
@@ -168,8 +191,8 @@ fi
 # --- served: the root is exported ------------------------------------------
 if [ -s "$SERVED" ]; then
 	# shellcheck disable=SC2046,SC2086
-	run_stage served env CURATOR_CONFORMANCE_ROOT="$ROOT" \
-		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} $(cat "$SERVED")
+	run_stage served env ${STORE_COMPAT_ENV[@]+"${STORE_COMPAT_ENV[@]}"} CURATOR_CONFORMANCE_ROOT="$ROOT" \
+		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${STORE_COMPAT_FLAGS[@]+"${STORE_COMPAT_FLAGS[@]}"} ${GO_TEST_FLAGS:-} $(cat "$SERVED")
 	rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
 else
 	echo 'test-gate: no served packages' >&2

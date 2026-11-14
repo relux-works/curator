@@ -348,65 +348,76 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 }
 
 // A genuine explicit custom origin is valid. With current default-native skills,
-// a managed caller must get the credential conflict in verify/dry-run/repair.
-// An absent default instead keeps the earlier exact native-skills refusal.
+// repair refuses the credential conflict; verification refuses at levels 2–4.
+// Level 1 retains its accepted stale-home warning and launch behavior.
+// An absent default keeps the exact native-skills dry-run refusal at all levels.
 // Every refusal preserves managed/profile/lock and both native fixture trees;
-// no credential payload is read, and no launch fragment may escape.
+// no credential payload is read, and refusals emit no launch fragment.
 func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
-	for _, mode := range []string{"verify", "repair-dry-run", "repair", "missing-native-default"} {
-		t.Run(mode, func(t *testing.T) {
-			fx, req := managedCallerFixtureAt(t, true)
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				t.Fatal(err)
-			}
-			defaultNative := filepath.Join(userHome, ".codex")
-			if mode != "missing-native-default" {
-				// Real profile-use setup, not a nativeSkillsState stub: prepare the
-				// selected default so the credential-conflict boundary is reached.
-				t.Setenv("CODEX_HOME", defaultNative)
-				results, err := UseWithPolicy(fx.home, fx.profile, "codex_cli", "", false, req.Policy)
-				if err != nil {
-					t.Fatalf("default native profile-use positive control: %v", err)
-				}
-				for _, result := range results {
-					if !result.OK {
-						t.Fatalf("default native profile-use: %s", result.Detail)
+	for _, level := range []int{1, 2, 3, 4} {
+		t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
+			for _, mode := range []string{"verify", "repair-dry-run", "repair", "missing-native-default"} {
+				t.Run(mode, func(t *testing.T) {
+					fx, req := managedCallerFixtureAt(t, true)
+					req.Policy.StartupVerificationLevel = level
+					userHome, err := os.UserHomeDir()
+					if err != nil {
+						t.Fatal(err)
 					}
-				}
-				row, err := nativeSkillsState(fx.home, fx.profile, "codex_cli", nil)
-				if err != nil || (row != nil && row.State != "current") {
-					t.Fatalf("native skills positive control: row=%+v err=%v", row, err)
-				}
-			}
-			t.Setenv("CODEX_HOME", fx.native["codex_cli"])
-			if _, err := Resolve(req); err != nil {
-				t.Fatalf("explicit custom origin positive control: %v", err)
-			}
-			if mode != "verify" {
-				req.Repair = true
-				req.PreserveLock = true
-				req.DryRun = mode != "repair"
-			}
-			t.Setenv("CODEX_HOME", ManagedHomeDir(fx.home, fx.profile, "codex_cli"))
-			before := managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])
-			result, err := Resolve(req)
-			if mode == "missing-native-default" {
-				want := DiagHomeStale + ": native skills home missing"
-				if err == nil || err.Error() != want {
-					t.Errorf("absent default must retain the earlier exact refusal %q, got %v", want, err)
-				}
-			} else if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
-				t.Errorf("custom-origin mismatch must remain %s, got %v", envregistry.DiagCredentialConflict, err)
-			}
-			if result == nil || !strings.Contains(strings.Join(result.Warnings, "\n"), nativeHomeFallbackNotice) {
-				t.Error("fallback must be reported, including an early refusal")
-			}
-			if result != nil && len(result.Document) != 0 {
-				t.Error("refused origin conflict emitted a fragment")
-			}
-			if !reflect.DeepEqual(before, managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])) {
-				t.Error("custom-origin refusal changed managed/profile/lock or native fixture state")
+					defaultNative := filepath.Join(userHome, ".codex")
+					if mode != "missing-native-default" {
+						// Real profile-use setup, not a nativeSkillsState stub: prepare the
+						// selected default so the credential-conflict boundary is reached.
+						t.Setenv("CODEX_HOME", defaultNative)
+						results, err := UseWithPolicy(fx.home, fx.profile, "codex_cli", "", false, req.Policy)
+						if err != nil {
+							t.Fatalf("default native profile-use positive control: %v", err)
+						}
+						for _, result := range results {
+							if !result.OK {
+								t.Fatalf("default native profile-use: %s", result.Detail)
+							}
+						}
+						row, err := nativeSkillsState(fx.home, fx.profile, "codex_cli", nil)
+						if err != nil || (row != nil && row.State != "current") {
+							t.Fatalf("native skills positive control: row=%+v err=%v", row, err)
+						}
+					}
+					t.Setenv("CODEX_HOME", fx.native["codex_cli"])
+					if _, err := Resolve(req); err != nil {
+						t.Fatalf("explicit custom origin positive control: %v", err)
+					}
+					if mode != "verify" {
+						req.Repair = true
+						req.PreserveLock = true
+						req.DryRun = mode != "repair"
+					}
+					t.Setenv("CODEX_HOME", ManagedHomeDir(fx.home, fx.profile, "codex_cli"))
+					before := managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])
+					result, err := Resolve(req)
+					warningStart := level == 1 && mode == "verify"
+					if warningStart {
+						if err != nil || result == nil || len(result.Document) == 0 || !strings.Contains(strings.Join(result.Warnings, "\n"), envregistry.DiagCredentialConflict) {
+							t.Errorf("level-one stale native-origin warning-start lost: result=%+v err=%v", result, err)
+						}
+					} else if mode == "missing-native-default" {
+						want := DiagHomeStale + ": native skills home missing"
+						if err == nil || err.Error() != want {
+							t.Errorf("absent default must retain the earlier exact refusal %q, got %v", want, err)
+						}
+					} else if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) {
+						t.Errorf("custom-origin mismatch must remain %s, got %v", envregistry.DiagCredentialConflict, err)
+					}
+					if result == nil || !strings.Contains(strings.Join(result.Warnings, "\n"), nativeHomeFallbackNotice) {
+						t.Error("fallback must be reported, including an early refusal")
+					}
+					if !warningStart && result != nil && len(result.Document) != 0 {
+						t.Error("refused origin conflict emitted a fragment")
+					}
+					if !reflect.DeepEqual(before, managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])) {
+						t.Error("custom-origin refusal changed managed/profile/lock or native fixture state")
+					}
+				})
 			}
 		})
 	}

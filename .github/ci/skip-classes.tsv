@@ -50,6 +50,7 @@ root-content	is a pre-revision root	allow	the supplied root predates this artefa
 root-content	publishes a release other than the pinned 	allow	CI's SPEC_PIN and the module's immutable release pin are promoted by separate owners; the module pin is asserted against its own release and declares any other one
 
 # --- protocol / platform-defined controls -----------------------------------
+opt-in	^separate store revision-2 draft qualification is not selected$	allow	the separate exact-pinned draft reader rehearsal is not the canonical v1 gate; reader/guard/control unit tests still run
 platform-control	^POSIX mode-bit contract$	allow	the authority writable-marker fixture checks POSIX mode bits on Unix; Windows keeps the native boundary and valid-carrier controls
 platform-control	the unreadable case uses POSIX mode bits; Windows ACL unreadability is not reproducible for the runner account	allow	the unreadable fixture uses POSIX mode-bit semantics unavailable to the hosted Windows runner account
 platform-control	available only on (Windows|macOS and Linux) in rc5-native-control-inventory-v[12]	allow	the inventory defines this control for one platform only
@@ -78,6 +79,9 @@ platform-control	^book shell toolchain requires Unix paths$	allow	the optional d
 platform-control	^native contribution witnesses require measured host tuple$	allow	the opt-in Claude mutation witnesses require the measured darwin/arm64 tuple; portable refusal tests still run
 
 # --- host capability --------------------------------------------------------
+host-capability	^filesystem cannot represent the colliding pair$	allow	the fixture observed that both case spellings identify one file; parser collision controls still execute
+host-capability	^filesystem cannot materialize the executable-bit mutation$	allow	the fixture observed that chmod cannot produce an executable bit; byte and roster drift controls still execute
+host-capability	^fixture requires Unix permission denial without root bypass$	allow	the guarded mode-000 fixture needs an unprivileged Unix caller; Windows boundary and ordinary drift controls still execute
 host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
 host-capability	filesystem does not support (hard|symbolic) links	allow	the runner filesystem provides no such link
 host-capability	this host cannot create	allow	the runner cannot create the artefact the vector needs

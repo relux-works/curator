@@ -1155,3 +1155,45 @@ internal/envprofile	TestNativeHomePhysicalContainment/manager-missing-child	linu
 internal/envprofile	TestNativeHomePhysicalContainment/default-without-selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
 internal/envprofile	TestNativeHomePhysicalContainment/default-after-managed-selector	linux,darwin,windows	linux,darwin,windows	host-capability	managed case alias boundary runs when Stat and SameFile prove the fixture names one directory
 internal/envprofile	TestNativeHomePhysicalContainment/case-distinct-outside	linux,darwin,windows	linux,darwin,windows	host-capability	distinct case spellings remain external when Stat and SameFile prove distinct directories
+# Separate draft store reader: mandatory guards; explicitly non-canonical rehearsal.
+internal/envprofile	TestStoreVerificationReaderClosedCarrier	linux,darwin,windows	-	-	closed case reader rejects malformed and unsupported inputs beside a valid control
+internal/envprofile	TestStoreVerificationSelectionRefusesIncompletePin	linux,darwin,windows	-	-	partial or mismatched store selection refuses before cases
+internal/envprofile	TestStoreVerificationCanonicalSelectorGuard	linux,darwin,windows	-	-	canonical gate refuses present-empty and set selectors beside an unset control
+internal/envprofile	TestStoreVerificationProductionNonreference	linux,darwin,windows	-	-	production source has no selector reference and a planted read is detected
+internal/envprofile	TestStoreVerificationPinnedCorpusReader	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
+internal/envprofile	TestStoreVerificationActualReaderDirections	-	linux,darwin,windows	opt-in	explicit exact-pinned draft reader rehearsal only; no runtime or canonical qualification
+internal/storecompatibility	TestExactMigrationPartitionAndControls	linux,darwin,windows	-	-	exact 38-row 32/6 migration partition rejects a same-count swapped-ID plant
+internal/storecompatibility	TestReplayEventDoesNotNormalizeDuplicateVerdicts	linux,darwin,windows	-	-	decoded duplicate event keys cannot erase a failing verdict
+
+# Whole-entry availability and mutation-boundary controls.
+internal/envprofile	TestStartupStoreAbsenceClassification	linux,darwin,windows	-	-	all four levels distinguish whole-entry availability from missing recorded payload; each has an intact control
+internal/envprofile	TestStartupRepairRejectsLateStorePlant	linux,darwin,windows	-	-	strict repair preserves late symlink/hardlink plants and passes safe byte-repair controls
+internal/envprofile	TestStartupAbsentEntryDoesNotHideStructure	linux,darwin,windows	-	-	absent leaf cannot conceal an unsafe or absent parent or a later member violation
+internal/envprofile	TestStartupNativeSkillRecordedRoster	linux,darwin,windows	-	-	native Git skill retains package admission and starts from its full recorded roster
+internal/gitops	TestPinnedSnapshotPathsProjection	linux,darwin,windows	-	-	selected roster and projected pin agree with real extraction for SHA1/SHA256
+internal/gitops	TestPinnedSnapshotPathsIsolation	linux,darwin,windows	-	-	ambient Git overrides cannot substitute a repository or supply a missing local object
+internal/gitops	TestPinnedSnapshotPathsRejectsAlternateAndGraft	linux,darwin,windows	-	-	native alternate/graft metadata refuses with a local-repository positive
+internal/gitops	TestPinnedSnapshotPathMetadataControls	linux,darwin,windows	-	-	unsafe paths/types/collisions and metadata/path-count excesses refuse without a partial roster
+internal/envprofile	TestStartupHomeDriftRetainsRepairContract	linux,darwin,windows	-	-	level 1 warns and starts a stale home; levels 2-4 and capture refuse; dry-run preserves and explicit repair restores verified bytes
+internal/envprofile	TestStoreVerificationCanonicalPinnedCorpusReader	-	linux,darwin,windows	opt-in	canonical stage requires the exact sibling revision-2 corpus at SPEC_PIN; reader coverage only
+internal/skillintegrity	TestExpectedEvidenceClassifiesParseBreakingDrift	linux,darwin,windows	-	-	missing skill and invalid installed declaration are mismatches beside intact and malformed-evidence controls
+internal/storecompatibility	TestArtifactAdmission	linux,darwin,windows	-	-	exact-head replay admission rejects missing evidence and same-count swapped row IDs
+internal/envprofile	TestStoreVerificationLandedFields	linux,darwin,windows	-	-	landed policy and ordered carriers survive decoding; missing and misplaced fields refuse
+internal/envprofile	TestStoreVerificationLandedSchemaControl	linux,darwin,windows	-	-	schema bypass reaches the intended missing-policy rejection assertion
+internal/envprofile	TestStartupHomeStaleLeadsPinFailure	linux,darwin,windows	-	-	old-lock home remains the leading diagnostic alongside pin drift; restored source repairs successfully
+internal/envprofile	TestStartupPermissiveExistingHomePreservesSource	linux,darwin,windows	-	-	level 1 existing-home launch preserves mismatching source; old-lock refusal and verified repair are neighbors
+
+# Windows observation and special-file classification regressions.
+internal/skillintegrity	TestSkillHardlinkObservationKeepsNamedRefusal	linux,darwin,windows	-	-	metadata observation retains a hardlink before named admission refusal; intact neighbors pass
+internal/skillintegrity	TestSkillHardlinkObservationControl	linux,darwin,windows	-	-	regressed observation or link admission reaches the intended hardlink assertion
+internal/pathboundary	TestSocketIsRegularTypeFailure	linux,darwin,windows	-	-	real AF_UNIX socket fails regular_types beside ordinary-file and symlink controls
+internal/pathboundary	TestWindowsSocketClassificationControl	windows	-	-	socket reparse misclassification reaches the regular_types assertion
+internal/envprofile	TestStoreVerificationObservationBindsReplacement	linux,darwin,windows	-	-	same-byte replacement cannot borrow earlier directory identity; retained original passes
+internal/envprofile	TestStoreVerificationObservationControl	linux,darwin,windows	-	-	lazy Windows identity or bypassed identity comparison reaches the replacement assertion
+internal/envprofile	TestStoreVerificationRuntimeRosterControl	-	linux,darwin,windows	opt-in	row and level omissions or failed and missing post-status observations reach their named runtime guards
+internal/envprofile	TestStoreVerificationMigrationCoverage	linux,darwin,windows	-	-	disjoint migration levels pass; scope invalid overlap and incomplete successors refuse
+internal/envprofile	TestStoreVerificationMigrationCoverageControl	linux,darwin,windows	-	-	disabled incomplete-level gate fails its intended assertion
+internal/envprofile	TestStartupCombinedHomeAndSourceDrift	linux,darwin,windows	-	-	combined copied-home and source drift keeps home precedence; verified strict repair restores both
+internal/envprofile	TestStartupCombinedRepairRequiresVerifiedInputs	linux,darwin,windows	-	-	unavailable pinned input refuses home repair at every level without writes or launch
+internal/envprofile	TestStartupCombinedDriftControls	linux,darwin,windows	-	-	decision-specific mutants fail the intended combined-drift assertions
+internal/envprofile	TestStartupSourceOnlySkillDriftKeepsExistingHome	linux,darwin,windows	-	-	intact earlier skill projection remains source-only; retargeted projection receipt refuses
