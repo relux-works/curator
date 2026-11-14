@@ -348,11 +348,11 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 }
 
 // A genuine explicit custom origin is valid. With current default-native skills,
-// a managed caller must get the credential conflict in verify/dry-run/repair.
-// An absent default instead keeps the earlier exact native-skills refusal.
-// These boundaries hold at all four startup levels with intact source evidence.
+// repair refuses the credential conflict; verification refuses at levels 2–4.
+// Level 1 retains its accepted stale-home warning and launch behavior.
+// An absent default keeps the exact native-skills dry-run refusal at all levels.
 // Every refusal preserves managed/profile/lock and both native fixture trees;
-// no credential payload is read, and no launch fragment may escape.
+// no credential payload is read, and refusals emit no launch fragment.
 func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
 	for _, level := range []int{1, 2, 3, 4} {
 		t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
@@ -395,7 +395,12 @@ func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
 					t.Setenv("CODEX_HOME", ManagedHomeDir(fx.home, fx.profile, "codex_cli"))
 					before := managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])
 					result, err := Resolve(req)
-					if mode == "missing-native-default" {
+					warningStart := level == 1 && mode == "verify"
+					if warningStart {
+						if err != nil || result == nil || len(result.Document) == 0 || !strings.Contains(strings.Join(result.Warnings, "\n"), envregistry.DiagCredentialConflict) {
+							t.Errorf("level-one stale native-origin warning-start lost: result=%+v err=%v", result, err)
+						}
+					} else if mode == "missing-native-default" {
 						want := DiagHomeStale + ": native skills home missing"
 						if err == nil || err.Error() != want {
 							t.Errorf("absent default must retain the earlier exact refusal %q, got %v", want, err)
@@ -406,7 +411,7 @@ func TestManagedCallerCustomOriginConflictRefuses(t *testing.T) {
 					if result == nil || !strings.Contains(strings.Join(result.Warnings, "\n"), nativeHomeFallbackNotice) {
 						t.Error("fallback must be reported, including an early refusal")
 					}
-					if result != nil && len(result.Document) != 0 {
+					if !warningStart && result != nil && len(result.Document) != 0 {
 						t.Error("refused origin conflict emitted a fragment")
 					}
 					if !reflect.DeepEqual(before, managedCallerSnapshot(t, fx, defaultNative, fx.native["codex_cli"])) {
