@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
@@ -94,7 +93,8 @@ func validateRecordedStorePaths(home string, lock *contextlock.Lock, member cont
 		}
 		roster, err := gitops.PinnedDirectorySnapshotPaths(newGitManager(home).repoDir(member.Source), member.Commit, directory)
 		if err != nil {
-			if strings.Contains(err.Error(), "pinned commit") && strings.Contains(err.Error(), "unavailable") {
+			var unavailable *gitops.ObjectUnavailableError
+			if errors.As(err, &unavailable) {
 				return &storeEntryFailure{Member: member, Path: entry, Check: diagPinHash, Err: &pinUnavailable{cause: fmt.Errorf("pinned commit object unavailable for member %s/%s: %w", member.Kind, member.Name, err)}}
 			}
 			return &storeEntryFailure{Member: member, Path: entry, Check: pathboundary.CheckRegular, Err: fmt.Errorf("pinned snapshot path metadata: %w", err)}

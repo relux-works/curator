@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
@@ -258,8 +257,8 @@ func storeEntryHashesFromPin(member contextlock.Member, entry string, version ha
 }
 
 func pinnedCommitObjectUnavailable(failure *storeEntryFailure) bool {
-	return failure != nil && failure.Check == diagPinHash &&
-		strings.Contains(failure.Err.Error(), "pinned commit object unavailable")
+	var unavailable *pinUnavailable
+	return failure != nil && failure.Check == diagPinHash && errors.As(failure.Err, &unavailable)
 }
 
 func pinnedCommitTree(home string, member contextlock.Member, entry string) (string, string, error) {
