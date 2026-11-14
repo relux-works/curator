@@ -659,3 +659,62 @@ func TestStartupPreservesContextPathContract(t *testing.T) {
 		t.Fatalf("context link gate changed: %v", failure)
 	}
 }
+
+// Home output is derived: even permissive policy reports stale before repair,
+// dry-run preserves the changed bytes, and explicit repair restores the verified
+// source bytes. Intact neighbors remain launchable at every level.
+func TestStartupHomeDriftRetainsRepairContract(t *testing.T) {
+	requireLinkCapability(t)
+	for _, level := range []int{1, 2, 3, 4} {
+		t.Run(fmt.Sprintf("level%d", level), func(t *testing.T) {
+			fx := writeManagedFixture(t, "sample")
+			seedLiveNativeCredentials(t, fx)
+			req := fx.request("claude_code")
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatal(err)
+			}
+			req.Policy.StartupVerificationLevel = level
+			req.Repair = false
+			if result, err := Resolve(req); err != nil || result == nil {
+				t.Fatalf("intact neighbor: %v", err)
+			}
+			path := filepath.Join(ManagedHomeDir(fx.home, fx.profile, "claude_code"), "CLAUDE.md")
+			want, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			changed := []byte("changed derived home bytes\n")
+			if err := os.WriteFile(path, changed, 0600); err != nil {
+				t.Fatal(err)
+			}
+			for _, mode := range []string{"observe", "dry-run", "repair"} {
+				t.Run(mode, func(t *testing.T) {
+					req.Repair = mode != "observe"
+					req.DryRun = mode == "dry-run"
+					result, err := Resolve(req)
+					if mode != "repair" {
+						if err == nil || !strings.HasPrefix(err.Error(), "environment_home_stale:") || (mode == "observe" && !strings.Contains(err.Error(), "--repair")) || (result != nil && len(result.Document) != 0) {
+							t.Fatalf("home drift lost leading stale diagnostic: output=%v err=%v", result != nil, err)
+						}
+						got, readErr := os.ReadFile(path)
+						if readErr != nil || !bytes.Equal(got, changed) {
+							t.Fatalf("read-only changed home: %v", readErr)
+						}
+					} else {
+						if err != nil || result == nil {
+							t.Fatalf("home repair refused: %v", err)
+						}
+						got, readErr := os.ReadFile(path)
+						if readErr != nil || !bytes.Equal(got, want) {
+							t.Fatalf("home bytes not restored: %v", readErr)
+						}
+					}
+				})
+			}
+		})
+	}
+}
