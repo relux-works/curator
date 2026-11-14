@@ -187,17 +187,18 @@ func (req *ResolveRequest) nativeHome(id string) (string, error) {
 	if req.NativeHomeOf != nil {
 		return req.NativeHomeOf(id)
 	}
-	if id == envregistry.Muse {
-		if req.OperatorXDG != "" {
-			return filepath.Join(req.OperatorXDG, "muse"), nil
-		}
-		return museNativeHome()
-	}
 	adapter, ok := adapterByID(id)
+	if id == envregistry.Muse {
+		adapter, ok = museNativeAdapter(), true
+	}
 	if !ok {
 		return "", fmt.Errorf("%s: unregistered environment %q", envregistry.DiagUnknown, id)
 	}
-	native, fallback, err := nativeHomeAt(adapter, req.Home)
+	value := os.Getenv(adapter.EnvVar)
+	if id == envregistry.Muse && req.OperatorXDG != "" {
+		value = req.OperatorXDG
+	}
+	native, fallback, err := nativeHomeSelection(adapter, req.Home, value)
 	req.nativeHomeFallback = req.nativeHomeFallback || fallback
 	return native, err
 }
@@ -234,6 +235,35 @@ func (req *ResolveRequest) operatorXDG() string {
 		return ""
 	}
 	return filepath.Join(home, ".config")
+}
+
+func (req *ResolveRequest) externalOperatorXDG() (string, error) {
+	xdg := req.operatorXDG()
+	if xdg == "" {
+		return "", nil
+	}
+	managed, err := nativePathIsManaged(xdg, req.Home)
+	if err != nil {
+		return "", nativeHomeRefusal(xdg, err)
+	}
+	if managed {
+		return "", nativeHomeRefusal(xdg, fmt.Errorf("XDG seed origin is inside managed environments"))
+	}
+	return xdg, nil
+}
+
+// externalXDGTarget validates each seed route as well as its parent selector.
+// A symlink below an outside XDG directory can still enter managed ownership.
+func (req *ResolveRequest) externalXDGTarget(xdg, name string) (string, error) {
+	target := filepath.Join(xdg, name)
+	managed, err := nativePathIsManaged(target, req.Home)
+	if err != nil {
+		return "", nativeHomeRefusal(target, err)
+	}
+	if managed {
+		return "", nativeHomeRefusal(target, fmt.Errorf("XDG seed target is inside managed environments"))
+	}
+	return target, nil
 }
 
 // mcpsOf loads the lock's MCP members from the store as resolved servers.
@@ -848,7 +878,10 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 		bundle.claudeInit = true
 	}
 	if adapter.ID == envregistry.OpenCode {
-		xdg := req.operatorXDG()
+		xdg, err := req.externalOperatorXDG()
+		if err != nil {
+			return nil, err
+		}
 		if xdg == "" {
 			return bundle, nil
 		}
@@ -856,7 +889,10 @@ func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bo
 			if name == "opencode" {
 				continue
 			}
-			target := filepath.Join(xdg, name)
+			target, err := req.externalXDGTarget(xdg, name)
+			if err != nil {
+				return nil, err
+			}
 			metadata, err := stateread.Stat(target)
 			if err != nil {
 				return nil, fmt.Errorf("%s: xdg seed %s: %v", envregistry.DiagSeedUnreadable, name, err)
@@ -1963,7 +1999,10 @@ func shadowWarnings(req *ResolveRequest, plan *homePlan, recorded []string) []st
 	for _, name := range recorded {
 		known[name] = true
 	}
-	xdg := req.operatorXDG()
+	xdg, err := req.externalOperatorXDG()
+	if err != nil {
+		return []string{err.Error()}
+	}
 	var warnings []string
 	for _, name := range req.Machine.XDGSeedAllowlist {
 		if name == "opencode" || known[name] {
@@ -1972,7 +2011,12 @@ func shadowWarnings(req *ResolveRequest, plan *homePlan, recorded []string) []st
 		if xdg == "" {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(xdg, name)); err != nil {
+		target, err := req.externalXDGTarget(xdg, name)
+		if err != nil {
+			warnings = append(warnings, err.Error())
+			continue
+		}
+		if _, err := os.Stat(target); err != nil {
 			continue
 		}
 		if _, err := os.Lstat(filepath.Join(plan.parent, name)); err == nil {
@@ -2531,15 +2575,24 @@ func (v *verification) checkXDG(req *ResolveRequest, plan *homePlan, marker *env
 	if plan.adapter.ID != envregistry.OpenCode {
 		return
 	}
-	xdg := req.operatorXDG()
+	xdg, err := req.externalOperatorXDG()
+	if err != nil {
+		v.reasons = append(v.reasons, err.Error())
+		return
+	}
 	expected := map[string]string{}
 	if xdg != "" {
 		for _, name := range req.Machine.XDGSeedAllowlist {
 			if name == "opencode" {
 				continue
 			}
-			if _, err := os.Stat(filepath.Join(xdg, name)); err == nil {
-				expected[name] = filepath.Join(xdg, name)
+			target, err := req.externalXDGTarget(xdg, name)
+			if err != nil {
+				v.reasons = append(v.reasons, err.Error())
+				return
+			}
+			if _, err := os.Stat(target); err == nil {
+				expected[name] = target
 			}
 		}
 	}

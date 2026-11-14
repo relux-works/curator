@@ -360,11 +360,15 @@ func syncManagedProfileWithOperation(home, profile string, policy Policy, machin
 		if !participates {
 			continue
 		}
-		_, err = Resolve(ResolveRequest{
+		resolved, resolveErr := Resolve(ResolveRequest{
 			Home: home, Profile: profile, EnvID: adapter.ID, Machine: machine,
 			Repair: true, Policy: policy, NativeHomeOf: nativeHomeOf, borrowedOperation: op,
 		})
+		err = resolveErr
 		result := EntryResult{Adapter: adapter.ID, Home: ManagedHomeDir(home, profile, adapter.ID), OK: err == nil}
+		if resolved != nil {
+			result.Warnings = append(result.Warnings, resolved.Warnings...)
+		}
 		if err != nil {
 			result.Detail = err.Error()
 			failures = append(failures, err.Error())

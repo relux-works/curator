@@ -260,8 +260,16 @@ curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
 
 When a caller already uses a managed environment, Curator excludes that managed
 root and its filesystem aliases as native seed or credential origins. For
-`env resolve`, it selects the operator HOME default and reports that fallback. This is a current native
-selection, not recovery of a previous selector. Existing credential links must
+`env resolve`, it selects the operator HOME default and reports that fallback.
+This is a current native selection, not recovery of a previous selector. Muse uses the same selection.
+Native-home operations that cannot report fallback refuse a managed caller
+rather than silently retargeting the HOME default. OpenCode repair refuses managed XDG seed origins,
+including individual seed routes through filesystem aliases. Native selectors
+with a parent traversal component, ancestor overlap, or ambiguous case identity
+under an absent managed root refuse with `environment_credential_conflict`.
+A managed HOME default refuses without claiming that fallback succeeded. Global
+reconciliation retains the Resolve fallback notice in its results.
+Existing credential links must
 still match the selected native path; repair preserves conflicting links and
 refuses them. No marker upgrade is required for this default-native repair.
 

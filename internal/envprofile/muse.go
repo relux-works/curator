@@ -10,15 +10,8 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
-func museNativeHome() (string, error) {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "muse"), nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "muse"), nil
+func museNativeAdapter() Adapter {
+	return Adapter{ID: envregistry.Muse, EnvVar: "XDG_CONFIG_HOME", DefaultDir: ".config/muse"}
 }
 
 // Seeds come only from the locked root snapshot, never from native credentials

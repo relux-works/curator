@@ -103,7 +103,10 @@ func adapterByID(id string) (Adapter, bool) {
 // specification's mechanism implies but does not spell; every test pins
 // homes through the variables instead.
 func NativeHome(adapter Adapter) (string, error) {
-	native, _, err := nativeHomeAt(adapter, nativeManagerHome())
+	native, fallback, err := nativeHomeAt(adapter, nativeManagerHome())
+	if err == nil && fallback {
+		return "", nativeHomeRefusal(os.Getenv(adapter.EnvVar), fmt.Errorf("managed caller requires an explicitly selected external native home for this operation"))
+	}
 	return native, err
 }
 
@@ -1217,7 +1220,7 @@ func purgeHomes(home, profile string) error {
 	for _, adapter := range Adapters {
 		native, err := NativeHome(adapter)
 		if err != nil {
-			continue
+			return err
 		}
 		marker, err := envmarker.Read(native)
 		if err != nil {

@@ -14,6 +14,11 @@ import (
 // A repair may seed from a native home only when its physical location is
 // outside managed environment ownership. This checks paths, never credentials.
 func (req *ResolveRequest) validateRepairNativeHome(adapter envregistry.Adapter) error {
+	if adapter.ID == envregistry.OpenCode {
+		if _, err := req.externalOperatorXDG(); err != nil {
+			return err
+		}
+	}
 	native, err := req.nativeHome(adapter.ID)
 	if err != nil {
 		return err
@@ -34,6 +39,13 @@ func (req *ResolveRequest) validateRepairNativeHome(adapter envregistry.Adapter)
 		default:
 			return fmt.Errorf("%s: native home has unusable read state %q", envregistry.DiagCredentialConflict, state.Kind)
 		}
+	}
+	managedPath, inspectErr := nativePathIsManaged(native, req.Home)
+	if inspectErr != nil {
+		return nativeHomeRefusal(native, inspectErr)
+	}
+	if managedPath {
+		return nativeHomeRefusal(native, fmt.Errorf("inside managed environments"))
 	}
 	native, err = repairDirectoryLocation(native)
 	if err != nil {

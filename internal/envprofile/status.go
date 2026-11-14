@@ -1046,7 +1046,8 @@ func scopeHomes(req StatusRequest, installed map[string]bool) ([]ScopeHome, []St
 			if req.NativeHomeOf != nil {
 				native, _ = req.NativeHomeOf(adapter.ID)
 			} else if adapter.ID == envregistry.Muse {
-				native, _ = museNativeHome()
+				selector := ResolveRequest{Home: req.Home}
+				native, _ = selector.nativeHome(envregistry.Muse)
 			} else if legacy, ok := adapterByID(adapter.ID); ok {
 				native, _ = NativeHome(legacy)
 			}

@@ -137,7 +137,7 @@ func TestManagedCallerHomeIsNeverNative(t *testing.T) {
 			if !ok {
 				t.Fatal("missing adapter")
 			}
-			native, err := NativeHome(adapter)
+			native, _, err := nativeHomeAt(adapter, fx.home)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -340,7 +340,7 @@ func TestNativeHomeUnsafeSelectionRefuses(t *testing.T) {
 				}
 			}
 			t.Setenv("CODEX_HOME", value)
-			if got, _, err := nativeHomeAt(adapter, manager); err == nil || got != "" {
+			if got, _, err := nativeHomeAt(adapter, manager); err == nil || got != "" || !strings.HasPrefix(err.Error(), envregistry.DiagCredentialConflict+":") || !strings.Contains(err.Error(), "run repair with the intended external native home") {
 				t.Errorf("unsafe native input must refuse, got %q %v", got, err)
 			}
 		})
@@ -492,13 +492,12 @@ func TestNativeHomePhysicalContainment(t *testing.T) {
 			t.Setenv("HOME", aliasHome)
 			t.Setenv("USERPROFILE", aliasHome)
 			selector := ""
-			wantFallback := mode == "default-after-managed-selector"
-			if wantFallback {
+			if mode == "default-after-managed-selector" {
 				selector = aliasHome
 			}
 			t.Setenv("CODEX_HOME", selector)
 			got, fallback, err := nativeHomeAt(adapter, manager)
-			if err == nil || !strings.Contains(err.Error(), "native HOME default for codex_cli is inside the managed environments root") || got != "" || fallback != wantFallback {
+			if err == nil || !strings.Contains(err.Error(), envregistry.DiagCredentialConflict) || got != "" || fallback {
 				t.Errorf("managed default must refuse: got %q fallback=%v err=%v", got, fallback, err)
 			}
 			if _, err := os.Lstat(missingDefault); !os.IsNotExist(err) {
