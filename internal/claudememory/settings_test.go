@@ -25,7 +25,7 @@ func TestNativeFileUsesOperatorHome(t *testing.T) {
 	}
 }
 
-// The merge adds only the native file, preserves existing exclusions/unrelated
+// The merge adds the native file and rules subtree, preserving exclusions/unrelated
 // number text, and does not broaden the exclusion to project or managed roots.
 func TestMergeNativeMemory(t *testing.T) {
 	// These are path values only: no native directory or file is read or written.
@@ -51,7 +51,7 @@ func TestMergeNativeMemory(t *testing.T) {
 			if err := json.Unmarshal(settings["claudeMdExcludes"], &excludes); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(excludes, []string{"**/vendor/CLAUDE.md", want}) || string(settings["n"]) != "1e999" || string(settings["hooks"]) != `{"SessionStart":[]}` {
+			if !reflect.DeepEqual(excludes, []string{"**/vendor/CLAUDE.md", want, base + tc.pattern + "/.claude/rules/**"}) || string(settings["n"]) != "1e999" || string(settings["hooks"]) != `{"SessionStart":[]}` {
 				t.Fatalf("merge changed unrelated settings or exclusion scope: %s", got)
 			}
 			again, err := Merge(got, native)

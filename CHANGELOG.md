@@ -30,13 +30,11 @@ All notable implementation changes are recorded here.
   `process_timeout` instead of `process_canceled`. Caller cancellation before
   the budget still reports `process_canceled`.
 
-### Documentation
-
-- Propose the offline profile graph CLI contract, `curator-profile-graph/1`
-  JSON Schema and a synthetic golden with exact-byte validation. The command
-  is not implemented in this contract round.
-
-### Fixed
+- Claude settings exclude the operator's native `.claude/CLAUDE.md` and
+  `.claude/rules/**` from parent-memory discovery while retaining project and
+  profile instructions. Managed-home repair preserves existing exclusions,
+  unrelated settings and file modes, refuses malformed input before recovery,
+  and leaves satisfied settings untouched.
 
 - A legacy `skills_root` checkout reached by a closure fetch (`upgrade`,
   `global upgrade`) and an existing git-substitution checkout no longer
@@ -113,12 +111,12 @@ All notable implementation changes are recorded here.
     `-`, and endpoints over 4096 bytes. An identity with no recorded
   spelling still refreshes through its stored remotes, and exact-commit
   replay is unchanged.
-### Fixed
 
-- Claude settings exclude the operator's native `.claude/CLAUDE.md` from
-  parent-memory discovery while retaining project and profile instructions.
-  Managed-home repair preserves existing exclusions and unrelated settings,
-  refuses malformed input, and leaves satisfied settings untouched.
+### Documentation
+
+- Propose the offline profile graph CLI contract, `curator-profile-graph/1`
+  JSON Schema and a synthetic golden with exact-byte validation. The command
+  is not implemented in this contract round.
 
 ## v0.15.0-rc.9 — 2026-10-24
 

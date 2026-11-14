@@ -355,7 +355,7 @@ func mustSettingsRel(t *testing.T, home, full string) string {
 	return rel
 }
 
-// Permission witnesses start with the independently specified native exclusion
+// Permission witnesses start with the independently specified native exclusions
 // already satisfied; optional settings have no native-memory ownership clause.
 func claudeSettingsFixtureBytes(t *testing.T, path string, input []byte) []byte {
 	t.Helper()
@@ -370,7 +370,7 @@ func claudeSettingsFixtureBytes(t *testing.T, path string, input []byte) []byte 
 	if err != nil {
 		t.Fatal(err)
 	}
-	object["claudeMdExcludes"], err = json.Marshal([]string{filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md"))})
+	object["claudeMdExcludes"], err = json.Marshal([]string{filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md")), filepath.ToSlash(filepath.Join(home, ".claude", "rules")) + "/**"})
 	if err != nil {
 		t.Fatal(err)
 	}

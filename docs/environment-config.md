@@ -188,14 +188,14 @@ the existing rename helper and its residual preparation window. External writers
 do not share the manager lock: scheduling between the final read and rename can
 still race, so this is not an atomic compare-and-swap guarantee.
 
-Claude `settings.json` carries a separate manager-owned `claudeMdExcludes`
-entry for the operator's native `.claude/CLAUDE.md`. Its path comes from the OS
-user home, independently of `CLAUDE_CONFIG_DIR`, and glob metacharacters are
-quoted. Curator does not read or move that native file. Provisioning and repair
-merge this entry into the managed settings, preserving existing exclusions and
-unrelated values; satisfied settings retain their bytes. Malformed settings or
+Claude `settings.json` carries separate manager-owned `claudeMdExcludes`
+entries for the operator's native `.claude/CLAUDE.md` and `.claude/rules/**`.
+Both paths come from the OS user home, independently of `CLAUDE_CONFIG_DIR`;
+path metacharacters are quoted, while the rules suffix recurses. Curator does
+not read or move native memory. Provisioning and repair merge these entries
+into the managed settings, preserving existing exclusions and unrelated values; satisfied settings retain their bytes. Malformed settings or
 nonregular destinations refuse rather than being replaced with defaults.
-Read-only resolve reports a missing entry as stale. The publication uses the
+Read-only resolve reports either missing entry as stale. The publication uses the
 same prepare-before-final-read rename boundary described above, with the same
 external-writer race limit. This exclusion does not match project or managed
 profile instruction files and does not disable managed policy memory.
@@ -479,8 +479,8 @@ curator env config unset claude_settings_mode.example
 ```
 
 With `read-only`, repair/provisioning creates an absent `settings.json` with the
-required native-memory exclusion. Existing `settings.json` retains unrelated
-values and exclusions; only a missing native-memory exclusion is added. The
+required native-memory exclusions. Existing `settings.json` retains unrelated
+values and exclusions; only missing native-memory exclusions are added. The
 exclusion publisher preserves the file's existing mode. Permission repair makes
 it and present `cowork_settings.json` and legacy `.config.json` regular `0400`
 files on Unix; those optional files retain their exact bytes.

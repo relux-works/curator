@@ -23,6 +23,7 @@ import (
 // Fixtures have no symlinks: the injected path resolver is identity-only. It
 // proves exclusion and retained project/profile entries at this filter boundary,
 // not complete session discovery, import handling or runtime qualification.
+// Direct/nested native rules are excluded while project/profile rules remain.
 func TestPinnedClaudeMemoryExclusion(t *testing.T) {
 	path := os.Getenv("CURATOR_CLAUDE_MEMORY_SPECIMEN")
 	if path == "" {
@@ -55,32 +56,34 @@ func TestPinnedClaudeMemoryExclusion(t *testing.T) {
 		t.Fatal("native oracle requires Node.js")
 	}
 	for _, name := range []string{"operator", "operator[1]*?{x}(y)!+@"} {
-		t.Run(name, func(t *testing.T) {
-			home := filepath.Join(t.TempDir(), name)
-			native := filepath.Join(home, ".claude", "CLAUDE.md")
-			project := filepath.Join(home, "project", "CLAUDE.md")
-			managed := filepath.Join(home, "managed", "CLAUDE.md")
-			for _, file := range []string{native, project, managed} {
-				if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+		for _, surface := range []string{"CLAUDE.md", "rules/direct.md", "rules/nested/deep.md"} {
+			t.Run(name+"/"+surface, func(t *testing.T) {
+				home := filepath.Join(t.TempDir(), name)
+				nativeFile := filepath.Join(home, ".claude", "CLAUDE.md")
+				native := filepath.Join(home, ".claude", filepath.FromSlash(surface))
+				project := filepath.Join(home, "project", ".claude", filepath.FromSlash(surface))
+				managed := filepath.Join(home, "managed", ".claude", filepath.FromSlash(surface))
+				for _, file := range []string{native, project, managed} {
+					if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(file, []byte("fixture instructions\n"), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				settings, err := Merge(nil, nativeFile)
+				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.WriteFile(file, []byte("fixture instructions\n"), 0600); err != nil {
+				input, err := json.Marshal(map[string]any{"settings": json.RawMessage(settings), "native": filepath.ToSlash(native), "project": filepath.ToSlash(project), "managed": filepath.ToSlash(managed)})
+				if err != nil {
 					t.Fatal(err)
 				}
-			}
-			settings, err := Merge(nil, native)
-			if err != nil {
-				t.Fatal(err)
-			}
-			input, err := json.Marshal(map[string]any{"settings": json.RawMessage(settings), "native": filepath.ToSlash(native), "project": filepath.ToSlash(project), "managed": filepath.ToSlash(managed)})
-			if err != nil {
-				t.Fatal(err)
-			}
-			script := []byte(`const fs=require('node:fs'), path=require('node:path');
+				script := []byte(`const fs=require('node:fs'), path=require('node:path');
 const x=fn=>{let mod;return()=>{if(!mod){mod={exports:{}};fn(mod.exports,mod)}return mod.exports}};
 `)
-			script = append(script, matcher...)
-			script = append(script, []byte(`
+				script = append(script, matcher...)
+				script = append(script, []byte(`
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
 let settings=input.settings;
 const pt=()=>settings, le=()=>null, wx=path.posix.dirname;
@@ -88,8 +91,8 @@ const Po=(_context,p)=>({resolvedPath:p,isSymlink:false,isCanonical:true});
 const AL=()=>false, Bq=()=>false;
 const V6t={default:O6t()};
 `)...)
-			script = append(script, filter...)
-			script = append(script, []byte(`
+				script = append(script, filter...)
+				script = append(script, []byte(`
 const entries=[{path:input.native,type:'Project'},{path:input.project,type:'Project'},{path:input.managed,type:'User'}];
 const configured=U2e(entries);
 const managedExcluded=o5t(input.native,'Managed');
@@ -97,26 +100,27 @@ settings={};
 const missing=U2e(entries);
 process.stdout.write(JSON.stringify({configured,missing,managedExcluded}));
 `)...)
-			file := filepath.Join(t.TempDir(), "native-memory.cjs")
-			if err := os.WriteFile(file, script, 0600); err != nil {
-				t.Fatal(err)
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-			command := exec.CommandContext(ctx, node, file)
-			command.Stdin = bytes.NewReader(input)
-			output, err := command.CombinedOutput()
-			if command.Process != nil {
-				t.Logf("owned native filter PID=%d", command.Process.Pid)
-			}
-			if err != nil {
-				t.Fatalf("native memory filter invocation: %v\n%s", err, output)
-			}
-			if err := checkNativeMemoryResult(output, filepath.ToSlash(native), filepath.ToSlash(project), filepath.ToSlash(managed)); err != nil {
-				t.Fatal(err)
-			}
-			t.Log("native excluded; project/profile retained; Managed policy retained; missing-exclusion control exposes native")
-		})
+				file := filepath.Join(t.TempDir(), "native-memory.cjs")
+				if err := os.WriteFile(file, script, 0600); err != nil {
+					t.Fatal(err)
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				command := exec.CommandContext(ctx, node, file)
+				command.Stdin = bytes.NewReader(input)
+				output, err := command.CombinedOutput()
+				if command.Process != nil {
+					t.Logf("owned native filter PID=%d", command.Process.Pid)
+				}
+				if err != nil {
+					t.Fatalf("native memory filter invocation: %v\n%s", err, output)
+				}
+				if err := checkNativeMemoryResult(output, filepath.ToSlash(native), filepath.ToSlash(project), filepath.ToSlash(managed)); err != nil {
+					t.Fatal(err)
+				}
+				t.Log("native excluded; project/profile retained; Managed policy retained; missing-exclusion control exposes native")
+			})
+		}
 	}
 }
 
