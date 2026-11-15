@@ -234,7 +234,7 @@ func TestMacOSHeavyParentsSeparate(t *testing.T) {
 	}
 	tests := windowsFixtureInventory()
 	for _, p := range ordinaryPackages {
-		tests[p] = append(tests[p], "TestGlobalNativeOwnershipNarrowingControls", "TestStartupObjectAvailabilityMatrix", "TestStartupObjectMainParity")
+		tests[p] = append(tests[p], "TestGlobalNativeOwnershipNarrowingControls", "TestStartupObjectAvailabilityMatrix", "TestStartupObjectMainParity", "TestCodexSeedCNarrowingControls")
 	}
 	parts, err := c.partition(tests)
 	if err != nil {
@@ -247,7 +247,7 @@ func TestMacOSHeavyParentsSeparate(t *testing.T) {
 				placement[name] = shard
 			}
 		}
-		if placement["TestGlobalNativeOwnershipNarrowingControls"] != 0 || placement["TestStartupObjectAvailabilityMatrix"] != 1 || placement["TestStartupObjectMainParity"] != 2 {
+		if placement["TestGlobalNativeOwnershipNarrowingControls"] != 0 || placement["TestStartupObjectAvailabilityMatrix"] != 1 || placement["TestStartupObjectMainParity"] != 2 || placement["TestCodexSeedCNarrowingControls"] != 4 {
 			t.Fatalf("heavy macOS parents share or lose their required placement: %v", placement)
 		}
 	}
@@ -255,15 +255,15 @@ func TestMacOSHeavyParentsSeparate(t *testing.T) {
 	testOrdinaryPartitionCoverage(t, c)
 }
 
-// The macOS placement exception must not move either heavy parent on Linux
+// The macOS placement exception must not move any measured parent on Linux
 // or Windows; these are their pre-rework FNV buckets in the native lane counts.
 func TestHeavyPlacementLeavesOtherPlatformsUnchanged(t *testing.T) {
 	for _, tc := range []struct {
-		lane, goos                string
-		ownership, matrix, parity int
+		lane, goos                      string
+		ownership, matrix, parity, seed int
 	}{
-		{"unix-test", "linux", 1, 0, 1},
-		{"windows-test", "windows", 1, 3, 1},
+		{"unix-test", "linux", 1, 0, 1, 2},
+		{"windows-test", "windows", 1, 3, 1, 1},
 	} {
 		c, err := ordinaryConfig(tc.lane, tc.goos)
 		if err != nil {
@@ -271,7 +271,7 @@ func TestHeavyPlacementLeavesOtherPlatformsUnchanged(t *testing.T) {
 		}
 		tests := windowsFixtureInventory()
 		for _, p := range ordinaryPackages {
-			tests[p] = append(tests[p], "TestGlobalNativeOwnershipNarrowingControls", "TestStartupObjectAvailabilityMatrix", "TestStartupObjectMainParity")
+			tests[p] = append(tests[p], "TestGlobalNativeOwnershipNarrowingControls", "TestStartupObjectAvailabilityMatrix", "TestStartupObjectMainParity", "TestCodexSeedCNarrowingControls")
 		}
 		parts, err := c.partition(tests)
 		if err != nil {
@@ -280,7 +280,7 @@ func TestHeavyPlacementLeavesOtherPlatformsUnchanged(t *testing.T) {
 		for p, shards := range parts {
 			for i, names := range shards {
 				for _, name := range names {
-					if name == "TestGlobalNativeOwnershipNarrowingControls" && i != tc.ownership || name == "TestStartupObjectAvailabilityMatrix" && i != tc.matrix || name == "TestStartupObjectMainParity" && i != tc.parity {
+					if name == "TestGlobalNativeOwnershipNarrowingControls" && i != tc.ownership || name == "TestStartupObjectAvailabilityMatrix" && i != tc.matrix || name == "TestStartupObjectMainParity" && i != tc.parity || name == "TestCodexSeedCNarrowingControls" && i != tc.seed {
 						t.Fatalf("macOS exception moved %s %s on %s to %d", p, name, tc.goos, i)
 					}
 				}
