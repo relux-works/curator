@@ -1206,3 +1206,13 @@ internal/gitops	TestPinnedPathsObjectAvailability	linux,darwin,windows	-	-	Tree 
 internal/gitops	TestPinnedCommitTreeRepositoryAvailability	linux,darwin,windows	-	-	Direct commit-tree reads classify invalid HEAD and objects metadata as repository availability
 internal/gitops	TestPinnedObjectAvailabilityControls	linux,darwin,windows	-	-	Three typed-return narrowing mutants reach their exact availability assertions
 internal/envprofile	TestHomeFirstIsNotBorrowedByRepositoryLoss	linux,darwin,windows	-	-	repository loss without home drift cannot borrow home_stale; the same loss with home drift leads home-first and retains pin_hash
+internal/schemaregexp	TestRevisionBypassesTimedEngine	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/schemaregexp	TestFixedHexFormats	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/schemaregexp	TestEngineErrorIsNotPatternMismatch	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/schemaregexp	TestEngineFaultBoundaries	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/schemaregexp	TestTimedEngineClockSerialized	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/schemaregexp	TestECMAPatternControls	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/envmarker	TestMarkerSchemaEngineError	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/envmarker	TestMarkerSchemaRevisionFormats	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/envmarker	TestMarker7ConcurrentIdleRevision	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+internal/envsnapshot	TestSnapshotSchemaEngineError	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.

@@ -580,12 +580,16 @@ and clear Git, SSH, agent and XDG selectors. Outputs stay under `.temp/` and in
 uploaded artifacts, as for the Windows mode. Native runtime evidence is required
 in addition to tool and workflow fixture controls.
 
-The marker/snapshot schema regexp engine is pinned to regexp2 v1.11.5, which
-fixes stale timeout deadlines after idle. Run
-`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/envmarker -run TestMarker7AfterRegexpClockIdle -count=1`
-for full-carrier name controls around an idle restart, and
-`env -u GIT_DIR -u GIT_WORK_TREE go test github.com/dlclark/regexp2 -run TestIncorrectDeadline -count=1`
-for the upstream deterministic deadline regression. Keep output under `.temp/`.
+Marker/snapshot schemas use jsonschema/v6 with the shared `internal/schemaregexp`
+adapter. Fixed hexadecimal revisions and digests use exact byte checks without
+regexp2's timeout clock. Other ECMA patterns retain regexp2 v1.11.5 and its
+one-second timeout, with serialized matches to protect concurrent idle restarts.
+Backend errors surface as typed engine errors rather than pattern mismatches;
+error text does not render backend input. Run
+`go test -p 1 -parallel 2 ./internal/schemaregexp ./internal/envmarker ./internal/envsnapshot`
+for injected timeout, valid/invalid revision, schema and carrier controls.
+The full snapshot destination tests require private ancestor directories.
+Keep validation output under `.temp/`.
 
 New Codex managed homes use provisioning seed revision C: top-level `projects`
 and `mcp_servers` are excluded, while unrelated decoded TOML values survive.

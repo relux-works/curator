@@ -130,7 +130,12 @@ TestStartupObjectAvailabilityMatrix hashed there. The earlier 1245.65s
 projection was not a final-head measurement and is superseded by that run.
 
 The macOS ordinary partitioner explicitly places the object-availability matrix
-on shard 1, separating it from the ownership controls on shard 0. Other names
+on shard 1, separating it from the ownership controls on shard 0.
+The repository parity parent is placed on shard 2: the preceding hosted run
+43676213540 measured 665.912s, 1450.626s, 769.571s, 1138.236s and 1116.398s;
+shard 1 missed the target by 10.626s, including 265.860s in that parity parent.
+Moving that parent is a balance change, not a qualification projection; every
+new-head shard still requires an actual hosted measurement. Other names
 retain FNV-1a-64 placement; Linux and Windows placement is unchanged. Placement
 is consistent across packages so shared selectors cannot cross-select a name.
 The inventory was 678 parents after the C8 rebase; the independent home-first

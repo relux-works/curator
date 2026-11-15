@@ -9,14 +9,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"reflect"
 	"sync"
-	"time"
 	"unicode/utf8"
 
-	"github.com/dlclark/regexp2"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/schemaregexp"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -124,7 +124,7 @@ type Descriptor struct {
 var schemas embed.FS
 var validators = sync.OnceValues(func() (map[string]*jsonschema.Schema, error) {
 	c := jsonschema.NewCompiler()
-	c.UseRegexpEngine(compilePattern)
+	c.UseRegexpEngine(schemaregexp.Compile)
 	c.UseLoader(closedLoader{})
 	paths, err := fs.Glob(schemas, "schemas/*/*.json")
 	if err != nil {
@@ -176,7 +176,15 @@ func decode(raw []byte, manifest bool, dst any) error {
 		schema = checks["manifest"]
 		reason = "manifest-schema"
 	}
-	if err := schema.Validate(value); err != nil {
+	return validateSnapshotSchema(schema, value, reason)
+}
+
+func validateSnapshotSchema(schema *jsonschema.Schema, value any, reason string) error {
+	if err := schemaregexp.Validate(schema, value); err != nil {
+		var engine *schemaregexp.EngineError
+		if errors.As(err, &engine) {
+			return fmt.Errorf("%w: %w", refuse("schema-engine"), err)
+		}
 		return refuse(reason)
 	}
 	return nil
@@ -249,22 +257,6 @@ func FragmentDigest(canonical []byte) (string, error) {
 type closedLoader struct{}
 
 func (closedLoader) Load(string) (any, error) { return nil, errors.New("unbundled schema") }
-
-type schemaPattern struct{ re *regexp2.Regexp }
-
-func (p schemaPattern) MatchString(s string) bool {
-	matched, err := p.re.MatchString(s)
-	return err == nil && matched
-}
-func (p schemaPattern) String() string { return p.re.String() }
-func compilePattern(s string) (jsonschema.Regexp, error) {
-	re, err := regexp2.Compile(s, regexp2.ECMAScript)
-	if err != nil {
-		return nil, err
-	}
-	re.MatchTimeout = time.Second
-	return schemaPattern{re}, nil
-}
 
 // encoding/json replaces invalid UTF-8. Refuse it before converting the typed
 // model to the JSON domain so encoding cannot silently change path identity.

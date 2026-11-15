@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"sync"
-	"time"
 
-	"github.com/dlclark/regexp2"
+	"github.com/relux-works/curator/internal/schemaregexp"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -22,7 +22,7 @@ var markerSchemas embed.FS
 var marker7Schema = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	c := jsonschema.NewCompiler()
 	c.UseLoader(markerSchemaLoader{})
-	c.UseRegexpEngine(markerPattern)
+	c.UseRegexpEngine(schemaregexp.Compile)
 	paths, err := fs.Glob(markerSchemas, "schemas/*/*.json")
 	if err != nil {
 		return nil, err
@@ -49,21 +49,6 @@ func (markerSchemaLoader) Load(string) (any, error) {
 	return nil, fmt.Errorf("unbundled marker schema")
 }
 
-type markerRegexp struct{ re *regexp2.Regexp }
-
-func (r markerRegexp) String() string { return r.re.String() }
-func (r markerRegexp) MatchString(s string) bool {
-	ok, err := r.re.MatchString(s)
-	return err == nil && ok
-}
-func markerPattern(pattern string) (jsonschema.Regexp, error) {
-	re, err := regexp2.Compile(pattern, regexp2.ECMAScript)
-	if err != nil {
-		return nil, err
-	}
-	re.MatchTimeout = time.Second
-	return markerRegexp{re}, nil
-}
 func validateMarker7(raw []byte) error {
 	schema, err := marker7Schema()
 	if err != nil {
@@ -75,7 +60,15 @@ func validateMarker7(raw []byte) error {
 	if err = decoder.Decode(&doc); err != nil {
 		return err
 	}
-	if err = schema.Validate(doc); err != nil {
+	return validateMarkerSchema(schema, doc)
+}
+
+func validateMarkerSchema(schema *jsonschema.Schema, doc any) error {
+	if err := schemaregexp.Validate(schema, doc); err != nil {
+		var engine *schemaregexp.EngineError
+		if errors.As(err, &engine) {
+			return fmt.Errorf("marker-7 schema engine failed: %w", err)
+		}
 		return fmt.Errorf("marker-7 carrier invalid: %w", err)
 	}
 	return nil

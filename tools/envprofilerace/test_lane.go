@@ -70,10 +70,14 @@ func (c testLane) partition(tests map[string][]string) (map[string][][]string, e
 			// #nosec G115 -- Native configurations fix the positive shard count to 3, 4 or 5.
 			i := int(h.Sum64() % uint64(c.shards))
 			// Both heavy envprofile parents hash to macOS shard 0. Keep the
-			// object-loss matrix on shard 1; apply placement by name across
+			// object-loss matrix on shard 1 and parity matrix on shard 2; apply
+			// placement by name across
 			// packages so the shared selector cannot cross-select a test.
 			if c.goos == "darwin" && name == "TestStartupObjectAvailabilityMatrix" {
 				i = 1
+			}
+			if c.goos == "darwin" && name == "TestStartupObjectMainParity" {
+				i = 2
 			}
 			shards[i] = append(shards[i], name)
 		}
