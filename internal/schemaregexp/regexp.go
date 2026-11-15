@@ -19,6 +19,7 @@ type EngineError struct{ Cause error }
 func (*EngineError) Error() string   { return "schema regexp engine failure" }
 func (e *EngineError) Unwrap() error { return e.Cause }
 
+// Validate preserves typed engine failures across the schema library's bool-only matcher API.
 func Validate(schema *jsonschema.Schema, value any) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
@@ -74,13 +75,14 @@ func (p hexPattern) MatchString(s string) bool {
 		return false
 	}
 	for i := 0; i < len(s); i++ {
-		if !(s[i] >= '0' && s[i] <= '9' || s[i] >= 'a' && s[i] <= 'f') {
+		if (s[i] < '0' || s[i] > '9') && (s[i] < 'a' || s[i] > 'f') {
 			return false
 		}
 	}
 	return true
 }
 
+// Compile uses exact byte checks for fixed hex formats and serialized ECMA matching otherwise.
 func Compile(pattern string) (jsonschema.Regexp, error) { return compile(pattern, compileTimed) }
 func compile(pattern string, fallback jsonschema.RegexpEngine) (jsonschema.Regexp, error) {
 	p := hexPattern{source: pattern}

@@ -86,7 +86,8 @@ func TestEngineErrorIsNotPatternMismatch(t *testing.T) {
 	}})
 	check := func(v string) {
 		err := Validate(s, v)
-		if v == "timeout" {
+		switch v {
+		case "timeout":
 			var engine *EngineError
 			var mismatch *jsonschema.ValidationError
 			if !errors.As(err, &engine) || !errors.Is(err, timeout) || errors.As(err, &mismatch) {
@@ -95,11 +96,11 @@ func TestEngineErrorIsNotPatternMismatch(t *testing.T) {
 			if err != nil && strings.Contains(err.Error(), "private-input") {
 				t.Error("engine diagnostic exposed backend input")
 			}
-		} else if v == "valid" {
+		case "valid":
 			if err != nil {
 				t.Errorf("valid control refused: %v", err)
 			}
-		} else {
+		default:
 			var mismatch *jsonschema.ValidationError
 			if !errors.As(err, &mismatch) {
 				t.Errorf("invalid control lost schema mismatch: %T %v", err, err)
