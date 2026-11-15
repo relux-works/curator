@@ -134,6 +134,9 @@ func startupBrokenRepositoryParity(t *testing.T) {
 							if err == nil || !strings.Contains(err.Error(), "pin_hash") || strings.Contains(err.Error(), "regular_types") || result != nil && len(result.Document) != 0 {
 								t.Fatalf("main-parity invalid repository pin refusal: %v", err)
 							}
+							if current && !owned && strings.Contains(err.Error(), DiagHomeStale) {
+								t.Fatalf("main-parity repository loss borrowed home precedence: %v", err)
+							}
 							if current && owned && (!strings.HasPrefix(err.Error(), "environment_home_stale:") || !strings.Contains(err.Error(), "--repair")) {
 								t.Fatalf("main-parity invalid repository hid home diagnostic: %v", err)
 							}

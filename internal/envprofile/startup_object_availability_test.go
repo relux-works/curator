@@ -122,6 +122,8 @@ func TestStartupObjectAvailabilityMatrix(t *testing.T) {
 										if !strings.HasPrefix(err.Error(), DiagHomeStale+":") || hintRequired && !strings.Contains(err.Error(), "--repair") {
 											t.Fatalf("object loss hid home diagnostic: %v", err)
 										}
+									} else if strings.Contains(err.Error(), DiagHomeStale) {
+										t.Fatalf("object loss borrowed home diagnostic without home drift: %v", err)
 									} else if loss != "blob" && (!strings.Contains(err.Error(), "pin_hash") || !strings.Contains(err.Error(), "pinned commit object unavailable")) {
 										t.Fatalf("object loss lost pin class: %v", err)
 									}
@@ -193,6 +195,7 @@ func TestStartupObjectLossBetweenInspectionAndPins(t *testing.T) {
 // Narrowing each new gate must fail at its intended assertion, not setup.
 func TestStartupObjectAvailabilityControls(t *testing.T) {
 	for _, p := range []struct{ name, file, before, after, test, witness string }{
+		{"borrowed-home-precedence", "managed.go", "return nil, homeInputsFailure(owned, err)", "_ = owned; return nil, homeInputsFailure(true, err)", "TestHomeFirstIsNotBorrowedByRepositoryLoss", "repository loss borrowed home precedence"},
 		{"blob-independent-roster", "../gitops/snapshot_paths.go", "sized.Write(meta)", "if _, err := runWithEnv(repo, env, \"cat-file\", \"-s\", strings.Fields(string(meta))[2]); err != nil { return nil, objectUnavailable(\"blob\", err) }; sized.Write(meta)", "TestStartupObjectAvailabilityMatrix/blob/level1/none/observe", "available store refused after blob loss"},
 		{"late-home-wrap", "managed.go", "if pinnedCommitObjectUnavailable(failure) {\n\t\t\treturn nil, homeInputFailure(failure)\n\t\t}", "if pinnedCommitObjectUnavailable(failure) {\n\t\t\treturn nil, failure\n\t\t}", "TestStartupObjectLossBetweenInspectionAndPins/true", "late object loss lost leading diagnostic"},
 		{"early-home-wrap", "managed.go", "return nil, homeInputsFailure(owned, err)", "_ = owned; return nil, err", "TestStartupObjectAvailabilityMatrix/cache/level1/home/observe", "object loss hid home diagnostic"},

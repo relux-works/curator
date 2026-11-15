@@ -121,13 +121,20 @@ configuration, and default-build tests prove its environment selector inert.
 The test-only `curator_cold_repository` tag exposes no release-binary input.
 
 The ordinary macOS lane uses five inventory-partitioned shards; Linux retains
-three. The 1800s per-package admission margin and 60m hard timeout are unchanged.
-The previous three-shard envprofile times were 1753.169s, 1348.396s and 1433.161s
-at the accepted head, with a second identical-tree run showing substantial
-runner variation. Replaying the slower measurements through the unchanged
-FNV-1a-64 selector gives a 1541.88s maximum with four shards and 1245.65s with
-five, before additional invalid-repository controls. Five is the smallest
-count below the 1440s delivery target. Final-head hosted measurements must also
-include those controls and confirm all 647 envprofile parents exactly once.
-Repartitioning retains every native test and mutation control; merge admission
-still requires the exact inventory union.
+three. The 1800s per-package admission margin and 60m hard timeout are unchanged;
+the delivery target is at most 1440s for every macOS envprofile shard.
+The pre-rework hosted run 43662354773 measured 1487.585s, 511.386s, 586.914s,
+1066.988s and 1010.379s across the five macOS envprofile shards. Its shard 0
+missed the target: both TestGlobalNativeOwnershipNarrowingControls and
+TestStartupObjectAvailabilityMatrix hashed there. The earlier 1245.65s
+projection was not a final-head measurement and is superseded by that run.
+
+The macOS ordinary partitioner explicitly places the object-availability matrix
+on shard 1, separating it from the ownership controls on shard 0. Other names
+retain FNV-1a-64 placement; Linux and Windows placement is unchanged. Placement
+is consistent across packages so shared selectors cannot cross-select a name.
+The inventory was 678 parents after the C8 rebase; the independent home-first
+precedence regression adds one, making 679. Every parent and mutation control
+remains in the exact inventory-union admission. Final-head hosted artifact
+measurements, including every shard's time and the <=1440s target verdict,
+are recorded in the producer's review packet; projections do not qualify a head.

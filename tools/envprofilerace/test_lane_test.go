@@ -224,3 +224,67 @@ func TestOrdinaryNativeLanes(t *testing.T) {
 		}
 	}
 }
+
+// The named heavy parents remain in the exact union but cannot share a macOS
+// ordinary shard. Shared names in other packages follow the same placement.
+func TestMacOSHeavyParentsSeparate(t *testing.T) {
+	c, err := ordinaryConfig("unix-test", "darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := windowsFixtureInventory()
+	for _, p := range ordinaryPackages {
+		tests[p] = append(tests[p], "TestGlobalNativeOwnershipNarrowingControls", "TestStartupObjectAvailabilityMatrix")
+	}
+	parts, err := c.partition(tests)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range ordinaryPackages {
+		placement := map[string]int{}
+		for shard, names := range parts[p] {
+			for _, name := range names {
+				placement[name] = shard
+			}
+		}
+		if placement["TestGlobalNativeOwnershipNarrowingControls"] != 0 || placement["TestStartupObjectAvailabilityMatrix"] != 1 {
+			t.Fatalf("heavy macOS parents share or lose their required placement: %v", placement)
+		}
+	}
+	// Exact selectors still exercise the existing missing/duplicate and future-name controls.
+	testOrdinaryPartitionCoverage(t, c)
+}
+
+// The macOS placement exception must not move either heavy parent on Linux
+// or Windows; these are their pre-rework FNV buckets in the native lane counts.
+func TestHeavyPlacementLeavesOtherPlatformsUnchanged(t *testing.T) {
+	for _, tc := range []struct {
+		lane, goos        string
+		ownership, matrix int
+	}{
+		{"unix-test", "linux", 1, 0},
+		{"windows-test", "windows", 1, 3},
+	} {
+		c, err := ordinaryConfig(tc.lane, tc.goos)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tests := windowsFixtureInventory()
+		for _, p := range ordinaryPackages {
+			tests[p] = append(tests[p], "TestGlobalNativeOwnershipNarrowingControls", "TestStartupObjectAvailabilityMatrix")
+		}
+		parts, err := c.partition(tests)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for p, shards := range parts {
+			for i, names := range shards {
+				for _, name := range names {
+					if name == "TestGlobalNativeOwnershipNarrowingControls" && i != tc.ownership || name == "TestStartupObjectAvailabilityMatrix" && i != tc.matrix {
+						t.Fatalf("macOS exception moved %s %s on %s to %d", p, name, tc.goos, i)
+					}
+				}
+			}
+		}
+	}
+}

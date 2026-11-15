@@ -687,6 +687,21 @@ while IFS="$(printf '\t')" read -r scope_class scope_pattern scope_policy scope_
 		done
 	fi
 
+	# Claim: a broad matching row cannot repeal an earlier scoped reason,
+	# including when another exact scoped declaration shares that reason.
+	cp "$CLASSES" "$SCOPED/overlap.tsv"
+	printf '%s\t%s\tallow\tsynthetic overlapping broad allowance\n' \
+		"$scope_class" "$scope_pattern" >>"$SCOPED/overlap.tsv"
+	assert "broad overlap cannot repeal exact scope: $scope_test" 1 \
+		scoped_gate "$scope_gate" "$SCOPED/overlap.tsv" windows "$scope_pkg" "$scope_unrelated" "$scope_reason"
+	assert_contains 'broad overlap reaches the scoped refusal' 'FATAL-scope' "$SCOPED/evidence/skips-observed.tsv"
+	assert "broad overlap preserves exact positive: $scope_test" 0 \
+		scoped_gate "$scope_gate" "$SCOPED/overlap.tsv" windows "$scope_pkg" "$scope_test" "$scope_reason"
+	awk '{ old = "} else if (!broad) broad = i"; at = index($0, old); if (at) { $0 = substr($0, 1, at - 1) "} else return i" substr($0, at + length(old)); n++ } print }
+		END { if (n != 1) exit 1 }' "$GATE" >"$SCOPED/folding/broad-mutant.sh"
+	assert "control catches broad-overlap regression: $scope_test" 0 \
+		scoped_gate "$SCOPED/folding/broad-mutant.sh" "$SCOPED/overlap.tsv" windows "$scope_pkg" "$scope_unrelated" "$scope_reason"
+
 	# An otherwise tolerant exact ledger row cannot repeal a scoped declaration.
 	cp "$SHIPPED" "$SCOPED/tolerant.tsv"
 	printf '%s\t%s\t-\tlinux,darwin,windows\t%s\tsynthetic toleration control\n' \

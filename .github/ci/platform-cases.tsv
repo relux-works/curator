@@ -1205,3 +1205,4 @@ internal/envprofile	TestStartupObjectMainParity	linux,darwin,windows	-	-	Missing
 internal/gitops	TestPinnedPathsObjectAvailability	linux,darwin,windows	-	-	Tree metadata roster is blob independent and object loss has a typed class
 internal/gitops	TestPinnedCommitTreeRepositoryAvailability	linux,darwin,windows	-	-	Direct commit-tree reads classify invalid HEAD and objects metadata as repository availability
 internal/gitops	TestPinnedObjectAvailabilityControls	linux,darwin,windows	-	-	Three typed-return narrowing mutants reach their exact availability assertions
+internal/envprofile	TestHomeFirstIsNotBorrowedByRepositoryLoss	linux,darwin,windows	-	-	repository loss without home drift cannot borrow home_stale; the same loss with home drift leads home-first and retains pin_hash

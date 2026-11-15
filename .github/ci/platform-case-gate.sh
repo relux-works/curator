@@ -154,13 +154,15 @@ function listed(set, want,   n, i, a) {
 }
 # A shared reason can have several exact case scopes. Prefer its matching
 # package/test declaration; keep a reason match to diagnose an out-of-scope skip.
-function classify(reason, pkg, test,   i, fallback) {
+function classify(reason, pkg, test,   i, fallback, broad) {
 	for (i = 1; i <= nclass; i++) {
 		if (reason !~ cregex[i]) continue
-		if (!fallback) fallback = i
-		if (cpolicy[i] != "scoped" || (cpackage[i] == pkg && ctest[i] == test)) return i
+		if (cpolicy[i] == "scoped") {
+			if (!fallback) fallback = i
+			if (cpackage[i] == pkg && ctest[i] == test) return i
+		} else if (!broad) broad = i
 	}
-	return fallback
+	return (fallback ? fallback : broad)
 }
 BEGIN {
 	FS = "\t"; fail = 0
