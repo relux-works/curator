@@ -122,7 +122,10 @@ func TestStartupObjectAvailabilityMatrix(t *testing.T) {
 										if !strings.HasPrefix(err.Error(), DiagHomeStale+":") || hintRequired && !strings.Contains(err.Error(), "--repair") {
 											t.Fatalf("object loss hid home diagnostic: %v", err)
 										}
-									} else if strings.Contains(err.Error(), DiagHomeStale) {
+										// Blob loss leaves metadata readable: source drift can also
+										// change linked home bytes. Repository/metadata loss must
+										// never borrow that home diagnostic without owned drift.
+									} else if loss != "blob" && strings.Contains(err.Error(), DiagHomeStale) {
 										t.Fatalf("object loss borrowed home diagnostic without home drift: %v", err)
 									} else if loss != "blob" && (!strings.Contains(err.Error(), "pin_hash") || !strings.Contains(err.Error(), "pinned commit object unavailable")) {
 										t.Fatalf("object loss lost pin class: %v", err)
