@@ -152,10 +152,15 @@ function listed(set, want,   n, i, a) {
 	for (i = 1; i <= n; i++) if (a[i] == want) return 1
 	return 0
 }
-function classify(reason,   i) {
-	for (i = 1; i <= nclass; i++)
-		if (reason ~ cregex[i]) return i
-	return 0
+# A shared reason can have several exact case scopes. Prefer its matching
+# package/test declaration; keep a reason match to diagnose an out-of-scope skip.
+function classify(reason, pkg, test,   i, fallback) {
+	for (i = 1; i <= nclass; i++) {
+		if (reason !~ cregex[i]) continue
+		if (!fallback) fallback = i
+		if (cpolicy[i] != "scoped" || (cpackage[i] == pkg && ctest[i] == test)) return i
+	}
+	return fallback
 }
 BEGIN {
 	FS = "\t"; fail = 0
@@ -222,7 +227,7 @@ BEGIN {
 	for (i = 1; i <= skips; i++) {
 		key = skiporder[i]
 		reason = skipreason[key]
-		ci = classify(reason)
+		ci = classify(reason, skippkg[key], skiptest[key])
 		cls = (ci ? cclass[ci] : "UNCLASSIFIED")
 
 		# Tier 1: a ledger case, or a subtest of one, has its own rule.

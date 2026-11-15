@@ -629,7 +629,7 @@ done
 
 echo ''
 echo '=== exact skip scopes: case, platform and measured filesystem capability ==='
-# Claim: the four scoped reasons admit only their declared case and platform.
+# Claim: all C8 and store scoped reasons admit only their declared case/platform.
 # Copied probe helpers below model capability verdicts deterministically; these
 # streams test gate policy, not native Windows/Linux/Darwin execution.
 SCOPED="$WORK/scoped"
@@ -656,10 +656,14 @@ scoped_gate() {
 		bash "$script" "$SCOPED/stream.json" "$SCOPED/evidence"
 }
 awk -F'\t' '$3 == "scoped" {print}' "$CLASSES" >"$SCOPED/rows.tsv"
-assert 'all four scoped allowances are covered by these controls' 0 \
-	test "$(wc -l <"$SCOPED/rows.tsv" | tr -d ' ')" = 4
+assert 'all ten scoped allowances are covered by these controls' 0 \
+	test "$(wc -l <"$SCOPED/rows.tsv" | tr -d ' ')" = 10
 while IFS="$(printf '\t')" read -r scope_class scope_pattern scope_policy scope_note scope_pkg scope_test scope_goos scope_cap; do
 	scope_reason="${scope_pattern#^}"; scope_reason="${scope_reason%\$}"
+	# Store rehearsal cases have exact opt-in ledger rows. A missing class
+	# therefore fails their required reason before the generic unclassified gate.
+	scope_unknown_verdict=FATAL-unclassified
+	[ "$scope_class" = opt-in ] && scope_unknown_verdict=FATAL-wrong-class
 	scope_gate="$SCOPED/folding/platform-case-gate.sh"
 	# Exact known case/GOOS positive beside the reviewer's unrelated-test witness.
 	for scope_target in $(echo "$scope_goos" | tr ',' ' '); do
@@ -697,7 +701,7 @@ while IFS="$(printf '\t')" read -r scope_class scope_pattern scope_policy scope_
 		if [ "$scope_edge" = prefix ]; then scope_near="unexpected: $scope_reason"; else scope_near="$scope_reason unexpectedly"; fi
 		assert "anchored $scope_edge reason refuses: $scope_test" 1 \
 			scoped_gate "$scope_gate" "$CLASSES" windows "$scope_pkg" "$scope_test" "$scope_near"
-		assert_contains 'nearby reason stays unclassified' 'FATAL-unclassified' "$SCOPED/evidence/skips-observed.tsv"
+		assert_contains 'nearby reason reaches its intended rejection' "$scope_unknown_verdict" "$SCOPED/evidence/skips-observed.tsv"
 		awk -F'\t' -v OFS='\t' -v pattern="$scope_pattern" -v edge="$scope_edge" '
 			$2 == pattern { if (edge == "prefix") sub(/^\^/, "", $2); else sub(/\$$/, "", $2) } {print}
 		' "$CLASSES" >"$SCOPED/anchor-mutant.tsv"
@@ -707,7 +711,7 @@ while IFS="$(printf '\t')" read -r scope_class scope_pattern scope_policy scope_
 	awk -F'\t' -v pattern="$scope_pattern" '$2 != pattern' "$CLASSES" >"$SCOPED/removed.tsv"
 	assert "exact reason needs its declaration: $scope_test" 1 \
 		scoped_gate "$scope_gate" "$SCOPED/removed.tsv" windows "$scope_pkg" "$scope_test" "$scope_reason"
-	assert_contains 'removed scoped declaration stays unclassified' 'FATAL-unclassified' "$SCOPED/evidence/skips-observed.tsv"
+	assert_contains 'removed declaration reaches its intended rejection' "$scope_unknown_verdict" "$SCOPED/evidence/skips-observed.tsv"
 
 	# Narrowing mutant: restoring global allow recreates each unrelated-test bug.
 	awk -F'\t' -v OFS='\t' -v pattern="$scope_pattern" '$2 == pattern {$3 = "allow"} {print}' \

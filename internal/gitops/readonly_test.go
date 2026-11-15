@@ -1,6 +1,7 @@
 package gitops
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,8 +32,22 @@ func TestPinnedReadOnlyNoAcquisition(t *testing.T) {
 	if _, _, err := PinnedDirectorySnapshotTree(repo, commit, "agents/skills/demo"); err != nil {
 		t.Fatalf("existing local pin: %v", err)
 	}
+	if paths, err := PinnedDirectorySnapshotPaths(repo, commit, "agents/skills/demo"); err != nil || len(paths) == 0 {
+		t.Fatalf("existing local roster: %v, %v", paths, err)
+	}
+	var unavailable *ObjectUnavailableError
+	if _, err := PinnedDirectorySnapshotPaths(repo, strings.Repeat("1", 40), ""); !errors.As(err, &unavailable) {
+		t.Fatalf("missing exact roster object: %v", err)
+	}
 	if _, _, err := PinnedCommitTree(repo, strings.Repeat("1", 40)); err == nil {
 		t.Fatal("missing exact object admitted")
+	}
+	// A broken repository must retain typed availability without creating config.
+	if err := os.Remove(filepath.Join(repo, ".git", "HEAD")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PinnedDirectorySnapshotPaths(repo, commit, ""); !errors.As(err, &unavailable) || unavailable.ObjectType != "repository" {
+		t.Fatalf("broken repository roster: %v", err)
 	}
 	entries, err := os.ReadDir(scratch)
 	if err != nil {
