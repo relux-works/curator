@@ -12,6 +12,13 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
+// noPendingJournalEntries reports lock-free certainty that the shared
+// transaction journal root holds no durable pending intent at read time.
+func noPendingJournalEntries(home string) bool {
+	entries, err := os.ReadDir(filepath.Join(home, "state", "transactions", "v1"))
+	return errors.Is(err, os.ErrNotExist) || (err == nil && len(entries) == 0)
+}
+
 // Legacy homes still need pending-intent certainty for read-only callers. This
 // path neither provisions the new namespace nor imposes its private-file format
 // on existing unrelated transaction state. A missing lock cannot hide intent.
@@ -34,10 +41,13 @@ func homeLeaseReadLegacy(home string, held *managerlock.Held) error {
 		defer cancel()
 		lock, err := manager.AcquireExistingHomeOnly(ctx)
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				if _, err := os.Lstat(filepath.Join(home, "state", "transactions", "v1")); errors.Is(err, os.ErrNotExist) {
-					return nil
-				}
+			// Read-only callers keep main's lock-free behaviour when no
+			// durable journal intent exists to be uncertain about: an
+			// absent or empty journal root proves no pending mutation
+			// without acquiring the held mutation lock. Any journal
+			// entry retains the busy/unreadable refusal below.
+			if noPendingJournalEntries(home) {
+				return nil
 			}
 			if ctx.Err() != nil {
 				return state.Refuse("environment_lock_unavailable", "mutation_lock_busy")

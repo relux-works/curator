@@ -3,6 +3,7 @@ package envprofile
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -286,11 +287,31 @@ func homeLeaseNativeTargets(environment string, resolver func(string) (string, e
 		if environment != "" && adapter.ID != envregistry.NormalizeEnvID(environment) {
 			continue
 		}
-		path, err := resolveNativeHome(adapter, resolver)
-		if err != nil {
-			return nil, err
+		if resolver != nil {
+			path, err := resolver(adapter.ID)
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, path)
+			continue
 		}
-		paths = append(paths, path)
+		// Target enumeration names physical candidates only; it must not
+		// turn the production external-origin policy into a new refusal
+		// for operations that never write the native home. A managed
+		// caller value still names its physical candidate so aliasing a
+		// leased managed home stays inside the guarded target set.
+		value := os.Getenv(adapter.EnvVar)
+		path, fallback, err := nativeHomeSelection(adapter, nativeManagerHome(), value)
+		if err == nil && path != "" {
+			paths = append(paths, path)
+		}
+		if value != "" && (err != nil || fallback) {
+			candidate := value
+			if adapter.ID == "opencode" || adapter.ID == envregistry.Muse {
+				candidate = filepath.Join(value, adapter.ID)
+			}
+			paths = append(paths, candidate)
+		}
 	}
 	return paths, nil
 }
