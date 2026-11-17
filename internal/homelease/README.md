@@ -1,23 +1,22 @@
 # Managed home leases
 
 This package implements the Curator side of the `home-lease/1` refusal
-contract in [curator-spec](https://github.com/relux-works/curator-spec/blob/3f8ffb7f15213872c66ceec28501b9e51d56ac5c/protocol/home-leases.md).
-It is under qualification. The command entry point reads the public
-`curator-run session-manager observe` contract through `SessionManagerObserver`.
-That closed v1 contract lacks required independent proofs, so bind refuses
-`environment_lease_authority_refused/authority_unavailable` and release of a
-blocking lease refuses
-`environment_lease_release_unconfirmed/session_state_unknown`.
-An acquire therefore remains protected until independently qualified
-reconciliation or an explicit audited operator break becomes possible.
-
-The missing consumer contract must independently bind the request, Werkstatt,
-manager registration, session, generation and OS process incarnation, and prove
-no-start or completion of descendants and ownership reconciliation. The closed
-curator-run observation at
-[870e6235](https://github.com/relux-works/curator-agent-launcher/blob/870e62350a008f8b71d368a054140221cbc97925/schemas/session-manager/session-observation.schema.json)
-does not supply all those proofs. A caller-supplied holder, PID existence,
-launcher exit or elapsed time cannot substitute for them.
+contract in [curator-spec](https://github.com/relux-works/curator-spec/blob/264244b321c7a2272450fc29bd9952f988d746d7/protocol/home-leases.md).
+It is under qualification. Bind reads the public
+`curator-run session-manager observe --schema v2` contract through
+`SessionManagerObserver` and succeeds only when the requested bound holder,
+the authoritative v2 process tuple and Curator's own kernel reading are
+byte-equal: `/proc` stat/status plus boot id on Linux, `proc_pidinfo`
+`PROC_PIDTBSDINFO` plus `kern.bootsessionuuid` on macOS. Platforms without
+a native observer refuse bind as unavailable authority. The first use adds
+no release authority, so release of a blocking lease still refuses
+`environment_lease_release_unconfirmed/session_state_unknown` until an
+authoritative reconciliation integration (terminal session, descendants
+and ownership, or proven no-start) is qualified. An acquire therefore
+remains protected until that reconciliation exists or an explicit audited
+operator break ends it. A caller-supplied holder, a manager assertion, PID
+existence, launcher exit or elapsed time cannot substitute for these
+proofs; the manager's tuple is an input to the observer, never the proof.
 
 ## Persistence and authority
 
@@ -84,7 +83,7 @@ before tests and verify protected operator context/marker/skill identities on
 exit. Their bounded negative controls use synthetic original homes only; see
 [`testhomeguard`](../testhomeguard/README.md).
 
-The exact accepted **131 paired schema vectors** run in
+The exact accepted **198 paired schema vectors** run in
 `state.TestAcceptedSchemaCorpus`. Runtime tests exercise real temporary stores,
 OS locks, journal recovery and writer entry points; synthetic observer evidence
 tests lifecycle decisions without qualifying a production observer. Refusals
@@ -94,9 +93,9 @@ unreferenced runtime and protected cache neighbors while retaining
 prepared/unknown home references alongside durable project roots. A real pending
 acquisition refuses the full collector and preserves the fixture preimage.
 
-The [68-pair qualification map](qualification.md) names each semantic pair,
-its actual Go tests and its remaining limits. These tests do **not** constitute
-complete execution of all 68 semantic pairs.
+The [qualification map](qualification.md) names semantic pairs, their actual
+Go tests and their remaining limits. These tests do **not** constitute
+complete execution of all semantic pairs in the pinned corpus.
 Consumer vectors HL21–HL24, including launcher `op.json` settlement and zero
 manager calls on terminal replay, require the actual consumer implementation.
 Writer coverage still needs a complete corpus adapter for all variants of the
