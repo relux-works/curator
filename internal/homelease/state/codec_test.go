@@ -23,7 +23,7 @@ func TestAcceptedSchemaCorpus(t *testing.T) {
 	if err := json.Unmarshal(raw, &corpus); err != nil {
 		t.Fatal(err)
 	}
-	if len(corpus.Pairs) != 131 {
+	if len(corpus.Pairs) != 198 {
 		t.Fatalf("unexpected accepted corpus size: %d", len(corpus.Pairs))
 	}
 	for _, pair := range corpus.Pairs {

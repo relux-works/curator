@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-type Process struct {
-	PID       int64  `json:"pid"`
-	StartedAt string `json:"started_at"`
-}
-
 type Holder struct {
 	Kind                string   `json:"kind"`
 	Launcher            string   `json:"launcher"`

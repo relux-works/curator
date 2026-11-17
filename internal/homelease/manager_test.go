@@ -227,7 +227,7 @@ func TestEvidenceAndAllHolders(t *testing.T) {
 	bound.Kind = "bound"
 	bound.Session = &session
 	bound.Generation = &generation
-	bound.Process = &state.Process{PID: 42, StartedAt: "2026-10-27T00:00:01Z"}
+	bound.Process = &state.Process{PID: 42, UID: 1001, BootID: "6f1c0e2a-8b44-4d1e-9a51-2f0c3d7e9b10", StartTime: &state.StartTime{Kind: state.StartLinux, Ticks: "123456789", Hz: 100}}
 	before := snapshot(t, f.m.home)
 	f.o.err = errors.New("launcher dead")
 	_, _, err := f.m.Bind(context.Background(), first.LeaseID, 1, bound)

@@ -48,7 +48,7 @@ func TestSemanticDeadLauncherRetainsLivingDescendant(t *testing.T) {
 	f := newFixture(t)
 	r := acquire(t, f)
 	h := boundHolder(r.Holder)
-	h.Process = &state.Process{PID: int64(pid), StartedAt: "2026-10-27T00:00:01Z"}
+	h.Process = &state.Process{PID: int64(pid), UID: 1001, BootID: "6f1c0e2a-8b44-4d1e-9a51-2f0c3d7e9b10", StartTime: &state.StartTime{Kind: state.StartLinux, Ticks: "123456789", Hz: 100}}
 	f.o.proof.Holder = h
 	if _, _, err := f.m.Bind(context.Background(), r.LeaseID, 1, h); err != nil {
 		t.Fatal(err)

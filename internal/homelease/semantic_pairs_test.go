@@ -171,8 +171,8 @@ func TestSemanticEveryObservedHolderField(t *testing.T) {
 		"werkstatt":     func(h *Holder) { s := "different-werkstatt"; h.Werkstatt = &s },
 		"session":       func(h *Holder) { s := "different-session"; h.Session = &s },
 		"generation":    func(h *Holder) { n := int64(8); h.Generation = &n },
-		"pid":           func(h *Holder) { h.Process = &state.Process{PID: 124, StartedAt: h.Process.StartedAt} },
-		"process-start": func(h *Holder) { h.Process = &state.Process{PID: h.Process.PID, StartedAt: "2026-10-27T00:00:02Z"} },
+		"pid":           func(h *Holder) { p := *h.Process; p.PID = 124; h.Process = &p },
+		"process-start": func(h *Holder) { p := *h.Process; s := *p.StartTime; s.Ticks = "123456790"; p.StartTime = &s; h.Process = &p },
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture(t)
