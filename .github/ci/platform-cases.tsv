@@ -1215,3 +1215,16 @@ internal/envmarker	TestMarkerSchemaEngineError	linux,darwin,windows	-	-	Exact pr
 internal/envmarker	TestMarkerSchemaRevisionFormats	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
 internal/envmarker	TestMarker7ConcurrentIdleRevision	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
 internal/envsnapshot	TestSnapshotSchemaEngineError	linux,darwin,windows	-	-	Exact production schema engine regression; no platform skip.
+
+# ====================================================================
+# Home-lease independent observer: the kernel readers and bind rows run
+# on the platforms whose native start-time variant they prove, and the
+# unsupported-platform refusal runs where no variant exists.
+internal/homelease	TestLinuxKernelReadsOwnChild	linux	-	-	the Linux kernel observer reads the exact tuple of the test's own child from /proc and refuses it once reaped
+internal/homelease	TestLinuxKernelRefusesThreadAndZombie	linux	-	-	the Linux kernel observer refuses a non-leader thread id and a zombie child beside live controls
+internal/homelease	TestDarwinKernelReadsOwnChild	darwin	-	-	the darwin kernel observer reads the exact proc_pidinfo tuple of the test's own child and refuses it once reaped
+internal/homelease	TestDarwinKernelRefusesZombie	darwin	-	-	the darwin kernel observer refuses a zombie child beside the live control
+internal/homelease	TestProductionBindObserverRows	linux,darwin	-	-	bind succeeds only when requested holder, authoritative observation and kernel reading agree; every refusal row preserves the prepared lease
+internal/homelease	TestRealKernelBindEndToEnd	linux,darwin	-	-	bind through the real kernel observer succeeds for the test's own live child and refuses shifted-start, other-boot, wrong-uid, zombie and vanished incarnations
+internal/homelease	TestObserverPlants	linux,darwin	-	-	each observer plant turns its named bind or ceiling test red while its positive control passes
+internal/homelease	TestProductionBindUnsupportedPlatform	windows	-	-	production bind refuses authority_unavailable on a platform with no native start-time variant
