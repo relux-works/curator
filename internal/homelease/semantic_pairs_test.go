@@ -165,14 +165,20 @@ func TestSemanticIndependentGenerationHolders(t *testing.T) {
 // exercises lifecycle decisions, not a production manager observation adapter.
 func TestSemanticEveryObservedHolderField(t *testing.T) {
 	for name, change := range map[string]func(*Holder){
-		"manager":       func(h *Holder) { h.ManagerID = "different-manager" },
-		"registration":  func(h *Holder) { h.ManagerRegisteredAt = "2026-10-27T00:01:00Z" },
-		"request":       func(h *Holder) { h.RequestID = "different-request" },
-		"werkstatt":     func(h *Holder) { s := "different-werkstatt"; h.Werkstatt = &s },
-		"session":       func(h *Holder) { s := "different-session"; h.Session = &s },
-		"generation":    func(h *Holder) { n := int64(8); h.Generation = &n },
-		"pid":           func(h *Holder) { p := *h.Process; p.PID = 124; h.Process = &p },
-		"process-start": func(h *Holder) { p := *h.Process; s := *p.StartTime; s.Ticks = "123456790"; p.StartTime = &s; h.Process = &p },
+		"manager":      func(h *Holder) { h.ManagerID = "different-manager" },
+		"registration": func(h *Holder) { h.ManagerRegisteredAt = "2026-10-27T00:01:00Z" },
+		"request":      func(h *Holder) { h.RequestID = "different-request" },
+		"werkstatt":    func(h *Holder) { s := "different-werkstatt"; h.Werkstatt = &s },
+		"session":      func(h *Holder) { s := "different-session"; h.Session = &s },
+		"generation":   func(h *Holder) { n := int64(8); h.Generation = &n },
+		"pid":          func(h *Holder) { p := *h.Process; p.PID = 124; h.Process = &p },
+		"process-start": func(h *Holder) {
+			p := *h.Process
+			s := *p.StartTime
+			s.Ticks = "123456790"
+			p.StartTime = &s
+			h.Process = &p
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture(t)
@@ -183,7 +189,11 @@ func TestSemanticEveryObservedHolderField(t *testing.T) {
 			f.o.proof.Holder = observed
 			before := snapshot(t, f.m.home)
 			_, _, err := f.m.Bind(context.Background(), r.LeaseID, 1, h)
-			requireRefusal(t, err, "environment_lease_holder_mismatch", "session_generation_changed")
+			reason := "session_generation_changed"
+			if name == "pid" || name == "process-start" {
+				reason = "process_incarnation_mismatch"
+			}
+			requireRefusal(t, err, "environment_lease_holder_mismatch", reason)
 			unchanged(t, before, f.m.home)
 			f.o.proof.Holder = h
 			out, reason, err := f.m.Bind(context.Background(), r.LeaseID, 1, h)
