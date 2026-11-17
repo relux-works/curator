@@ -173,6 +173,11 @@ func TestNativeHomeRenderedGuardChild(t *testing.T) {
 	if plant {
 		t.Setenv("HOME", origin)
 		t.Setenv("USERPROFILE", origin)
+		// TestMain pins provider overrides to its fixture home for
+		// ordinary tests; the plant resolves through unpinned HOME.
+		if err := os.Unsetenv("CLAUDE_CONFIG_DIR"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || (!plant && home == origin) {

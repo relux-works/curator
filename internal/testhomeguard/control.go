@@ -130,6 +130,15 @@ func Child(t *testing.T, resolve func() (string, error)) {
 		if err := os.Setenv("USERPROFILE", origin); err != nil {
 			t.Fatal(err)
 		}
+		// The plant simulates unpinned native-default resolution through
+		// HOME alone. A package TestMain may pin provider overrides to
+		// its own fixture home for ordinary tests; those deliberate pins
+		// are not the ambient default this control exercises.
+		for _, key := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR"} {
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	path, err := resolve()
 	if err != nil {
