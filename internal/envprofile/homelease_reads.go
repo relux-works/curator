@@ -2,28 +2,31 @@ package envprofile
 
 import (
 	"context"
-	"errors"
-	"os"
 	"path/filepath"
 
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
 // noPendingJournalEntries reports lock-free certainty that the shared
 // transaction journal root holds no durable pending intent at read time.
 func noPendingJournalEntries(home string) bool {
-	entries, err := os.ReadDir(filepath.Join(home, "state", "transactions", "v1"))
-	return errors.Is(err, os.ErrNotExist) || (err == nil && len(entries) == 0)
+	listing, err := stateread.ReadDir(filepath.Join(home, "state", "transactions", "v1"))
+	if err != nil {
+		return false
+	}
+	return listing.Kind == stateread.KindAbsent || len(listing.Entries) == 0
 }
 
 // Legacy homes still need pending-intent certainty for read-only callers. This
 // path neither provisions the new namespace nor imposes its private-file format
 // on existing unrelated transaction state. A missing lock cannot hide intent.
 func homeLeaseReadLegacy(home string, held *managerlock.Held) error {
-	if _, err := os.Lstat(filepath.Join(home, "state", "env-migration.json")); !errors.Is(err, os.ErrNotExist) {
+	migration, err := stateread.Lstat(filepath.Join(home, "state", "env-migration.json"))
+	if err != nil || migration.Kind != stateread.KindAbsent {
 		return state.LegacyPending(home)
 	}
 	var witness transaction.HomeLock

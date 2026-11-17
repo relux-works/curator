@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // GuardMutation is the transaction/recovery entry gate. The home-leases owner
@@ -85,29 +86,29 @@ func Overlap(a, b string) (bool, error) {
 	if !filepath.IsAbs(a) || !filepath.IsAbs(b) || filepath.Clean(a) != a || filepath.Clean(b) != b {
 		return false, fmt.Errorf("ambiguous lease path")
 	}
-	ai, ae := os.Stat(a)
-	bi, be := os.Stat(b)
-	if ae == nil && be == nil && os.SameFile(ai, bi) {
+	ao, _ := stateread.Stat(a)
+	bo, _ := stateread.Stat(b)
+	if ao.Kind == stateread.KindPresent && bo.Kind == stateread.KindPresent && os.SameFile(ao.Info, bo.Info) {
 		return true, nil
 	}
 	// A non-existing child of an existing case alias still belongs to that
 	// physical directory. Comparing cleaned path spellings would miss it on
 	// case-insensitive filesystems; inspect actual ancestor identity instead.
 	for _, pair := range [][2]string{{a, b}, {b, a}} {
-		base, err := os.Stat(pair[1])
+		base, err := stateread.Stat(pair[1])
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			return false, err
 		}
+		if base.Kind == stateread.KindAbsent {
+			continue
+		}
 		for parent := pair[0]; ; parent = filepath.Dir(parent) {
-			info, err := os.Stat(parent)
-			if err == nil && os.SameFile(base, info) {
-				return true, nil
-			}
-			if err != nil && !os.IsNotExist(err) {
+			observed, err := stateread.Stat(parent)
+			if err != nil {
 				return false, err
+			}
+			if observed.Kind == stateread.KindPresent && os.SameFile(base.Info, observed.Info) {
+				return true, nil
 			}
 			if parent == filepath.Dir(parent) {
 				break

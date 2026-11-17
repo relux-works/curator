@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/projectlease"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -37,9 +38,9 @@ func (m *Manager) List(ctx context.Context, environment, profile string) ([]Reco
 		}
 		if errors.Is(err, os.ErrNotExist) && !state.HasState(m.home) && !projectlease.HasState(m.home) {
 			// Missing lock is empty only if no journal inventory can be hidden.
-			_, pendingErr := os.Lstat(filepath.Join(m.home, "state", "transactions", "v1"))
-			_, legacyErr := os.Lstat(filepath.Join(m.home, "state", "env-migration.json"))
-			if errors.Is(pendingErr, os.ErrNotExist) && errors.Is(legacyErr, os.ErrNotExist) {
+			journal, journalErr := stateread.Lstat(filepath.Join(m.home, "state", "transactions", "v1"))
+			migration, migrationErr := stateread.Lstat(filepath.Join(m.home, "state", "env-migration.json"))
+			if journalErr == nil && migrationErr == nil && journal.Kind == stateread.KindAbsent && migration.Kind == stateread.KindAbsent {
 				return []Record{}, nil
 			}
 		}

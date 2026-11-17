@@ -1,9 +1,9 @@
 package state
 
 import (
-	"errors"
-	"os"
 	"path/filepath"
+
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 // LegacyPending retains the existing env-migration journal without reading
@@ -15,11 +15,11 @@ func LegacyPending(home string) error {
 	if err := CheckRoute(home, path); err != nil {
 		return Refuse("environment_lease_unreadable", "state_unreadable")
 	}
-	info, err := os.Lstat(path)
-	if errors.Is(err, os.ErrNotExist) {
+	observed, err := stateread.Lstat(path)
+	if err == nil && observed.Kind == stateread.KindAbsent {
 		return nil
 	}
-	if err != nil || !info.Mode().IsRegular() {
+	if err != nil || !observed.Info.Mode().IsRegular() {
 		return Refuse("environment_lease_unreadable", "state_unreadable")
 	}
 	return Refuse("environment_lease_recovery_required", "pending_mutation")

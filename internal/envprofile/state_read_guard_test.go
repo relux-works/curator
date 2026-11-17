@@ -197,6 +197,12 @@ func reviewedManagerReadExceptions() map[string]string {
 	allow("Checks the caller-selected capture-source destination after fetching and validating staged bytes; absence selects first publication, an existing tree must match exactly, and all other Lstat failures abort publication.",
 		"internal/harnessparity/cmd/capture-source/main.go:materialize",
 	)
+	allow("Test-only guard snapshots protected native homes it does not own: a missing inventory path is recorded as an absent identity, unreadable paths fail the snapshot, and no manager-state default is supplied.",
+		"internal/testhomeguard/guard.go:capture",
+	)
+	allow("Test-only guard narrows its own snapshot exemption: only a proven-absent SKILL.md beside registered runtime bucket files exempts the leaf, and every other inspection failure keeps the path protected.",
+		"internal/testhomeguard/guard.go:runtimeSkillMetadata",
+	)
 	allow("Reads kernel-owned /proc, not manager state; status, stat or exe can disappear between enumeration and read when a process exits. "+
 		"Strict scans skip vanished PIDs or stat-proven zombies/kernel threads and reject unexplained missing images; native scans preserve readable paths/inodes and independently probe removal candidates, "+
 		"so ENOENT alone never authorizes collection or supplies a manager-state default.",

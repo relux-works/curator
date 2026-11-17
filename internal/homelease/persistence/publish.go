@@ -13,6 +13,7 @@ import (
 
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
 )
 
@@ -141,17 +142,17 @@ func (d *publicationDirectories) makeAll(path string) error {
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return privatedir.MakeAll(path)
 	}
-	info, err := os.Lstat(path)
-	if err == nil {
+	observed, err := stateread.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if observed.Kind == stateread.KindPresent {
 		// The caller already admitted this route. Preserve existing directory
 		// permissions; only directories created here acquire a private mode.
-		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		if !observed.Info.IsDir() || observed.Info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("publication parent is not a real directory")
 		}
 		return nil
-	}
-	if !errors.Is(err, os.ErrNotExist) {
-		return err
 	}
 	if err := d.makeAll(filepath.Dir(path)); err != nil {
 		return err
@@ -159,10 +160,14 @@ func (d *publicationDirectories) makeAll(path string) error {
 	if err := privatedir.Make(path); err != nil {
 		return err
 	}
-	info, err = os.Lstat(path)
+	created, err := stateread.Lstat(path)
 	if err != nil {
 		return err
 	}
+	if created.Kind != stateread.KindPresent {
+		return stateread.AbsentError(path)
+	}
+	info := created.Info
 	// Complete Windows' deferred file identity while the created name is current.
 	if !os.SameFile(info, info) {
 		return fmt.Errorf("publication directory identity unavailable")

@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/protocoljson"
+	"github.com/relux-works/curator/internal/stateread"
 )
 
 func Namespace(home string) string  { return filepath.Join(home, "state", "home-leases", "v1") }
@@ -45,13 +46,14 @@ func CheckRoute(home, path string) error {
 	current := home
 	for _, component := range strings.Split(rel, string(filepath.Separator)) {
 		current = filepath.Join(current, component)
-		info, err := os.Lstat(current)
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
+		observed, err := stateread.Lstat(current)
 		if err != nil {
 			return err
 		}
+		if observed.Kind == stateread.KindAbsent {
+			return nil
+		}
+		info := observed.Info
 		if info.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("linked lease state")
 		}
@@ -93,11 +95,11 @@ func Read(home, path string) ([]byte, error) {
 
 func HasState(home string) bool {
 	for p := Namespace(home); p != home; p = filepath.Dir(p) {
-		info, err := os.Lstat(p)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		observed, err := stateread.Lstat(p)
+		if err != nil {
 			return true
 		}
-		if err == nil && (p == Namespace(home) || !info.IsDir()) {
+		if observed.Kind == stateread.KindPresent && (p == Namespace(home) || !observed.Info.IsDir()) {
 			return true
 		}
 	}
