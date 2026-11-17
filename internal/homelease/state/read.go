@@ -200,7 +200,7 @@ func DecodeLedger(home string, raw []byte, readArtifact func(string) ([]byte, er
 		}
 		for _, r := range []Record{e.Record, e.Initial} {
 			b, err := Canonical(r)
-			if err != nil || Validate("record", b) != nil {
+			if err != nil || Validate("record", b) != nil || ValidateHolderSemantics(r.Holder) != nil {
 				return nil, invalid()
 			}
 		}
