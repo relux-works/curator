@@ -53,7 +53,7 @@ func readLinuxProcess(pid int64, pass linuxPass) (state.Process, error) {
 	if err != nil {
 		return state.Process{}, err
 	}
-	pidBefore, ticksBefore, err := parseLinuxStat(statBefore)
+	pidBefore, stateBefore, ticksBefore, err := parseLinuxStat(statBefore)
 	if err != nil {
 		return state.Process{}, err
 	}
@@ -61,7 +61,7 @@ func readLinuxProcess(pid int64, pass linuxPass) (state.Process, error) {
 	if err != nil {
 		return state.Process{}, err
 	}
-	uid, err := parseLinuxStatusUID(status)
+	uid, tgid, err := parseLinuxStatus(status)
 	if err != nil {
 		return state.Process{}, err
 	}
@@ -69,9 +69,15 @@ func readLinuxProcess(pid int64, pass linuxPass) (state.Process, error) {
 	if err != nil {
 		return state.Process{}, err
 	}
-	pidAfter, ticksAfter, err := parseLinuxStat(statAfter)
+	pidAfter, stateAfter, ticksAfter, err := parseLinuxStat(statAfter)
 	if err != nil {
 		return state.Process{}, err
+	}
+	// A non-leader thread id and an exited-but-unreaped (zombie or dead)
+	// process are not a live incarnation Curator can bind to, even though
+	// their retained stat fields still parse.
+	if tgid != pid || stateBefore == "Z" || stateBefore == "X" || stateAfter == "Z" || stateAfter == "X" {
+		return state.Process{}, fmt.Errorf("process is a thread or has exited")
 	}
 	bootAfter, err := pass.bootID()
 	if err != nil {
@@ -95,44 +101,58 @@ func readLinuxProcess(pid int64, pass linuxPass) (state.Process, error) {
 	return process, nil
 }
 
-// parseLinuxStat extracts field 1 (pid) and field 22 (starttime ticks).
-// Field 2 (comm) may contain spaces and ")", so fields after it are counted
-// from the last ")": the first suffix token is field 3 and field 22 is the
-// twentieth suffix token.
-func parseLinuxStat(content []byte) (int64, string, error) {
+// parseLinuxStat extracts field 1 (pid), field 3 (state) and field 22
+// (starttime ticks). Field 2 (comm) may contain spaces and ")", so fields
+// after it are counted from the last ")": the first suffix token is field 3
+// and field 22 is the twentieth suffix token.
+func parseLinuxStat(content []byte) (int64, string, string, error) {
 	open := bytes.IndexByte(content, '(')
 	closeParen := bytes.LastIndexByte(content, ')')
 	if open < 1 || closeParen < open || closeParen+1 >= len(content) {
-		return 0, "", fmt.Errorf("unparseable process stat")
+		return 0, "", "", fmt.Errorf("unparseable process stat")
 	}
 	pidText := strings.TrimSpace(string(content[:open]))
 	pid, err := strconv.ParseInt(pidText, 10, 64)
 	if err != nil || pid < 1 {
-		return 0, "", fmt.Errorf("unparseable process stat pid")
+		return 0, "", "", fmt.Errorf("unparseable process stat pid")
 	}
 	suffix := strings.Fields(string(content[closeParen+1:]))
 	if len(suffix) < 20 {
-		return 0, "", fmt.Errorf("truncated process stat")
+		return 0, "", "", fmt.Errorf("truncated process stat")
 	}
-	return pid, suffix[19], nil
+	return pid, suffix[0], suffix[19], nil
 }
 
-func parseLinuxStatusUID(content []byte) (int64, error) {
+// parseLinuxStatus extracts the real uid (first Uid field) and the thread
+// group id, so a non-leader thread read can be told from its process.
+func parseLinuxStatus(content []byte) (int64, int64, error) {
+	uid, tgid := int64(-1), int64(-1)
 	for _, line := range strings.Split(string(content), "\n") {
-		if !strings.HasPrefix(line, "Uid:") {
-			continue
+		for _, field := range []struct {
+			prefix string
+			out    *int64
+		}{{"Uid:", &uid}, {"Tgid:", &tgid}} {
+			if !strings.HasPrefix(line, field.prefix) {
+				continue
+			}
+			fields := strings.Fields(strings.TrimPrefix(line, field.prefix))
+			if len(fields) < 1 {
+				return 0, 0, fmt.Errorf("unparseable process status %s", field.prefix)
+			}
+			value, err := strconv.ParseInt(fields[0], 10, 64)
+			if err != nil {
+				return 0, 0, fmt.Errorf("unparseable process status %s", field.prefix)
+			}
+			*field.out = value
 		}
-		fields := strings.Fields(strings.TrimPrefix(line, "Uid:"))
-		if len(fields) < 1 {
-			return 0, fmt.Errorf("unparseable process status uid")
-		}
-		uid, err := strconv.ParseInt(fields[0], 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("unparseable process status uid")
-		}
-		return uid, nil
 	}
-	return 0, fmt.Errorf("process status lacks uid")
+	if uid < 0 {
+		return 0, 0, fmt.Errorf("process status lacks uid")
+	}
+	if tgid < 1 {
+		return 0, 0, fmt.Errorf("process status lacks thread group id")
+	}
+	return uid, tgid, nil
 }
 
 type linuxProcPass struct{ dir *os.File }
