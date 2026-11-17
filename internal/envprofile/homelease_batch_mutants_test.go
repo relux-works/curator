@@ -33,12 +33,19 @@ func TestHomeLeaseBatchNarrowingMutants(t *testing.T) {
 			"\t\tif err := refusePreparedSkillPlanAdoption(home, name); err != nil {",
 			"\t\tif err := error(nil); err != nil {",
 			"TestPreparedPlanProbeOnBatchUpdateAndSync", "batch update probe:"},
-		// Dropping the sync entry probe must let sync run recovery and
-		// ensureDefault before the v5 refusal surfaces.
+		// Dropping the sync entry probe must let sync proceed past its
+		// entry -- into recovery and ensureDefault, whose
+		// migrateGlobalSkills fetch of the fixture's unreachable global
+		// skill fails first, or which creates the default profile --
+		// instead of refusing the v5 plan at the probe. Either way the
+		// test fails under its "sync" stage prefix ("sync probe:" for the
+		// wrong error, "sync: pre-recovery probe did not run first" for a
+		// created default), so the plant keys on that stage prefix; the
+		// ordering itself is asserted by the test's defaultAbsent check.
 		{"drop-sync-prepared-plan-probe",
 			"\tif err := refusePreparedSkillPlanAdoption(home, \"\"); err != nil {\n\t\treturn nil, nil, err, nil",
 			"\tif err := error(nil); err != nil {\n\t\treturn nil, nil, err, nil",
-			"TestPreparedPlanProbeOnBatchUpdateAndSync", "sync probe:"},
+			"TestPreparedPlanProbeOnBatchUpdateAndSync", "sync"},
 	}
 	controls := map[string]bool{}
 	for _, tc := range cases {

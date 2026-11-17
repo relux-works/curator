@@ -39,7 +39,11 @@ func (m *Manager) lookup(l *state.Ledger, id string) (state.Entry, bool, error) 
 
 // errSessionGenerationChanged marks a verifier's finding that the observed
 // holder identity differs from the requested bound holder in a member other
-// than the process tuple; bind maps it to its own closed row.
+// than the process tuple; bind maps it to its own closed row. Only
+// synthetic (test) verifiers produce this error: production VerifyBind
+// reports a session or generation divergence as unavailable instead, so
+// the session_generation_changed row out of verifyBind is reachable in
+// production only through the non-prepared-holder check in Bind.
 var errSessionGenerationChanged = errors.New("session generation changed")
 
 // verifyBind routes bind proof through a BindVerifier only: it compares

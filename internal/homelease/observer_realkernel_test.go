@@ -101,10 +101,10 @@ func TestRealKernelBindEndToEnd(t *testing.T) {
 	// only Curator's own kernel reading can refuse them.
 	rows := []struct {
 		name   string
-		mutate func(*state.Process)
+		mutate func(*testing.T, *state.Process)
 	}{
-		{"pid-reuse-shifted-start", func(p *state.Process) { shiftRealStart(t, p) }},
-		{"other-boot", func(p *state.Process) {
+		{"pid-reuse-shifted-start", func(t *testing.T, p *state.Process) { shiftRealStart(t, p) }},
+		{"other-boot", func(_ *testing.T, p *state.Process) {
 			boot := []byte(p.BootID)
 			if boot[0] == '0' {
 				boot[0] = '1'
@@ -113,12 +113,12 @@ func TestRealKernelBindEndToEnd(t *testing.T) {
 			}
 			p.BootID = string(boot)
 		}},
-		{"wrong-real-uid", func(p *state.Process) { p.UID++ }},
+		{"wrong-real-uid", func(_ *testing.T, p *state.Process) { p.UID++ }},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			fake := cloneProcess(&real)
-			row.mutate(fake)
+			row.mutate(t, fake)
 			f, r, h := realKernelBindSetup(t, cloneProcess(fake))
 			h.Process = fake
 			before := snapshot(t, f.m.home)
