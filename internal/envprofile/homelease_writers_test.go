@@ -146,14 +146,20 @@ func TestHomeLeaseNoncurrentRemoval(t *testing.T) {
 				t.Fatal(err)
 			}
 			m, lease := leaseManagedFixture(t, fx, envregistry.CodexCLI)
+			remove := func() error {
+				if purge {
+					return RemoveWithOptions(fx.home, fx.profile, RemoveOptions{Purge: true, ManagedOnly: true})
+				}
+				return Remove(fx.home, fx.profile, false)
+			}
 			before, _ := captureFixtureState(t, fx)
-			requireHomeLeaseRefusal(t, Remove(fx.home, fx.profile, purge), lease.LeaseID)
+			requireHomeLeaseRefusal(t, remove(), lease.LeaseID)
 			after, _ := captureFixtureState(t, fx)
 			if !bytes.Equal(before, after) {
 				t.Fatal("refused removal changed preimage")
 			}
 			breakFixtureLease(t, m, lease)
-			if err := Remove(fx.home, fx.profile, purge); err != nil {
+			if err := remove(); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := os.Lstat(ProfileDir(fx.home, fx.profile)); !os.IsNotExist(err) {
@@ -972,15 +978,16 @@ func TestHomeLeaseCredentialLinkRepair(t *testing.T) {
 	}
 }
 
-// W06: actual install/import --use and automatic first activation refuse
-// before publishing a new profile when they affect a leased old profile or
-// a physical native-home alias. Nonactivating installs/imports and the same
-// activation after break actually publish; an aliased target is then named
-// directly to satisfy the independent native route gate. Disjoint protection stays.
+// W06: actual install/import --use activation refuses before publishing a
+// new profile when it affects a leased old profile or a physical native-home
+// alias of one. Registration-only installs/imports (current main has no
+// automatic first activation) and the same activation after break actually
+// publish; an aliased target is then named directly to satisfy the
+// independent native route gate. Disjoint protection stays.
 // All import/native inputs are synthetic; no provider is launched.
 func TestHomeLeaseInstallImportActivation(t *testing.T) {
 	for _, operation := range []string{"install", "import"} {
-		for _, activation := range []string{"use", "first-alias"} {
+		for _, activation := range []string{"use", "use-alias"} {
 			t.Run(operation+"/"+activation, func(t *testing.T) {
 				fx, m, lease := leasedManagedFixture(t)
 				checkDisjoint := preserveDisjointHomeLease(t, fx)
@@ -1015,10 +1022,7 @@ func TestHomeLeaseInstallImportActivation(t *testing.T) {
 					t.Fatal("disjoint install changed target reservation", err)
 				}
 				checkDisjoint()
-				if activation == "first-alias" {
-					if err := os.Remove(CurrentFile(fx.home)); err != nil {
-						t.Fatal(err)
-					}
+				if activation == "use-alias" {
 					alias := filepath.Join(t.TempDir(), "native-alias")
 					if err := os.Symlink(ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI), alias); err != nil {
 						t.Fatal(err)
@@ -1026,7 +1030,7 @@ func TestHomeLeaseInstallImportActivation(t *testing.T) {
 					t.Setenv("CODEX_HOME", alias)
 				}
 				before, _ := captureFixtureState(t, fx)
-				_, _, err = write("activation-target", activation == "use")
+				_, _, err = write("activation-target", true)
 				requireHomeLeaseRefusal(t, err, lease.LeaseID)
 				after, _ := captureFixtureState(t, fx)
 				if !bytes.Equal(before, after) {
@@ -1036,12 +1040,12 @@ func TestHomeLeaseInstallImportActivation(t *testing.T) {
 					t.Fatal("refused profile was published", err)
 				}
 				breakFixtureLease(t, m, lease)
-				if activation == "first-alias" {
+				if activation == "use-alias" {
 					// The native writer independently refuses a symlinked home.
 					// Its valid positive uses the same physical target directly.
 					t.Setenv("CODEX_HOME", ManagedHomeDir(fx.home, fx.profile, envregistry.CodexCLI))
 				}
-				info, activated, err = write("activation-target", activation == "use")
+				info, activated, err = write("activation-target", true)
 				if err != nil || !activated || info.Name != "activation-target" {
 					t.Fatalf("activation control: name=%s activated=%t entries=%+v err=%v", info.Name, activated, info.Activation, err)
 				}
