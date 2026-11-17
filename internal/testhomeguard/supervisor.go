@@ -83,7 +83,14 @@ func Supervise(fixtureChild bool) (int, bool) {
 		fmt.Fprintln(os.Stderr, "testhomeguard: child observer handoff not verified")
 		code = 2
 	}
-	return g.Finish(code), true
+	finished := g.Finish(code)
+	// A child killed by a signal must stay signal-killed for the caller:
+	// converting it to an ordinary exit code would falsify the wait status
+	// of tests that assert signal disposition. A guard failure dominates.
+	if sig, signaled := signaledExit(waitErr); signaled && authErr == nil && finished == code {
+		reraiseSignal(sig)
+	}
+	return finished, true
 }
 
 // ControlProcess distinguishes an ambient-isolation control from a fixture
