@@ -41,6 +41,25 @@ func TestObserverPlants(t *testing.T) {
 		{"drop-uid-ceiling", "internal/homelease/state/process.go",
 			"if p.UID < 0 || p.UID > 4294967294 {", "if p.UID < 0 {",
 			"./internal/homelease/state", "TestProcessSemanticCeilings", "value above its ceiling accepted"},
+		// Trusting the manager's assertion instead of the real kernel must
+		// let a shifted-start tuple for the live child bind end to end.
+		{"real-kernel-trusts-manager", "internal/homelease/observer.go",
+			"observed, err := kernel(requested.Process.PID)", "observed, err := *requested.Process, error(nil)",
+			"./internal/homelease", "TestRealKernelBindEndToEnd", "wanted environment_lease_holder_mismatch/process_incarnation_mismatch"},
+		// Letting a non-verifier observer bind must revive proof by
+		// manager-shaped Observe evidence alone.
+		{"bind-trusts-observe-only", "internal/homelease/lifecycle.go",
+			"verifier, ok := m.observer.(BindVerifier)\n\tif !ok {", "verifier, ok := m.observer.(BindVerifier)\n\tif !ok { return nil } else if false {",
+			"./internal/homelease", "TestBindRefusesObserverWithoutBindVerifier", "wanted environment_lease_authority_refused/authority_unavailable"},
+		// Leaving the v2 session object open must admit an unknown member.
+		{"session-object-open", "internal/homelease/observation/observation_v2.go",
+			"if err != nil || !closedSession(session) {", "if err != nil {",
+			"./internal/homelease/observation", "TestParseV2Refusals", "forbidden v2 observation accepted"},
+		// Skipping holder semantics on ledger decode must admit a stored
+		// tuple above the uint64 ceiling.
+		{"ledger-skips-ceilings", "internal/homelease/state/read.go",
+			"|| ValidateHolderSemantics(r.Holder) != nil {", "{",
+			"./internal/homelease/state", "TestDecodeLedgerAppliesSemanticCeilings", "stored holder above the semantic ceiling decoded"},
 	}
 	controls := map[string]bool{}
 	for _, tc := range cases {
