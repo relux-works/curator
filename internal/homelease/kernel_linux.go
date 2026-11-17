@@ -20,6 +20,11 @@ import (
 // the contract maps it to the mismatch row, never to a retried success.
 var errKernelChanged = errors.New("kernel incarnation changed during observation pass")
 
+// errProcessExited is the exact kernel-level refusal for a zombie or dead
+// process; VerifyBind maps it to
+// environment_lease_authority_refused/authority_unavailable.
+var errProcessExited = errors.New("process has exited")
+
 func nativeStartTimeKind() string { return state.StartLinux }
 
 // linuxPass is the injectable source set for one Linux observation pass, so
@@ -73,11 +78,17 @@ func readLinuxProcess(pid int64, pass linuxPass) (state.Process, error) {
 	if err != nil {
 		return state.Process{}, err
 	}
-	// A non-leader thread id and an exited-but-unreaped (zombie or dead)
-	// process are not a live incarnation Curator can bind to, even though
-	// their retained stat fields still parse.
-	if tgid != pid || stateBefore == "Z" || stateBefore == "X" || stateAfter == "Z" || stateAfter == "X" {
-		return state.Process{}, fmt.Errorf("process is a thread or has exited")
+	// A non-leader thread id is not a live incarnation Curator can bind
+	// to, even though its retained stat fields still parse. This check
+	// stands alone so its plant anchor proves the thread row by itself.
+	if tgid != pid {
+		return state.Process{}, fmt.Errorf("process is a thread")
+	}
+	// An exited-but-unreaped (zombie or dead) process is not a live
+	// incarnation either. This check likewise stands alone, so its plant
+	// anchor proves the zombie row without the thread row dying first.
+	if stateBefore == "Z" || stateBefore == "X" || stateAfter == "Z" || stateAfter == "X" {
+		return state.Process{}, errProcessExited
 	}
 	bootAfter, err := pass.bootID()
 	if err != nil {

@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/relux-works/curator/internal/homelease/state"
+	"golang.org/x/sys/unix"
 )
 
 // Claim: stat field 22 is counted after the last ")" of comm, so a comm
@@ -165,30 +166,66 @@ func TestLinuxKernelReadsOwnChild(t *testing.T) {
 	}
 }
 
-// Claim: the kernel read refuses a non-leader thread id and a zombie child, while the thread-group leader and the live child beside them read normally.
+// parkedThreadID holds dedicated OS threads with runtime.LockOSThread,
+// parked until the returned release runs, and hands back a non-leader tid
+// that is guaranteed alive for the read. Picking an arbitrary entry from
+// /proc/self/task instead could name a Go runtime thread that exits before
+// the read, refusing with ENOENT for the wrong reason and sparing the
+// thread plant by flake.
+func parkedThreadID(t *testing.T) (int64, func()) {
+	t.Helper()
+	self := int64(os.Getpid())
+	type parked struct {
+		release chan struct{}
+		done    chan struct{}
+	}
+	var threads []parked
+	releaseAll := func() {
+		for _, th := range threads {
+			close(th.release)
+			<-th.done
+		}
+	}
+	// Only one OS thread has tid == pid (the leader), so parking several
+	// locked threads yields a live non-leader tid among them.
+	tid := int64(-1)
+	for i := 0; i < 4 && tid < 0; i++ {
+		th := parked{release: make(chan struct{}), done: make(chan struct{})}
+		idCh := make(chan int64, 1)
+		go func() {
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+			idCh <- int64(unix.Gettid())
+			<-th.release
+			close(th.done)
+		}()
+		threads = append(threads, th)
+		if id := <-idCh; id != self {
+			tid = id
+		}
+	}
+	if tid < 0 {
+		releaseAll()
+		t.Fatal("no parked non-leader thread to refuse")
+	}
+	return tid, releaseAll
+}
+
+// Claim: the kernel read refuses a non-leader thread id and a zombie child with their exact refusals, while the thread-group leader and the live child beside them read normally.
 func TestLinuxKernelRefusesThreadAndZombie(t *testing.T) {
 	// Valid control: this process is its own thread-group leader.
 	self, err := readKernelProcess(int64(os.Getpid()))
 	if err != nil || self.PID != int64(os.Getpid()) {
 		t.Fatalf("leader control: %+v %v", self, err)
 	}
-	entries, err := os.ReadDir("/proc/self/task")
-	if err != nil {
-		t.Fatal(err)
-	}
-	tid := int64(-1)
-	for _, entry := range entries {
-		id, err := strconv.ParseInt(entry.Name(), 10, 64)
-		if err == nil && id != int64(os.Getpid()) {
-			tid = id
-			break
-		}
-	}
-	if tid < 0 {
-		t.Fatal("test process has no non-leader thread to refuse")
-	}
-	if _, err := readKernelProcess(tid); err == nil {
+	tid, releaseThreads := parkedThreadID(t)
+	_, threadErr := readKernelProcess(tid)
+	releaseThreads()
+	if threadErr == nil {
 		t.Fatalf("thread id %d produced a process tuple", tid)
+	}
+	if !strings.Contains(threadErr.Error(), "process is a thread") {
+		t.Fatalf("thread id %d refusal is not the exact thread refusal: %v", tid, threadErr)
 	}
 
 	sleep, err := exec.LookPath("sleep")
@@ -228,6 +265,9 @@ func TestLinuxKernelRefusesThreadAndZombie(t *testing.T) {
 	if _, err := readKernelProcess(pid); err == nil {
 		_ = cmd.Wait()
 		t.Fatal("zombie child still produced a tuple")
+	} else if !errors.Is(err, errProcessExited) {
+		_ = cmd.Wait()
+		t.Fatalf("zombie refusal is not the exact exited refusal: %v", err)
 	}
 	_ = cmd.Wait()
 }
