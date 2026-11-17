@@ -26,10 +26,12 @@ const (
 	procInfoCallPidInfo = 2   // PROC_INFO_CALL_PIDINFO
 	procPidTBSDInfo     = 3   // PROC_PIDTBSDINFO
 	procBsdInfoSize     = 136 // sizeof(struct proc_bsdinfo)
+	bsdInfoOffStatus    = 4
 	bsdInfoOffPID       = 12
 	bsdInfoOffRUID      = 28
 	bsdInfoOffStartSec  = 120
 	bsdInfoOffStartUsec = 128
+	procStatusZombie    = 5 // SZOMB in <sys/proc.h>
 )
 
 func readKernelProcess(pid int64) (state.Process, error) {
@@ -51,6 +53,11 @@ func readKernelProcess(pid int64) (state.Process, error) {
 	gotPID := int64(binary.LittleEndian.Uint32(info[bsdInfoOffPID:]))
 	if gotPID != pid {
 		return state.Process{}, errKernelChanged
+	}
+	// A zombie has exited; its retained start time is not a live
+	// incarnation Curator can bind to.
+	if binary.LittleEndian.Uint32(info[bsdInfoOffStatus:]) == procStatusZombie {
+		return state.Process{}, fmt.Errorf("process has exited")
 	}
 	uid := int64(binary.LittleEndian.Uint32(info[bsdInfoOffRUID:]))
 	sec := binary.LittleEndian.Uint64(info[bsdInfoOffStartSec:])

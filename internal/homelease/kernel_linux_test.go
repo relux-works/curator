@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/homelease/state"
 )
@@ -24,7 +26,7 @@ func TestLinuxStatCommLastParenthesis(t *testing.T) {
 	}
 	suffix[19] = "987654321"
 	line := "4242 (weird ) comm name) " + strings.Join(suffix, " ") + "\n"
-	pid, ticks, err := parseLinuxStat([]byte(line))
+	pid, _, ticks, err := parseLinuxStat([]byte(line))
 	if err != nil || pid != 4242 || ticks != "987654321" {
 		t.Fatalf("valid control with hostile comm: %d %q %v", pid, ticks, err)
 	}
@@ -34,7 +36,7 @@ func TestLinuxStatCommLastParenthesis(t *testing.T) {
 		"empty":          "",
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, _, err := parseLinuxStat([]byte(bad)); err == nil {
+			if _, _, _, err := parseLinuxStat([]byte(bad)); err == nil {
 				t.Fatal("unparseable stat accepted")
 			}
 		})
@@ -92,7 +94,7 @@ func TestLinuxPassIncarnationChanged(t *testing.T) {
 		return &fakeLinuxPass{
 			boots:    []string{boot, boot},
 			stats:    []string{linuxStatLine(4242, "111"), linuxStatLine(4242, "111")},
-			statuses: []string{"Name:\tfixture\nUid:\t1001\t1001\t1001\t1001\n"},
+			statuses: []string{"Name:\tfixture\nTgid:\t4242\nUid:\t1001\t1001\t1001\t1001\n"},
 		}
 	}
 	process, err := readLinuxProcess(4242, stable())
@@ -128,7 +130,7 @@ func TestLinuxPassIncarnationChanged(t *testing.T) {
 func TestLinuxKernelReadsOwnChild(t *testing.T) {
 	sleep, err := exec.LookPath("sleep")
 	if err != nil {
-		t.Skip("no sleep binary for an owned child fixture")
+		t.Fatalf("owned child fixture requires a sleep binary: %v", err)
 	}
 	cmd := exec.Command(sleep, "30")
 	if err := cmd.Start(); err != nil {
@@ -161,4 +163,71 @@ func TestLinuxKernelReadsOwnChild(t *testing.T) {
 	if _, err := readKernelProcess(pid); err == nil {
 		t.Fatal("vanished child still produced a tuple")
 	}
+}
+
+// Claim: the kernel read refuses a non-leader thread id and a zombie child, while the thread-group leader and the live child beside them read normally.
+func TestLinuxKernelRefusesThreadAndZombie(t *testing.T) {
+	// Valid control: this process is its own thread-group leader.
+	self, err := readKernelProcess(int64(os.Getpid()))
+	if err != nil || self.PID != int64(os.Getpid()) {
+		t.Fatalf("leader control: %+v %v", self, err)
+	}
+	entries, err := os.ReadDir("/proc/self/task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tid := int64(-1)
+	for _, entry := range entries {
+		id, err := strconv.ParseInt(entry.Name(), 10, 64)
+		if err == nil && id != int64(os.Getpid()) {
+			tid = id
+			break
+		}
+	}
+	if tid < 0 {
+		t.Fatal("test process has no non-leader thread to refuse")
+	}
+	if _, err := readKernelProcess(tid); err == nil {
+		t.Fatalf("thread id %d produced a process tuple", tid)
+	}
+
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Fatalf("owned child fixture requires a sleep binary: %v", err)
+	}
+	cmd := exec.Command(sleep, "30")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	pid := int64(cmd.Process.Pid)
+	// Valid control: the live child reads normally before it is killed.
+	if _, err := readKernelProcess(pid); err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("live child control: %v", err)
+	}
+	if err := cmd.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	// The unreaped child is a zombie; poll its stat until the kernel says
+	// so, then the production read must refuse rather than reuse its tuple.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		raw, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+		if err == nil {
+			if fields := strings.Fields(string(raw[strings.LastIndex(string(raw), ")")+1:])); len(fields) > 0 && fields[0] == "Z" {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			_ = cmd.Wait()
+			t.Fatal("killed child never became a zombie")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, err := readKernelProcess(pid); err == nil {
+		_ = cmd.Wait()
+		t.Fatal("zombie child still produced a tuple")
+	}
+	_ = cmd.Wait()
 }
