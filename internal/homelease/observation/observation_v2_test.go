@@ -112,8 +112,10 @@ func TestParseV2Refusals(t *testing.T) {
 		"legacy process member": func(doc map[string]any) {
 			sessionOf(doc)["process"] = map[string]any{"pid": float64(4242), "started_at": "2026-10-27T00:00:00Z"}
 		},
-		"extra envelope member": func(doc map[string]any) { doc["extra"] = true },
-		"v1 schema string":      func(doc map[string]any) { doc["schema"] = "curator-run-session-observation-v1" },
+		"extra envelope member":  func(doc map[string]any) { doc["extra"] = true },
+		"v1 schema string":       func(doc map[string]any) { doc["schema"] = "curator-run-session-observation-v1" },
+		"unknown session member": func(doc map[string]any) { sessionOf(doc)["bogus"] = true },
+		"missing session member": func(doc map[string]any) { delete(sessionOf(doc), "doorbell") },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {

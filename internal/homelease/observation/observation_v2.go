@@ -92,7 +92,7 @@ func ParseV2(raw []byte) (RecordV2, error) {
 		return out, invalid
 	}
 	session, err := objectFields(envelope["session"])
-	if err != nil {
+	if err != nil || !closedSession(session) {
 		return out, invalid
 	}
 	if out.Session.Session, err = stringMember(session, "session"); err != nil || !v2SessionID.MatchString(out.Session.Session) {
@@ -149,6 +149,32 @@ func ParseV2(raw []byte) (RecordV2, error) {
 		out.Session.Termination = &termination
 	}
 	return out, nil
+}
+
+// sessionRequired is the closed member set every session-record carries
+// (readable and unreadable variants alike, per the vendored schema);
+// sessionOptional adds the conditional draining member and the two v2
+// evidence members. A session object with a member outside this union, or
+// missing a required one, is not a session-record observation at all.
+var sessionRequired = []string{"session", "operation_id", "manager", "runtime", "native_id", "readable", "state", "labels", "generation", "started_at", "last_activity_at", "doorbell"}
+var sessionOptional = []string{"draining", "process", "termination"}
+
+func closedSession(session map[string]json.RawMessage) bool {
+	allowed := make(map[string]bool, len(sessionRequired)+len(sessionOptional))
+	for _, member := range append(append([]string{}, sessionRequired...), sessionOptional...) {
+		allowed[member] = true
+	}
+	for member := range session {
+		if !allowed[member] {
+			return false
+		}
+	}
+	for _, member := range sessionRequired {
+		if _, ok := session[member]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func objectFields(raw []byte) (map[string]json.RawMessage, error) {
