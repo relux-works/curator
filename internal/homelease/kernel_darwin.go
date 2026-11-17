@@ -30,8 +30,6 @@ const (
 	bsdInfoOffRUID       = 28
 	bsdInfoOffStartSec   = 120
 	bsdInfoOffStartUsec  = 128
-	bsdInfoFieldPID      = "pbi_pid"
-	bsdInfoFieldStartSec = "pbi_start_tvsec"
 )
 
 func readKernelProcess(pid int64) (state.Process, error) {
