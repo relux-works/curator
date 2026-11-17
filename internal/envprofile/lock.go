@@ -49,7 +49,9 @@ var newOperationEngine = func(home string, options ...transaction.Option) (*tran
 		}
 		return guardProjectLeaseJournal(home, lock, journal)
 	}
-	return transaction.New(home, append(options, transaction.WithCommitCheck(check))...)
+	// The lease dispatch is the base policy; a caller-supplied final check
+	// (admission revalidation plus this dispatch) overrides it, as on main.
+	return transaction.New(home, append([]transaction.Option{transaction.WithCommitCheck(check)}, options...)...)
 }
 
 // Foreign publication and the complete recovery inventory use the same physical
