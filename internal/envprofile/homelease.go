@@ -427,7 +427,14 @@ func UpdateProfilesWithOptions(home string, names []string, options UpdateOption
 		info, moved, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile, options.RootRequirement, nil, true)
 		if compensate {
 			if err != nil && op.undo != nil {
-				err = errors.Join(err, op.undo.restore())
+				// Compensation is a writer too: validate the complete
+				// rollback set against the lease guard before restoring
+				// a single surface, as GlobalSkillTransaction does.
+				if guardErr := homeLeaseGuardUndo(op); guardErr != nil {
+					err = errors.Join(err, guardErr)
+				} else {
+					err = errors.Join(err, op.undo.restore())
+				}
 			}
 			op.undo = nil
 		}

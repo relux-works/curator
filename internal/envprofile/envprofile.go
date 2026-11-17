@@ -1272,7 +1272,14 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (info Info, mov
 		op.undo = &globalUndo{entries: map[string]*globalImage{}, managerHome: home}
 		defer func() {
 			if resultErr != nil {
-				resultErr = errors.Join(resultErr, op.undo.restore())
+				// Compensation is a writer too: validate the complete
+				// rollback set against the lease guard before restoring
+				// a single surface, as GlobalSkillTransaction does.
+				if guardErr := homeLeaseGuardUndo(op); guardErr != nil {
+					resultErr = errors.Join(resultErr, guardErr)
+				} else {
+					resultErr = errors.Join(resultErr, op.undo.restore())
+				}
 			}
 		}()
 	}
