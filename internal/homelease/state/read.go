@@ -221,8 +221,12 @@ func DecodeLedger(home string, raw []byte, readArtifact func(string) ([]byte, er
 			return nil, invalid()
 		}
 		reservation := e.Record.Holder
+		initial := e.Initial.Holder
+		// Process data is not reservation identity: a prepared holder may
+		// carry the legacy form, and bind replaces it with the tuple.
 		reservation.Kind, reservation.Session, reservation.Generation, reservation.Process = "prepared", nil, nil, nil
-		if !reflect.DeepEqual(reservation, e.Initial.Holder) {
+		initial.Process = nil
+		if !reflect.DeepEqual(reservation, initial) {
 			return nil, invalid()
 		}
 		if e.Record.Holder.Kind == "bound" {

@@ -138,7 +138,7 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (out Outcome, reason
 		return out, "", state.Refuse("usage", "invalid_selector")
 	}
 	raw, er := state.Canonical(req.Holder)
-	if er != nil || state.Validate("holder", raw) != nil || req.Holder.Kind != "prepared" || req.Holder.RequestID != req.RequestID {
+	if er != nil || state.Validate("holder", raw) != nil || req.Holder.Kind != "prepared" || req.Holder.RequestID != req.RequestID || state.ValidateHolderSemantics(req.Holder) != nil {
 		return out, "", state.Refuse("usage", "invalid_holder")
 	}
 	payload, er := state.Canonical(req)

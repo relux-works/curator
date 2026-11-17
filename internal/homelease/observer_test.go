@@ -26,6 +26,8 @@ func observationFixture(t *testing.T) map[string]any {
 	m := r["manager"].(map[string]any)
 	m["id"] = "manager-1"
 	m["registered_at"] = "2026-10-27T00:00:00Z"
+	r["schema"] = "curator-run-session-observation-v2"
+	r["capabilities"] = map[string]any{"process_observation": false}
 	s := r["session"].(map[string]any)
 	s["manager"] = "manager-1"
 	s["session"] = "SES-fixture"
@@ -161,7 +163,7 @@ func TestProductionObserverRetainsUnprovenLease(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if string(args) != "session-manager\nobserve\nmanager-1\n--session\nSES-fixture\n--json\n" {
+				if string(args) != "session-manager\nobserve\nmanager-1\n--session\nSES-fixture\n--json\n--schema\nv2\n--expect-registered-at\n2026-10-27T00:00:00Z\n--expect-generation\n7\n" {
 					t.Fatalf("wrong command: %q", args)
 				}
 			} else if _, err := os.Stat(calls); !os.IsNotExist(err) {

@@ -37,6 +37,38 @@ func (m *Manager) lookup(l *state.Ledger, id string) (state.Entry, bool, error) 
 	return e, false, nil
 }
 
+// verifyBind routes bind proof through the independent observer only. A
+// BindVerifier compares the requested tuple with the authoritative
+// observation and Curator's own kernel reading; the plain Observer path
+// remains for explicitly synthetic evidence in store tests. Unavailable
+// evidence and incarnation mismatch keep their separate closed rows.
+func (m *Manager) verifyBind(ctx context.Context, prepared, requested Holder) error {
+	if m.observer == nil {
+		return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
+	}
+	if verifier, ok := m.observer.(BindVerifier); ok {
+		err := verifier.VerifyBind(ctx, prepared, requested)
+		if errors.Is(err, ErrProcessIncarnationMismatch) {
+			return state.Refuse("environment_lease_holder_mismatch", "process_incarnation_mismatch")
+		}
+		if err != nil {
+			return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
+		}
+		return nil
+	}
+	observed, err := m.observer.Observe(ctx, requested)
+	if err != nil {
+		return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
+	}
+	if !state.ProcessEqual(observed.Holder.Process, requested.Process) {
+		return state.Refuse("environment_lease_holder_mismatch", "process_incarnation_mismatch")
+	}
+	if !reflect.DeepEqual(observed.Holder, requested) {
+		return state.Refuse("environment_lease_holder_mismatch", "session_generation_changed")
+	}
+	return nil
+}
+
 func (m *Manager) Bind(ctx context.Context, id string, revision int64, holder Holder) (out Outcome, reason string, err error) {
 	if !state.ValidID(id) {
 		return out, "", state.Refuse("usage", "invalid_selector")
@@ -45,7 +77,7 @@ func (m *Manager) Bind(ctx context.Context, id string, revision int64, holder Ho
 		return out, "", state.Refuse("usage", "revision_required")
 	}
 	raw, er := state.Canonical(holder)
-	if er != nil || state.Validate("holder", raw) != nil || holder.Kind != "bound" {
+	if er != nil || state.Validate("holder", raw) != nil || holder.Kind != "bound" || state.ValidateHolderSemantics(holder) != nil {
 		return out, "", state.Refuse("usage", "invalid_holder")
 	}
 	err = m.withState(ctx, func(l *state.Ledger, lock *managerlock.HomeLock, engine *transaction.Engine) error {
@@ -61,6 +93,12 @@ func (m *Manager) Bind(ctx context.Context, id string, revision int64, holder Ho
 			return state.Refuse("environment_lease_revision_conflict", "revision_changed")
 		}
 		if e.BindRevision != nil && *e.BindRevision == revision && reflect.DeepEqual(e.Record.Holder, holder) {
+			// A historical bind outcome is returned only while fresh
+			// independent observation still matches; replay never bypasses
+			// the observer, and its refusal leaves the record unchanged.
+			if err := m.verifyBind(ctx, e.Initial.Holder, holder); err != nil {
+				return err
+			}
 			r := e.Record
 			out.Lease = &r
 			reason = "bound"
@@ -78,15 +116,8 @@ func (m *Manager) Bind(ctx context.Context, id string, revision int64, holder Ho
 		if e.Record.Holder.Kind != "prepared" {
 			return state.Refuse("environment_lease_holder_mismatch", "session_generation_changed")
 		}
-		if m.observer == nil {
-			return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
-		}
-		observed, err := m.observer.Observe(ctx, holder)
-		if err != nil {
-			return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
-		}
-		if !reflect.DeepEqual(observed.Holder, holder) {
-			return state.Refuse("environment_lease_holder_mismatch", "session_generation_changed")
+		if err := m.verifyBind(ctx, e.Record.Holder, holder); err != nil {
+			return err
 		}
 		e.BindRevision = &revision
 		e.Record.Holder = holder
