@@ -37,34 +37,33 @@ func (m *Manager) lookup(l *state.Ledger, id string) (state.Entry, bool, error) 
 	return e, false, nil
 }
 
-// verifyBind routes bind proof through the independent observer only. A
-// BindVerifier compares the requested tuple with the authoritative
-// observation and Curator's own kernel reading; the plain Observer path
-// remains for explicitly synthetic evidence in store tests. Unavailable
+// errSessionGenerationChanged marks a verifier's finding that the observed
+// holder identity differs from the requested bound holder in a member other
+// than the process tuple; bind maps it to its own closed row.
+var errSessionGenerationChanged = errors.New("session generation changed")
+
+// verifyBind routes bind proof through a BindVerifier only: it compares
+// the requested tuple with the authoritative observation and Curator's own
+// kernel reading. An observer that cannot verify binds fails closed, so
+// manager-shaped Observe evidence alone is never proof. Unavailable
 // evidence and incarnation mismatch keep their separate closed rows.
 func (m *Manager) verifyBind(ctx context.Context, prepared, requested Holder) error {
 	if m.observer == nil {
 		return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
 	}
-	if verifier, ok := m.observer.(BindVerifier); ok {
-		err := verifier.VerifyBind(ctx, prepared, requested)
-		if errors.Is(err, ErrProcessIncarnationMismatch) {
-			return state.Refuse("environment_lease_holder_mismatch", "process_incarnation_mismatch")
-		}
-		if err != nil {
-			return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
-		}
-		return nil
-	}
-	observed, err := m.observer.Observe(ctx, requested)
-	if err != nil {
+	verifier, ok := m.observer.(BindVerifier)
+	if !ok {
 		return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
 	}
-	if !state.ProcessEqual(observed.Holder.Process, requested.Process) {
+	err := verifier.VerifyBind(ctx, prepared, requested)
+	if errors.Is(err, ErrProcessIncarnationMismatch) {
 		return state.Refuse("environment_lease_holder_mismatch", "process_incarnation_mismatch")
 	}
-	if !reflect.DeepEqual(observed.Holder, requested) {
+	if errors.Is(err, errSessionGenerationChanged) {
 		return state.Refuse("environment_lease_holder_mismatch", "session_generation_changed")
+	}
+	if err != nil {
+		return state.Refuse("environment_lease_authority_refused", "authority_unavailable")
 	}
 	return nil
 }

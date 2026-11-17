@@ -34,6 +34,22 @@ type fixtureObserver struct {
 
 func (f *fixtureObserver) Observe(context.Context, Holder) (Evidence, error) { return f.proof, f.err }
 
+// VerifyBind is the fixture's explicit synthetic bind verification: it
+// mirrors the refusal classes of the production verifier without claiming
+// a kernel reading. Store tests that need bind use this, never Observe.
+func (f *fixtureObserver) VerifyBind(_ context.Context, _, requested Holder) error {
+	if f.err != nil {
+		return f.err
+	}
+	if !state.ProcessEqual(f.proof.Holder.Process, requested.Process) {
+		return ErrProcessIncarnationMismatch
+	}
+	if !reflect.DeepEqual(f.proof.Holder, requested) {
+		return errSessionGenerationChanged
+	}
+	return nil
+}
+
 type fixture struct {
 	m   *Manager
 	a   *fixtureAuthority
