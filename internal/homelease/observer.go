@@ -133,12 +133,17 @@ func (o sessionManagerObserver) VerifyBind(ctx context.Context, prepared, reques
 		}
 		return errObservationUnavailable
 	}
-	if !state.ProcessEqual(record.Session.Process, requested.Process) ||
-		!state.StartTimeEqual(observed.StartTime, requested.Process.StartTime) ||
-		!state.ProcessEqual(&observed, requested.Process) {
+	if !state.ProcessEqual(record.Session.Process, requested.Process) || !kernelProcessEqual(observed, *requested.Process) {
 		return ErrProcessIncarnationMismatch
 	}
 	return nil
+}
+
+// kernelProcessEqual compares Curator's own reading field by field, with
+// the tagged birth identity as its own comparison step.
+func kernelProcessEqual(kernel, requested state.Process) bool {
+	return kernel.PID == requested.PID && kernel.UID == requested.UID &&
+		kernel.BootID == requested.BootID && state.StartTimeEqual(kernel.StartTime, requested.StartTime)
 }
 
 // Observe serves release reconciliation only. The first use adds no release

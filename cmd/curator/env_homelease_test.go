@@ -87,7 +87,7 @@ func TestEnvLeaseCLIWriterAndTerminalReplay(t *testing.T) {
 	writeNativeCredentials(t) // Synthetic provider roots from profileHome only.
 	pkg := t.TempDir()
 	writeContextPackage(t, pkg, "acme", "1.0.0", "lease CLI control\n")
-	for _, args := range [][]string{{"profile", "install", pkg}, {"env", "resolve", "codex_cli", "--repair"}} {
+	for _, args := range [][]string{{"profile", "install", pkg, "--use"}, {"env", "resolve", "codex_cli", "--repair"}} {
 		if code, _, stderr := runProfile(t, source, args...); code != exitOK {
 			t.Fatalf("fixture command %q: %d %s", args[0], code, stderr)
 		}
