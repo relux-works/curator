@@ -76,7 +76,12 @@ func TestProductionObserverBindAndPreparedRelease(t *testing.T) {
 func observerExecutable(t *testing.T, output string, code int) (sessionManagerObserver, string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("POSIX executable transport fixture")
+		// The fixture writes a POSIX shell script as the curator-run
+		// executable, which Windows cannot execute; this is the verbatim
+		// platform-control reason declared in .github/ci/skip-classes.tsv.
+		// Windows bind refusal stays covered by
+		// TestProductionBindUnsupportedPlatform.
+		t.Skip("test transport wrapper is POSIX-only")
 	}
 	root := t.TempDir()
 	path := filepath.Join(root, "curator-run")
