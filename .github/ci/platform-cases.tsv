@@ -1229,3 +1229,8 @@ internal/homelease	TestProductionBindObserverRows	linux,darwin	-	-	bind succeeds
 internal/homelease	TestRealKernelBindEndToEnd	linux,darwin	-	-	bind through the real kernel observer succeeds for the test's own live child and refuses shifted-start, other-boot, wrong-uid, zombie and vanished incarnations
 internal/homelease	TestObserverPlants	linux,darwin	-	-	each observer plant turns its named bind or ceiling test red while its positive control passes
 internal/homelease	TestProductionBindUnsupportedPlatform	windows	-	-	production bind refuses authority_unavailable on a platform with no native start-time variant
+internal/homelease	TestLinuxKernelThreadZombiePlant	linux	-	-	each Linux kernel plant (thread refusal, zombie refusal) turns its named row of TestLinuxKernelRefusesThreadAndZombie red while its positive control passes
+internal/homelease	TestDarwinKernelZombiePlant	darwin	-	-	dropping the darwin SZOMB refusal turns TestDarwinKernelRefusesZombie red by name while its positive control passes
+internal/homelease	TestBindRefusesObserverWithoutBindVerifier	linux,darwin,windows	-	-	bind refuses authority_unavailable when the observer is not a BindVerifier, while the synthetic verifier beside it binds
+internal/homelease/state	TestDecodeLedgerAppliesSemanticCeilings	linux,darwin,windows	-	-	ledger decode refuses a stored holder above the uint64 semantic ceiling, while the ledger at the ceiling decodes
+internal/envprofile	TestHomeLeaseBatchNarrowingMutants	linux,darwin,windows	-	-	each batch narrowing plant turns its named repin or prepared-plan test red while its positive control passes
