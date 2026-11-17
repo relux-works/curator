@@ -18,6 +18,14 @@ import (
 // the contract maps it to the mismatch row, never to a retried success.
 var errKernelChanged = errors.New("kernel incarnation changed during observation pass")
 
+// errProcessExited is the exact kernel-level refusal for a zombie: the
+// process has exited, so its retained start time is not a live incarnation.
+// VerifyBind maps it (like every non-change kernel failure) to
+// environment_lease_authority_refused/authority_unavailable. Tests assert
+// this sentinel, never any error, so an ESRCH from a lookup that cannot
+// reach zombies cannot masquerade as the SZOMB refusal.
+var errProcessExited = errors.New("process has exited")
+
 func nativeStartTimeKind() string { return state.StartDarwin }
 
 // proc_pidinfo flavor and call discipline from <sys/proc_info.h>. The
@@ -32,6 +40,14 @@ const (
 	bsdInfoOffStartSec  = 120
 	bsdInfoOffStartUsec = 128
 	procStatusZombie    = 5 // SZOMB in <sys/proc.h>
+	// procPidTBSDInfoZombieArg is the PROC_PIDTBSDINFO arg that makes
+	// XNU's proc_pidinfo_internal look zombies up (proc_find_zombref).
+	// With arg 0, proc_find never returns a zombie and the call fails
+	// ESRCH before any byte is parsed, so the SZOMB refusal in
+	// readKernelProcess could never fire. Passing 1 returns the zombie's
+	// proc_bsdinfo with pbi_status == SZOMB and leaves live processes on
+	// the same lookup as before.
+	procPidTBSDInfoZombieArg = 1
 )
 
 func readKernelProcess(pid int64) (state.Process, error) {
@@ -57,7 +73,7 @@ func readKernelProcess(pid int64) (state.Process, error) {
 	// A zombie has exited; its retained start time is not a live
 	// incarnation Curator can bind to.
 	if binary.LittleEndian.Uint32(info[bsdInfoOffStatus:]) == procStatusZombie {
-		return state.Process{}, fmt.Errorf("process has exited")
+		return state.Process{}, errProcessExited
 	}
 	uid := int64(binary.LittleEndian.Uint32(info[bsdInfoOffRUID:]))
 	sec := binary.LittleEndian.Uint64(info[bsdInfoOffStartSec:])
@@ -74,11 +90,13 @@ func readKernelProcess(pid int64) (state.Process, error) {
 }
 
 // darwinProcBsdInfo invokes the proc_pidinfo system call directly; its one
-// call returns the complete proc_bsdinfo for a single incarnation.
+// call returns the complete proc_bsdinfo for a single incarnation. The
+// zombie arg is required for that to be true of an exited-but-unreaped
+// process too (see procPidTBSDInfoZombieArg).
 func darwinProcBsdInfo(pid int64) ([]byte, error) {
 	buf := make([]byte, procBsdInfoSize)
 	r1, _, errno := unix.RawSyscall6(unix.SYS_PROC_INFO, procInfoCallPidInfo,
-		uintptr(pid), procPidTBSDInfo, 0,
+		uintptr(pid), procPidTBSDInfo, procPidTBSDInfoZombieArg,
 		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
 	if errno != 0 {
 		return nil, errno

@@ -13,7 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
-// Claim: dropping the SZOMB refusal at the darwin kernel read lets a zombie child keep its tuple, so TestDarwinKernelRefusesZombie kills the plant after its control passes.
+// Claim: dropping the SZOMB refusal at the darwin kernel read lets a zombie child keep its tuple, so TestDarwinKernelRefusesZombie kills the plant by name after its control passes. The production read reaches zombies (procPidTBSDInfoZombieArg), and the test asserts the exact exited refusal only once the kern.proc.pid oracle says SZOMB, so neither a returned tuple nor an ESRCH can spare this plant.
 func TestDarwinKernelZombiePlant(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
@@ -51,7 +51,7 @@ func TestDarwinKernelZombiePlant(t *testing.T) {
 	}
 	scratch := t.TempDir()
 	replacement := filepath.Join(scratch, "replacement.go")
-	if err := os.WriteFile(replacement, []byte(strings.Replace(source, anchor, "if false {", 1)), 0o600); err != nil {
+	if err := os.WriteFile(replacement, []byte(strings.Replace(source, anchor, "if false && binary.LittleEndian.Uint32(info[bsdInfoOffStatus:]) == procStatusZombie {", 1)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	raw, err = json.Marshal(map[string]any{"Replace": map[string]string{path: replacement}})

@@ -3,12 +3,14 @@
 package homelease
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/relux-works/curator/internal/homelease/state"
+	"golang.org/x/sys/unix"
 )
 
 // Claim: the real observer reads the exact proc_pidinfo tuple of the test's
@@ -50,7 +52,24 @@ func TestDarwinKernelReadsOwnChild(t *testing.T) {
 	}
 }
 
-// Claim: the darwin kernel read refuses a zombie child, while the same child alive beside it reads normally.
+// darwinZombieOracle reports, independently of the production proc_pidinfo
+// read, whether pid is SZOMB per the kern.proc.pid sysctl. The zombie test
+// asserts the production refusal only once this oracle says zombie, so the
+// refusal is proven to be the SZOMB branch deciding, not a lookup that
+// cannot reach zombies at all.
+func darwinZombieOracle(pid int64) (bool, error) {
+	info, err := unix.SysctlKinfoProc("kern.proc.pid", int(pid))
+	if err != nil {
+		return false, err
+	}
+	return int64(info.Proc.P_stat) == procStatusZombie, nil
+}
+
+// Claim: the darwin kernel read refuses a zombie child with the exact
+// exited refusal (errProcessExited, which VerifyBind maps to
+// environment_lease_authority_refused/authority_unavailable), while the
+// same child alive beside it reads normally. Any other error, ESRCH
+// included, fails this test by name, as does a returned tuple.
 func TestDarwinKernelRefusesZombie(t *testing.T) {
 	sleep, err := exec.LookPath("sleep")
 	if err != nil {
@@ -67,21 +86,36 @@ func TestDarwinKernelRefusesZombie(t *testing.T) {
 		_ = cmd.Wait()
 		t.Fatalf("live child control: %v", err)
 	}
+	if zombie, err := darwinZombieOracle(pid); err != nil || zombie {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("live child oracle control: zombie=%t err=%v", zombie, err)
+	}
 	if err := cmd.Process.Kill(); err != nil {
 		t.Fatal(err)
 	}
-	// Unreaped, the child is a zombie; the production read must start
-	// refusing instead of returning its retained tuple.
+	// Unreaped, the child is a zombie. Poll the independent sysctl oracle
+	// until the kernel says SZOMB, then the production read must give
+	// exactly the exited refusal rather than its retained tuple, and
+	// rather than the ESRCH a zombie-blind proc_pidinfo arg would give.
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		if _, err := readKernelProcess(pid); err != nil {
+		zombie, err := darwinZombieOracle(pid)
+		if err == nil && zombie {
 			break
 		}
 		if time.Now().After(deadline) {
 			_ = cmd.Wait()
-			t.Fatal("zombie child still produced a tuple")
+			t.Fatalf("killed child never became a zombie per kern.proc.pid oracle: zombie=%t err=%v", zombie, err)
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if _, err := readKernelProcess(pid); err == nil {
+		_ = cmd.Wait()
+		t.Fatal("zombie child still produced a tuple")
+	} else if !errors.Is(err, errProcessExited) {
+		_ = cmd.Wait()
+		t.Fatalf("zombie refusal is not the exact exited refusal: %v", err)
 	}
 	_ = cmd.Wait()
 	if _, err := readKernelProcess(pid); err == nil {
