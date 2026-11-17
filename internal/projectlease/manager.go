@@ -712,14 +712,21 @@ func ReferencesUnderLock(home string, lock transaction.HomeLock) (Roots, error) 
 	return r, nil
 }
 
+// HasLedgerState reports whether the authoritative ledger namespace may hold
+// project-lease records. Uncertain state is treated as present; only proven
+// absence of the namespace directory returns false. Materialized views under
+// the environments root are inventory, not authority, and are not probed here.
+func HasLedgerState(home string) bool {
+	observed, err := stateread.Lstat(filepath.Dir(statePath(home)))
+	return err != nil || observed.Kind != stateread.KindAbsent
+}
+
 // HasState guards the historical unlocked runtime collector. Uncertain state
 // is treated as present; project-aware callers must use locked collection.
 func HasState(home string) bool {
-	for _, p := range []string{filepath.Dir(statePath(home)), filepath.Join(home, "environments", "project-views")} {
-		observed, err := stateread.Lstat(p)
-		if err != nil || observed.Kind != stateread.KindAbsent {
-			return true
-		}
+	if HasLedgerState(home) {
+		return true
 	}
-	return false
+	observed, err := stateread.Lstat(filepath.Join(home, "environments", "project-views"))
+	return err != nil || observed.Kind != stateread.KindAbsent
 }

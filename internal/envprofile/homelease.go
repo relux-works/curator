@@ -137,7 +137,12 @@ func homeLeaseGuardUndo(op *operation) error {
 }
 
 func homeLeaseRead(home string, held *managerlock.Held) error {
-	if !state.HasState(home) && !projectlease.HasState(home) {
+	// Only the authoritative ledger namespaces decide whether lease records
+	// can exist. Unreadable materialized views under the environments root
+	// are orphan inventory for the caller to report, not lease authority:
+	// with both namespaces proven absent, the legacy pending-intent check
+	// is the whole read gate. Mutation guards keep the stricter HasState.
+	if !state.HasState(home) && !projectlease.HasLedgerState(home) {
 		return homeLeaseReadLegacy(home, held)
 	}
 	if held != nil {
