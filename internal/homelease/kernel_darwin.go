@@ -23,13 +23,13 @@ func nativeStartTimeKind() string { return state.StartDarwin }
 // proc_pidinfo flavor and call discipline from <sys/proc_info.h>. The
 // proc_bsdinfo layout is parsed by offset so no C types enter the build.
 const (
-	procInfoCallPidInfo  = 2   // PROC_INFO_CALL_PIDINFO
-	procPidTBSDInfo      = 3   // PROC_PIDTBSDINFO
-	procBsdInfoSize      = 136 // sizeof(struct proc_bsdinfo)
-	bsdInfoOffPID        = 12
-	bsdInfoOffRUID       = 28
-	bsdInfoOffStartSec   = 120
-	bsdInfoOffStartUsec  = 128
+	procInfoCallPidInfo = 2   // PROC_INFO_CALL_PIDINFO
+	procPidTBSDInfo     = 3   // PROC_PIDTBSDINFO
+	procBsdInfoSize     = 136 // sizeof(struct proc_bsdinfo)
+	bsdInfoOffPID       = 12
+	bsdInfoOffRUID      = 28
+	bsdInfoOffStartSec  = 120
+	bsdInfoOffStartUsec = 128
 )
 
 func readKernelProcess(pid int64) (state.Process, error) {
