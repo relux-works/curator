@@ -3,6 +3,7 @@ package envprofile
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -359,6 +360,9 @@ func SetScoped(home, scope, name string, clearScope bool) error {
 // SyncHomesWithPolicy retains one operation across the command's managed and
 // native phases. Neither phase releases the admission lock to a new acquire.
 func SyncHomesWithPolicy(home string, policy Policy, machine envregistry.MachineConfig) (managed, native []EntryResult, managedErr, nativeErr error) {
+	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
+		return nil, nil, err, nil
+	}
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, nil, err, nil
@@ -373,8 +377,31 @@ func SyncHomesWithPolicy(home string, policy Policy, machine envregistry.Machine
 }
 
 // UpdateProfilesWithOptions preflights the entire command before the first
-// profile changes and borrows the same operation for every update.
+// profile changes and borrows the same operation for every update. Each
+// name keeps the single-name path's pre-lock prepared-plan probe, and a
+// repin keeps its postimage-checked compensation, so a late refusal on the
+// batched CLI path restores the repin records and published scopes exactly
+// like UpdateWithOptions.
 func UpdateProfilesWithOptions(home string, names []string, options UpdateOptions, visit func(string, Info, bool, error) bool) error {
+	if options.RootRequirement != nil {
+		forms := 0
+		for _, value := range []string{options.RootRequirement.Range, options.RootRequirement.Tag, options.RootRequirement.Revision} {
+			if value != "" {
+				forms++
+			}
+		}
+		if forms != 1 {
+			return fmt.Errorf("%s: a named Git profile requires exactly one of --range, --tag, --revision", DiagRefConflict)
+		}
+	}
+	for _, name := range names {
+		if options.RootRequirement != nil && name == "" {
+			return fmt.Errorf("%s: a named Git profile requires exactly one of --range, --tag, --revision", DiagRefConflict)
+		}
+		if err := refusePreparedSkillPlanAdoption(home, name); err != nil {
+			return err
+		}
+	}
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return err
 	}
@@ -388,7 +415,17 @@ func UpdateProfilesWithOptions(home string, names []string, options UpdateOption
 	}
 	defer func() { _ = op.close() }()
 	for _, name := range names {
+		compensate := options.RootRequirement != nil
+		if compensate {
+			op.undo = &globalUndo{entries: map[string]*globalImage{}, managerHome: home}
+		}
 		info, moved, err := updateLocked(op, home, name, options.Policy, options.SurfacingSink, options.WarningSink, options.ConfirmSystemDelta, options.readRegularFile, options.RootRequirement, nil, true)
+		if compensate {
+			if err != nil && op.undo != nil {
+				err = errors.Join(err, op.undo.restore())
+			}
+			op.undo = nil
+		}
 		if !visit(name, info, moved, err) {
 			break
 		}
