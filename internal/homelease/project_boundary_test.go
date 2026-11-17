@@ -50,7 +50,7 @@ func TestProjectKindBoundary(t *testing.T) {
 	}
 	before := boundarySnapshot(t, home)
 	session, generation := "fixture-session", int64(1)
-	h := homelease.Holder{Kind: "bound", Launcher: "curator-run", ManagerID: "manager", ManagerRegisteredAt: "2026-10-27T00:00:00Z", RequestID: "request", Session: &session, Generation: &generation, Process: &state.Process{PID: 123, StartedAt: "2026-10-27T00:00:01Z"}}
+	h := homelease.Holder{Kind: "bound", Launcher: "curator-run", ManagerID: "manager", ManagerRegisteredAt: "2026-10-27T00:00:00Z", RequestID: "request", Session: &session, Generation: &generation, Process: &state.Process{PID: 123, UID: 1001, BootID: "6f1c0e2a-8b44-4d1e-9a51-2f0c3d7e9b10", StartTime: &state.StartTime{Kind: state.StartLinux, Ticks: "123456789", Hz: 100}}}
 	for _, action := range []func() error{
 		func() error { _, _, err := m.Bind(context.Background(), b.LeaseID, 1, h); return err },
 		func() error { _, _, err := m.Release(context.Background(), b.LeaseID); return err },

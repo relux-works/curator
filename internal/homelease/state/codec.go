@@ -14,7 +14,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-// Exact public schemas from curator-spec 3f8ffb7f15213872c66ceec28501b9e51d56ac5c.
+// Exact public schemas from curator-spec 264244b321c7a2272450fc29bd9952f988d746d7.
 // All references resolve offline; no schema can introduce a network dependency.
 //
 //go:embed schemas/*.json
@@ -125,6 +125,9 @@ func ParseHolder(raw []byte) (Holder, error) {
 		return h, Refuse("usage", "invalid_holder")
 	}
 	if err := json.Unmarshal(raw, &h); err != nil {
+		return h, Refuse("usage", "invalid_holder")
+	}
+	if err := ValidateHolderSemantics(h); err != nil {
 		return h, Refuse("usage", "invalid_holder")
 	}
 	return h, nil

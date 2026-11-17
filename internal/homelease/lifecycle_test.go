@@ -17,7 +17,7 @@ import (
 func boundHolder(h Holder) Holder {
 	session, generation := "fixture-session", int64(7)
 	h.Kind, h.Session, h.Generation = "bound", &session, &generation
-	h.Process = &state.Process{PID: 123, StartedAt: "2026-10-27T00:00:01Z"}
+	h.Process = &state.Process{PID: 123, UID: 1001, BootID: "6f1c0e2a-8b44-4d1e-9a51-2f0c3d7e9b10", StartTime: &state.StartTime{Kind: state.StartLinux, Ticks: "123456789", Hz: 100}}
 	return h
 }
 

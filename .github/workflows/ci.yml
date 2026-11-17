@@ -51,7 +51,7 @@ env:
   # The pin is not a release qualification or a conformance claim. Candidate
   # suites enter through the non-default `candidate-conformance` job only.
   # The root serves the whole module; suite-plan.sh defers nothing against it.
-  SPEC_PIN: 2743676ec7706ae20042bda94424e714d65953a1
+  SPEC_PIN: 264244b321c7a2272450fc29bd9952f988d746d7
   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
   # workflow pins @v5, so without these two lines a job may download a
   # toolchain or read a per-user go env file. The identity step below reads
