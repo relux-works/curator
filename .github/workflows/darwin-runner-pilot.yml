@@ -1,0 +1,88 @@
+name: Darwin runner pilot
+
+on:
+  push:
+    branches: [pilot/darwin-runner]
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: "local"
+  GOENV: "off"
+
+jobs:
+  darwin-runner-pilot:
+    name: Go 1.25.5 driver (macOS pilot)
+    runs-on: [darwin-arm64-vm-pilot]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest]
+        go: ['1.25.5']
+    steps:
+      - name: Record pilot runner identity
+        shell: bash
+        run: |
+          uname -a
+          sw_vers
+          id -un
+      - uses: actions/checkout@v4
+      - name: Initialize private Go state
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash .github/ci/isolate-go-state.sh
+
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: 8b34c870ab7deba99b243ba26646d68b07bb630b
+          path: protocol-spec
+      - uses: actions/setup-go@v5
+        with:
+          cache: ${{ runner.environment != 'self-hosted' || runner.os != 'Linux' }}
+          go-version: ${{ matrix.go }}
+      - name: Verify family toolchain identity
+        shell: bash
+        env:
+          QUALIFIED_GO_VERSION: ${{ matrix.go }}
+        run: |
+          set -euo pipefail
+          actual="$(go version)"
+          echo "$actual"
+          [[ "$actual" == "go version go$QUALIFIED_GO_VERSION "* ]]
+          [[ "$(go env GOTOOLCHAIN)" == local ]]
+          [[ -z "$(go env GOENV)" || "$(go env GOENV)" == off ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Driver qualification and reproducibility
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          CURATOR_GO_CONTROL_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/go-native-controls-v2
+          CURATOR_REAL_GO_TEST: '1'
+          CURATOR_REAL_GO_BUILD_TEST: '1'
+          GOFLAGS: '-work'
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go test -count=1 -timeout=10m -json ./internal/godriver | tee driver-tests.json
+          python3 - <<'PYCODE'
+          import json
+          required = {"TestNativeControlInventoryMatchesTheAcceptedVector", "TestCapabilityEvidenceRecordMatchesTheAcceptedVector", "TestExplicitNativeControlVectorCannotDisappear", "TestBuildRejectsArtifactDuringAcceptance", "TestBuildCallerContextDiagnostics", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/compile-failure", "TestRealGoV1VendoredBuildIsBoundedAndNotLaunched/artifact-tamper", "TestRealGoV1ModuleRootsBuildIsBoundedAndNotLaunched"}
+          import sys
+          if sys.platform != "win32":
+              required |= {'TestWorkerExitNarrowingControls/no-failure-teardown', 'TestWorkerClosedManagerPipes', 'TestWorkerClosedManagerPipes/header', 'TestWorkerClosedManagerPipes/held-stdout', 'TestWorkerClosedManagerPipes/plain-EOF', 'TestWorkerClosedManagerPipes/session-failure', 'TestWorkerClosedManagerPipes/read-error', 'TestWorkerExitNarrowingControls', 'TestWorkerExitNarrowingControls/EOF-only-reader', 'TestWorkerSuccessfulShutdownKillsDescendants', 'TestWorkerExitNarrowingControls/no-success-teardown', 'TestWorkerExitNarrowingControls/ignored-kill-error', 'TestWorkerExitNarrowingControls/collapsed-status', 'TestWorkerTeardownStatusDiagnostic', 'TestWorkerExitNarrowingControls/no-signal-wait', 'TestWorkerFailureKillsDescendants', 'TestWorkerExitNarrowingControls/no-worker-deadline', 'TestWorkerIndependentDeadline', 'TestWorkerExitNarrowingControls/fatal-SIGPIPE', 'TestWorkerPipeHandlerDoesNotLeakToExec', 'TestWorkerCodedCauseKeepsTeardownStatus', 'TestWorkerExitNarrowingControls/ignored-SIGPIPE', 'TestWorkerExitNarrowingControls/coded-cause-first', 'TestWorkerExitNarrowingControls/main-failure-closed-output', 'TestWorkerCheckedKill', 'TestWorkerEOFWhileShutdownQueued'}
+          passed = {row.get("Test") for line in open("driver-tests.json") if (row := json.loads(line)).get("Action") == "pass"}
+          assert required <= passed, required - passed
+          PYCODE
+      - name: Driver vet
+        run: go vet ./internal/godriver
+      - name: Build manager
+        run: go build ./cmd/curator
+      - name: Restore runner temporary tree permissions
+        if: always() && runner.environment == 'self-hosted' && runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: bash scripts/restore-runner-tmp.sh
