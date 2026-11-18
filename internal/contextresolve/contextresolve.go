@@ -15,9 +15,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identity"
@@ -26,18 +28,19 @@ import (
 
 // Diagnostic codes (environments §1.1, §2.1, §6.1).
 const (
-	DiagRangeConflict        = "context_range_conflict"
-	DiagVersionMismatch      = "context_version_mismatch"
-	DiagWeightConflict       = "context_weight_conflict"
-	DiagWeightsNotRoot       = "context_weights_not_root"
-	DiagWeightsDuplicate     = "context_weights_duplicate"
-	DiagWeightUnknown        = "context_weight_unknown"
-	DiagCompositionInvalid   = "environment_composition_invalid"
-	DiagMCPPackageNotAllowed = "mcp_package_not_allowed"
-	DiagSourceMismatch       = DiagRangeConflict
-	DiagSourceUnsigned       = "context_source_unsigned"
-	DiagSourceSignerRejected = "context_source_signer_rejected"
-	DiagSourceSignersMissing = "context_source_signers_missing"
+	DiagRangeConflict                  = "context_range_conflict"
+	DiagVersionMismatch                = "context_version_mismatch"
+	DiagWeightConflict                 = "context_weight_conflict"
+	DiagWeightsNotRoot                 = "context_weights_not_root"
+	DiagWeightsDuplicate               = "context_weights_duplicate"
+	DiagWeightUnknown                  = "context_weight_unknown"
+	DiagCompositionInvalid             = "environment_composition_invalid"
+	DiagMCPPackageNotAllowed           = "mcp_package_not_allowed"
+	DiagSourceMismatch                 = DiagRangeConflict
+	DiagSourceUnsigned                 = "context_source_unsigned"
+	DiagSourceSignerRejected           = "context_source_signer_rejected"
+	DiagSourceSignersMissing           = "context_source_signers_missing"
+	DiagProfileSkillCapabilityConflict = "profile_skill_capability_conflict"
 )
 
 // MachineRequirer names the machine as the requirer of the install
@@ -46,16 +49,19 @@ const MachineRequirer = "machine"
 
 // Requirement is one constraint-contributing declaration.
 type Requirement struct {
-	Mode      string
-	Commands  []string
-	Kind      string
-	Name      string
-	Source    string // canonical network identity, or "" to take the source's own
-	Range     string
-	Tag       string
-	Revision  string
-	Directory string
-	Weight    *int64
+	Mode                    string
+	Commands                []string
+	Kind                    string
+	Name                    string
+	Source                  string // canonical network identity, or "" to take the source's own
+	Range                   string
+	Tag                     string
+	Revision                string
+	Directory               string
+	Weight                  *int64
+	ProfileSkillRequirement bool
+	Capabilities            capabilities.Manifest
+	CapabilitiesPresent     bool
 }
 
 // Form renders the requirement's constraint for diagnostics: "range ^3",
@@ -252,15 +258,17 @@ type Result struct {
 
 // Resolved is where a member was resolved from.
 type Resolved struct {
-	Kind        string
-	Name        string
-	Source      string
-	Directory   string
-	Commit      string
-	StateHash   string
-	HashVersion hashing.Version
-	Version     string
-	Package     *Package
+	Kind                       string
+	Name                       string
+	Source                     string
+	Directory                  string
+	Commit                     string
+	StateHash                  string
+	HashVersion                hashing.Version
+	Version                    string
+	Package                    *Package
+	ProfileCapabilities        capabilities.Manifest
+	ProfileCapabilitiesPresent bool
 }
 
 // VerifyMCPPin rechecks signer policy against an exact locked commit without
@@ -1044,8 +1052,17 @@ func (r *resolver) build() (*Result, error) {
 		}
 		member.Weight = weight
 		lock.Members = append(lock.Members, member)
-		result.Members[Key(sel.kind, name)] = Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
+		resolved := Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
 			Commit: sel.commit, StateHash: member.StateHash, HashVersion: hashing.Version(lockHashVersion), Version: member.Version, Package: sel.pkg}
+		if sel.kind == contextlock.KindSkill {
+			caps, present, err := r.profileSkillCapabilities(name)
+			if err != nil {
+				return nil, err
+			}
+			resolved.ProfileCapabilities = caps
+			resolved.ProfileCapabilitiesPresent = present
+		}
+		result.Members[Key(sel.kind, name)] = resolved
 	}
 	lock.Sort()
 	hash, err := lock.Hash()
@@ -1054,6 +1071,68 @@ func (r *resolver) build() (*Result, error) {
 	}
 	result.Lock, result.LockHash, result.Warnings = lock, hash, warnings
 	return result, nil
+}
+
+// profileSkillCapabilities combines only profile requires.skills edges. Other
+// resolver inputs do not declare profile capabilities and cannot erase or
+// widen a profile declaration.
+func (r *resolver) profileSkillCapabilities(name string) (capabilities.Manifest, bool, error) {
+	var first *Requirement
+	for _, edge := range r.constraints[name] {
+		requirement := edge.requirement
+		if requirement.Kind != contextlock.KindSkill || !requirement.ProfileSkillRequirement {
+			continue
+		}
+		if first == nil {
+			firstRequirement := requirement
+			first = &firstRequirement
+			continue
+		}
+		if first.CapabilitiesPresent != requirement.CapabilitiesPresent ||
+			(first.CapabilitiesPresent && !equalCapabilities(first.Capabilities, requirement.Capabilities)) {
+			return capabilities.Manifest{}, false, fmt.Errorf("%s: skill %s has conflicting profile declarations", DiagProfileSkillCapabilityConflict, name)
+		}
+	}
+	if first == nil || !first.CapabilitiesPresent {
+		return capabilities.Manifest{}, false, nil
+	}
+	return normalizeCapabilities(first.Capabilities), true, nil
+}
+
+func normalizeCapabilities(value capabilities.Manifest) capabilities.Manifest {
+	value.Network = sortedNetworkCapabilities(value.Network)
+	value.Filesystem.Paths = sortedCapabilityList(value.Filesystem.Paths)
+	value.Exec = sortedCapabilityList(value.Exec)
+	value.Secrets = sortedCapabilityList(value.Secrets)
+	value.EnvRead = sortedCapabilityList(value.EnvRead)
+	return value
+}
+
+func sortedNetworkCapabilities(values []string) []string {
+	values = sortedCapabilityList(values)
+	for index := range values {
+		values[index] = strings.ToLower(values[index])
+	}
+	sort.Strings(values)
+	return slices.Compact(values)
+}
+
+func sortedCapabilityList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := append([]string(nil), values...)
+	sort.Strings(result)
+	return result
+}
+
+func equalCapabilities(left, right capabilities.Manifest) bool {
+	left = normalizeCapabilities(left)
+	right = normalizeCapabilities(right)
+	return slices.Equal(left.Network, right.Network) &&
+		left.Filesystem.Keyword == right.Filesystem.Keyword && slices.Equal(left.Filesystem.Paths, right.Filesystem.Paths) &&
+		slices.Equal(left.Exec, right.Exec) && slices.Equal(left.Secrets, right.Secrets) &&
+		slices.Equal(left.EnvRead, right.EnvRead) && left.PromptScope == right.PromptScope
 }
 
 func (r *resolver) validateSkillRequirements(name string, sel *selection) error {

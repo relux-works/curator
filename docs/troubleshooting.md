@@ -594,6 +594,20 @@ Cause: an endpoint `alias` field names no entry of the policy
 Remedy: declare the alias in the `aliases` table. The table lives in
 machine source-policy.json.
 
+### audit.capability.network-undeclared
+
+Symptom: `profile install` or `profile update` refuses a manifestless skill
+with `audit.capability.network-undeclared` and names a host and Markdown file.
+
+Cause: strict audit found a host that the profile skill requirement does not
+declare. A source pin does not grant network capability.
+
+Remedy: when the skill has no native manifest, add the uncovered host or a
+narrow covering glob to `requires.skills.<name>.capabilities.network` in its
+`agent-context.json` and use schema 4 for that package. Packages without this
+field keep their current schema. If the skill has a native manifest, update
+that declaration instead; profile capabilities cannot override it.
+
 ### source_audit_rejected
 
 Symptom: `source_audit_rejected` with the member name.

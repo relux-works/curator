@@ -39,6 +39,44 @@ Schema 2 retains closed fields and admits only absent or empty
 required empty settings and contributions. Lock schemas 1–2 remain readable
 and reject skill directories. Draft lock schema 3 remains unsupported.
 
+## Capabilities for a manifestless profile skill
+
+A context package may declare capabilities for a selected skill that has no
+`agent-skill.json`, `csk-skill.json`, or `agents/runtime.json`. Add the optional
+`capabilities` member to that skill requirement and set the containing
+`agent-context.json` to schema 4. A package that does not use this field keeps
+its current schema; there is no schema bump requirement for other packages.
+
+```json
+{
+  "schema_version": 4,
+  "name": "sample-profile",
+  "version": "1.0.0",
+  "requires": {
+    "skills": {
+      "reader": {
+        "git": "https://source.example.org/skills/reader.git",
+        "tag": "v1.0.0",
+        "capabilities": {
+          "network": ["api.example.net", "docs.example.net"]
+        }
+      }
+    }
+  }
+}
+```
+
+The capability object uses the native skill grammar: `network`, `exec`,
+`secrets`, and `env_read` accept `"none"` or a validated list; `filesystem`
+accepts `"repo"`, `"home-config"`, or a validated path list; and
+`prompt_scope`, when present, is a non-empty string. Unknown fields and wrong
+types refuse. The profile cannot override a native skill manifest. When more
+than one profile edge reaches the same selected skill, every edge must either
+omit capabilities or declare a semantically equal object. Curator refuses a
+conflict instead of combining the declarations.
+Semantic equality ignores list order and compares network host patterns after
+the audit's existing lowercase normalization.
+
 Profile-selected Git skills extract only their declared directory and its
 regular-file descendants. Discovery links elsewhere in the repository do not
 enter the snapshot. A link in the selected directory or any ancestor, a

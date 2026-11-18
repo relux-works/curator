@@ -102,7 +102,7 @@ Every manifest field is required:
 |`schema`|`curator.skill-integrity/1`|
 |`name`, `source`, `commit`, `state_sha256`, `directory`|Exact existing lock-member identity; unused identity strings stay empty|
 |`manifest_kind`|`native` or `synthesized`|
-|`declaration_path`, `declaration_sha256`, `declaration`|Selected native file and exact-byte digest with null declaration, or empty path/digest with the fixed synthetic declaration|
+|`declaration_path`, `declaration_sha256`, `declaration`|Selected native file and exact-byte digest with null declaration, or empty path/digest with the fixed-shape synthetic declaration|
 |`hash_version`, `content_sha256`|Frozen content-v2 algorithm and complete selected-tree content hash|
 |`files`|Complete bytewise-sorted regular-file roster|
 
@@ -121,16 +121,30 @@ the observation.
 
 Native precedence and dual-manifest agreement retain the existing parser:
 `agent-skill.json`, `csk-skill.json`, then `agents/runtime.json`. Only genuine
-absence of all three permits synthesis. The synthetic declaration is exactly:
+absence of all three permits synthesis. Without profile-declared capabilities,
+the synthetic declaration remains exactly:
 
 ```json
 {"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}}
 ```
 
-It grants no commands, runtime roots or capabilities. Synthesis records evidence
-in the profile lock and never writes a manifest into the skill source. Startup
-compares the frozen expected evidence; it never regenerates an expectation from
-drifted installed content.
+It grants no commands, runtime roots or capabilities. A schema-4 context
+package may declare capabilities on a `requires.skills.<name>` member for a
+manifestless skill. Its lock evidence keeps this same schema-3 shape, with empty
+`runtime_roots` and `commands`, and records the validated capability object:
+
+```json
+{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":["api.example.net"],"filesystem":"repo","exec":"none","secrets":"none","env_read":"none"}}
+```
+
+The synthetic validator accepts no other fields and parses the object with the
+same capability grammar as a native skill manifest. A profile declaration that
+parses to all-none produces the original fixed bytes; `{}` instead means the
+default repository filesystem capability. Profile capabilities cannot replace
+a native manifest. Synthesis records evidence in the profile lock and never
+writes a manifest into the skill source. Startup validates and compares the
+frozen declaration and digest; it never regenerates an expectation from the
+current profile or drifted installed content.
 
 ## Whole-entry availability
 

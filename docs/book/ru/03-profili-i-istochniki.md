@@ -47,6 +47,40 @@ Resolver находит совместимый выбор; конфликт тр
 Выбор каталога входит в идентичность и должен совпадать у requirers
 одного skill. Schema 1 такой selector не принимает. ⟦работает сегодня⟧
 
+Schema 4 добавляет `capabilities` в `requires.skills.<name>` для
+manifestless skill. Его можно указывать только если у skill нет
+`agent-skill.json`, `csk-skill.json` и `agents/runtime.json`; профиль не
+переопределяет собственный manifest skill. Пакет без этого поля сохраняет
+текущую schema и не требует повышения версии. Объект использует ту же
+grammar, что и capability declaration в manifest skill. ⟦работает сегодня⟧
+
+```json
+{
+  "schema_version": 4,
+  "name": "sample-profile",
+  "version": "1.0.0",
+  "requires": {
+    "skills": {
+      "reader": {
+        "git": "https://source.example.org/skills/reader.git",
+        "tag": "v1.0.0",
+        "capabilities": {"network": ["api.example.net", "docs.example.net"]}
+      }
+    }
+  }
+}
+```
+
+Если несколько profile edges выбирают один skill, их capability declarations
+должны быть семантически равны: порядок элементов списков не важен, а host
+patterns сети сравниваются после уже используемого audit приведения к нижнему
+регистру. Curator откажет при разном наборе или если
+одно ребро объявляет capabilities, а другое опускает поле; значения не
+объединяются. Lock 6 фиксирует итоговую synthetic declaration со schema 3,
+пустыми `runtime_roots` и `commands`. При старте проверяется сохранённая
+declaration, а текущий профиль не читается для её пересоздания.
+⟦работает сегодня⟧
+
 ## Profile и Skillfile — разные декларации
 
 Profile начинает от context package и сохраняет своё замыкание в profile

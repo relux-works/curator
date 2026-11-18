@@ -70,7 +70,12 @@ func prepareStartupEvidence(home string, manager *gitManager, result *contextres
 			cleanup()
 			return err
 		}
-		evidence, err := skillintegrity.Build(context.Background(), root, contextlock.SkillIdentity(member), budget)
+		var evidence skillintegrity.Entry
+		if resolved.ProfileCapabilitiesPresent {
+			evidence, err = skillintegrity.BuildWithProfileCapabilities(context.Background(), root, contextlock.SkillIdentity(member), &resolved.ProfileCapabilities, budget)
+		} else {
+			evidence, err = skillintegrity.Build(context.Background(), root, contextlock.SkillIdentity(member), budget)
+		}
 		cleanup()
 		if err != nil {
 			return err

@@ -110,7 +110,11 @@ func TestSkillDirectoryClosedSuccessors(t *testing.T) {
 			delete(m, "requires")
 			m["codex_settings"] = map[string]any{}
 		}},
-		{"manifest-unsupported-four", false, func(m map[string]any) { m["schema_version"] = 4 }},
+		{"manifest-schema-four-unknown-top-level", false, func(m map[string]any) {
+			m["schema_version"] = 4
+			m["unexpected"] = true
+		}},
+		{"manifest-unsupported-five", false, func(m map[string]any) { m["schema_version"] = 5 }},
 		{"manifest-unknown-top-level", false, func(m map[string]any) { m["unexpected"] = true }},
 		{"lock-no-precedence", true, func(m map[string]any) { delete(m, "precedence") }},
 		{"lock-no-settings", true, func(m map[string]any) { delete(m, "codex_settings") }},
