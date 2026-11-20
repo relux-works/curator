@@ -1350,33 +1350,55 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          normalize_version() {
-            local kind="$1"
-            local status="$2"
-            local output="$3"
+          normalize_go_version() {
+            local status="$1"
+            local output="$2"
             if [[ "$status" != "0" ]]; then
               printf 'unavailable'
               return
             fi
-            case "$kind" in
-              go)
-                if [[ "$output" =~ ^go[[:space:]]version[[:space:]]go[0-9]+\.[0-9]+\.[0-9]+[[:space:]][[:alnum:]_]+/[[:alnum:]_]+$ ]]; then
-                  printf '%s' "$output"
-                else
-                  printf 'unavailable'
-                fi
-                ;;
-              git)
-                if [[ "$output" =~ ^git[[:space:]]version[[:space:]][0-9]+\.[0-9]+\.[0-9]+([.-][[:alnum:]_.+-]+|[[:space:]]\(Apple[[:space:]]Git-[0-9]+\))?$ ]]; then
-                  printf '%s' "$output"
-                else
-                  printf 'unavailable'
-                fi
-                ;;
-              *)
-                printf 'unavailable'
-                ;;
+            if [[ "$output" =~ ^go[[:space:]]version[[:space:]]go([0-9]+\.[0-9]+\.[0-9]+)[[:space:]](darwin|windows)/(amd64|arm64)$ ]]; then
+              printf '%s' "${BASH_REMATCH[1]}"
+            else
+              printf 'unavailable'
+            fi
+          }
+          normalize_goos() {
+            local status="$1"
+            local value="$2"
+            if [[ "$status" != "0" ]]; then
+              printf 'unavailable'
+              return
+            fi
+            case "$value" in
+              darwin|windows) printf '%s' "$value" ;;
+              *) printf 'unavailable' ;;
             esac
+          }
+          normalize_goarch() {
+            local status="$1"
+            local value="$2"
+            if [[ "$status" != "0" ]]; then
+              printf 'unavailable'
+              return
+            fi
+            case "$value" in
+              amd64|arm64) printf '%s' "$value" ;;
+              *) printf 'unavailable' ;;
+            esac
+          }
+          normalize_git_version() {
+            local status="$1"
+            local output="$2"
+            if [[ "$status" != "0" ]]; then
+              printf 'unavailable'
+              return
+            fi
+            if [[ "$output" =~ ^git[[:space:]]version[[:space:]]([0-9]+\.[0-9]+\.[0-9]+)([[:space:]]\(Apple[[:space:]]Git-[0-9]+\)|\.windows\.[0-9]+)?$ ]]; then
+              printf '%s' "${BASH_REMATCH[1]}"
+            else
+              printf 'unavailable'
+            fi
           }
           capture_version_probe() {
             local kind="$1"
@@ -1388,8 +1410,15 @@ jobs:
               version_probe_exit=$?
               raw=""
             fi
-            version_probe_value="$(normalize_version "$kind" "$version_probe_exit" "$raw")"
+            case "$kind" in
+              go) version_probe_value="$(normalize_go_version "$version_probe_exit" "$raw")" ;;
+              git) version_probe_value="$(normalize_git_version "$version_probe_exit" "$raw")" ;;
+              *) version_probe_value="unavailable" ;;
+            esac
           }
+          token_payload="$(printf '%30s' '')"
+          token_payload="${token_payload// /A}"
+          token_shape="ghp_${token_payload}"
           version_probe_failure_fixture() {
             printf '%s\n' 'go version go1.25.5 darwin/arm64'
             printf '%s\n' '/Users/runner/PROBE_DIAGCONTROL' >&2
@@ -1404,13 +1433,13 @@ jobs:
           good_go_probe_control="$(
             {
               capture_version_probe go printf '%s\n' 'go version go1.25.5 darwin/arm64'
-              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+              printf '%s %s %s %s\n' "$version_probe_value" "$version_probe_exit" "$(normalize_goos 0 darwin)" "$(normalize_goarch 0 arm64)"
             } 2>&1
           )"
           good_windows_go_probe_control="$(
             {
               capture_version_probe go printf '%s\n' 'go version go1.25.5 windows/amd64'
-              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+              printf '%s %s %s %s\n' "$version_probe_value" "$version_probe_exit" "$(normalize_goos 0 windows)" "$(normalize_goarch 0 amd64)"
             } 2>&1
           )"
           good_git_probe_control="$(
@@ -1425,6 +1454,9 @@ jobs:
               printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
             } 2>&1
           )"
+          token_goos_probe_control="$(normalize_go_version 0 "go version go1.25.5 ${token_shape}/arm64")"
+          token_goos_env_control="$(normalize_goos 0 "$token_shape")"
+          token_git_suffix_control="$(normalize_git_version 0 "git version 2.50.1.${token_shape}")"
           malformed_probe_control="$(
             {
               capture_version_probe git printf '%s\n' 'git version /Users/runner/PROBE_DIAGCONTROL'
@@ -1432,10 +1464,13 @@ jobs:
             } 2>&1
           )"
           if [[ "$failed_probe_control" != "unavailable 23" ||
-                "$good_go_probe_control" != "go version go1.25.5 darwin/arm64 0" ||
-                "$good_windows_go_probe_control" != "go version go1.25.5 windows/amd64 0" ||
-                "$good_git_probe_control" != "git version 2.50.1 (Apple Git-155) 0" ||
-                "$good_windows_git_probe_control" != "git version 2.50.1.windows.1 0" ||
+                "$good_go_probe_control" != "1.25.5 0 darwin arm64" ||
+                "$good_windows_go_probe_control" != "1.25.5 0 windows amd64" ||
+                "$good_git_probe_control" != "2.50.1 0" ||
+                "$good_windows_git_probe_control" != "2.50.1 0" ||
+                "$token_goos_probe_control" != "unavailable" ||
+                "$token_goos_env_control" != "unavailable" ||
+                "$token_git_suffix_control" != "unavailable" ||
                 "$malformed_probe_control" != "unavailable 0" ]]; then
             printf 'CAPTURE_REASON=metadata/version-probe-control-failed\n' >&2
             exit 2
@@ -1451,13 +1486,13 @@ jobs:
             go_version="$version_probe_value"
             go_exit="$version_probe_exit"
             set +e
-            goos="$(GOENV=off GOTOOLCHAIN=local go env GOOS 2>/dev/null)"
+            raw_goos="$(GOENV=off GOTOOLCHAIN=local go env GOOS 2>/dev/null)"
             goos_exit=$?
-            goarch="$(GOENV=off GOTOOLCHAIN=local go env GOARCH 2>/dev/null)"
+            raw_goarch="$(GOENV=off GOTOOLCHAIN=local go env GOARCH 2>/dev/null)"
             goarch_exit=$?
             set -e
-            [[ "$goos_exit" -eq 0 ]] || goos="unavailable"
-            [[ "$goarch_exit" -eq 0 ]] || goarch="unavailable"
+            goos="$(normalize_goos "$goos_exit" "$raw_goos")"
+            goarch="$(normalize_goarch "$goarch_exit" "$raw_goarch")"
           fi
           git_version="unavailable"
           git_exit=127
