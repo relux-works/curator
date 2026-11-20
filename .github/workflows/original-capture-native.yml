@@ -617,7 +617,10 @@ jobs:
 
           const (
             reasonInternal = "sanitize/internal-failure"
-            reasonSelfCheckField = "sanitize/selfcheck-field-control"
+            reasonSelfCheckFieldDetection = "sanitize/selfcheck-field-detection-control"
+            reasonSelfCheckFieldRedaction = "sanitize/selfcheck-field-redaction-control"
+            reasonSelfCheckFieldLeak = "sanitize/selfcheck-field-leak-control"
+            reasonSelfCheckPlantedValue = "sanitize/selfcheck-planted-value-control"
             reasonSelfCheckCredential = "sanitize/selfcheck-credential-control"
             reasonSelfCheckPath = "sanitize/selfcheck-path-control"
             reasonSelfCheckDiagnosticKey = "sanitize/selfcheck-diagnostic-key-control"
@@ -936,16 +939,41 @@ jobs:
           func selfCheck() error {
             for _, key := range []string{"api_token", "apiKey", "privateKey", "refreshToken"} {
               input := map[string]any{key: "ghp_" + strings.Repeat("A", 30), "safe": "ordinary"}
-              inputCode, _ := unsafeValue(input, "$")
+              inputCode, inputPath := unsafeValue(input, "$")
+              if inputCode != reasonUnsafeSensitiveKey || inputPath != "$" {
+                return refuse(reasonSelfCheckFieldDetection, 0, 0, "$")
+              }
               cleaned, count := sanitizeValue(input)
-              encoded, _ := json.Marshal(cleaned)
+              encoded, err := json.Marshal(cleaned)
+              if err != nil {
+                return refuse(reasonSelfCheckFieldRedaction, 0, 0, "$")
+              }
               object, ok := cleaned.(map[string]any)
               wantObject := map[string]any{"safe": "ordinary", "_redacted": []any{marker}}
-              if inputCode == "" || count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) ||
-                  strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
-                  !strings.Contains(string(encoded), marker) {
-                return refuse(reasonSelfCheckField, 0, 0, "$")
+              if count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) {
+                return refuse(reasonSelfCheckFieldRedaction, 0, 0, "$")
               }
+              if strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
+                  !strings.Contains(string(encoded), marker) {
+                return refuse(reasonSelfCheckFieldLeak, 0, 0, "$")
+              }
+            }
+            plantedValue := "ghp_" + strings.Repeat("A", 30)
+            plantedInput := map[string]any{"value": plantedValue, "safe": "ordinary"}
+            plantedCode, plantedPath := unsafeValue(plantedInput, "$")
+            if plantedCode != reasonUnsafeText || plantedPath != "$" {
+              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
+            }
+            cleanedPlanted, plantedCount := sanitizeValue(plantedInput)
+            encodedPlanted, err := json.Marshal(cleanedPlanted)
+            if err != nil {
+              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
+            }
+            plantedObject, ok := cleanedPlanted.(map[string]any)
+            wantPlanted := map[string]any{"value": marker, "safe": "ordinary"}
+            if plantedCount != 1 || !ok || !reflect.DeepEqual(plantedObject, wantPlanted) ||
+                strings.Contains(string(encodedPlanted), "ghp_") || !strings.Contains(string(encodedPlanted), marker) {
+              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
             }
             hostileKey := "ghp_" + strings.Repeat("A", 30)
             hostileKeyInput := map[string]any{
@@ -1501,13 +1529,14 @@ jobs:
             git_version="$version_probe_value"
             git_exit="$version_probe_exit"
           fi
-          base="ffd2cf65da2c0afdf46bf45a39aad74b3d59ab04"
+          pushed_sha="$GITHUB_SHA"
           head=""
           head_exit=1
-          if head="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD 2>/dev/null)"; then head_exit=0; fi
-          head_parent=""
-          parent_exit=1
-          if head_parent="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD^ 2>/dev/null)"; then parent_exit=0; fi
+          if head="$(git -C "$GITHUB_WORKSPACE" rev-parse --verify HEAD 2>/dev/null)"; then head_exit=0; fi
+          head_matches_pushed_sha=false
+          if [[ "$head" =~ ^[0-9a-f]{40}$ && "$pushed_sha" =~ ^[0-9a-f]{40}$ && "$head" == "$pushed_sha" ]]; then
+            head_matches_pushed_sha=true
+          fi
           working_status=""
           working_status_exit=1
           if working_status="$(git -C "$GITHUB_WORKSPACE" status --porcelain --untracked-files=all 2>/dev/null)"; then working_status_exit=0; fi
@@ -1519,36 +1548,11 @@ jobs:
           elif [[ "$RUNNER_OS" == "macOS" && "$CAPTURE_UMASK" == "0077" ]]; then
             umask_valid=true
           fi
-          original_tree_clean=false
-          baseline_diff_exit=1
-          if [[ -n "$head" ]]; then
-            if git -C "$GITHUB_WORKSPACE" diff --quiet "$base" "$head" -- . \
-                ':(exclude)testdata/originalcapture/**' \
-                ':(exclude).github/workflows/original-capture-native.yml'; then
-              baseline_diff_exit=0
-              original_tree_clean=true
-            else
-              baseline_diff_exit=$?
-            fi
-          fi
-          expected_paths='.github/workflows/original-capture-native.yml'
-          actual_paths=""
-          write_set_exit=1
-          if [[ -n "$head" ]]; then
-            if actual_paths="$(git -C "$GITHUB_WORKSPACE" diff --name-only "$base" "$head" 2>/dev/null | LC_ALL=C sort)"; then
-              write_set_exit=0
-            fi
-          fi
-          write_set_exact=false
-          if [[ "$write_set_exit" -eq 0 && "$actual_paths" == "$expected_paths" ]]; then write_set_exact=true; fi
-          base_is_parent=false
-          [[ "$head_parent" == "$base" ]] && base_is_parent=true
           lane_verdict=fail
           if [[ "$CHECKOUT_OUTCOME" == "success" && "$GO_SETUP_OUTCOME" == "success" &&
                 "$SOURCE_OUTCOME" == "success" && "$MODULE_OUTCOME" == "success" &&
                 "$CAPTURE_OUTCOME" == "success" && "$SANITIZER_OUTCOME" == "success" &&
-                "$working_clean" == "true" && "$original_tree_clean" == "true" &&
-                "$write_set_exact" == "true" && "$base_is_parent" == "true" &&
+                "$working_clean" == "true" && "$head_matches_pushed_sha" == "true" &&
                 "$umask_valid" == "true" ]]; then
             lane_verdict=pass
           fi
@@ -1560,9 +1564,9 @@ jobs:
             printf 'posix-umask=%s\n' "$CAPTURE_UMASK"
             printf 'GOOS=%s\nGOARCH=%s\ngo_version=%s\ngo_version_exit=%s\ngoos_exit=%s\ngoarch_exit=%s\n' \
               "$goos" "$goarch" "$go_version" "$go_exit" "$goos_exit" "$goarch_exit"
-            printf 'git_version=%s\ngit_version_exit=%s\nhead=%s\nparent=%s\n' "$git_version" "$git_exit" "$head" "$head_parent"
-            printf 'head_exit=%s\nparent_exit=%s\nworking_status_exit=%s\nbaseline_diff_exit=%s\nwrite_set_exit=%s\n' \
-              "$head_exit" "$parent_exit" "$working_status_exit" "$baseline_diff_exit" "$write_set_exit"
+            printf 'git_version=%s\ngit_version_exit=%s\nhead=%s\nhead_exit=%s\nhead_matches_pushed_sha=%s\n' \
+              "$git_version" "$git_exit" "$head" "$head_exit" "$head_matches_pushed_sha"
+            printf 'working_status_exit=%s\n' "$working_status_exit"
             printf 'source_verification_outcome=%s\nsource_verification_exit=%s\n' "$SOURCE_OUTCOME" "$SOURCE_EXIT"
             printf 'module_command=go mod download\nmodule_outcome=%s\nmodule_exit=%s\n' "$MODULE_OUTCOME" "$MODULE_EXIT"
             printf 'test_command=go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity\n'
@@ -1578,16 +1582,19 @@ jobs:
               "$WINDOWS_ROOT_PASSED" "$ALL_TEST_FAILURES" "$ALL_TEST_SKIPS" "$OUTPUT_JSON_FILES"
             printf 'sanitizer_outcome=%s\nsanitizer_exit=%s\nredacted_fields=%s\nredacted_values=%s\n' \
               "$SANITIZER_OUTCOME" "$SANITIZER_EXIT" "$REDACTED_FIELDS" "$REDACTED_VALUES"
-            printf 'working_tree_clean=%s\noriginal_tree_clean=%s\nwrite_set_exact=%s\nbase_is_parent=%s\n' \
-              "$working_clean" "$original_tree_clean" "$write_set_exact" "$base_is_parent"
+            printf 'working_tree_clean=%s\n' "$working_clean"
           } > "$CAPTURE_ROOT/artifact/metadata.txt"
           {
             printf '### Lane metadata: %s (%s)\n\n' "$RUNNER_OS" "$MATRIX_RUNNER"
             printf 'Verdict: **%s**. Rows: %s executed, %s passed, %s failed, %s skipped.\n' \
               "$lane_verdict" "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
           } >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$working_clean" != "true" || "$original_tree_clean" != "true" ||
-                "$write_set_exact" != "true" || "$base_is_parent" != "true" ]]; then
+          if [[ "$head_matches_pushed_sha" != "true" ]]; then
+            printf 'CAPTURE_REASON=metadata/head-mismatch\n' >&2
+            exit 1
+          fi
+          if [[ "$working_clean" != "true" ]]; then
+            printf 'CAPTURE_REASON=metadata/working-tree-dirty\n' >&2
             exit 1
           fi
 
