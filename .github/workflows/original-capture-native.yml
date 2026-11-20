@@ -196,19 +196,57 @@ jobs:
           CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
         run: |
           set -euo pipefail
+          capture_shell_error() {
+            local status=$?
+            trap - ERR
+            printf 'CAPTURE_REASON=capture/shell-command-failed\n' >&2
+            exit "$status"
+          }
+          trap capture_shell_error ERR
+          umask 077
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            printf 'posix_umask=not-applicable\n' >> "$GITHUB_OUTPUT"
+          else
+            effective_umask="$(umask)"
+            if [[ "$effective_umask" != "0077" ]]; then
+              printf 'posix_umask=invalid\n' >> "$GITHUB_OUTPUT"
+              printf 'CAPTURE_REASON=capture/umask-mismatch\n' >&2
+              exit 1
+            fi
+            printf 'posix_umask=%s\n' "$effective_umask" >> "$GITHUB_OUTPUT"
+          fi
           cd "$GITHUB_WORKSPACE"
           cat > "$CAPTURE_ROOT/audit.go" <<'GO'
           package main
 
           import (
             "bufio"
+            "encoding/json"
             "fmt"
             "io"
             "os"
             "path/filepath"
+            "regexp"
             "strconv"
             "strings"
           )
+
+          type auditFailure string
+
+          func (failure auditFailure) Error() string { return string(failure) }
+
+          type testEvent struct {
+            Action string `json:"Action"`
+            Package string `json:"Package"`
+            Test string `json:"Test"`
+          }
+
+          type failureName struct {
+            Package string
+            Test string
+          }
+
+          var publicTestName = regexp.MustCompile(`^[A-Za-z0-9_./-]+$`)
 
           type counts struct {
             baseline, baselinePass, baselineFail, baselineSkip int
@@ -220,17 +258,35 @@ jobs:
             outputFiles int
           }
 
-          func parseLog(input io.Reader) (counts, error) {
+          func parseLog(input io.Reader) (counts, []failureName, error) {
             var result counts
+            var failures []failureName
             scanner := bufio.NewScanner(input)
             scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
             for scanner.Scan() {
-              fields := strings.Fields(scanner.Text())
-              if len(fields) < 3 || fields[0] != "---" {
+              var event testEvent
+              if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+                return result, nil, auditFailure("CAPTURE_REASON=capture/audit-invalid-test-event")
+              }
+              if event.Action == "fail" && event.Test == "" {
+                if publicTestName.MatchString(event.Package) {
+                  failures = append(failures, failureName{Package: event.Package})
+                }
                 continue
               }
-              status, name := fields[1], fields[2]
-              if status == "FAIL:" { result.allFails++ }
+              if event.Test == "" {
+                continue
+              }
+              status, name := strings.ToUpper(event.Action)+":", event.Test
+              if status != "PASS:" && status != "FAIL:" && status != "SKIP:" {
+                continue
+              }
+              if status == "FAIL:" {
+                result.allFails++
+                if publicTestName.MatchString(event.Package) && publicTestName.MatchString(event.Test) {
+                  failures = append(failures, failureName{Package: event.Package, Test: event.Test})
+                }
+              }
               if status == "SKIP:" { result.allSkips++ }
               if strings.HasPrefix(name, "TestFreezeOriginalBaseline/") {
                 if name == "TestFreezeOriginalBaseline/repeat-determinism" {
@@ -263,66 +319,76 @@ jobs:
                   name == "TestWindowsRootParameter") { result.rootPass++ }
               if name == "TestWindowsRootParameter" && status == "PASS:" { result.windowsRootPass++ }
             }
-            return result, scanner.Err()
+            if scanner.Err() != nil {
+              return result, nil, auditFailure("CAPTURE_REASON=capture/audit-test-log-read")
+            }
+            return result, failures, nil
           }
 
-          func (value counts) valid(testExit int) bool {
+          func (value counts) rowCountsValid() bool {
             executed := value.baseline + value.launchers
             passed := value.baselinePass + value.launcherPass
             failed := value.baselineFail + value.launcherFail
             skipped := value.baselineSkip + value.launcherSkip
-            return testExit == 0 && value.baseline == 17 && value.launchers == 30 &&
+            return value.baseline == 17 && value.launchers == 30 &&
               executed == 47 && passed == 47 && failed == 0 && skipped == 0 &&
               value.repeatSeen == 1 && value.repeatPass == 1 &&
               value.comparator == 2 && value.comparatorPass == 2 &&
               value.comparatorFail == 0 && value.comparatorSkip == 0 &&
               value.mcpControlPass == 1 && value.launcherControlPass == 1 &&
               value.rootPass == 4 && value.windowsRootPass == 1 &&
-              value.allFails == 0 && value.allSkips == 0 && value.outputFiles == 47
+              value.allFails == 0 && value.allSkips == 0
+          }
+
+          func (value counts) valid(testExit int) bool {
+            return testExit == 0 && value.rowCountsValid() && value.outputFiles == 47
           }
 
           func selfCheck() error {
             var sample strings.Builder
-            for index := 0; index < 17; index++ { fmt.Fprintf(&sample, "--- PASS: TestFreezeOriginalBaseline/case-%02d (0.00s)\n", index) }
-            sample.WriteString("--- PASS: TestFreezeOriginalBaseline/repeat-determinism (0.00s)\n")
-            for index := 0; index < 30; index++ { fmt.Fprintf(&sample, "--- PASS: TestFreezeOriginalLaunchers/case-%02d (0.00s)\n", index) }
-            sample.WriteString("--- PASS: TestOriginalComparatorControls/claude_code-mcp (0.00s)\n")
-            sample.WriteString("--- PASS: TestOriginalComparatorControls/claude-launcher-typed-projection (0.00s)\n")
-            sample.WriteString("--- PASS: TestFreezeOriginalBaseline (0.00s)\n")
-            sample.WriteString("--- PASS: TestFreezeOriginalLaunchers (0.00s)\n")
-            sample.WriteString("--- PASS: TestOriginalComparatorControls (0.00s)\n")
-            sample.WriteString("--- PASS: TestWindowsRootParameter (0.00s)\n")
-            parsed, err := parseLog(strings.NewReader(sample.String()))
-            if err != nil { return err }
+            const samplePackage = "github.com/relux-works/curator/.temp/original-capture/harnessparity"
+            addPass := func(name string) {
+              fmt.Fprintf(&sample, "{\"Action\":\"pass\",\"Package\":%q,\"Test\":%q}\n", samplePackage, name)
+            }
+            for index := 0; index < 17; index++ { addPass(fmt.Sprintf("TestFreezeOriginalBaseline/case-%02d", index)) }
+            addPass("TestFreezeOriginalBaseline/repeat-determinism")
+            for index := 0; index < 30; index++ { addPass(fmt.Sprintf("TestFreezeOriginalLaunchers/case-%02d", index)) }
+            addPass("TestOriginalComparatorControls/claude_code-mcp")
+            addPass("TestOriginalComparatorControls/claude-launcher-typed-projection")
+            addPass("TestFreezeOriginalBaseline")
+            addPass("TestFreezeOriginalLaunchers")
+            addPass("TestOriginalComparatorControls")
+            addPass("TestWindowsRootParameter")
+            parsed, _, err := parseLog(strings.NewReader(sample.String()))
+            if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-self-check-json") }
             parsed.outputFiles = 47
-            if !parsed.valid(0) { return fmt.Errorf("positive audit control failed") }
+            if !parsed.valid(0) { return auditFailure("CAPTURE_REASON=capture/audit-self-check-positive") }
             parsed.allSkips++
-            if parsed.valid(0) { return fmt.Errorf("skip rejection control failed") }
+            if parsed.valid(0) { return auditFailure("CAPTURE_REASON=capture/audit-self-check-skip") }
             parsed.allSkips--
             parsed.outputFiles = 46
-            if parsed.valid(0) { return fmt.Errorf("partial output rejection control failed") }
+            if parsed.valid(0) { return auditFailure("CAPTURE_REASON=capture/audit-self-check-count") }
+            failing := `{"Action":"fail","Package":"public/package","Test":"TestPublicFailure","Output":"CAPTURE_PRIVATE_OUTPUT_CONTROL"}`
+            _, failures, err := parseLog(strings.NewReader(failing + "\n"))
+            if err != nil || len(failures) != 1 || failures[0].Package != "public/package" ||
+                failures[0].Test != "TestPublicFailure" || strings.Contains(fmt.Sprint(failures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+            }
             return nil
           }
 
-          func run() error {
-            if err := selfCheck(); err != nil { return err }
-            if len(os.Args) != 4 { return fmt.Errorf("invalid audit arguments") }
-            testExit, err := strconv.Atoi(os.Args[3])
-            if err != nil { return fmt.Errorf("invalid test exit code") }
-            input, err := os.Open(os.Args[1])
-            if err != nil { return err }
-            result, parseErr := parseLog(input)
-            closeErr := input.Close()
-            if parseErr != nil { return parseErr }
-            if closeErr != nil { return closeErr }
-            entries, err := os.ReadDir(os.Args[2])
-            if err != nil { return err }
-            for _, entry := range entries {
-              if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-                return fmt.Errorf("unexpected capture output entry")
-              }
-              result.outputFiles++
+          func writeFailureNames(path string, failures []failureName) error {
+            var names strings.Builder
+            for _, failure := range failures {
+              fmt.Fprintf(&names, "CAPTURE_FAIL Package=%s Test=%s\n", failure.Package, failure.Test)
             }
+            if err := os.WriteFile(path, []byte(names.String()), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-failure-name-write")
+            }
+            return nil
+          }
+
+          func printCounts(result counts) {
             executed := result.baseline + result.launchers
             passed := result.baselinePass + result.launcherPass
             failed := result.baselineFail + result.launcherFail
@@ -335,12 +401,50 @@ jobs:
             fmt.Printf("comparator_mcp_control_passed=%d\ncomparator_launcher_control_passed=%d\n", result.mcpControlPass, result.launcherControlPass)
             fmt.Printf("root_tests_passed=%d\nwindows_root_parameter_passed=%d\n", result.rootPass, result.windowsRootPass)
             fmt.Printf("all_test_failures=%d\nall_test_skips=%d\noutput_json_files=%d\n", result.allFails, result.allSkips, result.outputFiles)
-            if !result.valid(testExit) { return fmt.Errorf("capture coverage or test verdict is incomplete") }
+          }
+
+          func run() error {
+            if err := selfCheck(); err != nil { return err }
+            if len(os.Args) != 5 { return auditFailure("CAPTURE_REASON=capture/audit-invalid-arguments") }
+            testExit, err := strconv.Atoi(os.Args[3])
+            if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-invalid-test-exit") }
+            input, err := os.Open(os.Args[1])
+            if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-test-log-open") }
+            result, failures, parseErr := parseLog(input)
+            closeErr := input.Close()
+            if parseErr != nil { return parseErr }
+            if closeErr != nil { return auditFailure("CAPTURE_REASON=capture/audit-test-log-close") }
+            if testExit != 0 {
+              if err := writeFailureNames(os.Args[4], failures); err != nil { return err }
+            }
+            entries, err := os.ReadDir(os.Args[2])
+            if err != nil {
+              printCounts(result)
+              return auditFailure("CAPTURE_REASON=capture/audit-output-list")
+            }
+            result.outputFiles = len(entries)
+            for _, entry := range entries {
+              if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+                printCounts(result)
+                return auditFailure("CAPTURE_REASON=capture/audit-output-entry-unexpected")
+              }
+            }
+            printCounts(result)
+            if testExit != 0 { return auditFailure("CAPTURE_REASON=capture/go-test-failed") }
+            if result.outputFiles != 47 { return auditFailure("CAPTURE_REASON=capture/audit-output-count-incomplete") }
+            if !result.rowCountsValid() { return auditFailure("CAPTURE_REASON=capture/audit-row-counts-incomplete") }
             return nil
           }
 
           func main() {
-            if err := run(); err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+            if err := run(); err != nil {
+              if failure, ok := err.(auditFailure); ok {
+                fmt.Fprintln(os.Stderr, failure.Error())
+              } else {
+                fmt.Fprintln(os.Stderr, "CAPTURE_REASON=capture/audit-internal-failure")
+              }
+              os.Exit(1)
+            }
           }
           GO
           native_path() {
@@ -378,7 +482,10 @@ jobs:
           )
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             systemroot="${SYSTEMROOT:-${WINDIR:-}}"
-            [[ -n "$systemroot" ]] || exit 2
+            if [[ -z "$systemroot" ]]; then
+              printf 'CAPTURE_REASON=capture/systemroot-missing\n' >&2
+              exit 2
+            fi
             trusted_path="$trusted_path:$(cygpath -u "$systemroot")/System32"
             clean_env[13]="PATH=$trusted_path"
             clean_env+=("SYSTEMROOT=$systemroot" "WINDIR=${WINDIR:-$systemroot}" \
@@ -388,26 +495,32 @@ jobs:
             trusted_path="$trusted_path:/usr/bin:/bin"
             clean_env[13]="PATH=$trusted_path"
           fi
-          if [[ -n "$(find "$CAPTURE_ROOT/raw-output" -mindepth 1 -print -quit)" ]]; then
-            echo "The capture output directory is not empty." >&2
+          if ! find "$CAPTURE_ROOT/raw-output" -mindepth 1 -print -quit > "$CAPTURE_ROOT/output-entry-check.raw.txt"; then
+            printf 'CAPTURE_REASON=capture/output-directory-scan-failed\n' >&2
+            exit 1
+          fi
+          if [[ -s "$CAPTURE_ROOT/output-entry-check.raw.txt" ]]; then
+            printf 'CAPTURE_REASON=capture/output-directory-not-empty\n' >&2
             exit 2
           fi
-          set +e
-          env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+          failed_names_file="$CAPTURE_ROOT/test-failures.names.txt"
+          if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             HARNESS_CAPTURE_OUT="$output_path" \
-            go test -p 1 -count=1 -v ./.temp/original-capture/harnessparity \
-            > "$CAPTURE_ROOT/test-output.raw.txt" 2>&1
-          test_exit=$?
-          set -e
-          set +e
-          env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity \
+            > "$CAPTURE_ROOT/test-output.raw.txt" 2>&1; then
+            test_exit=0
+          else
+            test_exit=$?
+          fi
+          if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             go run "$CAPTURE_ROOT/audit.go" "$CAPTURE_ROOT/test-output.raw.txt" \
-            "$CAPTURE_ROOT/raw-output" "$test_exit" \
-            > "$CAPTURE_ROOT/audit-metrics.raw.txt" 2> "$CAPTURE_ROOT/audit-error.raw.txt"
-          audit_exit=$?
-          set -e
-          cat "$CAPTURE_ROOT/audit-metrics.raw.txt" "$CAPTURE_ROOT/audit-error.raw.txt" \
-            > "$CAPTURE_ROOT/audit-output.raw.txt"
+            "$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" \
+            > "$CAPTURE_ROOT/audit-metrics.raw.txt" 2> "$CAPTURE_ROOT/audit-error.raw.txt"; then
+            audit_exit=0
+          else
+            audit_exit=$?
+          fi
+          cat "$CAPTURE_ROOT/audit-metrics.raw.txt" > "$CAPTURE_ROOT/audit-output.raw.txt"
           audit_metrics=()
           audit_metric_count=0
           metrics_valid=true
@@ -432,6 +545,38 @@ jobs:
             printf '### Native capture: %s (%s)\n\n' "$RUNNER_OS" "$RUNNER_ARCH"
             printf 'Test command exit: %s. Go audit command exit: %s.\n' "$test_exit" "$audit_exit"
           } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$audit_exit" -ne 0 ]]; then
+            if [[ "$metrics_valid" != "true" ]]; then
+              audit_reason_line='CAPTURE_REASON=capture/audit-metrics-invalid'
+            else
+              reason_found=false
+              audit_reason_line=''
+              while IFS= read -r line; do
+                if [[ "$line" =~ ^CAPTURE_REASON=capture/[a-z0-9-]+$ ]]; then
+                  audit_reason_line="$line"
+                  reason_found=true
+                  break
+                fi
+              done < "$CAPTURE_ROOT/audit-error.raw.txt"
+              if [[ "$reason_found" != "true" ]]; then
+                audit_reason_line='CAPTURE_REASON=capture/audit-command-failed'
+              fi
+            fi
+            printf '%s\n' "$audit_reason_line" >> "$CAPTURE_ROOT/audit-output.raw.txt"
+            printf '%s\n' "$audit_reason_line" >&2
+            if [[ "$audit_metric_count" -gt 0 ]]; then
+              for line in "${audit_metrics[@]}"; do
+                printf 'CAPTURE_COUNT %s\n' "$line" >&2
+              done
+            fi
+            if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then
+              while IFS= read -r line; do
+                if [[ "$line" =~ ^CAPTURE_FAIL\ Package=([A-Za-z0-9_./-]+)\ Test=([A-Za-z0-9_./-]*)$ ]]; then
+                  printf 'CAPTURE_FAIL Package=%s Test=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" >&2
+                fi
+              done < "$failed_names_file"
+            fi
+          fi
           exit "$audit_exit"
 
       - name: Sanitize and verify artifact contents
@@ -443,6 +588,13 @@ jobs:
           REQUIRE_47: ${{ steps.capture.outcome == 'success' }}
         run: |
           set -euo pipefail
+          sanitize_shell_error() {
+            local status=$?
+            trap - ERR
+            printf 'CAPTURE_REASON=sanitize/shell-command-failed\n' >&2
+            exit "$status"
+          }
+          trap sanitize_shell_error ERR
           cd "$GITHUB_WORKSPACE"
           cat > "$CAPTURE_ROOT/sanitize.go" <<'GO'
           package main
@@ -462,6 +614,78 @@ jobs:
           )
 
           const marker = "<redacted:category>"
+
+          const (
+            reasonInternal = "sanitize/internal-failure"
+            reasonSelfCheckField = "sanitize/selfcheck-field-control"
+            reasonSelfCheckCredential = "sanitize/selfcheck-credential-control"
+            reasonSelfCheckPath = "sanitize/selfcheck-path-control"
+            reasonSelfCheckSplitPath = "sanitize/selfcheck-split-path-control"
+            reasonSelfCheckBlob = "sanitize/selfcheck-decoded-blob-control"
+            reasonSelfCheckManifest = "sanitize/selfcheck-manifest-control"
+            reasonSelfCheckManifestContents = "sanitize/selfcheck-manifest-contents-control"
+            reasonArguments = "sanitize/invalid-arguments"
+            reasonOutputCreate = "sanitize/output-create-failed"
+            reasonRawList = "sanitize/raw-output-list-failed"
+            reasonRawEntry = "sanitize/raw-output-entry-unexpected"
+            reasonRawRead = "sanitize/raw-output-read-failed"
+            reasonRawJSON = "sanitize/raw-output-invalid-json"
+            reasonOutputMarshal = "sanitize/output-json-encode-failed"
+            reasonOutputWrite = "sanitize/output-write-failed"
+            reasonOutputCount = "sanitize/output-count-incomplete"
+            reasonManifestList = "sanitize/manifest-list-failed"
+            reasonManifestEntry = "sanitize/manifest-entry-unexpected"
+            reasonManifestRead = "sanitize/manifest-file-read-failed"
+            reasonManifestEncode = "sanitize/manifest-encode-failed"
+            reasonManifestWrite = "sanitize/manifest-write-failed"
+            reasonManifestVerify = "sanitize/manifest-verification-failed"
+            reasonLogRead = "sanitize/log-read-failed"
+            reasonLogUnsafe = "sanitize/log-unsafe-text"
+            reasonLogWrite = "sanitize/log-write-failed"
+            reasonArtifactLogRead = "sanitize/artifact-log-read-failed"
+            reasonArtifactLogUnsafe = "sanitize/artifact-log-unsafe-text"
+            reasonSanitizedOutputList = "sanitize/sanitized-output-list-failed"
+            reasonSanitizedOutputRead = "sanitize/sanitized-output-read-failed"
+            reasonSanitizedOutputJSON = "sanitize/sanitized-output-invalid-json"
+            reasonUnsafeSensitiveKey = "sanitize/unsafe-sensitive-key"
+            reasonUnsafeText = "sanitize/unsafe-text-remains"
+            reasonUnsafeDecodedBlob = "sanitize/unsafe-decoded-blob"
+          )
+
+          type sanitizeFailure struct {
+            code string
+            fileIndex int
+            fileCount int
+            jsonPath string
+          }
+
+          func (failure sanitizeFailure) Error() string {
+            output := "CAPTURE_REASON=" + failure.code
+            if failure.fileCount > 0 {
+              output += fmt.Sprintf(" file=%d/%d", failure.fileIndex, failure.fileCount)
+            }
+            if failure.jsonPath != "" {
+              output += " path=" + failure.jsonPath
+            }
+            return output
+          }
+
+          func refuse(code string, fileIndex, fileCount int, jsonPath string) error {
+            return sanitizeFailure{code: code, fileIndex: fileIndex, fileCount: fileCount, jsonPath: jsonPath}
+          }
+
+          var safeJSONKey = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
+
+          func childPath(parent, key string) string {
+            if safeJSONKey.MatchString(key) {
+              return parent + "." + key
+            }
+            return parent
+          }
+
+          func arrayPath(parent string, index int) string {
+            return fmt.Sprintf("%s[%d]", parent, index)
+          }
 
           var valuePatterns = []*regexp.Regexp{
             regexp.MustCompile("(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}"),
@@ -601,43 +825,50 @@ jobs:
             return assignmentPattern.MatchString(value)
           }
 
-          func unsafeBlob(data []byte) bool {
+          func unsafeBlob(data []byte) string {
             var value any
             if json.Unmarshal(data, &value) == nil {
-              return unsafeValue(value)
+              code, _ := unsafeValue(value, "$")
+              return code
             }
-            return unsafeText(string(data))
+            if unsafeText(string(data)) { return reasonUnsafeText }
+            return ""
           }
 
-          func unsafeValue(value any) bool {
+          func unsafeValue(value any, path string) (string, string) {
             switch current := value.(type) {
             case map[string]any:
-              for key, child := range current {
+              keys := make([]string, 0, len(current))
+              for key := range current { keys = append(keys, key) }
+              sort.Strings(keys)
+              for _, key := range keys {
+                child := current[key]
+                keyPath := childPath(path, key)
                 if sensitiveName(key) {
-                  return true
+                  return reasonUnsafeSensitiveKey, keyPath
                 }
                 if key == "bytes" || key == "document" {
                   if encoded, ok := child.(string); ok {
                     decoded, err := base64.StdEncoding.DecodeString(encoded)
-                    if err == nil && unsafeBlob(decoded) {
-                      return true
+                    if err == nil && unsafeBlob(decoded) != "" {
+                      return reasonUnsafeDecodedBlob, keyPath
                     }
                   }
                 }
-                if unsafeValue(child) {
-                  return true
+                if code, unsafePath := unsafeValue(child, keyPath); code != "" {
+                  return code, unsafePath
                 }
               }
             case []any:
-              for _, child := range current {
-                if unsafeValue(child) {
-                  return true
+              for index, child := range current {
+                if code, unsafePath := unsafeValue(child, arrayPath(path, index)); code != "" {
+                  return code, unsafePath
                 }
               }
             case string:
-              return unsafeText(current)
+              if unsafeText(current) { return reasonUnsafeText, path }
             }
-            return false
+            return "", ""
           }
 
           type manifestEntry struct {
@@ -653,19 +884,19 @@ jobs:
           func buildManifest(directory string) (outputManifest, error) {
             result := outputManifest{Files: []manifestEntry{}}
             entries, err := os.ReadDir(directory)
-            if err != nil { return result, err }
-            for _, entry := range entries {
+            if err != nil { return result, refuse(reasonManifestList, 0, 0, "$") }
+            for index, entry := range entries {
               if entry.IsDir() {
-                return result, fmt.Errorf("unexpected output manifest entry")
+                return result, refuse(reasonManifestEntry, index+1, len(entries), "$")
               }
               if entry.Name() == "MANIFEST.json" {
                 continue
               }
               if filepath.Ext(entry.Name()) != ".json" {
-                return result, fmt.Errorf("unexpected output manifest entry")
+                return result, refuse(reasonManifestEntry, index+1, len(entries), "$")
               }
               data, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-              if err != nil { return result, err }
+              if err != nil { return result, refuse(reasonManifestRead, index+1, len(entries), "$") }
               digest := sha256.Sum256(data)
               result.Files = append(result.Files, manifestEntry{
                 Path: entry.Name(), Bytes: int64(len(data)), SHA256: hex.EncodeToString(digest[:]),
@@ -679,53 +910,62 @@ jobs:
             expected, err := buildManifest(directory)
             if err != nil { return err }
             encoded, err := json.MarshalIndent(expected, "", "  ")
-            if err != nil { return err }
+            if err != nil { return refuse(reasonManifestEncode, 0, 0, "$") }
             encoded = append(encoded, '\n')
             path := filepath.Join(directory, "MANIFEST.json")
-            if err := os.WriteFile(path, encoded, 0600); err != nil { return err }
+            if err := os.WriteFile(path, encoded, 0600); err != nil { return refuse(reasonManifestWrite, 0, 0, "$") }
             actualBytes, err := os.ReadFile(path)
-            if err != nil { return err }
+            if err != nil { return refuse(reasonManifestRead, 0, 0, "$") }
             var actual outputManifest
-            if err := json.Unmarshal(actualBytes, &actual); err != nil { return err }
+            if err := json.Unmarshal(actualBytes, &actual); err != nil { return refuse(reasonManifestVerify, 0, 0, "$") }
             recomputed, err := buildManifest(directory)
             if err != nil { return err }
             if !reflect.DeepEqual(expected, actual) || !reflect.DeepEqual(expected, recomputed) {
-              return fmt.Errorf("output manifest verification failed")
+              return refuse(reasonManifestVerify, 0, 0, "$")
             }
             return nil
           }
 
-          func sanitizeTextFile(source, destination string) error {
+          func sanitizeTextFile(source, destination string, fileIndex, fileCount int) error {
             data, err := os.ReadFile(source)
             if err != nil {
-              return err
+              return refuse(reasonLogRead, fileIndex, fileCount, "$")
             }
             cleaned, count := redactText(string(data))
             redactedValues += count
             if unsafeText(cleaned) {
-              return fmt.Errorf("unsafe text remains")
+              return refuse(reasonLogUnsafe, fileIndex, fileCount, "$")
             }
-            return os.WriteFile(destination, []byte(cleaned), 0600)
+            if err := os.WriteFile(destination, []byte(cleaned), 0600); err != nil {
+              return refuse(reasonLogWrite, fileIndex, fileCount, "$")
+            }
+            return nil
           }
 
           func selfCheck() error {
             for _, key := range []string{"api_token", "apiKey", "privateKey", "refreshToken"} {
               input := map[string]any{key: "ghp_" + strings.Repeat("A", 30), "safe": "ordinary"}
+              inputCode, _ := unsafeValue(input, "$")
               cleaned, count := sanitizeValue(input)
               encoded, _ := json.Marshal(cleaned)
               object, ok := cleaned.(map[string]any)
               wantObject := map[string]any{"safe": "ordinary", "_redacted": []any{marker}}
-              if count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) ||
+              if inputCode == "" || count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) ||
                   strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
                   !strings.Contains(string(encoded), marker) {
-                return fmt.Errorf("field redaction control failed")
+                return refuse(reasonSelfCheckField, 0, 0, "$")
               }
             }
             input := "safe prefix Bearer abcdefghijklmnop safe suffix"
             text, count := redactText(input)
             want := "safe prefix " + marker + " safe suffix"
-            if count != 1 || text != want || unsafeText(text) {
-              return fmt.Errorf("credential-value control failed")
+            if !unsafeText(input) || count != 1 || text != want || unsafeText(text) {
+              return refuse(reasonSelfCheckCredential, 0, 0, "$")
+            }
+            assignment := "credential_conflict_token: " + marker
+            cleanedAssignment, assignmentCount := redactText(assignment)
+            if !unsafeText(assignment) || assignmentCount != 1 || cleanedAssignment != marker || unsafeText(cleanedAssignment) {
+              return refuse(reasonSelfCheckCredential, 0, 0, "$")
             }
             for _, credential := range []string{
               "sk_live_" + strings.Repeat("A", 16),
@@ -735,41 +975,92 @@ jobs:
               input := "safe prefix " + credential + " safe suffix"
               cleaned, count := redactText(input)
               want := "safe prefix " + marker + " safe suffix"
-              if count != 1 || cleaned != want || unsafeText(cleaned) {
-                return fmt.Errorf("additional credential-value control failed")
+              if !unsafeText(input) || count != 1 || cleaned != want || unsafeText(cleaned) {
+                return refuse(reasonSelfCheckCredential, 0, 0, "$")
               }
             }
-            windowsHome := "D:\\a\\_temp\\original-capture-123-1\\home\\.gitconfig"
-            homeInput := "safe prefix " + windowsHome + " safe suffix"
-            cleanedHome, pathCount := redactText(homeInput)
-            if pathCount != 1 || cleanedHome != "safe prefix "+marker+" safe suffix" || unsafeText(cleanedHome) {
-              return fmt.Errorf("Windows private-home control failed")
+            for _, privateHome := range []string{
+              "D:\\a\\_temp\\original-capture-123-1\\home\\.gitconfig",
+              "/Users/runner/work/repository/home/.gitconfig",
+              "/home/runner/.config/curator/state",
+              "D:/a/_temp/original-capture-123-1/home/.gitconfig",
+            } {
+              homeInput := "safe prefix " + privateHome + " safe suffix"
+              cleanedHome, pathCount := redactText(homeInput)
+              if !unsafeText(homeInput) || pathCount != 1 || cleanedHome != "safe prefix "+marker+" safe suffix" || unsafeText(cleanedHome) {
+                return refuse(reasonSelfCheckPath, 0, 0, "$")
+              }
+            }
+            splitPath := "/Users/runner/" + "HOSTILE_SECRET_DIAGCONTROL" + "/repository"
+            cleanedSplitPath, splitPathCount := redactText(splitPath)
+            if !unsafeText(splitPath) || splitPathCount < 1 || unsafeText(cleanedSplitPath) {
+              return refuse(reasonSelfCheckSplitPath, 0, 0, "$")
+            }
+            safeBlob := []byte(`{"payload":"ordinary"}`)
+            secretBlob := []byte(`{"payload":"/Users/runner/private"}`)
+            safeBlobDigest := sha256.Sum256(safeBlob)
+            secretBlobDigest := sha256.Sum256(secretBlob)
+            safeShape := map[string]any{
+              "bytes": base64.StdEncoding.EncodeToString(safeBlob),
+              "sha256": hex.EncodeToString(safeBlobDigest[:]),
+            }
+            safeShapeCleaned, safeShapeCount := sanitizeValue(safeShape)
+            safeShapeCode, _ := unsafeValue(safeShapeCleaned, "$")
+            originalSafeCode, _ := unsafeValue(safeShape, "$")
+            if originalSafeCode != "" || safeShapeCount != 0 || safeShapeCode != "" {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            }
+            secretShape := map[string]any{
+              "bytes": base64.StdEncoding.EncodeToString(secretBlob),
+              "sha256": hex.EncodeToString(secretBlobDigest[:]),
+            }
+            secretOriginalCode, _ := unsafeValue(secretShape, "$")
+            secretShapeCleaned, secretShapeCount := sanitizeValue(secretShape)
+            secretShapeObject, ok := secretShapeCleaned.(map[string]any)
+            if !ok || secretOriginalCode != reasonUnsafeDecodedBlob || secretShapeCount == 0 || unsafeBlob(secretBlob) == "" {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            }
+            sanitizedEncoded, ok := secretShapeObject["bytes"].(string)
+            if !ok {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            }
+            sanitizedBlob, err := base64.StdEncoding.DecodeString(sanitizedEncoded)
+            if err != nil || unsafeBlob(sanitizedBlob) != "" {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            }
+            sanitizedBlobDigest := sha256.Sum256(sanitizedBlob)
+            if secretShapeObject["sha256"] != hex.EncodeToString(sanitizedBlobDigest[:]) {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            }
+            sanitizedShapeCode, _ := unsafeValue(secretShapeCleaned, "$")
+            if sanitizedShapeCode != "" {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
             }
             manifestDir, err := os.MkdirTemp("", "capture-manifest-check-")
             if err != nil {
-              return err
+              return refuse(reasonSelfCheckManifest, 0, 0, "$")
             }
             defer os.RemoveAll(manifestDir)
             fixture := []byte("{\"ok\":true}\n")
             if err := os.WriteFile(filepath.Join(manifestDir, "one.json"), fixture, 0600); err != nil {
-              return err
+              return refuse(reasonSelfCheckManifest, 0, 0, "$")
             }
             if err := writeVerifiedManifest(manifestDir); err != nil {
-              return fmt.Errorf("positive manifest control failed: %w", err)
+              return refuse(reasonSelfCheckManifest, 0, 0, "$")
             }
             manifestBytes, err := os.ReadFile(filepath.Join(manifestDir, "MANIFEST.json"))
             if err != nil {
-              return err
+              return refuse(reasonSelfCheckManifest, 0, 0, "$")
             }
             var manifest outputManifest
             if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
-              return err
+              return refuse(reasonSelfCheckManifest, 0, 0, "$")
             }
             digest := sha256.Sum256(fixture)
             if len(manifest.Files) != 1 || manifest.Files[0].Path != "one.json" ||
                 manifest.Files[0].Bytes != int64(len(fixture)) ||
                 manifest.Files[0].SHA256 != hex.EncodeToString(digest[:]) {
-              return fmt.Errorf("positive manifest contents control failed")
+              return refuse(reasonSelfCheckManifestContents, 0, 0, "$")
             }
             return nil
           }
@@ -781,30 +1072,30 @@ jobs:
             redactedFields = 0
             redactedValues = 0
             if len(os.Args) != 4 {
-              return fmt.Errorf("invalid sanitizer arguments")
+              return refuse(reasonArguments, 0, 0, "$")
             }
             rawDir, artifactDir := os.Args[1], os.Args[2]
             require47 := os.Args[3] == "true"
             outputDir := filepath.Join(artifactDir, "outputs")
             if err := os.MkdirAll(outputDir, 0700); err != nil {
-              return err
+              return refuse(reasonOutputCreate, 0, 0, "$")
             }
             entries, err := os.ReadDir(rawDir)
             if err != nil {
-              return err
+              return refuse(reasonRawList, 0, 0, "$")
             }
             jsonCount := 0
-            for _, entry := range entries {
+            for index, entry := range entries {
               if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-                return fmt.Errorf("unexpected capture output entry")
+                return refuse(reasonRawEntry, index+1, len(entries), "$")
               }
               input, err := os.ReadFile(filepath.Join(rawDir, entry.Name()))
               if err != nil {
-                return err
+                return refuse(reasonRawRead, index+1, len(entries), "$")
               }
               var value any
               if err := json.Unmarshal(input, &value); err != nil {
-                return fmt.Errorf("capture output is not valid JSON")
+                return refuse(reasonRawJSON, index+1, len(entries), "$")
               }
               cleaned, found := sanitizeValue(value)
               var output []byte
@@ -813,50 +1104,57 @@ jobs:
               } else {
                 output, err = json.MarshalIndent(cleaned, "", "  ")
                 if err != nil {
-                  return err
+                  return refuse(reasonOutputMarshal, index+1, len(entries), "$")
                 }
                 output = append(output, '\n')
               }
               if err := os.WriteFile(filepath.Join(outputDir, entry.Name()), output, 0600); err != nil {
-                return err
+                return refuse(reasonOutputWrite, index+1, len(entries), "$")
               }
               jsonCount++
             }
             if jsonCount > 47 || (require47 && jsonCount != 47) {
-              return fmt.Errorf("capture output count is incomplete")
+              return refuse(reasonOutputCount, 0, 0, "$")
             }
             if err := writeVerifiedManifest(outputDir); err != nil {
               return err
             }
             logs := []struct{ source, destination string }{
-              {filepath.Join(filepath.Dir(rawDir), "test-output.raw.txt"), filepath.Join(artifactDir, "test-output.txt")},
               {filepath.Join(filepath.Dir(rawDir), "audit-output.raw.txt"), filepath.Join(artifactDir, "audit-output.txt")},
               {filepath.Join(filepath.Dir(rawDir), "module-download.raw.txt"), filepath.Join(artifactDir, "module-download.txt")},
               {filepath.Join(filepath.Dir(rawDir), "source-verification.log"), filepath.Join(artifactDir, "source-verification.txt")},
+              {filepath.Join(filepath.Dir(rawDir), "test-output.raw.txt"), filepath.Join(artifactDir, "test-output.txt")},
             }
-            for _, log := range logs {
-              if err := sanitizeTextFile(log.source, log.destination); err != nil {
+            for index, log := range logs {
+              if err := sanitizeTextFile(log.source, log.destination, index+1, len(logs)); err != nil {
                 return err
               }
             }
-            for _, entry := range []string{"test-output.txt", "audit-output.txt", "module-download.txt", "source-verification.txt"} {
+            artifactLogs := []string{"audit-output.txt", "module-download.txt", "source-verification.txt", "test-output.txt"}
+            for index, entry := range artifactLogs {
               data, err := os.ReadFile(filepath.Join(artifactDir, entry))
-              if err != nil || unsafeText(string(data)) {
-                return fmt.Errorf("unsafe artifact log remains")
+              if err != nil {
+                return refuse(reasonArtifactLogRead, index+1, len(artifactLogs), "$")
+              }
+              if unsafeText(string(data)) {
+                return refuse(reasonArtifactLogUnsafe, index+1, len(artifactLogs), "$")
               }
             }
             files, err := os.ReadDir(outputDir)
             if err != nil {
-              return err
+              return refuse(reasonSanitizedOutputList, 0, 0, "$")
             }
-            for _, entry := range files {
+            for index, entry := range files {
               data, err := os.ReadFile(filepath.Join(outputDir, entry.Name()))
               if err != nil {
-                return err
+                return refuse(reasonSanitizedOutputRead, index+1, len(files), "$")
               }
               var value any
-              if err := json.Unmarshal(data, &value); err != nil || unsafeValue(value) {
-                return fmt.Errorf("unsafe capture output remains")
+              if err := json.Unmarshal(data, &value); err != nil {
+                return refuse(reasonSanitizedOutputJSON, index+1, len(files), "$")
+              }
+              if code, jsonPath := unsafeValue(value, "$"); code != "" {
+                return refuse(code, index+1, len(files), jsonPath)
               }
             }
             fmt.Printf("sanitized_json_files=%d\nredacted_fields=%d\nredacted_values=%d\n", jsonCount, redactedFields, redactedValues)
@@ -865,7 +1163,11 @@ jobs:
 
           func main() {
             if err := run(); err != nil {
-              fmt.Fprintln(os.Stderr, err)
+              if failure, ok := err.(sanitizeFailure); ok {
+                fmt.Fprintln(os.Stderr, failure.Error())
+              } else {
+                fmt.Fprintln(os.Stderr, "CAPTURE_REASON="+reasonInternal)
+              }
               os.Exit(1)
             }
           }
@@ -904,7 +1206,10 @@ jobs:
           )
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             systemroot="${SYSTEMROOT:-${WINDIR:-}}"
-            [[ -n "$systemroot" ]] || exit 2
+            if [[ -z "$systemroot" ]]; then
+              printf 'CAPTURE_REASON=sanitize/systemroot-missing\n' >&2
+              exit 2
+            fi
             trusted_path="$trusted_path:$(cygpath -u "$systemroot")/System32"
             clean_env[13]="PATH=$trusted_path"
             clean_env+=("SYSTEMROOT=$systemroot" "WINDIR=${WINDIR:-$systemroot}" \
@@ -914,15 +1219,17 @@ jobs:
             trusted_path="$trusted_path:/usr/bin:/bin"
             clean_env[13]="PATH=$trusted_path"
           fi
-          set +e
-          env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+          if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             go run "$CAPTURE_ROOT/sanitize.go" \
             "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/artifact" "$REQUIRE_47" \
-            > "$CAPTURE_ROOT/sanitizer.log" 2>&1
-          sanitize_exit=$?
-          set -e
+            > "$CAPTURE_ROOT/sanitizer.log" 2>&1; then
+            sanitize_exit=0
+          else
+            sanitize_exit=$?
+          fi
           sanitizer_metrics=()
           sanitizer_metric_count=0
+          sanitizer_metrics_invalid=false
           if [[ "$sanitize_exit" -eq 0 ]]; then
             metrics_valid=true
             while IFS= read -r line; do
@@ -939,12 +1246,29 @@ jobs:
             done < "$CAPTURE_ROOT/sanitizer.log"
             if [[ "$metrics_valid" != "true" || "$sanitizer_metric_count" -ne 3 ]]; then
               sanitize_exit=2
+              sanitizer_metrics_invalid=true
             fi
           fi
           printf 'exit_code=%s\n' "$sanitize_exit" >> "$GITHUB_OUTPUT"
           if [[ "$sanitize_exit" -eq 0 ]]; then
             printf '%s\n' "${sanitizer_metrics[@]}" >> "$GITHUB_OUTPUT"
           else
+            if [[ "$sanitizer_metrics_invalid" == "true" ]]; then
+              printf 'CAPTURE_REASON=sanitize/metrics-invalid\n' >&2
+            else
+              reason_pattern='^CAPTURE_REASON=sanitize/[a-z0-9-]+( file=[0-9]+/[0-9]+)?( path=\$([A-Za-z0-9_.-]+|\[[0-9]+\])*)?$'
+              reason_found=false
+              while IFS= read -r line; do
+                if [[ "$line" =~ $reason_pattern ]]; then
+                  printf '%s\n' "$line" >&2
+                  reason_found=true
+                  break
+                fi
+              done < "$CAPTURE_ROOT/sanitizer.log"
+              if [[ "$reason_found" != "true" ]]; then
+                printf 'CAPTURE_REASON=sanitize/tool-command-failed\n' >&2
+              fi
+            fi
             echo "Artifact sanitization failed; refusing export." >&2
           fi
           exit "$sanitize_exit"
@@ -963,6 +1287,7 @@ jobs:
           MODULE_OUTCOME: ${{ steps.modules.outcome }}
           MODULE_EXIT: ${{ steps.modules.outputs.exit_code || 'not-run' }}
           CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          CAPTURE_UMASK: ${{ steps.capture.outputs.posix_umask || 'not-recorded' }}
           CAPTURE_EXIT: ${{ steps.capture.outputs.test_command_exit || 'not-run' }}
           AUDIT_EXIT: ${{ steps.capture.outputs.audit_exit || 'not-run' }}
           CASE_EXECUTED: ${{ steps.capture.outputs.executed || '0' }}
@@ -1013,7 +1338,7 @@ jobs:
             git_exit=$?
             set -e
           fi
-          base="643e727edd2db21307ca6d8c0332935e33d50ac8"
+          base="ffd2cf65da2c0afdf46bf45a39aad74b3d59ab04"
           head=""
           head_exit=1
           if head="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD 2>/dev/null)"; then head_exit=0; fi
@@ -1025,6 +1350,12 @@ jobs:
           if working_status="$(git -C "$GITHUB_WORKSPACE" status --porcelain --untracked-files=all 2>/dev/null)"; then working_status_exit=0; fi
           working_clean=false
           if [[ "$working_status_exit" -eq 0 && -z "$working_status" ]]; then working_clean=true; fi
+          umask_valid=false
+          if [[ "$RUNNER_OS" == "Windows" && "$CAPTURE_UMASK" == "not-applicable" ]]; then
+            umask_valid=true
+          elif [[ "$RUNNER_OS" == "macOS" && "$CAPTURE_UMASK" == "0077" ]]; then
+            umask_valid=true
+          fi
           original_tree_clean=false
           baseline_diff_exit=1
           if [[ -n "$head" ]]; then
@@ -1037,13 +1368,7 @@ jobs:
               baseline_diff_exit=$?
             fi
           fi
-          expected_paths="$(printf '%s\n' \
-            '.github/workflows/original-capture-native.yml' \
-            'testdata/originalcapture/capture_homes_test.go' \
-            'testdata/originalcapture/capture_launchers_test.go' \
-            'testdata/originalcapture/controls_test.go' \
-            'testdata/originalcapture/launcher_fixture_test.go' \
-            'testdata/originalcapture/legacy_fixture_test.go' | LC_ALL=C sort)"
+          expected_paths='.github/workflows/original-capture-native.yml'
           actual_paths=""
           write_set_exit=1
           if [[ -n "$head" ]]; then
@@ -1060,7 +1385,8 @@ jobs:
                 "$SOURCE_OUTCOME" == "success" && "$MODULE_OUTCOME" == "success" &&
                 "$CAPTURE_OUTCOME" == "success" && "$SANITIZER_OUTCOME" == "success" &&
                 "$working_clean" == "true" && "$original_tree_clean" == "true" &&
-                "$write_set_exact" == "true" && "$base_is_parent" == "true" ]]; then
+                "$write_set_exact" == "true" && "$base_is_parent" == "true" &&
+                "$umask_valid" == "true" ]]; then
             lane_verdict=pass
           fi
           {
@@ -1068,6 +1394,7 @@ jobs:
             printf 'workflow_run_id=%s\nworkflow_run_attempt=%s\nworkflow_run_url=https://github.com/%s/actions/runs/%s\n' \
               "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             printf 'checkout_outcome=%s\ngo_setup_outcome=%s\n' "$CHECKOUT_OUTCOME" "$GO_SETUP_OUTCOME"
+            printf 'posix-umask=%s\n' "$CAPTURE_UMASK"
             printf 'GOOS=%s\nGOARCH=%s\ngo_version=%s\ngo_version_exit=%s\ngoos_exit=%s\ngoarch_exit=%s\n' \
               "$goos" "$goarch" "$go_version" "$go_exit" "$goos_exit" "$goarch_exit"
             printf 'git_version=%s\ngit_version_exit=%s\nhead=%s\nparent=%s\n' "$git_version" "$git_exit" "$head" "$head_parent"
@@ -1075,9 +1402,9 @@ jobs:
               "$head_exit" "$parent_exit" "$working_status_exit" "$baseline_diff_exit" "$write_set_exit"
             printf 'source_verification_outcome=%s\nsource_verification_exit=%s\n' "$SOURCE_OUTCOME" "$SOURCE_EXIT"
             printf 'module_command=go mod download\nmodule_outcome=%s\nmodule_exit=%s\n' "$MODULE_OUTCOME" "$MODULE_EXIT"
-            printf 'test_command=go test -p 1 -count=1 -v ./.temp/original-capture/harnessparity\n'
+            printf 'test_command=go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity\n'
             printf 'test_outcome=%s\ntest_exit=%s\n' "$CAPTURE_OUTCOME" "$CAPTURE_EXIT"
-            printf 'audit_command=go run <runner-temp>/audit.go <test-log> <output-directory> <test-exit>\naudit_exit=%s\n' "$AUDIT_EXIT"
+            printf 'audit_command=go run <runner-temp>/audit.go <test-log> <output-directory> <test-exit> <failure-names-file>\naudit_exit=%s\n' "$AUDIT_EXIT"
             printf 'case_rows_executed=%s\ncase_rows_passed=%s\ncase_rows_failed=%s\ncase_rows_skipped=%s\n' \
               "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
             printf 'repeat_seen=%s\nrepeat_passed=%s\ncomparator_rows=%s\ncomparator_passed=%s\n' \
