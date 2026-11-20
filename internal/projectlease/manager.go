@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	homeleasestate "github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/stateread"
@@ -153,6 +154,9 @@ func (m *Manager) acquireUnderLock(ctx context.Context, r Request, l *ledger, lo
 		return err
 	}
 	// Authority and session callbacks may have observed artifacts earlier.
+	if err := homeleasestate.GuardMutation(m.home, lock, "project-leases", []string{filepath.Join(m.home, homeRelative(c))}); err != nil {
+		return err
+	}
 	// Recheck presence while the exact-home lock excludes the collector, before
 	// a durable lease can claim roots that no longer exist.
 	if err = m.verifyArtifacts(c); err != nil {
@@ -377,6 +381,9 @@ func (m *Manager) publishView(ctx context.Context, id, ref, sha, owner string, f
 			// A generated receipt can be empty; the native writable home still
 			// exists before transfer. Existing directories are never hardened.
 			projectHome := filepath.Join(m.home, key)
+			if err := homeleasestate.GuardMutation(m.home, lock, "project-leases", []string{projectHome}); err != nil {
+				return err
+			}
 			if err = checkedRoute(m.home, projectHome); err != nil {
 				return err
 			}
@@ -581,6 +588,54 @@ func (m *Manager) Status(ctx context.Context) ([]Status, error) {
 		result = append(result, s)
 	}
 	return result, nil
+}
+
+// GuardMutation protects busy project homes from direct writers owned by other
+// subsystems. Nil targets means all homes; an empty nonnil set means no writes.
+// The caller retains the same acquisition through its last native write.
+func GuardMutation(home string, lock transaction.HomeLock, targets []string) error {
+	if !HasState(home) {
+		return nil
+	}
+	manager, err := managerlock.New(home)
+	if err != nil {
+		return err
+	}
+	home = manager.Home()
+	// Reuse the qualified witness, pending-intent and ledger read boundary.
+	if _, err := ReferencesUnderLock(home, lock); err != nil {
+		return err
+	}
+	l, err := load(home)
+	if err != nil {
+		return err
+	}
+	blockingSessions := map[string]bool{}
+	for _, e := range l.Leases {
+		if e.State == Released {
+			continue
+		}
+		overlaps := targets == nil
+		for _, target := range targets {
+			match, err := homeleasestate.Overlap(target, filepath.Join(home, homeRelative(e.Composition)))
+			if err != nil {
+				return fmt.Errorf("project mutation target unavailable: %w", err)
+			}
+			overlaps = overlaps || match
+		}
+		if overlaps {
+			blockingSessions[e.Binding.SessionRef] = true
+		}
+	}
+	if len(blockingSessions) == 0 {
+		return nil
+	}
+	ordered := make([]string, 0, len(blockingSessions))
+	for session := range blockingSessions {
+		ordered = append(ordered, session)
+	}
+	sort.Strings(ordered)
+	return fmt.Errorf("%s: sessions %s retain this home; wait or end the owning sessions", Busy, strings.Join(ordered, ", "))
 }
 
 // ReferencesUnderLock is the GC boundary. A corrupt or unreadable ledger is an

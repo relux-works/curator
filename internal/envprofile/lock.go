@@ -43,7 +43,28 @@ type operation struct {
 
 // newOperationEngine keeps recovery observation available to entry-point tests.
 var newOperationEngine = func(home string, options ...transaction.Option) (*transaction.Engine, error) {
-	return transaction.New(home, append([]transaction.Option{transaction.WithCommitCheck(projectlease.TransactionCheck(home))}, options...)...)
+	check := func(lock transaction.HomeLock, journal transaction.Journal) error {
+		if journal.ProjectIdentity == "project-leases" {
+			return projectlease.TransactionCheck(home)(lock, journal)
+		}
+		return guardProjectLeaseJournal(home, lock, journal)
+	}
+	// The lease dispatch is the base policy; a caller-supplied final check
+	// (admission revalidation plus this dispatch) overrides it, as on main.
+	return transaction.New(home, append([]transaction.Option{transaction.WithCommitCheck(check)}, options...)...)
+}
+
+// Foreign publication and the complete recovery inventory use the same physical
+// project-home target gate. Project-owned journals retain their artifact policy.
+func guardProjectLeaseJournal(home string, lock transaction.HomeLock, journal transaction.Journal) error {
+	if journal.ProjectIdentity == "project-leases" {
+		return nil
+	}
+	targets := make([]string, 0, len(journal.Targets))
+	for _, target := range journal.Targets {
+		targets = append(targets, target.LivePath)
+	}
+	return projectlease.GuardMutation(home, lock, targets)
 }
 
 // beginCaptureOperation never provisions a home or invokes recovery. The
@@ -102,7 +123,7 @@ func beginOperationValidated(home string, validateInputs func() error, options .
 	if err := skillruntime.RefuseUnadmitted(home); err != nil {
 		return nil, err
 	}
-	return beginOperationChecked(home, validateInputs, nil, options...)
+	return beginOperationGuarded(home, validateInputs, nil, options...)
 }
 
 func beginOperationAdmitted(home string, revalidateAdmission func() error) (*operation, error) {
@@ -112,7 +133,22 @@ func beginOperationAdmitted(home string, revalidateAdmission func() error) (*ope
 	return beginOperationChecked(home, nil, revalidateAdmission)
 }
 
+func beginOperationSelected(home string, validate func() error, selectTargets func() ([]string, error), options ...transaction.Option) (*operation, error) {
+	return beginOperationSelectedRecovery(home, validate, selectTargets, true, options...)
+}
+
+func beginOperationSelectedRecovery(home string, validate func() error, selectTargets func() ([]string, error), recoverPending bool, options ...transaction.Option) (*operation, error) {
+	if err := skillruntime.RefuseUnadmitted(home); err != nil {
+		return nil, err
+	}
+	return beginOperationCheckedLease(home, validate, nil, selectTargets, recoverPending, options...)
+}
+
 func beginOperationChecked(home string, validateInputs, revalidateAdmission func() error, options ...transaction.Option) (*operation, error) {
+	return beginOperationCheckedLease(home, validateInputs, revalidateAdmission, nil, true, options...)
+}
+
+func beginOperationCheckedLease(home string, validateInputs, revalidateAdmission func() error, selectTargets func() ([]string, error), recoverPending bool, options ...transaction.Option) (*operation, error) {
 	admitted := revalidateAdmission != nil
 	// Refuse before even creating mutation-lock state in an existing node home.
 	if err := envauthority.Validate(home); err != nil {
@@ -154,6 +190,19 @@ func beginOperationChecked(home string, validateInputs, revalidateAdmission func
 			return nil, err
 		}
 	}
+	var targets []string
+	if selectTargets != nil {
+		var err error
+		targets, err = selectTargets()
+		if err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+		if err := homeLeaseGuardBeforeRecovery(home, lock, targets); err != nil {
+			_ = lock.Close()
+			return nil, err
+		}
+	}
 	// Keep the admission live for recovery, every swap and rollback. The
 	// ordinary project-lease check remains in the combined check as well.
 	options = append(options, transaction.WithCommitCheck(func(w transaction.HomeLock, j transaction.Journal) error {
@@ -166,6 +215,9 @@ func beginOperationChecked(home string, validateInputs, revalidateAdmission func
 			if err := revalidateAdmission(); err != nil {
 				return err
 			}
+		}
+		if j.ProjectIdentity != "project-leases" {
+			return guardProjectLeaseJournal(home, w, j)
 		}
 		return projectlease.TransactionCheck(home)(w, j)
 	}))
@@ -185,8 +237,15 @@ func beginOperationChecked(home string, validateInputs, revalidateAdmission func
 		}
 		journalWitness = &routingHomeLock{underlying: lock, validate: revalidateAdmission}
 		recovered, err = engine.RecoverWithOutcome(journalWitness)
-	} else {
-		recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+	} else if recoverPending {
+		// A commit refusal can abort its journal. Admit ALL foreign target sets
+		// read-only before replay so neither an earlier journal nor rollback writes.
+		_, err = engine.PendingRecoveryMatching(lock, func(journal transaction.Journal) (bool, error) {
+			return false, guardProjectLeaseJournal(home, lock, journal)
+		})
+		if err == nil {
+			recovered, err = projectlease.RecoverUnderLock(home, lock, engine)
+		}
 	}
 	if err != nil {
 		_ = lock.Close()
@@ -203,6 +262,14 @@ func beginOperationChecked(home string, validateInputs, revalidateAdmission func
 	if err := envauthority.Validate(home); err != nil {
 		_ = op.close()
 		return nil, op.recoveryRefusal(err)
+	}
+	// Generic lock/recovery acquisition does not declare a project-home write.
+	// Selected writers must qualify their complete target set after recovery.
+	if targets != nil {
+		if err := homeLeaseGuard(home, lock, targets); err != nil {
+			_ = op.close()
+			return nil, op.recoveryRefusal(err)
+		}
 	}
 	return op, nil
 }

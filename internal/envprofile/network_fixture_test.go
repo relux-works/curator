@@ -1,7 +1,9 @@
 package envprofile
 
 import (
+	"fmt"
 	"github.com/relux-works/curator/internal/testgitenv"
+	"github.com/relux-works/curator/internal/testhomeguard"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,9 +60,18 @@ func TestMain(m *testing.M) {
 	if name := filepath.Base(os.Args[0]); name == "git" || name == "git.exe" {
 		os.Exit(runMissingPinGit())
 	}
+	if code, parent := testhomeguard.Supervise(false); parent {
+		os.Exit(code)
+	}
+	previousHome, _ := os.UserHomeDir()
 	// Scrub ambient Git and native roots before declaring this package's
 	// explicit fixture homes; isolation must not erase those selected roots.
 	restoreGitEnv := testgitenv.Isolate()
+	if err := testhomeguard.CheckIsolation(previousHome); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		restoreGitEnv()
+		os.Exit(2)
+	}
 	applyFixtureIdentityPolicy()
 	// BUG-261027-5t7pqj: inherited adapter roots must never escape the test HOME.
 	testHome, err := os.MkdirTemp("", "curator-package-home-*")

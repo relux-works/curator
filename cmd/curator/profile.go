@@ -342,31 +342,40 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 		names = []string{machine}
 	}
 	failed := false
-	for _, name := range names {
+	usage := false
+	batchErr := envprofile.UpdateProfilesWithOptions(cfg.Home(), names, envprofile.UpdateOptions{
+		Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta, RootRequirement: requirement,
+	}, func(name string, info envprofile.Info, moved bool, err error) bool {
 		// The §2.3 surfacing rows print to stdout during the operation —
 		// after the audit gate passes, before the lock is published or
 		// any scope is resynced — so Info.Surfacing stays empty and
 		// nothing prints twice. The closed columns carry no per-profile
 		// prefix.
-		info, moved, err := envprofile.UpdateWithOptions(cfg.Home(), name, envprofile.UpdateOptions{
-			Policy: policy, SurfacingSink: c.stdout, WarningSink: c.stderr, ConfirmSystemDelta: *confirmSystemDelta, RootRequirement: requirement,
-		})
 		if err != nil {
 			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", name, err)
 			if strings.Contains(err.Error(), envprofile.DiagRefConflict) {
-				return exitUsage
+				usage = true
+				return false
 			}
 			failed = true
 			if strings.Contains(err.Error(), envprofile.DiagSystemDeltaConfirmationRequired) {
-				break
+				return false
 			}
-			continue
+			return true
 		}
 		if moved {
 			_, _ = fmt.Fprintf(c.stdout, "%s: updated (lock %s)\n", info.Name, info.LockHash)
 		} else {
 			_, _ = fmt.Fprintf(c.stdout, "%s: unchanged\n", info.Name)
 		}
+		return true
+	})
+	if batchErr != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", batchErr)
+		failed = true
+	}
+	if usage {
+		return exitUsage
 	}
 	if failed {
 		return exitFail
@@ -426,7 +435,7 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
-	managed, managedErr := envprofile.SyncManagedHomesWithPolicy(cfg.Home(), policy, machineFromConfig(cfg))
+	managed, results, managedErr, err := envprofile.SyncHomesWithPolicy(cfg.Home(), policy, machineFromConfig(cfg))
 	for _, result := range managed {
 		if result.OK {
 			_, _ = fmt.Fprintf(c.stdout, "%s: synced (%s)\n", result.Adapter, result.Home)
@@ -438,7 +447,6 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", managedErr)
 		return exitFail
 	}
-	results, err := envprofile.SyncWithPolicy(cfg.Home(), policy)
 	for _, result := range results {
 		if result.OK {
 			_, _ = fmt.Fprintf(c.stdout, "%s: synced (%s)\n", result.Adapter, result.Home)

@@ -166,9 +166,9 @@ func UseWithPolicy(home, name, environment, target string, clearScope bool, poli
 	if err := refusePreparedSkillPlanAdoption(home, candidate); err != nil {
 		return nil, err
 	}
-	op, err := beginOperationValidated(home, func() error {
+	op, err := beginOperationSelected(home, func() error {
 		return requireAdapterRuntimes(home, environment, target)
-	})
+	}, func() ([]string, error) { return homeLeaseSelectionTargets(home, name, environment) })
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			if err := op.capture(scopePath); err != nil {
 				return results, err
 			}
-			if err := SetScoped(home, scope, "", true); err != nil {
+			if err := setScopedDirect(op, home, scope, "", true); err != nil {
 				return results, err
 			}
 			if err := op.recordPostimages(scopePath); err != nil {
@@ -419,11 +419,15 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
 		return nil, err
 	}
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseSelectionTargets(home, "", "") })
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
+	return syncWithOperation(op, home, policy)
+}
+
+func syncWithOperation(op *operation, home string, policy Policy) ([]EntryResult, error) {
 	if err := preflightCurrentPathSources(home, policy); err != nil {
 		return nil, err
 	}
@@ -727,6 +731,9 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	native, err := resolveNativeHome(adapter, nativeHomeOf)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
+	}
+	if err := homeLeaseGuard(home, op.lock, []string{native}); err != nil {
+		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 	}
 	document, written, err := contextmaterialize.Monolithic(lock, hash, precedence, adapter.ID, packages)
 	if err != nil {
