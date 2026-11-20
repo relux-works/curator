@@ -953,8 +953,10 @@ jobs:
               if count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) {
                 return refuse(reasonSelfCheckFieldRedaction, 0, 0, "$")
               }
-              if strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
-                  !strings.Contains(string(encoded), marker) {
+              var encodedObject map[string]any
+              if err := json.Unmarshal(encoded, &encodedObject); err != nil ||
+                  strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
+                  !reflect.DeepEqual(encodedObject, wantObject) {
                 return refuse(reasonSelfCheckFieldLeak, 0, 0, "$")
               }
             }
@@ -969,10 +971,15 @@ jobs:
             if err != nil {
               return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
             }
+            var encodedPlantedObject map[string]any
+            if err := json.Unmarshal(encodedPlanted, &encodedPlantedObject); err != nil {
+              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
+            }
             plantedObject, ok := cleanedPlanted.(map[string]any)
             wantPlanted := map[string]any{"value": marker, "safe": "ordinary"}
             if plantedCount != 1 || !ok || !reflect.DeepEqual(plantedObject, wantPlanted) ||
-                strings.Contains(string(encodedPlanted), "ghp_") || !strings.Contains(string(encodedPlanted), marker) {
+                strings.Contains(string(encodedPlanted), "ghp_") ||
+                !reflect.DeepEqual(encodedPlantedObject, wantPlanted) {
               return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
             }
             hostileKey := "ghp_" + strings.Repeat("A", 30)
