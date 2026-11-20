@@ -49,6 +49,7 @@ jobs:
           printf '%s\n' 'Module download not run.' > "$capture_root/module-download.raw.txt"
           printf '%s\n' 'Test command not run.' > "$capture_root/test-output.raw.txt"
           printf '%s\n' 'Capture audit not run.' > "$capture_root/audit-output.raw.txt"
+          printf '%s\n' 'No failing subtest detail.' > "$capture_root/failure-details.txt"
           artifact_dir="$capture_root/artifact"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             artifact_dir="$(cygpath -w "$artifact_dir")"
@@ -224,6 +225,7 @@ jobs:
             "regexp"
             "strconv"
             "strings"
+            "unicode/utf8"
           )
 
           type auditFailure string
@@ -234,12 +236,29 @@ jobs:
             Action string `json:"Action"`
             Package string `json:"Package"`
             Test string `json:"Test"`
+            Output string `json:"Output"`
           }
 
           type failureName struct {
             Package string
             Test string
           }
+
+          type failureDetail struct {
+            Package string
+            Test string
+            Output string
+            Truncated bool
+          }
+
+          type detailKey struct {
+            Package string
+            Test string
+          }
+
+          const maxFailureDetails = 4
+          const maxFailureDetailBytes = 1024
+          const maxFailureDetailsBytes = 8192
 
           var publicTestName = regexp.MustCompile(`^[A-Za-z0-9_./-]+$`)
 
@@ -369,6 +388,65 @@ jobs:
                 failures[0].Test != "TestPublicFailure" || strings.Contains(fmt.Sprint(failures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
             }
+            detailFailure := failureName{Package: "public/package", Test: "TestPublicFailure"}
+            detailEvents := strings.Join([]string{
+              `{"Action":"output","Package":"public/package","Test":"TestPassing","Output":"PASSING_TEST_DETAIL_MUST_NOT_APPEAR\n"}`,
+              `{"Action":"output","Package":"public/package","Test":"TestPublicFailure","Output":"SAFE_FAILURE_DETAIL_CONTROL\n"}`,
+              `{"Action":"fail","Package":"public/package","Test":"TestPublicFailure"}`,
+            }, "\n")
+            details, err := collectFailureDetails(strings.NewReader(detailEvents), []failureName{detailFailure})
+            if err != nil || len(details) != 1 || details[0].Package != detailFailure.Package ||
+                details[0].Test != detailFailure.Test || !strings.Contains(details[0].Output, "SAFE_FAILURE_DETAIL_CONTROL") ||
+                strings.Contains(details[0].Output, "PASSING_TEST_DETAIL_MUST_NOT_APPEAR") {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
+            }
+            if len(details[0].Output) > 1024 {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-bound")
+            }
+            excessFailures := []failureName{
+              {Package: "public/package", Test: "TestFailure1"},
+              {Package: "public/package", Test: "TestFailure2"},
+              {Package: "public/package", Test: "TestFailure3"},
+              {Package: "public/package", Test: "TestFailure4"},
+              {Package: "public/package", Test: "TestFailure5"},
+            }
+            capped, err := collectFailureDetails(strings.NewReader(""), excessFailures)
+            if err != nil || len(capped) != 4 {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-count")
+            }
+            longOutput := strings.Repeat("X", maxFailureDetailBytes+100)
+            longEvent := fmt.Sprintf(`{"Action":"output","Package":%q,"Test":%q,"Output":%q}`,
+              detailFailure.Package, detailFailure.Test, longOutput)
+            bounded, err := collectFailureDetails(strings.NewReader(longEvent+"\n"), []failureName{detailFailure})
+            if err != nil || len(bounded) != 1 || len(bounded[0].Output) > maxFailureDetailBytes || !bounded[0].Truncated {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-bound")
+            }
+            detailFile, err := os.CreateTemp("", "capture-failure-detail-selfcheck-")
+            if err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
+            }
+            detailPath := detailFile.Name()
+            if err := detailFile.Close(); err != nil {
+              os.Remove(detailPath)
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
+            }
+            defer os.Remove(detailPath)
+            if err := writeFailureDetails(detailPath, details); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
+            }
+            written, err := os.ReadFile(detailPath)
+            if err != nil || len(written) > 8192 || len(written) > maxFailureDetailsBytes ||
+                !strings.Contains(string(written), "SAFE_FAILURE_DETAIL_CONTROL") {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
+            }
+            if err := writeFailureDetails(detailPath, bounded); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
+            }
+            truncatedWritten, err := os.ReadFile(detailPath)
+            if err != nil || len(truncatedWritten) > 8192 ||
+                !strings.Contains(string(truncatedWritten), "Failure detail truncated by the capture limit.") {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-bound")
+            }
             return nil
           }
 
@@ -379,6 +457,113 @@ jobs:
             }
             if err := os.WriteFile(path, []byte(names.String()), 0600); err != nil {
               return auditFailure("CAPTURE_REASON=capture/audit-failure-name-write")
+            }
+            return nil
+          }
+
+          func appendBounded(current, value string, limit int) (string, bool) {
+            remaining := limit - len(current)
+            if remaining <= 0 {
+              return current, true
+            }
+            if len(value) <= remaining {
+              return current + value, false
+            }
+            prefix := value[:remaining]
+            for len(prefix) > 0 && !utf8.ValidString(prefix) {
+              prefix = prefix[:len(prefix)-1]
+            }
+            return current + prefix, true
+          }
+
+          func collectFailureDetails(input io.Reader, failures []failureName) ([]failureDetail, error) {
+            selected := make([]failureName, 0, maxFailureDetails)
+            selectedKeys := make(map[detailKey]bool)
+            for _, failure := range failures {
+              key := detailKey{Package: failure.Package, Test: failure.Test}
+              if failure.Test == "" || len(failure.Package) > 256 || len(failure.Test) > 256 ||
+                  !publicTestName.MatchString(failure.Package) || !publicTestName.MatchString(failure.Test) || selectedKeys[key] {
+                continue
+              }
+              if len(selected) == maxFailureDetails {
+                break
+              }
+              selected = append(selected, failure)
+              selectedKeys[key] = true
+            }
+
+            scanner := bufio.NewScanner(input)
+            scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
+            output := make(map[detailKey]string, len(selected))
+            seen := make(map[detailKey]bool, len(selected))
+            truncated := make(map[detailKey]bool, len(selected))
+            for scanner.Scan() {
+              var event testEvent
+              if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+                return nil, auditFailure("CAPTURE_REASON=capture/audit-invalid-failure-detail-event")
+              }
+              if event.Action != "output" {
+                continue
+              }
+              key := detailKey{Package: event.Package, Test: event.Test}
+              if !selectedKeys[key] {
+                continue
+              }
+              seen[key] = true
+              next, cut := appendBounded(output[key], event.Output, maxFailureDetailBytes)
+              output[key] = next
+              if cut {
+                truncated[key] = true
+              }
+            }
+            if scanner.Err() != nil {
+              return nil, auditFailure("CAPTURE_REASON=capture/audit-failure-detail-read")
+            }
+
+            details := make([]failureDetail, 0, len(selected))
+            for _, failure := range selected {
+              key := detailKey{Package: failure.Package, Test: failure.Test}
+              detail := output[key]
+              if !seen[key] || detail == "" {
+                detail = "[No output event was recorded.]\n"
+              }
+              details = append(details, failureDetail{
+                Package: failure.Package, Test: failure.Test,
+                Output: detail, Truncated: truncated[key],
+              })
+            }
+            return details, nil
+          }
+
+          func writeFailureDetails(path string, details []failureDetail) error {
+            var report strings.Builder
+            for _, detail := range details {
+              if len(detail.Package) > 256 || len(detail.Test) > 256 ||
+                  !publicTestName.MatchString(detail.Package) || !publicTestName.MatchString(detail.Test) {
+                continue
+              }
+              header := fmt.Sprintf("CAPTURE_DETAIL Package=%s Test=%s\n", detail.Package, detail.Test)
+              if report.Len()+len(header) > maxFailureDetailsBytes {
+                break
+              }
+              report.WriteString(header)
+              body, cut := appendBounded("", detail.Output, maxFailureDetailsBytes-report.Len())
+              report.WriteString(body)
+              if detail.Truncated || cut {
+                marker := "\n[Failure detail truncated by the capture limit.]\n"
+                if report.Len()+len(marker) <= maxFailureDetailsBytes {
+                  report.WriteString(marker)
+                }
+              }
+            }
+            if report.Len() == 0 {
+              report.WriteString("No failing subtest detail was captured.\n")
+            }
+            if report.Len() > maxFailureDetailsBytes {
+              return auditFailure("CAPTURE_REASON=capture/audit-failure-detail-bound")
+            }
+            if err := os.WriteFile(path, []byte(report.String()), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-failure-detail-write")
             }
             return nil
           }
@@ -400,7 +585,7 @@ jobs:
 
           func run() error {
             if err := selfCheck(); err != nil { return err }
-            if len(os.Args) != 5 { return auditFailure("CAPTURE_REASON=capture/audit-invalid-arguments") }
+            if len(os.Args) != 6 { return auditFailure("CAPTURE_REASON=capture/audit-invalid-arguments") }
             testExit, err := strconv.Atoi(os.Args[3])
             if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-invalid-test-exit") }
             input, err := os.Open(os.Args[1])
@@ -411,6 +596,13 @@ jobs:
             if closeErr != nil { return auditFailure("CAPTURE_REASON=capture/audit-test-log-close") }
             if testExit != 0 {
               if err := writeFailureNames(os.Args[4], failures); err != nil { return err }
+              detailInput, err := os.Open(os.Args[1])
+              if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-failure-detail-open") }
+              details, detailErr := collectFailureDetails(detailInput, failures)
+              detailCloseErr := detailInput.Close()
+              if detailErr != nil { return detailErr }
+              if detailCloseErr != nil { return auditFailure("CAPTURE_REASON=capture/audit-failure-detail-close") }
+              if err := writeFailureDetails(os.Args[5], details); err != nil { return err }
             }
             entries, err := os.ReadDir(os.Args[2])
             if err != nil {
@@ -501,22 +693,30 @@ jobs:
             exit 2
           fi
           failed_names_file="$CAPTURE_ROOT/test-failures.names.txt"
+          failure_details_file="$CAPTURE_ROOT/failure-details.txt"
+          private_test_log="$CAPTURE_ROOT/test-output.private.raw.txt"
           if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             HARNESS_CAPTURE_OUT="$output_path" \
             HARNESS_REPEAT_CAPTURE_OUT="$repeat_path" \
             go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity \
-            > "$CAPTURE_ROOT/test-output.raw.txt" 2>&1; then
+            > "$private_test_log" 2>&1; then
             test_exit=0
           else
             test_exit=$?
           fi
           if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
-            go run "$CAPTURE_ROOT/audit.go" "$CAPTURE_ROOT/test-output.raw.txt" \
-            "$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" \
+            go run "$CAPTURE_ROOT/audit.go" "$private_test_log" \
+            "$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" "$failure_details_file" \
             > "$CAPTURE_ROOT/audit-metrics.raw.txt" 2> "$CAPTURE_ROOT/audit-error.raw.txt"; then
             audit_exit=0
           else
             audit_exit=$?
+          fi
+          if [[ "$test_exit" -eq 0 && "$audit_exit" -eq 0 ]]; then
+            cp "$private_test_log" "$CAPTURE_ROOT/test-output.raw.txt"
+          else
+            printf '%s\n' 'Full test log withheld; see sanitized failure-details.txt.' \
+              > "$CAPTURE_ROOT/test-output.raw.txt"
           fi
           cat "$CAPTURE_ROOT/audit-metrics.raw.txt" > "$CAPTURE_ROOT/audit-output.raw.txt"
           audit_metrics=()
@@ -611,6 +811,7 @@ jobs:
               "os"
               "path/filepath"
               "regexp"
+              "runtime"
               "sort"
               "strings"
 
@@ -643,6 +844,7 @@ jobs:
               {"token-hostile-sentinel", regexp.MustCompile("(?i)HOSTILE_SECRET_[A-Z0-9_]+")},
               {"token-google-stripe", regexp.MustCompile("(?i)\\b(?:AIza[0-9A-Za-z_-]{35}|sk_(?:live|test)_[A-Za-z0-9]{16,})\\b")},
               {"path-private-home", regexp.MustCompile("(?i)(?:[A-Za-z]:)?[/\\\\](?:[^/\\\\\\s\\\"'<>]+[/\\\\])*(?:Users|home)(?:[/\\\\][^\\s\\\"'<>]*)?")},
+              {"path-absolute", regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9_:/])(?:[A-Z]:[\\/]|\\\\|/(?:[^/\s"'<>]+/)+)[^\s"'<>]*`)},
           }
 
           var assignmentPattern = regexp.MustCompile("(?i)[A-Za-z0-9_.-]*(?:secret|token|password|passwd|credential|authorization|api[_-]?key|access[_-]?key|refresh[_-]?token|private[_-]?key)[A-Za-z0-9_.-]*\\s*[:=]\\s*[^,;\\n}]+")
@@ -1189,7 +1391,7 @@ jobs:
                   return err
               }
               parent := filepath.Dir(caseDir)
-              logNames := []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt"}
+              logNames := []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt", "failure-details.txt"}
               logs := make([]inputFile, 0, len(logNames))
               for _, name := range logNames {
                   file, err := readRegular(filepath.Join(parent, name), "input-log-read-failed")
@@ -1242,7 +1444,7 @@ jobs:
                       return operational("staging-failed")
                   }
               }
-              published := make([]string, 0, 6)
+              published := make([]string, 0, len(logNames)+2)
               rollback := func() error {
                   failed := false
                   for _, name := range published {
@@ -1255,7 +1457,7 @@ jobs:
                   }
                   return nil
               }
-              for _, name := range []string{"outputs", "repeat-observations", logNames[0], logNames[1], logNames[2], logNames[3]} {
+              for _, name := range append([]string{"outputs", "repeat-observations"}, logNames...) {
                   source := filepath.Join(stage, name)
                   target := filepath.Join(artifactDir, name)
                   if err := os.Rename(source, target); err != nil {
@@ -1365,7 +1567,7 @@ jobs:
                   }
                   paths.repeatData = append(paths.repeatData, file)
               }
-              for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt"} {
+              for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt", "failure-details.txt"} {
                   data := []byte("neutral control log\n")
                   file := inputFile{name: name, data: data, mode: 0600}
                   if err := writeFile(filepath.Join(paths.root, name), data, file.mode); err != nil {
@@ -1500,6 +1702,20 @@ jobs:
               return writeFile(path, data, 0600)
           }
 
+          func plantExpectedLog(paths *controlPaths, name string, data []byte) error {
+              for index := range paths.logData {
+                  if paths.logData[index].name != name {
+                      continue
+                  }
+                  if err := writeFile(filepath.Join(paths.root, name), data, paths.logData[index].mode); err != nil {
+                      return operational("selfcheck-fixture-setup-failed")
+                  }
+                  paths.logData[index].data = append([]byte(nil), data...)
+                  return nil
+              }
+              return operational("selfcheck-fixture-setup-failed")
+          }
+
           func expectedManifest(files []inputFile) []byte {
               var encoded bytes.Buffer
               encoded.WriteString("{\"files\":[")
@@ -1519,13 +1735,13 @@ jobs:
 
           func verifyControlArtifact(paths controlPaths) error {
               entries, err := os.ReadDir(paths.artifact)
-              if err != nil || len(entries) != 6 {
+              if err != nil || len(entries) != 7 {
                   return operational("selfcheck-output-shape-failed")
               }
               expectedRoot := map[string]bool{
                   "outputs": true, "repeat-observations": true,
                   "audit-output.raw.txt": true, "module-download.raw.txt": true,
-                  "source-verification.log": true, "test-output.raw.txt": true,
+                  "source-verification.log": true, "test-output.raw.txt": true, "failure-details.txt": true,
               }
               for _, entry := range entries {
                   if !expectedRoot[entry.Name()] {
@@ -1545,10 +1761,14 @@ jobs:
                       return operational("selfcheck-output-shape-failed")
                   }
                   for _, file := range group.files {
-                      got, err := os.ReadFile(filepath.Join(directory, file.name))
-                      info, statErr := os.Stat(filepath.Join(directory, file.name))
-                      if err != nil || statErr != nil || !bytes.Equal(got, file.data) || info.Mode().Perm() != file.mode {
+                      path := filepath.Join(directory, file.name)
+                      got, err := os.ReadFile(path)
+                      if err != nil || !bytes.Equal(got, file.data) {
                           return operational("selfcheck-byte-preservation-failed")
+                      }
+                      info, statErr := os.Stat(path)
+                      if statErr != nil || !controlModePreserved(info.Mode().Perm(), file.mode) {
+                          return operational("selfcheck-mode-preservation-failed")
                       }
                   }
                   gotManifest, err := os.ReadFile(filepath.Join(directory, "MANIFEST.json"))
@@ -1557,11 +1777,97 @@ jobs:
                   }
               }
               for _, file := range paths.logData {
-                  got, err := os.ReadFile(filepath.Join(paths.artifact, file.name))
-                  info, statErr := os.Stat(filepath.Join(paths.artifact, file.name))
-                  if err != nil || statErr != nil || !bytes.Equal(got, file.data) || info.Mode().Perm() != file.mode {
+                  path := filepath.Join(paths.artifact, file.name)
+                  got, err := os.ReadFile(path)
+                  if err != nil || !bytes.Equal(got, file.data) {
                       return operational("selfcheck-byte-preservation-failed")
                   }
+                  info, statErr := os.Stat(path)
+                  if statErr != nil || !controlModePreserved(info.Mode().Perm(), file.mode) {
+                      return operational("selfcheck-mode-preservation-failed")
+                  }
+              }
+              return nil
+          }
+
+          func controlModePreserved(got, want os.FileMode) bool {
+              return controlModePreservedFor(runtime.GOOS, got, want)
+          }
+
+          func controlModePreservedFor(goos string, got, want os.FileMode) bool {
+              if goos == "windows" {
+                  return got&0200 == want&0200
+              }
+              return got == want
+          }
+
+          func checkModeControls() error {
+              controls := []struct {
+                  goos string
+                  got  os.FileMode
+                  want os.FileMode
+                  pass bool
+              }{
+                  {"windows", 0666, 0600, true},
+                  {"windows", 0444, 0400, true},
+                  {"windows", 0444, 0600, false},
+                  {"windows", 0666, 0400, false},
+                  {"darwin", 0600, 0600, true},
+                  {"darwin", 0666, 0600, false},
+              }
+              for _, control := range controls {
+                  if controlModePreservedFor(control.goos, control.got, control.want) != control.pass {
+                      return operational("selfcheck-mode-control-failed")
+                  }
+              }
+              return nil
+          }
+
+          func expectByteCorruptionRejected(paths controlPaths, path string, file inputFile) error {
+              data, err := os.ReadFile(path)
+              if err != nil || len(data) == 0 || !bytes.Equal(data, file.data) {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              corrupted := append([]byte(nil), data...)
+              corrupted[0] ^= 1
+              if err := os.WriteFile(path, corrupted, file.mode); err != nil {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              gate, ok := verifyControlArtifact(paths).(gateError)
+              restoreErr := os.WriteFile(path, data, file.mode)
+              if restoreErr != nil {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              if !ok || gate.code != "sanitize/selfcheck-byte-preservation-failed" {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              return nil
+          }
+
+          func expectAllByteCorruptionsRejected(paths controlPaths) error {
+              if len(paths.caseFiles) == 0 || len(paths.repeatData) == 0 || len(paths.logData) == 0 {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              for _, file := range paths.caseFiles {
+                  path := filepath.Join(paths.artifact, "outputs", file.name)
+                  if err := expectByteCorruptionRejected(paths, path, file); err != nil {
+                      return err
+                  }
+              }
+              for _, file := range paths.repeatData {
+                  path := filepath.Join(paths.artifact, "repeat-observations", file.name)
+                  if err := expectByteCorruptionRejected(paths, path, file); err != nil {
+                      return err
+                  }
+              }
+              for _, file := range paths.logData {
+                  path := filepath.Join(paths.artifact, file.name)
+                  if err := expectByteCorruptionRejected(paths, path, file); err != nil {
+                      return err
+                  }
+              }
+              if err := verifyControlArtifact(paths); err != nil {
+                  return operational("selfcheck-negative-control-failed")
               }
               return nil
           }
@@ -1582,6 +1888,9 @@ jobs:
                   return operational("selfcheck-temp-create-failed")
               }
               defer os.RemoveAll(base)
+              if err := checkModeControls(); err != nil {
+                  return err
+              }
 
               neutral, err := prepareControl(filepath.Join(base, "neutral"), 1)
               if err != nil {
@@ -1614,6 +1923,35 @@ jobs:
                   return operational("selfcheck-positive-control-failed")
               }
               if err := expectPass(neutral, false); err != nil {
+                  return err
+              }
+              detailControl, err := prepareControl(filepath.Join(base, "failure-detail-safe"), 1)
+              if err != nil {
+                  return err
+              }
+              safeDetail := []byte("CAPTURE_DETAIL Package=public/package Test=TestPlantedFailure\nSAFE_FAILURE_DETAIL_CONTROL\n")
+              if err := plantExpectedLog(&detailControl, "failure-details.txt", safeDetail); err != nil {
+                  return err
+              }
+              if err := expectPass(detailControl, false); err != nil {
+                  return err
+              }
+              exportedDetail, err := os.ReadFile(filepath.Join(detailControl.artifact, "failure-details.txt"))
+              if err != nil || !bytes.Contains(exportedDetail, []byte("SAFE_FAILURE_DETAIL_CONTROL")) {
+                  return operational("selfcheck-failure-detail-positive-failed")
+              }
+              privateDetailControl, err := prepareControl(filepath.Join(base, "failure-detail-private-path"), 1)
+              if err != nil {
+                  return err
+              }
+              privateDetail := []byte("CAPTURE_DETAIL Package=public/package Test=TestPrivatePath\nC:\\Users\\example\\private\\state\n")
+              if err := plantControl(privateDetailControl, "log", "failure-details.txt", privateDetail); err != nil {
+                  return err
+              }
+              if err := expectRefusal(privateDetailControl, "path-private-home"); err != nil {
+                  return err
+              }
+              if err := expectAllByteCorruptionsRejected(neutral); err != nil {
                   return err
               }
 
@@ -1787,6 +2125,7 @@ jobs:
                   {"token-hostile-sentinel", "HOSTILE_SECRET_CONTROL"},
                   {"token-google-stripe", "AIza" + strings.Repeat("B", 35)},
                   {"path-private-home", "/Users/example/private/state"},
+                  {"path-absolute", "D:\\a\\_temp\\runner\\private-state"},
                   {"credential-assignment", "credential_token=neutral-value"},
               }
               targets := []struct{ kind, name string }{
@@ -1796,6 +2135,7 @@ jobs:
                   {"log", "module-download.raw.txt"},
                   {"log", "source-verification.log"},
                   {"log", "test-output.raw.txt"},
+                  {"log", "failure-details.txt"},
               }
               for index, trigger := range triggers {
                   for targetIndex, target := range targets {
@@ -2294,7 +2634,7 @@ jobs:
             printf 'module_command=go mod download\nmodule_outcome=%s\nmodule_exit=%s\n' "$MODULE_OUTCOME" "$MODULE_EXIT"
             printf 'test_command=go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity\n'
             printf 'test_outcome=%s\ntest_exit=%s\n' "$CAPTURE_OUTCOME" "$CAPTURE_EXIT"
-            printf 'audit_command=go run <runner-temp>/audit.go <test-log> <output-directory> <test-exit> <failure-names-file>\naudit_exit=%s\n' "$AUDIT_EXIT"
+            printf 'audit_command=go run <runner-temp>/audit.go <private-test-log> <output-directory> <test-exit> <failure-names-file> <failure-details-file>\naudit_exit=%s\n' "$AUDIT_EXIT"
             printf 'case_rows_executed=%s\ncase_rows_passed=%s\ncase_rows_failed=%s\ncase_rows_skipped=%s\n' \
               "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
             printf 'repeat_seen=%s\nrepeat_passed=%s\ncomparator_rows=%s\ncomparator_passed=%s\n' \
