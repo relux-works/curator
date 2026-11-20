@@ -72,6 +72,12 @@ func runLauncherFixture(t testing.TB, c fixtureCase) fixtureResult {
 		t.Fatal(err)
 	}
 	root = physical
+	rootBinding, err := bindFixtureRoot(fixtureRootEvidence{
+		Root: root, Origin: "driver-created", RecordedBeforeRun: true,
+	})
+	if err != nil {
+		t.Fatal("fixture root binding refused")
+	}
 	t.Setenv("HOME", root)
 	t.Setenv("USERPROFILE", root)
 	system := filepath.Join(root, "system.json")
@@ -84,7 +90,7 @@ func runLauncherFixture(t testing.TB, c fixtureCase) fixtureResult {
 	}
 	result := fixtureResult{Case: c, Executed: true, NativePreserved: true, ProjectPreserved: true}
 	artifact := func(name string, payload []byte) {
-		mustWrite(t, filepath.Join(output, name), fixtureTemplate(payload, root), 0o600)
+		mustWrite(t, filepath.Join(output, name), mustProjectFixture(t, rootBinding, payload), 0o600)
 	}
 	projection := func(cfg *config.Config) {
 		t.Helper()
@@ -118,7 +124,7 @@ func runLauncherFixture(t testing.TB, c fixtureCase) fixtureResult {
 		if errStat != nil || info.Mode().Perm() != beforeInfo.Mode().Perm() || !reflect.DeepEqual(beforePaths, fixturePaths(t, root)) {
 			t.Fatal("rejected read changed mode or created a partial output")
 		}
-		result.Refusal = string(fixtureTemplate([]byte(err.Error()), root))
+		result.Refusal = string(mustProjectFixture(t, rootBinding, []byte(err.Error())))
 		artifact("refusal.txt", []byte(result.Refusal))
 		// Rejected source files are inputs, not emitted outputs. Assert their
 		// complete unchanged bytes in-process, and export only the digest/mode.
@@ -224,11 +230,11 @@ func runLauncherFixture(t testing.TB, c fixtureCase) fixtureResult {
 			t.Fatal("system authority refusal changed")
 		}
 	case strings.HasPrefix(c.State, "cli-"):
-		runLauncherCLI(t, c, root, path, output, artifact, &result)
+		runLauncherCLI(t, c, root, path, output, artifact, rootBinding, &result)
 	default:
 		t.Fatal("unrecognized launcher fixture")
 	}
-	result.Tree = readTree(t, output, root)
+	result.Tree = readTree(t, output, rootBinding)
 	return result
 }
 
@@ -252,7 +258,7 @@ func moduleRoot(t testing.TB) string {
 	return ""
 }
 
-func runLauncherCLI(t testing.TB, c fixtureCase, root, path, output string, artifact func(string, []byte), result *fixtureResult) {
+func runLauncherCLI(t testing.TB, c fixtureCase, root, path, output string, artifact func(string, []byte), rootBinding fixtureRootBinding, result *fixtureResult) {
 	t.Helper()
 	name := "curator-fixture"
 	if runtime.GOOS == "windows" {
@@ -328,7 +334,7 @@ func runLauncherCLI(t testing.TB, c fixtureCase, root, path, output string, arti
 		if code != want || len(stdout) != 0 || strings.Contains(string(stderr), "HOSTILE_SECRET") || c.State == "cli-arguments" && !strings.Contains(string(stderr), "takes no arguments") {
 			t.Fatal("original CLI refusal changed")
 		}
-		result.Refusal = string(fixtureTemplate(stderr, root))
+		result.Refusal = string(mustProjectFixture(t, rootBinding, stderr))
 		artifact("stdout.txt", stdout)
 		artifact("refusal.txt", stderr)
 	}

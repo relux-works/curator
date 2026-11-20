@@ -43,17 +43,12 @@ jobs:
           [[ ! -e "$capture_root" && ! -L "$capture_root" ]] || exit 1
           mkdir -p "$capture_root/home/AppData/Roaming" "$capture_root/home/AppData/Local" \
             "$capture_root/tmp" "$capture_root/gocache" "$capture_root/gomodcache" \
-            "$capture_root/gopath" "$capture_root/raw-output" "$capture_root/artifact/outputs"
+            "$capture_root/gopath" "$capture_root/raw-output" "$capture_root/repeat-raw" "$capture_root/artifact"
           : > "$capture_root/home/.gitconfig"
           printf '%s\n' 'Source verification not run.' > "$capture_root/source-verification.log"
           printf '%s\n' 'Module download not run.' > "$capture_root/module-download.raw.txt"
           printf '%s\n' 'Test command not run.' > "$capture_root/test-output.raw.txt"
           printf '%s\n' 'Capture audit not run.' > "$capture_root/audit-output.raw.txt"
-          printf '%s\n' 'Source verification not run.' > "$capture_root/artifact/source-verification.txt"
-          printf '%s\n' 'Module download not run.' > "$capture_root/artifact/module-download.txt"
-          printf '%s\n' 'Test command not run.' > "$capture_root/artifact/test-output.txt"
-          printf '%s\n' 'Capture audit not run.' > "$capture_root/artifact/audit-output.txt"
-          printf '%s\n' 'Lane metadata pending.' > "$capture_root/artifact/metadata.txt"
           artifact_dir="$capture_root/artifact"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             artifact_dir="$(cygpath -w "$artifact_dir")"
@@ -102,11 +97,11 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          fe3b30a8ea09d56306ae7fdd20c8a5b1f9bdf5656b21fd679d6cb5ee927cfe6a capture_homes_test.go
+          35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
-          92c65dd911b8a95a77d1bdd3d46d71ff77d8452ee868665a0cfc0f030a6f7540 controls_test.go
-          adb6cda6a35a0db2d943787db323bde26e9d3244c3bbb7a71a8f349bb6a16fa7 launcher_fixture_test.go
-          b36fc5d0aa798784539da26b6dd0be0e70041058d7a0566bc07a0422798ba377 legacy_fixture_test.go
+          2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
+          deaefe19fadacd5d449176bfab0aa60d029c842f14c5070fbea7e9f0e539e983 launcher_fixture_test.go
+          e9250a474e897a0d8aa9e0ee6f01afd0a42d8532ae6e8d812148810a4ffae911 legacy_fixture_test.go
           PINS
           }
           set +e
@@ -456,13 +451,15 @@ jobs:
           }
           go_dir="$(dirname "$(command -v go)")"
           git_dir="$(dirname "$(command -v git)")"
-          trusted_path="$go_dir:$git_dir"
+          env_dir="$(dirname "$(command -v env)")"
+          trusted_path="$go_dir:$git_dir:$env_dir"
           home_path="$(native_path "$CAPTURE_ROOT/home")"
           temp_path="$(native_path "$CAPTURE_ROOT/tmp")"
           cache_path="$(native_path "$CAPTURE_ROOT/gocache")"
           modcache_path="$(native_path "$CAPTURE_ROOT/gomodcache")"
           gopath_path="$(native_path "$CAPTURE_ROOT/gopath")"
           output_path="$(native_path "$CAPTURE_ROOT/raw-output")"
+          repeat_path="$(native_path "$CAPTURE_ROOT/repeat-raw")"
           gitconfig_path="$(native_path "$CAPTURE_ROOT/home/.gitconfig")"
           clean_env=(
             "HOME=$home_path"
@@ -506,6 +503,7 @@ jobs:
           failed_names_file="$CAPTURE_ROOT/test-failures.names.txt"
           if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             HARNESS_CAPTURE_OUT="$output_path" \
+            HARNESS_REPEAT_CAPTURE_OUT="$repeat_path" \
             go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity \
             > "$CAPTURE_ROOT/test-output.raw.txt" 2>&1; then
             test_exit=0
@@ -596,653 +594,1380 @@ jobs:
           }
           trap sanitize_shell_error ERR
           cd "$GITHUB_WORKSPACE"
-          cat > "$CAPTURE_ROOT/sanitize.go" <<'GO'
+          sanitizer_source_dir="$GITHUB_WORKSPACE/.temp/capture-exporter"
+          mkdir -p "$sanitizer_source_dir"
+          cat > "$sanitizer_source_dir/main.go" <<'GO'
           package main
 
           import (
-            "crypto/sha256"
-            "encoding/base64"
-            "encoding/hex"
-            "encoding/json"
-            "fmt"
-            "os"
-            "path/filepath"
-            "regexp"
-            "reflect"
-            "sort"
-            "strings"
+              "bytes"
+              "crypto/sha256"
+              "encoding/base64"
+              "encoding/hex"
+              "encoding/json"
+              "errors"
+              "fmt"
+              "io"
+              "os"
+              "path/filepath"
+              "regexp"
+              "sort"
+              "strings"
+
+              "github.com/relux-works/curator/internal/envmarker"
           )
 
-          const marker = "<redacted:category>"
-
-          const (
-            reasonInternal = "sanitize/internal-failure"
-            reasonSelfCheckFieldDetection = "sanitize/selfcheck-field-detection-control"
-            reasonSelfCheckFieldRedaction = "sanitize/selfcheck-field-redaction-control"
-            reasonSelfCheckFieldLeak = "sanitize/selfcheck-field-leak-control"
-            reasonSelfCheckPlantedValue = "sanitize/selfcheck-planted-value-control"
-            reasonSelfCheckCredential = "sanitize/selfcheck-credential-control"
-            reasonSelfCheckPath = "sanitize/selfcheck-path-control"
-            reasonSelfCheckDiagnosticKey = "sanitize/selfcheck-diagnostic-key-control"
-            reasonSelfCheckSplitPath = "sanitize/selfcheck-split-path-control"
-            reasonSelfCheckBlob = "sanitize/selfcheck-decoded-blob-control"
-            reasonSelfCheckManifest = "sanitize/selfcheck-manifest-control"
-            reasonSelfCheckManifestContents = "sanitize/selfcheck-manifest-contents-control"
-            reasonArguments = "sanitize/invalid-arguments"
-            reasonOutputCreate = "sanitize/output-create-failed"
-            reasonRawList = "sanitize/raw-output-list-failed"
-            reasonRawEntry = "sanitize/raw-output-entry-unexpected"
-            reasonRawRead = "sanitize/raw-output-read-failed"
-            reasonRawJSON = "sanitize/raw-output-invalid-json"
-            reasonOutputMarshal = "sanitize/output-json-encode-failed"
-            reasonOutputWrite = "sanitize/output-write-failed"
-            reasonOutputCount = "sanitize/output-count-incomplete"
-            reasonManifestList = "sanitize/manifest-list-failed"
-            reasonManifestEntry = "sanitize/manifest-entry-unexpected"
-            reasonManifestRead = "sanitize/manifest-file-read-failed"
-            reasonManifestEncode = "sanitize/manifest-encode-failed"
-            reasonManifestWrite = "sanitize/manifest-write-failed"
-            reasonManifestVerify = "sanitize/manifest-verification-failed"
-            reasonLogRead = "sanitize/log-read-failed"
-            reasonLogUnsafe = "sanitize/log-unsafe-text"
-            reasonLogWrite = "sanitize/log-write-failed"
-            reasonArtifactLogRead = "sanitize/artifact-log-read-failed"
-            reasonArtifactLogUnsafe = "sanitize/artifact-log-unsafe-text"
-            reasonSanitizedOutputList = "sanitize/sanitized-output-list-failed"
-            reasonSanitizedOutputRead = "sanitize/sanitized-output-read-failed"
-            reasonSanitizedOutputJSON = "sanitize/sanitized-output-invalid-json"
-            reasonUnsafeSensitiveKey = "sanitize/unsafe-sensitive-key"
-            reasonUnsafeText = "sanitize/unsafe-text-remains"
-            reasonUnsafeDecodedBlob = "sanitize/unsafe-decoded-blob"
-          )
-
-          type sanitizeFailure struct {
-            code string
-            fileIndex int
-            fileCount int
-            jsonPath string
+          type gateError struct {
+              code     string
+              security bool
           }
 
-          func (failure sanitizeFailure) Error() string {
-            output := "CAPTURE_REASON=" + failure.code
-            if failure.fileCount > 0 {
-              output += fmt.Sprintf(" file=%d/%d", failure.fileIndex, failure.fileCount)
-            }
-            if failure.jsonPath != "" {
-              output += " path=" + failure.jsonPath
-            }
-            return output
+          func (e gateError) Error() string { return e.code }
+
+          func operational(code string) error { return gateError{code: "sanitize/" + code} }
+          func refusal(code string) error     { return gateError{code: "sanitize/" + code, security: true} }
+
+          type detector struct {
+              code    string
+              pattern *regexp.Regexp
           }
 
-          func refuse(code string, fileIndex, fileCount int, jsonPath string) error {
-            return sanitizeFailure{code: code, fileIndex: fileIndex, fileCount: fileCount, jsonPath: jsonPath}
+          var detectors = []detector{
+              {"token-bearer", regexp.MustCompile("(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}")},
+              {"token-github-gitlab", regexp.MustCompile("\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})\\b")},
+              {"token-sk", regexp.MustCompile("\\bsk-[A-Za-z0-9_-]{20,}\\b")},
+              {"token-slack", regexp.MustCompile("\\bxox[baprs]-[A-Za-z0-9-]{10,}\\b")},
+              {"token-aws-access-key", regexp.MustCompile("\\bAKIA[0-9A-Z]{16}\\b")},
+              {"token-jwt", regexp.MustCompile("\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\b")},
+              {"token-private-key", regexp.MustCompile("(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----")},
+              {"token-hostile-sentinel", regexp.MustCompile("(?i)HOSTILE_SECRET_[A-Z0-9_]+")},
+              {"token-google-stripe", regexp.MustCompile("(?i)\\b(?:AIza[0-9A-Za-z_-]{35}|sk_(?:live|test)_[A-Za-z0-9]{16,})\\b")},
+              {"path-private-home", regexp.MustCompile("(?i)(?:[A-Za-z]:)?[/\\\\](?:[^/\\\\\\s\\\"'<>]+[/\\\\])*(?:Users|home)(?:[/\\\\][^\\s\\\"'<>]*)?")},
           }
 
-          func arrayPath(parent string, index int) string {
-            return fmt.Sprintf("%s[%d]", parent, index)
-          }
-
-          var valuePatterns = []*regexp.Regexp{
-            regexp.MustCompile("(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}"),
-            regexp.MustCompile("\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})\\b"),
-            regexp.MustCompile("\\bsk-[A-Za-z0-9_-]{20,}\\b"),
-            regexp.MustCompile("\\bxox[baprs]-[A-Za-z0-9-]{10,}\\b"),
-            regexp.MustCompile("\\bAKIA[0-9A-Z]{16}\\b"),
-            regexp.MustCompile("\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\b"),
-            regexp.MustCompile("(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----"),
-            regexp.MustCompile("(?i)HOSTILE_SECRET_[A-Z0-9_]+"),
-            regexp.MustCompile("(?i)\\b(?:AIza[0-9A-Za-z_-]{35}|sk_(?:live|test)_[A-Za-z0-9]{16,})\\b"),
-            regexp.MustCompile(`(?i)(?:[A-Za-z]:)?[/\\](?:[^/\\\s"'<>]+[/\\])*(?:Users|home)(?:[/\\][^\s"'<>]*)?`),
-          }
           var assignmentPattern = regexp.MustCompile("(?i)[A-Za-z0-9_.-]*(?:secret|token|password|passwd|credential|authorization|api[_-]?key|access[_-]?key|refresh[_-]?token|private[_-]?key)[A-Za-z0-9_.-]*\\s*[:=]\\s*[^,;\\n}]+")
 
-          var redactedFields int
-          var redactedValues int
-
           func sensitiveName(name string) bool {
-            lower := strings.ToLower(name)
-            normalized := strings.NewReplacer("_", "", "-", "", ".", "").Replace(lower)
-            for _, part := range []string{"secret", "token", "password", "passwd", "authorization", "apikey", "accesskey", "refreshtoken", "privatekey"} {
-              if strings.Contains(normalized, part) {
-                return true
+              lower := strings.ToLower(name)
+              normalized := strings.NewReplacer("_", "", "-", "", ".", "").Replace(lower)
+              for _, part := range []string{"secret", "token", "password", "passwd", "authorization", "apikey", "accesskey", "refreshtoken", "privatekey"} {
+                  if strings.Contains(normalized, part) {
+                      return true
+                  }
               }
-            }
-            return strings.Contains(normalized, "credential") && !strings.Contains(normalized, "credentialstore")
+              return strings.Contains(normalized, "credential") && !strings.Contains(normalized, "credentialstore")
           }
 
-          func addMarker(object map[string]any) {
-            prior, _ := object["_redacted"].([]any)
-            object["_redacted"] = append(prior, marker)
-          }
-
-          func redactText(input string) (string, int) {
-            count := 0
-            output := input
-            for _, pattern := range valuePatterns {
-              matches := pattern.FindAllStringIndex(output, -1)
-              if len(matches) > 0 {
-                count += len(matches)
-                output = pattern.ReplaceAllString(output, marker)
+          func emptyMetadata(key string, value any) bool {
+              if key != "credential_source" && key != "secret_material_waivers" {
+                  return false
               }
-            }
-            matches := assignmentPattern.FindAllStringIndex(output, -1)
-            if len(matches) > 0 {
-              count += len(matches)
-              output = assignmentPattern.ReplaceAllString(output, marker)
-            }
-            return output, count
-          }
-
-          func sanitizeBlob(input []byte) ([]byte, int) {
-            var value any
-            if json.Unmarshal(input, &value) == nil {
-              cleaned, count := sanitizeValue(value)
-              if count > 0 {
-                encoded, err := json.Marshal(cleaned)
-                if err == nil {
-                  return encoded, count
-                }
+              switch item := value.(type) {
+              case nil:
+                  return true
+              case string:
+                  return item == ""
+              case map[string]any:
+                  return len(item) == 0
+              case []any:
+                  return len(item) == 0
+              default:
+                  return false
               }
-              return input, count
-            }
-            cleaned, count := redactText(string(input))
-            redactedValues += count
-            return []byte(cleaned), count
           }
 
-          func sanitizeValue(value any) (any, int) {
-            switch current := value.(type) {
-            case map[string]any:
-              count := 0
-              for key, child := range current {
-                if sensitiveName(key) {
-                  delete(current, key)
-                  addMarker(current)
-                  count++
-                  redactedFields++
-                  continue
-                }
-                if key == "bytes" || key == "document" {
-                  if encoded, ok := child.(string); ok {
-                    decoded, err := base64.StdEncoding.DecodeString(encoded)
-                    if err == nil {
-                      cleaned, found := sanitizeBlob(decoded)
-                      if found > 0 {
-                        current[key] = base64.StdEncoding.EncodeToString(cleaned)
-                        if key == "bytes" {
-                          digest := sha256.Sum256(cleaned)
-                          if _, exists := current["sha256"]; exists {
-                            current["sha256"] = hex.EncodeToString(digest[:])
+          func fixtureRootForms(caseDir string) []string {
+              root := filepath.Join(filepath.Dir(caseDir), "tmp")
+              forms := []string{root, filepath.ToSlash(root)}
+              quoted, err := json.Marshal(root)
+              if err == nil && len(quoted) >= 2 {
+                  forms = append(forms, string(quoted[1:len(quoted)-1]))
+              }
+              sort.Slice(forms, func(i, j int) bool { return len(forms[i]) > len(forms[j]) })
+              return forms
+          }
+
+          func pathBoundaryBefore(value string, at int) bool {
+              if at == 0 {
+                  return true
+              }
+              switch value[at-1] {
+              case '"', '\'', ' ', '\t', '\n', '\r', '=', ':', '(', '[', '{', ',', ';':
+                  return true
+              default:
+                  return false
+              }
+          }
+
+          func pathBoundaryAfter(value string, at int) bool {
+              if at == len(value) {
+                  return true
+              }
+              switch value[at] {
+              case '/':
+                  return true
+              case '\\':
+                  return os.PathSeparator == '\\'
+              case '"', '\'', ' ', '\t', '\n', '\r', ',', ';', ')', ']', '}':
+                  return true
+              default:
+                  return false
+              }
+          }
+
+          func hasFixtureRoot(value string, forms []string) bool {
+              for _, form := range forms {
+                  if form == "" {
+                      continue
+                  }
+                  for offset := 0; offset < len(value); {
+                      found := strings.Index(value[offset:], form)
+                      if found < 0 {
+                          break
+                      }
+                      at := offset + found
+                      after := at + len(form)
+                      if pathBoundaryBefore(value, at) && pathBoundaryAfter(value, after) {
+                          return true
+                      }
+                      offset = at + 1
+                  }
+              }
+              return false
+          }
+
+          func unsafeText(value string, roots []string) error {
+              if err := unsafeTextPatterns(value, roots); err != nil {
+                  return err
+              }
+              if assignmentPattern.MatchString(value) {
+                  return refusal("credential-assignment")
+              }
+              return nil
+          }
+
+          func unsafeTextPatterns(value string, roots []string) error {
+              if hasFixtureRoot(value, roots) {
+                  return refusal("path-fixture-root-leak")
+              }
+              for _, item := range detectors {
+                  if item.pattern.MatchString(value) {
+                      return refusal(item.code)
+                  }
+              }
+              return nil
+          }
+
+          type duplicateJSONKey struct{}
+
+          func (duplicateJSONKey) Error() string { return "duplicate JSON object key" }
+
+          func decodeJSONValue(decoder *json.Decoder) (any, error) {
+              token, err := decoder.Token()
+              if err != nil {
+                  return nil, err
+              }
+              delim, ok := token.(json.Delim)
+              if !ok {
+                  return token, nil
+              }
+              switch delim {
+              case '{':
+                  object := make(map[string]any)
+                  for decoder.More() {
+                      keyToken, err := decoder.Token()
+                      if err != nil {
+                          return nil, err
+                      }
+                      key, ok := keyToken.(string)
+                      if !ok {
+                          return nil, errors.New("invalid object key")
+                      }
+                      if _, exists := object[key]; exists {
+                          return nil, duplicateJSONKey{}
+                      }
+                      child, err := decodeJSONValue(decoder)
+                      if err != nil {
+                          return nil, err
+                      }
+                      object[key] = child
+                  }
+                  closing, err := decoder.Token()
+                  if err != nil || closing != json.Delim('}') {
+                      return nil, errors.New("invalid object end")
+                  }
+                  return object, nil
+              case '[':
+                  array := make([]any, 0)
+                  for decoder.More() {
+                      child, err := decodeJSONValue(decoder)
+                      if err != nil {
+                          return nil, err
+                      }
+                      array = append(array, child)
+                  }
+                  closing, err := decoder.Token()
+                  if err != nil || closing != json.Delim(']') {
+                      return nil, errors.New("invalid array end")
+                  }
+                  return array, nil
+              default:
+                  return nil, errors.New("unexpected JSON delimiter")
+              }
+          }
+
+          func parseJSON(data []byte) (any, error) {
+              decoder := json.NewDecoder(bytes.NewReader(data))
+              decoder.UseNumber()
+              value, err := decodeJSONValue(decoder)
+              if err != nil {
+                  return nil, err
+              }
+              if _, err := decoder.Token(); err != io.EOF {
+                  if err == nil {
+                      return nil, errors.New("trailing JSON value")
+                  }
+                  return nil, err
+              }
+              return value, nil
+          }
+
+          func scanJSON(data []byte, roots []string) error {
+              value, err := parseJSON(data)
+              if err != nil {
+                  var duplicate duplicateJSONKey
+                  if errors.As(err, &duplicate) {
+                      return operational("input-duplicate-json-key")
+                  }
+                  return operational("input-invalid-json")
+              }
+              return scanValueDepthRaw(value, roots, 0, data)
+          }
+
+          func scanBlob(data []byte, roots []string) error {
+              value, err := parseJSON(data)
+              if err == nil {
+                  return scanValueDepthRaw(value, roots, 0, data)
+              }
+              var duplicate duplicateJSONKey
+              if errors.As(err, &duplicate) {
+                  return operational("input-duplicate-json-key")
+              }
+              return scanStructuredText(data, roots, 0)
+          }
+
+          func scanLog(data []byte, roots []string) error {
+              return scanStructuredText(data, roots, 0)
+          }
+
+          func scanStructuredText(data []byte, roots []string, depth int) error {
+              if depth > 128 {
+                  return operational("input-json-depth-exceeded")
+              }
+              if err := unsafeTextPatterns(string(data), roots); err != nil {
+                  return err
+              }
+              textStart := 0
+              for offset := 0; offset < len(data); offset++ {
+                  if data[offset] != '{' && data[offset] != '[' {
+                      continue
+                  }
+                  decoder := json.NewDecoder(bytes.NewReader(data[offset:]))
+                  decoder.UseNumber()
+                  value, err := decodeJSONValue(decoder)
+                  if err != nil {
+                      var duplicate duplicateJSONKey
+                      if errors.As(err, &duplicate) {
+                          return operational("input-duplicate-json-key")
+                      }
+                      continue
+                  }
+                  end := offset + int(decoder.InputOffset())
+                  if end <= offset {
+                      continue
+                  }
+                  if err := unsafeTextAssignments(string(data[textStart:offset])); err != nil {
+                      return err
+                  }
+                  if err := scanValueDepthRaw(value, roots, depth+1, data[offset:end]); err != nil {
+                      return err
+                  }
+                  textStart = end
+                  offset = end - 1
+              }
+              return unsafeTextAssignments(string(data[textStart:]))
+          }
+
+          func unsafeTextAssignments(value string) error {
+              if assignmentPattern.MatchString(value) {
+                  return refusal("credential-assignment")
+              }
+              return nil
+          }
+
+          func scanValue(value any, roots []string) error {
+              return scanValueDepthRaw(value, roots, 0, nil)
+          }
+
+          func scanValueDepth(value any, roots []string, depth int) error {
+              return scanValueDepthRaw(value, roots, depth, nil)
+          }
+
+          func scanValueDepthRaw(value any, roots []string, depth int, raw []byte) error {
+              if depth > 128 {
+                  return operational("input-json-depth-exceeded")
+              }
+              switch item := value.(type) {
+              case map[string]any:
+                  credentialSourcePending := false
+                  if source, exists := item["credential_source"]; exists && !emptyMetadata("credential_source", source) {
+                      // Scan the field values before parsing so detector hits retain their
+                      // detector reason even when the same value also makes the marker invalid.
+                      if err := scanValueDepth(source, roots, depth+1); err != nil {
+                          return err
+                      }
+                      credentialSourcePending = true
+                  }
+                  keys := make([]string, 0, len(item))
+                  for key := range item {
+                      keys = append(keys, key)
+                  }
+                  sort.Strings(keys)
+                  for _, key := range keys {
+                      if err := unsafeText(key, roots); err != nil {
+                          return err
+                      }
+                      child := item[key]
+                      if sensitiveName(key) && key != "TBH_CREDENTIAL_BACKEND" {
+                          if emptyMetadata(key, child) {
+                              continue
                           }
-                        }
-                        count += found
-                        continue
+                          if key == "credential_source" && credentialSourcePending {
+                              continue
+                          }
+                          return refusal("sensitive-field-nonempty")
                       }
-                    } else {
-                      cleaned, found := redactText(encoded)
-                      if found > 0 {
-                        current[key] = cleaned
-                        count += found
-                        redactedValues += found
-                        continue
+                      if strings.EqualFold(key, "bytes") || strings.EqualFold(key, "document") {
+                          if encoded, ok := child.(string); ok {
+                              decoded, err := base64.StdEncoding.DecodeString(encoded)
+                              if err == nil {
+                                  if strings.EqualFold(key, "bytes") {
+                                      if digest, exists := item["sha256"]; exists {
+                                          expected, ok := digest.(string)
+                                          actual := sha256.Sum256(decoded)
+                                          if !ok || expected != hex.EncodeToString(actual[:]) {
+                                              return operational("decoded-sha256-mismatch")
+                                          }
+                                      }
+                                  }
+                                  if err := scanBlob(decoded, roots); err != nil {
+                                      return err
+                                  }
+                              }
+                          }
                       }
-                    }
+                      if key == "credential_source" && credentialSourcePending {
+                          continue
+                      }
+                      if err := scanValueDepth(child, roots, depth+1); err != nil {
+                          return err
+                      }
                   }
-                }
-                cleaned, found := sanitizeValue(child)
-                current[key] = cleaned
-                count += found
-              }
-              return current, count
-            case []any:
-              count := 0
-              for index, child := range current {
-                cleaned, found := sanitizeValue(child)
-                current[index] = cleaned
-                count += found
-              }
-              return current, count
-            case string:
-              cleaned, count := redactText(current)
-              redactedValues += count
-              return cleaned, count
-            default:
-              return value, 0
-            }
-          }
-
-          func unsafeText(value string) bool {
-            for _, pattern := range valuePatterns {
-              if pattern.MatchString(value) {
-                return true
-              }
-            }
-            return assignmentPattern.MatchString(value)
-          }
-
-          func unsafeBlob(data []byte) string {
-            var value any
-            if json.Unmarshal(data, &value) == nil {
-              code, _ := unsafeValue(value, "$")
-              return code
-            }
-            if unsafeText(string(data)) { return reasonUnsafeText }
-            return ""
-          }
-
-          func unsafeValue(value any, path string) (string, string) {
-            switch current := value.(type) {
-            case map[string]any:
-              keys := make([]string, 0, len(current))
-              for key := range current { keys = append(keys, key) }
-              sort.Strings(keys)
-              for _, key := range keys {
-                child := current[key]
-                if sensitiveName(key) {
-                  return reasonUnsafeSensitiveKey, path
-                }
-                if key == "bytes" || key == "document" {
-                  if encoded, ok := child.(string); ok {
-                    decoded, err := base64.StdEncoding.DecodeString(encoded)
-                    if err == nil && unsafeBlob(decoded) != "" {
-                      return reasonUnsafeDecodedBlob, path
-                    }
+                  if credentialSourcePending {
+                      marker, err := validateCredentialSourceCarrier(raw)
+                      if err != nil {
+                          return err
+                      }
+                      parsedSource, err := json.Marshal(marker.CredentialSource)
+                      if err != nil {
+                          return operational("credential-source-scan-failed")
+                      }
+                      parsedValue, err := parseJSON(parsedSource)
+                      if err != nil {
+                          return operational("credential-source-scan-failed")
+                      }
+                      if err := scanValueDepth(parsedValue, roots, depth+1); err != nil {
+                          return err
+                      }
                   }
-                }
-                if code, unsafePath := unsafeValue(child, path); code != "" {
-                  return code, unsafePath
-                }
+              case []any:
+                  for _, child := range item {
+                      if err := scanValueDepth(child, roots, depth+1); err != nil {
+                          return err
+                      }
+                  }
+              case string:
+                  return scanStructuredText([]byte(item), roots, depth+1)
               }
-            case []any:
-              for index, child := range current {
-                if code, unsafePath := unsafeValue(child, arrayPath(path, index)); code != "" {
-                  return code, unsafePath
-                }
+              return nil
+          }
+
+          func validateCredentialSourceCarrier(raw []byte) (*envmarker.Marker, error) {
+              if len(raw) == 0 {
+                  return nil, refusal("credential-source-invalid")
               }
-            case string:
-              if unsafeText(current) { return reasonUnsafeText, path }
-            }
-            return "", ""
+              marker, err := envmarker.Parse(raw)
+              if err != nil || marker == nil || marker.Version != envmarker.VersionV7 || marker.CredentialSource == nil {
+                  return nil, refusal("credential-source-invalid")
+              }
+              return marker, nil
+          }
+
+          type inputFile struct {
+              name string
+              data []byte
+              mode os.FileMode
+          }
+
+          func readRegular(path, reason string) (inputFile, error) {
+              info, err := os.Lstat(path)
+              if err != nil || !info.Mode().IsRegular() {
+                  return inputFile{}, operational(reason)
+              }
+              file, err := os.Open(path)
+              if err != nil {
+                  return inputFile{}, operational(reason)
+              }
+              defer file.Close()
+              opened, err := file.Stat()
+              if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
+                  return inputFile{}, operational(reason)
+              }
+              data, err := io.ReadAll(file)
+              if err != nil {
+                  return inputFile{}, operational(reason)
+              }
+              after, err := file.Stat()
+              if err != nil || after.Size() != int64(len(data)) || after.Mode().Perm() != opened.Mode().Perm() || !after.ModTime().Equal(opened.ModTime()) {
+                  return inputFile{}, operational(reason)
+              }
+              return inputFile{name: filepath.Base(path), data: data, mode: opened.Mode().Perm()}, nil
+          }
+
+          func readDirectoryFiles(directory string, want map[string]bool, reason string) ([]inputFile, error) {
+              info, err := os.Lstat(directory)
+              if err != nil || !info.IsDir() {
+                  return nil, operational(reason)
+              }
+              entries, err := os.ReadDir(directory)
+              if err != nil {
+                  return nil, operational(reason)
+              }
+              if len(entries) != len(want) {
+                  return nil, operational(reason)
+              }
+              result := make([]inputFile, 0, len(entries))
+              for _, entry := range entries {
+                  name := entry.Name()
+                  if !want[name] || filepath.Base(name) != name || entry.IsDir() {
+                      return nil, operational(reason)
+                  }
+                  file, err := readRegular(filepath.Join(directory, name), reason)
+                  if err != nil {
+                      return nil, err
+                  }
+                  result = append(result, file)
+              }
+              sort.Slice(result, func(i, j int) bool { return result[i].name < result[j].name })
+              return result, nil
+          }
+
+          func readCaseFiles(directory string, require47 bool) ([]inputFile, error) {
+              info, err := os.Lstat(directory)
+              if err != nil || !info.IsDir() {
+                  return nil, operational("input-case-list-invalid")
+              }
+              entries, err := os.ReadDir(directory)
+              if err != nil || len(entries) > 47 {
+                  return nil, operational("input-case-list-invalid")
+              }
+              if require47 && len(entries) != 47 {
+                  return nil, operational("input-case-count-invalid")
+              }
+              result := make([]inputFile, 0, len(entries))
+              for _, entry := range entries {
+                  name := entry.Name()
+                  if filepath.Base(name) != name || filepath.Ext(name) != ".json" || name == "MANIFEST.json" || entry.IsDir() {
+                      return nil, operational("input-case-entry-invalid")
+                  }
+                  file, err := readRegular(filepath.Join(directory, name), "input-read-failed")
+                  if err != nil {
+                      return nil, err
+                  }
+                  result = append(result, file)
+              }
+              sort.Slice(result, func(i, j int) bool { return result[i].name < result[j].name })
+              return result, nil
           }
 
           type manifestEntry struct {
-            Path string `json:"path"`
-            Bytes int64 `json:"bytes"`
-            SHA256 string `json:"sha256"`
+              path   string
+              bytes  int64
+              sha256 string
           }
 
-          type outputManifest struct {
-            Files []manifestEntry `json:"files"`
-          }
-
-          func buildManifest(directory string) (outputManifest, error) {
-            result := outputManifest{Files: []manifestEntry{}}
-            entries, err := os.ReadDir(directory)
-            if err != nil { return result, refuse(reasonManifestList, 0, 0, "$") }
-            for index, entry := range entries {
-              if entry.IsDir() {
-                return result, refuse(reasonManifestEntry, index+1, len(entries), "$")
+          func manifestFor(files []inputFile) []manifestEntry {
+              result := make([]manifestEntry, 0, len(files))
+              for _, file := range files {
+                  digest := sha256.Sum256(file.data)
+                  result = append(result, manifestEntry{path: file.name, bytes: int64(len(file.data)), sha256: hex.EncodeToString(digest[:])})
               }
-              if entry.Name() == "MANIFEST.json" {
-                continue
-              }
-              if filepath.Ext(entry.Name()) != ".json" {
-                return result, refuse(reasonManifestEntry, index+1, len(entries), "$")
-              }
-              data, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-              if err != nil { return result, refuse(reasonManifestRead, index+1, len(entries), "$") }
-              digest := sha256.Sum256(data)
-              result.Files = append(result.Files, manifestEntry{
-                Path: entry.Name(), Bytes: int64(len(data)), SHA256: hex.EncodeToString(digest[:]),
-              })
-            }
-            sort.Slice(result.Files, func(i, j int) bool { return result.Files[i].Path < result.Files[j].Path })
-            return result, nil
+              sort.Slice(result, func(i, j int) bool { return result[i].path < result[j].path })
+              return result
           }
 
-          func writeVerifiedManifest(directory string) error {
-            expected, err := buildManifest(directory)
-            if err != nil { return err }
-            encoded, err := json.MarshalIndent(expected, "", "  ")
-            if err != nil { return refuse(reasonManifestEncode, 0, 0, "$") }
-            encoded = append(encoded, '\n')
-            path := filepath.Join(directory, "MANIFEST.json")
-            if err := os.WriteFile(path, encoded, 0600); err != nil { return refuse(reasonManifestWrite, 0, 0, "$") }
-            actualBytes, err := os.ReadFile(path)
-            if err != nil { return refuse(reasonManifestRead, 0, 0, "$") }
-            var actual outputManifest
-            if err := json.Unmarshal(actualBytes, &actual); err != nil { return refuse(reasonManifestVerify, 0, 0, "$") }
-            recomputed, err := buildManifest(directory)
-            if err != nil { return err }
-            if !reflect.DeepEqual(expected, actual) || !reflect.DeepEqual(expected, recomputed) {
-              return refuse(reasonManifestVerify, 0, 0, "$")
-            }
-            return nil
-          }
-
-          func sanitizeTextFile(source, destination string, fileIndex, fileCount int) error {
-            data, err := os.ReadFile(source)
-            if err != nil {
-              return refuse(reasonLogRead, fileIndex, fileCount, "$")
-            }
-            cleaned, count := redactText(string(data))
-            redactedValues += count
-            if unsafeText(cleaned) {
-              return refuse(reasonLogUnsafe, fileIndex, fileCount, "$")
-            }
-            if err := os.WriteFile(destination, []byte(cleaned), 0600); err != nil {
-              return refuse(reasonLogWrite, fileIndex, fileCount, "$")
-            }
-            return nil
-          }
-
-          func selfCheck() error {
-            for _, key := range []string{"api_token", "apiKey", "privateKey", "refreshToken"} {
-              input := map[string]any{key: "ghp_" + strings.Repeat("A", 30), "safe": "ordinary"}
-              inputCode, inputPath := unsafeValue(input, "$")
-              if inputCode != reasonUnsafeSensitiveKey || inputPath != "$" {
-                return refuse(reasonSelfCheckFieldDetection, 0, 0, "$")
+          func writeFile(path string, data []byte, mode os.FileMode) error {
+              if err := os.WriteFile(path, data, mode); err != nil {
+                  return err
               }
-              cleaned, count := sanitizeValue(input)
-              encoded, err := json.Marshal(cleaned)
+              return os.Chmod(path, mode)
+          }
+
+          func writeManifest(directory string, files []inputFile) error {
+              entries := manifestFor(files)
+              var encoded bytes.Buffer
+              encoded.WriteString("{\"files\":[")
+              for index, entry := range entries {
+                  if index > 0 {
+                      encoded.WriteByte(',')
+                  }
+                  pathJSON, err := json.Marshal(entry.path)
+                  if err != nil {
+                      return operational("manifest-encode-failed")
+                  }
+                  fmt.Fprintf(&encoded, "{\"path\":%s,\"bytes\":%d,\"sha256\":%q}", pathJSON, entry.bytes, entry.sha256)
+              }
+              encoded.WriteString("]}\n")
+              if err := writeFile(filepath.Join(directory, "MANIFEST.json"), encoded.Bytes(), 0600); err != nil {
+                  return operational("manifest-write-failed")
+              }
+              return nil
+          }
+
+          func directoryEmpty(path string) (bool, error) {
+              info, err := os.Lstat(path)
+              if err != nil || !info.IsDir() {
+                  return false, operational("artifact-directory-invalid")
+              }
+              entries, err := os.ReadDir(path)
               if err != nil {
-                return refuse(reasonSelfCheckFieldRedaction, 0, 0, "$")
+                  return false, operational("artifact-directory-read-failed")
               }
-              object, ok := cleaned.(map[string]any)
-              wantObject := map[string]any{"safe": "ordinary", "_redacted": []any{marker}}
-              if count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) {
-                return refuse(reasonSelfCheckFieldRedaction, 0, 0, "$")
-              }
-              var encodedObject map[string]any
-              if err := json.Unmarshal(encoded, &encodedObject); err != nil ||
-                  strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
-                  !reflect.DeepEqual(encodedObject, wantObject) {
-                return refuse(reasonSelfCheckFieldLeak, 0, 0, "$")
-              }
-            }
-            plantedValue := "ghp_" + strings.Repeat("A", 30)
-            plantedInput := map[string]any{"value": plantedValue, "safe": "ordinary"}
-            plantedCode, plantedPath := unsafeValue(plantedInput, "$")
-            if plantedCode != reasonUnsafeText || plantedPath != "$" {
-              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
-            }
-            cleanedPlanted, plantedCount := sanitizeValue(plantedInput)
-            encodedPlanted, err := json.Marshal(cleanedPlanted)
-            if err != nil {
-              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
-            }
-            var encodedPlantedObject map[string]any
-            if err := json.Unmarshal(encodedPlanted, &encodedPlantedObject); err != nil {
-              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
-            }
-            plantedObject, ok := cleanedPlanted.(map[string]any)
-            wantPlanted := map[string]any{"value": marker, "safe": "ordinary"}
-            if plantedCount != 1 || !ok || !reflect.DeepEqual(plantedObject, wantPlanted) ||
-                strings.Contains(string(encodedPlanted), "ghp_") ||
-                !reflect.DeepEqual(encodedPlantedObject, wantPlanted) {
-              return refuse(reasonSelfCheckPlantedValue, 0, 0, "$")
-            }
-            hostileKey := "ghp_" + strings.Repeat("A", 30)
-            hostileKeyInput := map[string]any{
-              hostileKey: map[string]any{"nested": "/Users/runner/private"},
-            }
-            hostileKeyCode, hostileKeyPath := unsafeValue(hostileKeyInput, "$")
-            hostileKeyRefusal := refuse(hostileKeyCode, 1, 1, hostileKeyPath)
-            wantHostileKeyRefusal := "CAPTURE_REASON=" + reasonUnsafeText + " file=1/1 path=$"
-            if hostileKeyCode != reasonUnsafeText || hostileKeyPath != "$" ||
-                hostileKeyRefusal.Error() != wantHostileKeyRefusal || strings.Contains(hostileKeyRefusal.Error(), hostileKey) {
-              return refuse(reasonSelfCheckDiagnosticKey, 0, 0, "$")
-            }
-            input := "safe prefix Bearer abcdefghijklmnop safe suffix"
-            text, count := redactText(input)
-            want := "safe prefix " + marker + " safe suffix"
-            if !unsafeText(input) || count != 1 || text != want || unsafeText(text) {
-              return refuse(reasonSelfCheckCredential, 0, 0, "$")
-            }
-            assignment := "credential_conflict_token: " + marker
-            cleanedAssignment, assignmentCount := redactText(assignment)
-            if !unsafeText(assignment) || assignmentCount != 1 || cleanedAssignment != marker || unsafeText(cleanedAssignment) {
-              return refuse(reasonSelfCheckCredential, 0, 0, "$")
-            }
-            for _, credential := range []string{
-              "sk_live_" + strings.Repeat("A", 16),
-              "sk_test_" + strings.Repeat("A", 16),
-              "AIza" + strings.Repeat("B", 35),
-            } {
-              input := "safe prefix " + credential + " safe suffix"
-              cleaned, count := redactText(input)
-              want := "safe prefix " + marker + " safe suffix"
-              if !unsafeText(input) || count != 1 || cleaned != want || unsafeText(cleaned) {
-                return refuse(reasonSelfCheckCredential, 0, 0, "$")
-              }
-            }
-            for _, privateHome := range []string{
-              "D:\\a\\_temp\\original-capture-123-1\\home\\.gitconfig",
-              "/Users/runner/work/repository/home/.gitconfig",
-              "/home/runner/.config/curator/state",
-              "D:/a/_temp/original-capture-123-1/home/.gitconfig",
-            } {
-              homeInput := "safe prefix " + privateHome + " safe suffix"
-              cleanedHome, pathCount := redactText(homeInput)
-              if !unsafeText(homeInput) || pathCount != 1 || cleanedHome != "safe prefix "+marker+" safe suffix" || unsafeText(cleanedHome) {
-                return refuse(reasonSelfCheckPath, 0, 0, "$")
-              }
-            }
-            splitPath := "/Users/runner/" + "HOSTILE_SECRET_DIAGCONTROL" + "/repository"
-            cleanedSplitPath, splitPathCount := redactText(splitPath)
-            wantSplitPath := marker + marker + "/repository"
-            if !unsafeText(splitPath) || splitPathCount != 2 || cleanedSplitPath != wantSplitPath || unsafeText(cleanedSplitPath) {
-              return refuse(reasonSelfCheckSplitPath, 0, 0, "$")
-            }
-            safeBlob := []byte(`{"payload":"ordinary"}`)
-            secretBlob := []byte(`{"payload":"/Users/runner/private","ordinary":"safe sibling"}`)
-            safeBlobDigest := sha256.Sum256(safeBlob)
-            secretBlobDigest := sha256.Sum256(secretBlob)
-            safeShape := map[string]any{
-              "bytes": base64.StdEncoding.EncodeToString(safeBlob),
-              "sha256": hex.EncodeToString(safeBlobDigest[:]),
-            }
-            safeShapeOriginal, err := json.Marshal(safeShape)
-            if err != nil {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            var expectedSafeShape any
-            if err := json.Unmarshal(safeShapeOriginal, &expectedSafeShape); err != nil {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            originalSafeCode, _ := unsafeValue(safeShape, "$")
-            safeShapeCleaned, safeShapeCount := sanitizeValue(safeShape)
-            safeShapeCode, _ := unsafeValue(safeShapeCleaned, "$")
-            if originalSafeCode != "" || safeShapeCount != 0 || safeShapeCode != "" ||
-                !reflect.DeepEqual(safeShapeCleaned, expectedSafeShape) {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            safeShapeObject, ok := safeShapeCleaned.(map[string]any)
-            if !ok {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            safeEncoded, ok := safeShapeObject["bytes"].(string)
-            if !ok {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            cleanedSafeBlob, err := base64.StdEncoding.DecodeString(safeEncoded)
-            if err != nil {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            var originalSafePayload any
-            var cleanedSafePayload any
-            if json.Unmarshal(safeBlob, &originalSafePayload) != nil ||
-                json.Unmarshal(cleanedSafeBlob, &cleanedSafePayload) != nil ||
-                !reflect.DeepEqual(cleanedSafePayload, originalSafePayload) {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            secretShape := map[string]any{
-              "bytes": base64.StdEncoding.EncodeToString(secretBlob),
-              "sha256": hex.EncodeToString(secretBlobDigest[:]),
-              "ordinary": "outer safe sibling",
-            }
-            secretOriginalCode, _ := unsafeValue(secretShape, "$")
-            secretShapeCleaned, secretShapeCount := sanitizeValue(secretShape)
-            secretShapeObject, ok := secretShapeCleaned.(map[string]any)
-            if !ok || secretOriginalCode != reasonUnsafeDecodedBlob || secretShapeCount != 1 || unsafeBlob(secretBlob) == "" ||
-                secretShapeObject["ordinary"] != "outer safe sibling" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            sanitizedEncoded, ok := secretShapeObject["bytes"].(string)
-            if !ok {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            sanitizedBlob, err := base64.StdEncoding.DecodeString(sanitizedEncoded)
-            if err != nil || unsafeBlob(sanitizedBlob) != "" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            var sanitizedBlobShape any
-            if err := json.Unmarshal(sanitizedBlob, &sanitizedBlobShape); err != nil ||
-                !reflect.DeepEqual(sanitizedBlobShape, map[string]any{"payload": marker, "ordinary": "safe sibling"}) {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            sanitizedBlobDigest := sha256.Sum256(sanitizedBlob)
-            if secretShapeObject["sha256"] != hex.EncodeToString(sanitizedBlobDigest[:]) {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            sanitizedShapeCode, _ := unsafeValue(secretShapeCleaned, "$")
-            if sanitizedShapeCode != "" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$")
-            }
-            manifestDir, err := os.MkdirTemp("", "capture-manifest-check-")
-            if err != nil {
-              return refuse(reasonSelfCheckManifest, 0, 0, "$")
-            }
-            defer os.RemoveAll(manifestDir)
-            fixture := []byte("{\"ok\":true}\n")
-            if err := os.WriteFile(filepath.Join(manifestDir, "one.json"), fixture, 0600); err != nil {
-              return refuse(reasonSelfCheckManifest, 0, 0, "$")
-            }
-            if err := writeVerifiedManifest(manifestDir); err != nil {
-              return refuse(reasonSelfCheckManifest, 0, 0, "$")
-            }
-            manifestBytes, err := os.ReadFile(filepath.Join(manifestDir, "MANIFEST.json"))
-            if err != nil {
-              return refuse(reasonSelfCheckManifest, 0, 0, "$")
-            }
-            var manifest outputManifest
-            if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
-              return refuse(reasonSelfCheckManifest, 0, 0, "$")
-            }
-            digest := sha256.Sum256(fixture)
-            if len(manifest.Files) != 1 || manifest.Files[0].Path != "one.json" ||
-                manifest.Files[0].Bytes != int64(len(fixture)) ||
-                manifest.Files[0].SHA256 != hex.EncodeToString(digest[:]) {
-              return refuse(reasonSelfCheckManifestContents, 0, 0, "$")
-            }
-            return nil
+              return len(entries) == 0, nil
           }
 
-          func run() error {
-            if err := selfCheck(); err != nil {
-              return err
-            }
-            redactedFields = 0
-            redactedValues = 0
-            if len(os.Args) != 4 {
-              return refuse(reasonArguments, 0, 0, "$")
-            }
-            rawDir, artifactDir := os.Args[1], os.Args[2]
-            require47 := os.Args[3] == "true"
-            outputDir := filepath.Join(artifactDir, "outputs")
-            if err := os.MkdirAll(outputDir, 0700); err != nil {
-              return refuse(reasonOutputCreate, 0, 0, "$")
-            }
-            entries, err := os.ReadDir(rawDir)
-            if err != nil {
-              return refuse(reasonRawList, 0, 0, "$")
-            }
-            jsonCount := 0
-            for index, entry := range entries {
-              if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-                return refuse(reasonRawEntry, index+1, len(entries), "$")
+          func writeInputSet(stage string, dirname string, files []inputFile) error {
+              directory := filepath.Join(stage, dirname)
+              if err := os.Mkdir(directory, 0700); err != nil {
+                  return operational("staging-failed")
               }
-              input, err := os.ReadFile(filepath.Join(rawDir, entry.Name()))
+              for _, file := range files {
+                  if err := writeFile(filepath.Join(directory, file.name), file.data, file.mode); err != nil {
+                      return operational("staging-failed")
+                  }
+              }
+              if err := writeManifest(directory, files); err != nil {
+                  return err
+              }
+              return nil
+          }
+
+          func exportGate(caseDir, repeatDir, artifactDir string, require47 bool) error {
+              empty, err := directoryEmpty(artifactDir)
               if err != nil {
-                return refuse(reasonRawRead, index+1, len(entries), "$")
+                  return err
               }
-              var value any
-              if err := json.Unmarshal(input, &value); err != nil {
-                return refuse(reasonRawJSON, index+1, len(entries), "$")
+              if !empty {
+                  return operational("artifact-not-empty")
               }
-              cleaned, found := sanitizeValue(value)
-              var output []byte
-              if found == 0 {
-                output = input
-              } else {
-                output, err = json.MarshalIndent(cleaned, "", "  ")
-                if err != nil {
-                  return refuse(reasonOutputMarshal, index+1, len(entries), "$")
-                }
-                output = append(output, '\n')
-              }
-              if err := os.WriteFile(filepath.Join(outputDir, entry.Name()), output, 0600); err != nil {
-                return refuse(reasonOutputWrite, index+1, len(entries), "$")
-              }
-              jsonCount++
-            }
-            if jsonCount > 47 || (require47 && jsonCount != 47) {
-              return refuse(reasonOutputCount, 0, 0, "$")
-            }
-            if err := writeVerifiedManifest(outputDir); err != nil {
-              return err
-            }
-            logs := []struct{ source, destination string }{
-              {filepath.Join(filepath.Dir(rawDir), "audit-output.raw.txt"), filepath.Join(artifactDir, "audit-output.txt")},
-              {filepath.Join(filepath.Dir(rawDir), "module-download.raw.txt"), filepath.Join(artifactDir, "module-download.txt")},
-              {filepath.Join(filepath.Dir(rawDir), "source-verification.log"), filepath.Join(artifactDir, "source-verification.txt")},
-              {filepath.Join(filepath.Dir(rawDir), "test-output.raw.txt"), filepath.Join(artifactDir, "test-output.txt")},
-            }
-            for index, log := range logs {
-              if err := sanitizeTextFile(log.source, log.destination, index+1, len(logs)); err != nil {
-                return err
-              }
-            }
-            artifactLogs := []string{"audit-output.txt", "module-download.txt", "source-verification.txt", "test-output.txt"}
-            for index, entry := range artifactLogs {
-              data, err := os.ReadFile(filepath.Join(artifactDir, entry))
+              cases, err := readCaseFiles(caseDir, require47)
               if err != nil {
-                return refuse(reasonArtifactLogRead, index+1, len(artifactLogs), "$")
+                  return err
               }
-              if unsafeText(string(data)) {
-                return refuse(reasonArtifactLogUnsafe, index+1, len(artifactLogs), "$")
-              }
-            }
-            files, err := os.ReadDir(outputDir)
-            if err != nil {
-              return refuse(reasonSanitizedOutputList, 0, 0, "$")
-            }
-            for index, entry := range files {
-              data, err := os.ReadFile(filepath.Join(outputDir, entry.Name()))
+              repeats, err := readDirectoryFiles(repeatDir, map[string]bool{"first.json": true, "second.json": true}, "input-repeat-set-invalid")
               if err != nil {
-                return refuse(reasonSanitizedOutputRead, index+1, len(files), "$")
+                  return err
               }
-              var value any
-              if err := json.Unmarshal(data, &value); err != nil {
-                return refuse(reasonSanitizedOutputJSON, index+1, len(files), "$")
+              parent := filepath.Dir(caseDir)
+              logNames := []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt"}
+              logs := make([]inputFile, 0, len(logNames))
+              for _, name := range logNames {
+                  file, err := readRegular(filepath.Join(parent, name), "input-log-read-failed")
+                  if err != nil {
+                      return err
+                  }
+                  logs = append(logs, file)
               }
-              if code, jsonPath := unsafeValue(value, "$"); code != "" {
-                return refuse(code, index+1, len(files), jsonPath)
+              roots := fixtureRootForms(caseDir)
+              for _, file := range cases {
+                  if err := unsafeText(file.name, roots); err != nil {
+                      return err
+                  }
+                  if sensitiveName(strings.TrimSuffix(file.name, filepath.Ext(file.name))) {
+                      return refusal("sensitive-field-nonempty")
+                  }
+                  if err := scanJSON(file.data, roots); err != nil {
+                      return err
+                  }
               }
-            }
-            fmt.Printf("sanitized_json_files=%d\nredacted_fields=%d\nredacted_values=%d\n", jsonCount, redactedFields, redactedValues)
-            return nil
+              for _, file := range repeats {
+                  if err := unsafeText(file.name, roots); err != nil {
+                      return err
+                  }
+                  if err := scanJSON(file.data, roots); err != nil {
+                      return err
+                  }
+              }
+              for _, file := range logs {
+                  if err := scanLog(file.data, roots); err != nil {
+                      return err
+                  }
+              }
+              stage, err := os.MkdirTemp(filepath.Dir(artifactDir), ".capture-export-stage-")
+              if err != nil {
+                  return operational("staging-create-failed")
+              }
+              defer os.RemoveAll(stage)
+              if err := os.Chmod(stage, 0700); err != nil {
+                  return operational("staging-create-failed")
+              }
+              if err := writeInputSet(stage, "outputs", cases); err != nil {
+                  return err
+              }
+              if err := writeInputSet(stage, "repeat-observations", repeats); err != nil {
+                  return err
+              }
+              for _, file := range logs {
+                  if err := writeFile(filepath.Join(stage, file.name), file.data, file.mode); err != nil {
+                      return operational("staging-failed")
+                  }
+              }
+              published := make([]string, 0, 6)
+              rollback := func() error {
+                  failed := false
+                  for _, name := range published {
+                      if err := os.RemoveAll(filepath.Join(artifactDir, name)); err != nil {
+                          failed = true
+                      }
+                  }
+                  if failed {
+                      return operational("rollback-failed")
+                  }
+                  return nil
+              }
+              for _, name := range []string{"outputs", "repeat-observations", logNames[0], logNames[1], logNames[2], logNames[3]} {
+                  source := filepath.Join(stage, name)
+                  target := filepath.Join(artifactDir, name)
+                  if err := os.Rename(source, target); err != nil {
+                      if rollbackErr := rollback(); rollbackErr != nil {
+                          return rollbackErr
+                      }
+                      return operational("publish-failed")
+                  }
+                  published = append(published, name)
+              }
+              return nil
+          }
+
+          func parseRequire47(value string) (bool, bool) {
+              switch value {
+              case "true":
+                  return true, true
+              case "false":
+                  return false, true
+              default:
+                  return false, false
+              }
           }
 
           func main() {
-            if err := run(); err != nil {
-              if failure, ok := err.(sanitizeFailure); ok {
-                fmt.Fprintln(os.Stderr, failure.Error())
-              } else {
-                fmt.Fprintln(os.Stderr, "CAPTURE_REASON="+reasonInternal)
+              if err := selfCheck(); err != nil {
+                  if failure, ok := err.(gateError); ok {
+                      fmt.Fprintln(os.Stderr, "CAPTURE_REASON="+failure.code)
+                  } else {
+                      fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/internal-failure")
+                  }
+                  os.Exit(2)
               }
-              os.Exit(1)
-            }
+              os.Exit(runGate(os.Args[1:], os.Stdout, os.Stderr))
+          }
+
+          func runGate(args []string, stdout, stderr io.Writer) int {
+              if len(args) != 4 {
+                  fmt.Fprintln(stderr, "CAPTURE_REASON=sanitize/invalid-arguments")
+                  return 2
+              }
+              require47, ok := parseRequire47(args[3])
+              if !ok {
+                  fmt.Fprintln(stderr, "CAPTURE_REASON=sanitize/invalid-arguments")
+                  return 2
+              }
+              if err := exportGate(args[0], args[1], args[2], require47); err != nil {
+                  failure, typed := err.(gateError)
+                  if !typed {
+                      fmt.Fprintln(stderr, "CAPTURE_REASON=sanitize/internal-failure")
+                      return 2
+                  }
+                  fmt.Fprintln(stderr, "CAPTURE_REASON="+failure.code)
+                  if failure.security {
+                      return 1
+                  }
+                  return 2
+              }
+              fmt.Fprintf(stdout, "export_gate=PASS\nexported_case_files=%d\nexported_repeat_observations=2\n", countCaseFiles(args[0]))
+              return 0
+          }
+
+          func countCaseFiles(directory string) int {
+              entries, err := os.ReadDir(directory)
+              if err != nil {
+                  return 0
+              }
+              return len(entries)
+          }
+
+          type controlPaths struct {
+              root       string
+              caseDir    string
+              repeatDir  string
+              artifact   string
+              caseFiles  []inputFile
+              repeatData []inputFile
+              logData    []inputFile
+          }
+
+          func prepareControl(base string, caseCount int) (controlPaths, error) {
+              paths := controlPaths{
+                  root:      filepath.Join(base, "capture"),
+                  caseDir:   filepath.Join(base, "capture", "raw-output"),
+                  repeatDir: filepath.Join(base, "capture", "repeat-raw"),
+                  artifact:  filepath.Join(base, "capture", "artifact"),
+              }
+              for _, directory := range []string{paths.caseDir, paths.repeatDir, paths.artifact, filepath.Join(paths.root, "tmp")} {
+                  if err := os.MkdirAll(directory, 0700); err != nil {
+                      return paths, operational("selfcheck-fixture-setup-failed")
+                  }
+              }
+              for index := 0; index < caseCount; index++ {
+                  name := fmt.Sprintf("case-%02d.json", index)
+                  data := []byte(fmt.Sprintf("{\"case\":%d}\n", index))
+                  file := inputFile{name: name, data: data, mode: 0600}
+                  if err := writeFile(filepath.Join(paths.caseDir, name), data, file.mode); err != nil {
+                      return paths, operational("selfcheck-fixture-setup-failed")
+                  }
+                  paths.caseFiles = append(paths.caseFiles, file)
+              }
+              for _, name := range []string{"first.json", "second.json"} {
+                  data := []byte("{\"observation\":\"neutral\"}\n")
+                  file := inputFile{name: name, data: data, mode: 0600}
+                  if err := writeFile(filepath.Join(paths.repeatDir, name), data, file.mode); err != nil {
+                      return paths, operational("selfcheck-fixture-setup-failed")
+                  }
+                  paths.repeatData = append(paths.repeatData, file)
+              }
+              for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt"} {
+                  data := []byte("neutral control log\n")
+                  file := inputFile{name: name, data: data, mode: 0600}
+                  if err := writeFile(filepath.Join(paths.root, name), data, file.mode); err != nil {
+                      return paths, operational("selfcheck-fixture-setup-failed")
+                  }
+                  paths.logData = append(paths.logData, file)
+              }
+              return paths, nil
+          }
+
+          func assertArtifactEmpty(path string) error {
+              entries, err := os.ReadDir(path)
+              if err != nil || len(entries) != 0 {
+                  return operational("selfcheck-refusal-published-payload")
+              }
+              return nil
+          }
+
+          func expectRefusal(paths controlPaths, expected string) error {
+              var stdout, stderr bytes.Buffer
+              code := runGate([]string{paths.caseDir, paths.repeatDir, paths.artifact, "false"}, &stdout, &stderr)
+              if code != 1 || stdout.Len() != 0 || stderr.String() != diagnostic(expected) {
+                  return operational("selfcheck-refusal-control-failed")
+              }
+              return assertArtifactEmpty(paths.artifact)
+          }
+
+          func diagnostic(code string) string { return "CAPTURE_REASON=sanitize/" + code + "\n" }
+
+          func triggerJSON(value string) []byte {
+              encoded, _ := json.Marshal(map[string]string{"value": value})
+              return append(encoded, '\n')
+          }
+
+          func readMarkerControl() (map[string]any, error) {
+              payload, err := os.ReadFile(filepath.Join("internal", "envmarker", "testdata", "seed-c", "node.json"))
+              if err != nil {
+                  return nil, operational("selfcheck-marker-fixture-read-failed")
+              }
+              marker, err := envmarker.Parse(payload)
+              if err != nil || marker == nil || marker.Version != envmarker.VersionV7 || marker.CredentialSource == nil {
+                  return nil, operational("selfcheck-marker-fixture-invalid")
+              }
+              value, err := parseJSON(payload)
+              if err != nil {
+                  return nil, operational("selfcheck-marker-fixture-invalid")
+              }
+              object, ok := value.(map[string]any)
+              if !ok {
+                  return nil, operational("selfcheck-marker-fixture-invalid")
+              }
+              return object, nil
+          }
+
+          func markerCredentialSource(marker map[string]any) (map[string]any, error) {
+              source, ok := marker["credential_source"].(map[string]any)
+              if !ok {
+                  return nil, operational("selfcheck-marker-fixture-invalid")
+              }
+              return source, nil
+          }
+
+          func markerNodeSource(marker map[string]any) (map[string]any, error) {
+              credentialSource, err := markerCredentialSource(marker)
+              if err != nil {
+                  return nil, err
+              }
+              source, ok := credentialSource["source"].(map[string]any)
+              if !ok {
+                  return nil, operational("selfcheck-marker-fixture-invalid")
+              }
+              return source, nil
+          }
+
+          func plantMarkerControl(paths *controlPaths, marker map[string]any) error {
+              if len(paths.caseFiles) != 1 {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              payload, err := json.Marshal(marker)
+              if err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              digest := sha256.Sum256(payload)
+              data, err := json.Marshal(map[string]any{
+                  "bytes":  base64.StdEncoding.EncodeToString(payload),
+                  "sha256": hex.EncodeToString(digest[:]),
+              })
+              if err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              data = append(data, '\n')
+              file := inputFile{name: "case-00.json", data: data, mode: 0600}
+              if err := writeFile(filepath.Join(paths.caseDir, file.name), file.data, file.mode); err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              paths.caseFiles[0] = file
+              return nil
+          }
+
+          func prepareMarkerControl(base string, mutate func(map[string]any) error) (controlPaths, error) {
+              marker, err := readMarkerControl()
+              if err != nil {
+                  return controlPaths{}, err
+              }
+              if mutate != nil {
+                  if err := mutate(marker); err != nil {
+                      return controlPaths{}, err
+                  }
+              }
+              paths, err := prepareControl(base, 1)
+              if err != nil {
+                  return paths, err
+              }
+              if err := plantMarkerControl(&paths, marker); err != nil {
+                  return paths, err
+              }
+              return paths, nil
+          }
+
+          func plantControl(paths controlPaths, target, name string, data []byte) error {
+              var path string
+              switch target {
+              case "case":
+                  path = filepath.Join(paths.caseDir, name)
+              case "repeat":
+                  path = filepath.Join(paths.repeatDir, name)
+              case "log":
+                  path = filepath.Join(paths.root, name)
+              default:
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              return writeFile(path, data, 0600)
+          }
+
+          func expectedManifest(files []inputFile) []byte {
+              var encoded bytes.Buffer
+              encoded.WriteString("{\"files\":[")
+              ordered := append([]inputFile(nil), files...)
+              sort.Slice(ordered, func(i, j int) bool { return ordered[i].name < ordered[j].name })
+              for index, file := range ordered {
+                  if index > 0 {
+                      encoded.WriteByte(',')
+                  }
+                  name, _ := json.Marshal(file.name)
+                  digest := sha256.Sum256(file.data)
+                  fmt.Fprintf(&encoded, "{\"path\":%s,\"bytes\":%d,\"sha256\":%q}", name, len(file.data), hex.EncodeToString(digest[:]))
+              }
+              encoded.WriteString("]}\n")
+              return encoded.Bytes()
+          }
+
+          func verifyControlArtifact(paths controlPaths) error {
+              entries, err := os.ReadDir(paths.artifact)
+              if err != nil || len(entries) != 6 {
+                  return operational("selfcheck-output-shape-failed")
+              }
+              expectedRoot := map[string]bool{
+                  "outputs": true, "repeat-observations": true,
+                  "audit-output.raw.txt": true, "module-download.raw.txt": true,
+                  "source-verification.log": true, "test-output.raw.txt": true,
+              }
+              for _, entry := range entries {
+                  if !expectedRoot[entry.Name()] {
+                      return operational("selfcheck-output-shape-failed")
+                  }
+              }
+              for _, group := range []struct {
+                  name  string
+                  files []inputFile
+              }{
+                  {"outputs", paths.caseFiles},
+                  {"repeat-observations", paths.repeatData},
+              } {
+                  directory := filepath.Join(paths.artifact, group.name)
+                  items, err := os.ReadDir(directory)
+                  if err != nil || len(items) != len(group.files)+1 {
+                      return operational("selfcheck-output-shape-failed")
+                  }
+                  for _, file := range group.files {
+                      got, err := os.ReadFile(filepath.Join(directory, file.name))
+                      info, statErr := os.Stat(filepath.Join(directory, file.name))
+                      if err != nil || statErr != nil || !bytes.Equal(got, file.data) || info.Mode().Perm() != file.mode {
+                          return operational("selfcheck-byte-preservation-failed")
+                      }
+                  }
+                  gotManifest, err := os.ReadFile(filepath.Join(directory, "MANIFEST.json"))
+                  if err != nil || !bytes.Equal(gotManifest, expectedManifest(group.files)) {
+                      return operational("selfcheck-manifest-failed")
+                  }
+              }
+              for _, file := range paths.logData {
+                  got, err := os.ReadFile(filepath.Join(paths.artifact, file.name))
+                  info, statErr := os.Stat(filepath.Join(paths.artifact, file.name))
+                  if err != nil || statErr != nil || !bytes.Equal(got, file.data) || info.Mode().Perm() != file.mode {
+                      return operational("selfcheck-byte-preservation-failed")
+                  }
+              }
+              return nil
+          }
+
+          func expectPass(paths controlPaths, require47 bool) error {
+              var stdout, stderr bytes.Buffer
+              code := runGate([]string{paths.caseDir, paths.repeatDir, paths.artifact, fmt.Sprint(require47)}, &stdout, &stderr)
+              expected := fmt.Sprintf("export_gate=PASS\nexported_case_files=%d\nexported_repeat_observations=2\n", countCaseFiles(paths.caseDir))
+              if code != 0 || stdout.String() != expected || stderr.Len() != 0 {
+                  return operational("selfcheck-positive-control-failed")
+              }
+              return verifyControlArtifact(paths)
+          }
+
+          func selfCheck() error {
+              base, err := os.MkdirTemp("", "capture-export-selfcheck-")
+              if err != nil {
+                  return operational("selfcheck-temp-create-failed")
+              }
+              defer os.RemoveAll(base)
+
+              neutral, err := prepareControl(filepath.Join(base, "neutral"), 1)
+              if err != nil {
+                  return err
+              }
+              blob := []byte("{\"nested\":[\"ordinary\",17]}")
+              digest := sha256.Sum256(blob)
+              neutralValue := map[string]any{
+                  "credential_source":       nil,
+                  "secret_material_waivers": map[string]any{},
+                  "credentialStore":         "neutral",
+                  "TBH_CREDENTIAL_BACKEND":  map[string]any{"nested": []any{"ordinary", json.Number("3")}},
+                  "BYTES":                   "not base64",
+                  "bytes":                   base64.StdEncoding.EncodeToString(blob),
+                  "sha256":                  hex.EncodeToString(digest[:]),
+              }
+              neutralBytes, err := json.Marshal(neutralValue)
+              if err != nil {
+                  return operational("selfcheck-positive-control-failed")
+              }
+              neutralBytes = append(neutralBytes, '\n')
+              neutralFile := inputFile{name: "case-00.json", data: neutralBytes, mode: 0600}
+              if err := writeFile(filepath.Join(neutral.caseDir, neutralFile.name), neutralBytes, neutralFile.mode); err != nil {
+                  return operational("selfcheck-positive-control-failed")
+              }
+              neutral.caseFiles[0] = neutralFile
+              neutralLog := []byte("{\"credential_source\":null,\"secret_material_waivers\":[]}\n")
+              neutral.logData[0].data = neutralLog
+              if err := writeFile(filepath.Join(neutral.root, neutral.logData[0].name), neutralLog, 0600); err != nil {
+                  return operational("selfcheck-positive-control-failed")
+              }
+              if err := expectPass(neutral, false); err != nil {
+                  return err
+              }
+
+              neutralForms := []struct {
+                  key   string
+                  value any
+              }{
+                  {"credential_source", ""},
+                  {"credential_source", nil},
+                  {"credential_source", map[string]any{}},
+                  {"credential_source", []any{}},
+                  {"secret_material_waivers", ""},
+                  {"secret_material_waivers", nil},
+                  {"secret_material_waivers", map[string]any{}},
+                  {"secret_material_waivers", []any{}},
+              }
+              for index, form := range neutralForms {
+                  paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("neutral-form-%02d", index)), 1)
+                  if err != nil {
+                      return err
+                  }
+                  data, err := json.Marshal(map[string]any{form.key: form.value})
+                  if err != nil {
+                      return operational("selfcheck-positive-control-failed")
+                  }
+                  file := inputFile{name: "case-00.json", data: append(data, '\n'), mode: 0600}
+                  if err := writeFile(filepath.Join(paths.caseDir, file.name), file.data, file.mode); err != nil {
+                      return operational("selfcheck-positive-control-failed")
+                  }
+                  paths.caseFiles[0] = file
+                  if err := expectPass(paths, false); err != nil {
+                      return err
+                  }
+              }
+
+              validMarker, err := prepareMarkerControl(filepath.Join(base, "marker-valid"), nil)
+              if err != nil {
+                  return err
+              }
+              if err := expectPass(validMarker, false); err != nil {
+                  return err
+              }
+              perHomeMarker, err := prepareMarkerControl(filepath.Join(base, "marker-valid-per-home"), func(marker map[string]any) error {
+                  marker["credential_source"] = map[string]any{"mode": "per-home"}
+                  marker["seeds"] = []any{"config.toml"}
+                  return nil
+              })
+              if err != nil {
+                  return err
+              }
+              if err := expectPass(perHomeMarker, false); err != nil {
+                  return err
+              }
+
+              markerControls := []struct {
+                  name   string
+                  reason string
+                  mutate func(map[string]any) error
+              }{
+                  {
+                      name:   "extra-credential-source-field",
+                      reason: "credential-source-invalid",
+                      mutate: func(marker map[string]any) error {
+                          credentialSource, err := markerCredentialSource(marker)
+                          if err == nil {
+                              credentialSource["unexpected"] = true
+                          }
+                          return err
+                      },
+                  },
+                  {
+                      name:   "extra-node-source-field",
+                      reason: "credential-source-invalid",
+                      mutate: func(marker map[string]any) error {
+                          source, err := markerNodeSource(marker)
+                          if err == nil {
+                              source["unexpected"] = true
+                          }
+                          return err
+                      },
+                  },
+                  {
+                      name:   "invalid-source-ref",
+                      reason: "credential-source-invalid",
+                      mutate: func(marker map[string]any) error {
+                          source, err := markerNodeSource(marker)
+                          if err == nil {
+                              source["source_ref"] = "local:invalid"
+                          }
+                          return err
+                      },
+                  },
+                  {
+                      name:   "legacy-marker-with-source",
+                      reason: "credential-source-invalid",
+                      mutate: func(marker map[string]any) error {
+                          marker["version"] = json.Number("3")
+                          return nil
+                      },
+                  },
+                  {
+                      name:   "token-in-source-ref",
+                      reason: "token-hostile-sentinel",
+                      mutate: func(marker map[string]any) error {
+                          source, err := markerNodeSource(marker)
+                          if err == nil {
+                              source["source_ref"] = "local:HOSTILE_SECRET_CONTROL"
+                          }
+                          return err
+                      },
+                  },
+                  {
+                      name:   "home-path-in-source-ref",
+                      reason: "path-private-home",
+                      mutate: func(marker map[string]any) error {
+                          source, err := markerNodeSource(marker)
+                          if err == nil {
+                              source["source_ref"] = "/Users/example/private/fixture"
+                          }
+                          return err
+                      },
+                  },
+                  {
+                      name:   "nonempty-secret-material-waivers",
+                      reason: "sensitive-field-nonempty",
+                      mutate: func(marker map[string]any) error {
+                          marker["secret_material_waivers"] = []any{"non-empty"}
+                          return nil
+                      },
+                  },
+              }
+              for _, control := range markerControls {
+                  paths, err := prepareMarkerControl(filepath.Join(base, "marker-"+control.name), control.mutate)
+                  if err != nil {
+                      return err
+                  }
+                  if err := expectRefusal(paths, control.reason); err != nil {
+                      return err
+                  }
+              }
+
+              for _, count := range []int{0, 1, 46} {
+                  paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("partial-%d", count)), count)
+                  if err != nil {
+                      return err
+                  }
+                  if err := expectPass(paths, false); err != nil {
+                      return err
+                  }
+              }
+              full, err := prepareControl(filepath.Join(base, "full"), 47)
+              if err != nil {
+                  return err
+              }
+              if err := expectPass(full, true); err != nil {
+                  return err
+              }
+
+              tokenPrefix := strings.Repeat("A", 30)
+              triggers := []struct {
+                  code  string
+                  value string
+              }{
+                  {"token-bearer", "Bearer abcdefghijklmnop"},
+                  {"token-github-gitlab", "ghp_" + tokenPrefix},
+                  {"token-sk", "sk-" + tokenPrefix},
+                  {"token-slack", "xoxb-abcdefghij"},
+                  {"token-aws-access-key", "AKIAABCDEFGHIJKLMNOP"},
+                  {"token-jwt", "eyJAAAAA.eyJBBBBB.eyJCCCCC"},
+                  {"token-private-key", "-----BEGIN RSA PRIVATE KEY-----\nneutral\n-----END RSA PRIVATE KEY-----"},
+                  {"token-hostile-sentinel", "HOSTILE_SECRET_CONTROL"},
+                  {"token-google-stripe", "AIza" + strings.Repeat("B", 35)},
+                  {"path-private-home", "/Users/example/private/state"},
+                  {"credential-assignment", "credential_token=neutral-value"},
+              }
+              targets := []struct{ kind, name string }{
+                  {"case", "case-00.json"},
+                  {"repeat", "first.json"},
+                  {"log", "audit-output.raw.txt"},
+                  {"log", "module-download.raw.txt"},
+                  {"log", "source-verification.log"},
+                  {"log", "test-output.raw.txt"},
+              }
+              for index, trigger := range triggers {
+                  for targetIndex, target := range targets {
+                      paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("trigger-%02d-%02d", index, targetIndex)), 1)
+                      if err != nil {
+                          return err
+                      }
+                      value := []byte(trigger.value)
+                      if target.kind != "log" {
+                          value = triggerJSON(trigger.value)
+                      }
+                      if err := plantControl(paths, target.kind, target.name, value); err != nil {
+                          return operational("selfcheck-fixture-setup-failed")
+                      }
+                      if err := expectRefusal(paths, trigger.code); err != nil {
+                          return err
+                      }
+                  }
+              }
+
+              sensitiveKeys := []string{"api_token", "apiKey", "privateKey", "refreshToken", "password", "credential"}
+              for index, key := range sensitiveKeys {
+                  paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("sensitive-%02d", index)), 1)
+                  if err != nil {
+                      return err
+                  }
+                  value, _ := json.Marshal(map[string]any{key: "neutral"})
+                  if err := plantControl(paths, "case", "case-00.json", append(value, '\n')); err != nil {
+                      return operational("selfcheck-fixture-setup-failed")
+                  }
+                  if err := expectRefusal(paths, "sensitive-field-nonempty"); err != nil {
+                      return err
+                  }
+              }
+              for index, name := range []string{"HOSTILE_SECRET_CONTROL.json", "ghp_" + tokenPrefix + ".json", "api_token.json"} {
+                  paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("filename-%02d", index)), 1)
+                  if err != nil {
+                      return err
+                  }
+                  oldPath := filepath.Join(paths.caseDir, "case-00.json")
+                  newPath := filepath.Join(paths.caseDir, name)
+                  if err := os.Rename(oldPath, newPath); err != nil {
+                      return operational("selfcheck-fixture-setup-failed")
+                  }
+                  paths.caseFiles[0].name = name
+                  expected := "sensitive-field-nonempty"
+                  if index < 2 {
+                      expected = "token-hostile-sentinel"
+                      if index == 1 {
+                          expected = "token-github-gitlab"
+                      }
+                  }
+                  if err := expectRefusal(paths, expected); err != nil {
+                      return err
+                  }
+              }
+              for index, value := range []any{"", nil, map[string]any{}, []any{}} {
+                  paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("sensitive-empty-%02d", index)), 1)
+                  if err != nil {
+                      return err
+                  }
+                  data, _ := json.Marshal(map[string]any{"api_token": value})
+                  if err := plantControl(paths, "case", "case-00.json", append(data, '\n')); err != nil {
+                      return operational("selfcheck-fixture-setup-failed")
+                  }
+                  if err := expectRefusal(paths, "sensitive-field-nonempty"); err != nil {
+                      return err
+                  }
+              }
+              tbhValue, err := prepareControl(filepath.Join(base, "tbh-value"), 1)
+              if err != nil {
+                  return err
+              }
+              tbhJSON, _ := json.Marshal(map[string]any{"TBH_CREDENTIAL_BACKEND": map[string]any{"nested": "HOSTILE_SECRET_CONTROL"}})
+              if err := plantControl(tbhValue, "case", "case-00.json", append(tbhJSON, '\n')); err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              if err := expectRefusal(tbhValue, "token-hostile-sentinel"); err != nil {
+                  return err
+              }
+
+              for index, field := range []string{"bytes", "document"} {
+                  for _, payload := range [][]byte{
+                      []byte("HOSTILE_SECRET_DECODED"),
+                      triggerJSON("/Users/example/decoded"),
+                  } {
+                      paths, err := prepareControl(filepath.Join(base, fmt.Sprintf("decoded-%02d-%02d", index, len(payload))), 1)
+                      if err != nil {
+                          return err
+                      }
+                      object := map[string]any{field: base64.StdEncoding.EncodeToString(payload)}
+                      if field == "bytes" {
+                          digest := sha256.Sum256(payload)
+                          object["sha256"] = hex.EncodeToString(digest[:])
+                      }
+                      encoded, _ := json.Marshal(object)
+                      if err := plantControl(paths, "case", "case-00.json", append(encoded, '\n')); err != nil {
+                          return operational("selfcheck-fixture-setup-failed")
+                      }
+                      expected := "token-hostile-sentinel"
+                      if bytes.Contains(payload, []byte("/Users/")) {
+                          expected = "path-private-home"
+                      }
+                      if err := expectRefusal(paths, expected); err != nil {
+                          return err
+                      }
+                  }
+              }
+
+              rootLeak, err := prepareControl(filepath.Join(base, "root-leak"), 1)
+              if err != nil {
+                  return err
+              }
+              rootValue := filepath.Join(rootLeak.root, "tmp", "nested", "observation")
+              rootJSON, _ := json.Marshal(map[string]string{"root": rootValue})
+              if err := plantControl(rootLeak, "repeat", "first.json", append(rootJSON, '\n')); err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              if err := expectRefusal(rootLeak, "path-fixture-root-leak"); err != nil {
+                  return err
+              }
+
+              duplicate, err := prepareControl(filepath.Join(base, "duplicate-json"), 1)
+              if err != nil {
+                  return err
+              }
+              if err := plantControl(duplicate, "case", "case-00.json", []byte("{\"safe\":1,\"safe\":2}\n")); err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              if err := expectOperationalEmpty(duplicate, "input-duplicate-json-key"); err != nil {
+                  return err
+              }
+
+              metadata, err := prepareControl(filepath.Join(base, "preexisting-metadata"), 0)
+              if err != nil {
+                  return err
+              }
+              metadataBytes := []byte("existing neutral metadata\n")
+              metadataPath := filepath.Join(metadata.artifact, "metadata.txt")
+              if err := writeFile(metadataPath, metadataBytes, 0600); err != nil {
+                  return operational("selfcheck-fixture-setup-failed")
+              }
+              if err := expectOperationalEmpty(metadata, "artifact-not-empty"); err != nil {
+                  return err
+              }
+              gotMetadata, err := os.ReadFile(metadataPath)
+              if err != nil || !bytes.Equal(gotMetadata, metadataBytes) {
+                  return operational("selfcheck-preexisting-metadata-mutated")
+              }
+              return nil
+          }
+
+          func expectOperationalEmpty(paths controlPaths, expected string) error {
+              var stdout, stderr bytes.Buffer
+              code := runGate([]string{paths.caseDir, paths.repeatDir, paths.artifact, "false"}, &stdout, &stderr)
+              if code != 2 || stdout.Len() != 0 || stderr.String() != diagnostic(expected) {
+                  return operational("selfcheck-operational-control-failed")
+              }
+              entries, err := os.ReadDir(paths.artifact)
+              if err != nil {
+                  return operational("selfcheck-operational-control-failed")
+              }
+              if expected == "artifact-not-empty" {
+                  if len(entries) != 1 || entries[0].Name() != "metadata.txt" {
+                      return operational("selfcheck-operational-control-mutated-artifact")
+                  }
+                  return nil
+              }
+              if len(entries) != 0 {
+                  return operational("selfcheck-operational-control-mutated-artifact")
+              }
+              return nil
           }
           GO
           native_path() {
@@ -1292,57 +2017,47 @@ jobs:
             trusted_path="$trusted_path:/usr/bin:/bin"
             clean_env[13]="PATH=$trusted_path"
           fi
-          if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
-            go run "$CAPTURE_ROOT/sanitize.go" \
-            "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/artifact" "$REQUIRE_47" \
-            > "$CAPTURE_ROOT/sanitizer.log" 2>&1; then
-            sanitize_exit=0
-          else
-            sanitize_exit=$?
+          sanitizer_stdout="$CAPTURE_ROOT/sanitizer.stdout"
+          sanitizer_stderr="$CAPTURE_ROOT/sanitizer.stderr"
+          sanitizer_build_stdout="$CAPTURE_ROOT/sanitizer-build.stdout"
+          sanitizer_build_stderr="$CAPTURE_ROOT/sanitizer-build.stderr"
+          sanitizer_binary="$CAPTURE_ROOT/sanitize"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            sanitizer_binary="$CAPTURE_ROOT/sanitize.exe"
           fi
-          sanitizer_metrics=()
-          sanitizer_metric_count=0
-          sanitizer_metrics_invalid=false
-          if [[ "$sanitize_exit" -eq 0 ]]; then
-            metrics_valid=true
-            while IFS= read -r line; do
-              case "$line" in
-                sanitized_json_files=*|redacted_fields=*|redacted_values=*)
-                  sanitizer_metrics+=("$line")
-                  sanitizer_metric_count=$((sanitizer_metric_count + 1))
-                  ;;
-                *)
-                  metrics_valid=false
-                  break
-                  ;;
-              esac
-            done < "$CAPTURE_ROOT/sanitizer.log"
-            if [[ "$metrics_valid" != "true" || "$sanitizer_metric_count" -ne 3 ]]; then
-              sanitize_exit=2
-              sanitizer_metrics_invalid=true
-            fi
-          fi
-          printf 'exit_code=%s\n' "$sanitize_exit" >> "$GITHUB_OUTPUT"
-          if [[ "$sanitize_exit" -eq 0 ]]; then
-            printf '%s\n' "${sanitizer_metrics[@]}" >> "$GITHUB_OUTPUT"
-          else
-            if [[ "$sanitizer_metrics_invalid" == "true" ]]; then
-              printf 'CAPTURE_REASON=sanitize/metrics-invalid\n' >&2
+          : > "$sanitizer_stdout"
+          : > "$sanitizer_stderr"
+          if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$sanitizer_binary" ./.temp/capture-exporter > "$sanitizer_build_stdout" 2> "$sanitizer_build_stderr"; then
+            if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$sanitizer_binary" "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/repeat-raw" "$CAPTURE_ROOT/artifact" "$REQUIRE_47" > "$sanitizer_stdout" 2> "$sanitizer_stderr"; then
+              sanitize_exit=0
             else
-              reason_pattern='^CAPTURE_REASON=sanitize/[a-z0-9-]+( file=[0-9]+/[0-9]+)?( path=\$(\[[0-9]+\])*)?$'
-              reason_found=false
-              while IFS= read -r line; do
-                if [[ "$line" =~ $reason_pattern ]]; then
-                  printf '%s\n' "$line" >&2
-                  reason_found=true
-                  break
-                fi
-              done < "$CAPTURE_ROOT/sanitizer.log"
-              if [[ "$reason_found" != "true" ]]; then
-                printf 'CAPTURE_REASON=sanitize/tool-command-failed\n' >&2
-              fi
+              sanitize_exit=$?
             fi
-            echo "Artifact sanitization failed; refusing export." >&2
+          else
+            sanitize_exit=2
+          fi
+          if [[ "$sanitize_exit" -eq 0 ]]; then
+            exported_case_files="$(sed -n 's/^exported_case_files=//p' "$sanitizer_stdout")"
+            expected_stdout="$CAPTURE_ROOT/sanitizer.expected"
+            printf 'export_gate=PASS\nexported_case_files=%s\nexported_repeat_observations=2\n' "$exported_case_files" > "$expected_stdout"
+            if ! cmp -s "$expected_stdout" "$sanitizer_stdout" || [[ -s "$sanitizer_stderr" ]] || [[ ! "$exported_case_files" =~ ^(0|[1-9][0-9]?)$ ]] || (( exported_case_files > 47 )); then
+              sanitize_exit=2
+              printf 'CAPTURE_REASON=sanitize/pass-output-invalid\n' >&2
+            else
+              {
+                printf 'exit_code=0\nexport_gate=PASS\n'
+                printf 'exported_case_files=%s\nexported_repeat_observations=2\n' "$exported_case_files"
+              } >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          if [[ "$sanitize_exit" -ne 0 ]]; then
+            printf 'exit_code=%s\n' "$sanitize_exit" >> "$GITHUB_OUTPUT"
+            reason_line=""
+            if [[ ! -s "$sanitizer_stdout" ]] && [[ "$(wc -l < "$sanitizer_stderr" | tr -d ' ')" == 1 ]] && IFS= read -r reason_line < "$sanitizer_stderr" && [[ "$reason_line" =~ ^CAPTURE_REASON=sanitize/[a-z0-9-]+$ ]]; then
+              printf '%s\n' "$reason_line" >&2
+            else
+              printf 'CAPTURE_REASON=sanitize/tool-command-failed\n' >&2
+            fi
           fi
           exit "$sanitize_exit"
 
@@ -1380,8 +2095,9 @@ jobs:
           OUTPUT_JSON_FILES: ${{ steps.capture.outputs.output_json_files || '0' }}
           SANITIZER_OUTCOME: ${{ steps.sanitize.outcome }}
           SANITIZER_EXIT: ${{ steps.sanitize.outputs.exit_code || 'not-run' }}
-          REDACTED_FIELDS: ${{ steps.sanitize.outputs.redacted_fields || '0' }}
-          REDACTED_VALUES: ${{ steps.sanitize.outputs.redacted_values || '0' }}
+          EXPORT_GATE: ${{ steps.sanitize.outputs.export_gate || 'not-run' }}
+          EXPORTED_CASE_FILES: ${{ steps.sanitize.outputs.exported_case_files || '0' }}
+          EXPORTED_REPEAT_OBSERVATIONS: ${{ steps.sanitize.outputs.exported_repeat_observations || '0' }}
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -1587,14 +2303,16 @@ jobs:
               "$COMPARATOR_FAILED" "$COMPARATOR_SKIPPED" "$ROOT_TESTS_PASSED"
             printf 'windows_root_parameter_passed=%s\nall_test_failures=%s\nall_test_skips=%s\noutput_json_files=%s\n' \
               "$WINDOWS_ROOT_PASSED" "$ALL_TEST_FAILURES" "$ALL_TEST_SKIPS" "$OUTPUT_JSON_FILES"
-            printf 'sanitizer_outcome=%s\nsanitizer_exit=%s\nredacted_fields=%s\nredacted_values=%s\n' \
-              "$SANITIZER_OUTCOME" "$SANITIZER_EXIT" "$REDACTED_FIELDS" "$REDACTED_VALUES"
+            printf 'export_gate=%s\nsanitizer_outcome=%s\nsanitizer_exit=%s\nexported_case_files=%s\nexported_repeat_observations=%s\n' \
+              "$EXPORT_GATE" "$SANITIZER_OUTCOME" "$SANITIZER_EXIT" "$EXPORTED_CASE_FILES" "$EXPORTED_REPEAT_OBSERVATIONS"
             printf 'working_tree_clean=%s\n' "$working_clean"
-          } > "$CAPTURE_ROOT/artifact/metadata.txt"
+          } > "$CAPTURE_ROOT/lane-metadata.txt"
           {
             printf '### Lane metadata: %s (%s)\n\n' "$RUNNER_OS" "$MATRIX_RUNNER"
             printf 'Verdict: **%s**. Rows: %s executed, %s passed, %s failed, %s skipped.\n' \
               "$lane_verdict" "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
+            printf 'Export gate: %s; %s case files and %s repeat observations.\n' \
+              "$EXPORT_GATE" "$EXPORTED_CASE_FILES" "$EXPORTED_REPEAT_OBSERVATIONS"
           } >> "$GITHUB_STEP_SUMMARY"
           if [[ "$head_matches_pushed_sha" != "true" ]]; then
             printf 'CAPTURE_REASON=metadata/head-mismatch\n' >&2
@@ -1609,7 +2327,7 @@ jobs:
         if: always() && steps.directories.outcome == 'success' && steps.sanitize.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: original-capture-${{ matrix.runner }}
+          name: original-capture-05-${{ matrix.runner }}
           path: ${{ steps.directories.outputs.artifact_dir }}
           if-no-files-found: error
           retention-days: 7

@@ -1,6 +1,9 @@
 package harnessparity
 
 import (
+	"bytes"
+	"flag"
+	"fmt"
 	"github.com/relux-works/curator/internal/testgitenv"
 	"os"
 	"path/filepath"
@@ -9,6 +12,14 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if err := captureCallerEnvironmentError(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	flag.Parse()
+	if *nativeParentWorker {
+		os.Exit(m.Run())
+	}
 	cleanup := testgitenv.Isolate()
 	root, err := os.MkdirTemp("", "original-capture-system-")
 	if err != nil {
@@ -74,17 +85,82 @@ func TestOriginalComparatorControls(t *testing.T) {
 	}
 }
 
-// Literal and JSON-escaped Windows fixture-root parameters normalize equally;
-// unrelated values remain unchanged. This does not claim native Windows output.
+// Explicit root bindings project only exact path-boundary forms and retain all
+// suffixes, entries, non-root bytes, and unrelated paths.
 func TestWindowsRootParameter(t *testing.T) {
-	root := `C:\fixture\root`
-	raw := []byte(`{"path":"C:\\fixture\\root\\child","other":"unchanged"}`)
-	got := string(fixtureTemplate(raw, root))
-	want := `{"path":"${FIXTURE_ROOT}\\child","other":"unchanged"}`
-	if got != want {
-		t.Fatal("escaped fixture parameter mismatch")
+	valid := func(root string) fixtureRootEvidence {
+		return fixtureRootEvidence{Root: root, Origin: "driver-created", RecordedBeforeRun: true}
 	}
-	if string(fixtureTemplate([]byte("unrelated"), root)) != "unrelated" {
-		t.Fatal("unrelated bytes changed")
+	rows := []struct {
+		id      string
+		binding fixtureRootEvidence
+		windows bool
+		input   []byte
+		want    []byte
+		refuse  bool
+	}{
+		{"windows-slash-order", valid(`C:\fixture\one`), true,
+			[]byte(`{"claudeMdExcludes":["C:/fixture/one/operator/.claude/CLAUDE.md","C:/fixture/one/operator/.claude/rules/**"],"keep":17}`),
+			[]byte(`{"claudeMdExcludes":["${FIXTURE_ROOT}/operator/.claude/CLAUDE.md","${FIXTURE_ROOT}/operator/.claude/rules/**"],"keep":17}`), false},
+		{"windows-native", valid(`C:\fixture\one`), true, []byte(`C:\fixture\one\child`), []byte(`${FIXTURE_ROOT}\child`), false},
+		{"windows-json-escaped", valid(`C:\fixture\one`), true, []byte(`"C:\\fixture\\one\\child"`), []byte(`"${FIXTURE_ROOT}\\child"`), false},
+		{"linux-darwin", valid("/fixture/one"), false, []byte(`{"p":"/fixture/one/child","keep":[2,1]}`), []byte(`{"p":"${FIXTURE_ROOT}/child","keep":[2,1]}`), false},
+		{"near-prefix-sibling", valid(`C:\fixture\one`), true, []byte(`C:/fixture/one-sibling/file`), []byte(`C:/fixture/one-sibling/file`), false},
+		{"near-prefix-posix", valid("/fixture/one"), false, []byte(`/fixture/one-sibling/file`), []byte(`/fixture/one-sibling/file`), false},
+		{"unrelated-path", valid(`C:\fixture\one`), true, []byte(`D:/elsewhere/file`), []byte(`D:/elsewhere/file`), false},
+		{"canonical-unchanged", valid("/fixture/one"), false, []byte(`${FIXTURE_ROOT}/child`), []byte(`${FIXTURE_ROOT}/child`), false},
+		{"changed-suffix", valid("/fixture/one"), false, []byte(`/fixture/one/different`), []byte(`${FIXTURE_ROOT}/different`), false},
+		{"changed-nonroot", valid("/fixture/one"), false, []byte(`{"p":"/fixture/one/child","keep":18}`), []byte(`{"p":"${FIXTURE_ROOT}/child","keep":18}`), false},
+		{"windows-equivalent-root", valid(`C:\fixture\two`), true,
+			[]byte(`{"claudeMdExcludes":["C:/fixture/two/operator/.claude/CLAUDE.md","C:/fixture/two/operator/.claude/rules/**"],"keep":17}`),
+			rowsExpectedWindowsOrder(), false},
+		{"changed-exclusion-entry", valid(`C:\fixture\one`), true,
+			[]byte(`{"claudeMdExcludes":["C:/fixture/one/operator/.claude/CLAUDE.md","C:/fixture/one/operator/.claude/changed/**"],"keep":17}`),
+			[]byte(`{"claudeMdExcludes":["${FIXTURE_ROOT}/operator/.claude/CLAUDE.md","${FIXTURE_ROOT}/operator/.claude/changed/**"],"keep":17}`), false},
+		{"quoted-root-value", valid("/fixture/one"), false, []byte("{\"p\":\"/fixture/one\",\"keep\":17}"), []byte("{\"p\":\"${FIXTURE_ROOT}\",\"keep\":17}"), false},
+		{"colon-path-boundary", valid("/fixture/one"), false, []byte("path:/fixture/one/child"), []byte("path:${FIXTURE_ROOT}/child"), false},
+		{"missing-binding", fixtureRootEvidence{}, false, []byte(`/fixture/one/child`), nil, true},
+		{"ambiguous-binding", fixtureRootEvidence{Root: "/fixture/one", Origin: "driver-created", RecordedBeforeRun: true, Ambiguous: true}, false, []byte(`/fixture/one/child`), nil, true},
+		{"environment-binding", fixtureRootEvidence{Root: "/fixture/one", Origin: "environment", RecordedBeforeRun: true}, false, []byte(`/fixture/one/child`), nil, true},
+		{"output-binding", fixtureRootEvidence{Root: "/fixture/one", Origin: "captured-output", RecordedBeforeRun: true}, false, []byte(`/fixture/one/child`), nil, true},
+		{"late-binding", fixtureRootEvidence{Root: "/fixture/one", Origin: "driver-created"}, false, []byte(`/fixture/one/child`), nil, true},
+		{"non-absolute-binding", fixtureRootEvidence{Root: "fixture/one", Origin: "driver-created", RecordedBeforeRun: true}, false, []byte("/fixture/one/child"), nil, true},
+		{"trailing-separator-binding", fixtureRootEvidence{Root: "/fixture/one/", Origin: "driver-created", RecordedBeforeRun: true}, false, []byte("/fixture/one/child"), nil, true},
 	}
+
+	results := make(map[string][]byte, len(rows))
+	for _, row := range rows {
+		t.Run(row.id, func(t *testing.T) {
+			if !row.refuse {
+				binding, err := bindFixtureRoot(row.binding)
+				if err != nil || binding.windows != row.windows {
+					t.Fatal("fixture-root form was not derived from its explicit root")
+				}
+			}
+			got, err := projectFixtureRoot(row.binding, row.input)
+			if row.refuse {
+				if err == nil || !isFixtureRootBindingRefusal(err) || len(got) != 0 {
+					t.Fatal("invalid fixture-root binding was not refused without output")
+				}
+				return
+			}
+			if err != nil || !bytes.Equal(row.want, got) {
+				t.Fatal("fixture-root projection differed from the literal expectation")
+			}
+			results[row.id] = got
+		})
+	}
+	if !bytes.Equal(results["windows-slash-order"], results["windows-equivalent-root"]) {
+		t.Fatal("equivalent explicit Windows roots did not parameterize equally")
+	}
+	if bytes.Equal(results["linux-darwin"], results["changed-suffix"]) || bytes.Equal(results["linux-darwin"], results["changed-nonroot"]) {
+		t.Fatal("changed suffix or non-root field was not observable")
+	}
+	if bytes.Equal(results["windows-slash-order"], results["changed-exclusion-entry"]) {
+		t.Fatal("changed exclusion entry was not observable")
+	}
+}
+
+func rowsExpectedWindowsOrder() []byte {
+	return []byte(`{"claudeMdExcludes":["${FIXTURE_ROOT}/operator/.claude/CLAUDE.md","${FIXTURE_ROOT}/operator/.claude/rules/**"],"keep":17}`)
 }

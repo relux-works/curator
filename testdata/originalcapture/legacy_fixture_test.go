@@ -144,19 +144,181 @@ func fixtureGitStore(t testing.TB, manager, kind, name, identity, source string)
 	return commit
 }
 
-// Only the explicit fixture root parameter is replaced. No digest, timestamp,
-// field, path or native output is discarded. Paths inside the isolated fixture
-// are represented portably; all other bytes must compare exactly.
-func fixtureTemplate(payload []byte, root string) []byte {
-	result := bytes.ReplaceAll(payload, []byte(root), []byte("${FIXTURE_ROOT}"))
-	quoted, _ := json.Marshal(root)
-	if len(quoted) >= 2 {
-		result = bytes.ReplaceAll(result, quoted[1:len(quoted)-1], []byte("${FIXTURE_ROOT}"))
-	}
-	return result
+type fixtureRootForm struct {
+	value   string
+	kind    string
+	windows bool
 }
 
-func readTree(t testing.TB, dir, root string) []treeNode {
+type fixtureRootEvidence struct {
+	Root              string
+	Origin            string
+	RecordedBeforeRun bool
+	Ambiguous         bool
+}
+
+type fixtureRootBinding struct {
+	evidence fixtureRootEvidence
+	forms    []fixtureRootForm
+	windows  bool
+}
+
+type fixtureRootRefusal string
+
+func (refusal fixtureRootRefusal) Error() string { return string(refusal) }
+
+func isFixtureRootBindingRefusal(err error) bool {
+	refusal, ok := err.(fixtureRootRefusal)
+	if !ok {
+		return false
+	}
+	switch refusal {
+	case "fixture-root/missing-binding", "fixture-root/ambiguous-binding", "fixture-root/untrusted-origin", "fixture-root/late-binding", "fixture-root/non-absolute", "fixture-root/trailing-separator":
+		return true
+	default:
+		return false
+	}
+}
+
+func bindFixtureRoot(evidence fixtureRootEvidence) (fixtureRootBinding, error) {
+	if evidence.Root == "" {
+		return fixtureRootBinding{}, fixtureRootRefusal("fixture-root/missing-binding")
+	}
+	if evidence.Ambiguous {
+		return fixtureRootBinding{}, fixtureRootRefusal("fixture-root/ambiguous-binding")
+	}
+	if evidence.Origin != "driver-created" {
+		return fixtureRootBinding{}, fixtureRootRefusal("fixture-root/untrusted-origin")
+	}
+	if !evidence.RecordedBeforeRun {
+		return fixtureRootBinding{}, fixtureRootRefusal("fixture-root/late-binding")
+	}
+	root := evidence.Root
+	windows := absoluteWindowsFixtureRoot(root)
+	if !windows && !strings.HasPrefix(root, "/") {
+		return fixtureRootBinding{}, fixtureRootRefusal("fixture-root/non-absolute")
+	}
+	if strings.HasSuffix(root, "/") || strings.HasSuffix(root, `\`) {
+		return fixtureRootBinding{}, fixtureRootRefusal("fixture-root/trailing-separator")
+	}
+
+	binding := fixtureRootBinding{evidence: evidence, windows: windows}
+	add := func(value, kind string) {
+		if value == "" {
+			return
+		}
+		for _, prior := range binding.forms {
+			if prior.value == value {
+				return
+			}
+		}
+		binding.forms = append(binding.forms, fixtureRootForm{value: value, kind: kind, windows: windows})
+	}
+	add(root, "native")
+	if windows {
+		add(strings.ReplaceAll(root, `\`, "/"), "slash")
+	}
+	quoted, err := json.Marshal(root)
+	if err != nil || len(quoted) < 2 {
+		return fixtureRootBinding{}, fmt.Errorf("fixture root JSON spelling unavailable")
+	}
+	add(string(quoted[1:len(quoted)-1]), "json-escaped")
+	sort.SliceStable(binding.forms, func(i, j int) bool {
+		return len(binding.forms[i].value) > len(binding.forms[j].value)
+	})
+	return binding, nil
+}
+
+func absoluteWindowsFixtureRoot(root string) bool {
+	if len(root) >= 3 && ((root[0] >= 'A' && root[0] <= 'Z') || (root[0] >= 'a' && root[0] <= 'z')) && root[1] == ':' && (root[2] == '\\' || root[2] == '/') {
+		return true
+	}
+	if !strings.HasPrefix(root, `\\`) {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(root, `\\`), `\`)
+	return len(parts) >= 2 && parts[0] != "" && parts[1] != ""
+}
+
+func (form fixtureRootForm) suffixBoundary(payload []byte, after int) bool {
+	if after == len(payload) {
+		return true
+	}
+	next := payload[after]
+	if next == '/' {
+		return true
+	}
+	if next == '\\' {
+		return form.windows && (form.kind != "json-escaped" || after+1 < len(payload) && payload[after+1] == '\\')
+	}
+	switch next {
+	case '"', '\'', ' ', '\t', '\n', '\r', ',', ';', ')', ']', '}':
+		return true
+	default:
+		return false
+	}
+}
+
+func fixturePathStartBoundary(payload []byte, at int) bool {
+	if at == 0 {
+		return true
+	}
+	switch payload[at-1] {
+	case '"', '\'', ' ', '\t', '\n', '\r', '=', ':', '(', '[', '{', ',', ';':
+		return true
+	default:
+		return false
+	}
+}
+
+func (binding fixtureRootBinding) project(payload []byte) ([]byte, error) {
+	if binding.evidence.Root == "" || len(binding.forms) == 0 {
+		return nil, fixtureRootRefusal("fixture-root/missing-binding")
+	}
+	var result bytes.Buffer
+	for at := 0; at < len(payload); {
+		matched := false
+		if fixturePathStartBoundary(payload, at) {
+			for _, form := range binding.forms {
+				if !bytes.HasPrefix(payload[at:], []byte(form.value)) {
+					continue
+				}
+				after := at + len(form.value)
+				if !form.suffixBoundary(payload, after) {
+					continue
+				}
+				result.WriteString("${FIXTURE_ROOT}")
+				at = after
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			result.WriteByte(payload[at])
+			at++
+		}
+	}
+	return result.Bytes(), nil
+}
+
+func projectFixtureRoot(evidence fixtureRootEvidence, payload []byte) ([]byte, error) {
+	binding, err := bindFixtureRoot(evidence)
+	if err != nil {
+		return nil, err
+	}
+	return binding.project(payload)
+}
+
+func mustProjectFixture(t testing.TB, binding fixtureRootBinding, payload []byte) []byte {
+	t.Helper()
+	projected, err := binding.project(payload)
+	if err != nil {
+		t.Fatal("fixture root projection refused")
+	}
+	return projected
+}
+
+func readTree(t testing.TB, dir string, binding fixtureRootBinding) []treeNode {
 	t.Helper()
 	var nodes []treeNode
 	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
@@ -179,7 +341,7 @@ func readTree(t testing.TB, dir, root string) []treeNode {
 			if err != nil {
 				return err
 			}
-			node.Link = string(fixtureTemplate([]byte(link), root))
+			node.Link = string(mustProjectFixture(t, binding, []byte(link)))
 			node.SHA256 = hashBytes([]byte(node.Link))
 		case info.IsDir():
 			node.Kind = "directory"
@@ -189,7 +351,7 @@ func readTree(t testing.TB, dir, root string) []treeNode {
 			if err != nil {
 				return err
 			}
-			node.Bytes = fixtureTemplate(payload, root)
+			node.Bytes = mustProjectFixture(t, binding, payload)
 			node.SHA256 = hashBytes(node.Bytes)
 		default:
 			return fmt.Errorf("unexpected fixture node %s", rel)
@@ -205,13 +367,33 @@ func readTree(t testing.TB, dir, root string) []treeNode {
 }
 
 func runLegacyFixture(t testing.TB, c fixtureCase) fixtureResult {
+	result, _ := runLegacyFixtureWithRoot(t, c)
+	return result
+}
+
+func runLegacyFixtureWithRoot(t testing.TB, c fixtureCase) (fixtureResult, string) {
+	return runLegacyFixtureAtRoot(t, c, "", false)
+}
+
+func runLegacyFixtureAtRoot(t testing.TB, c fixtureCase, fixtureRoot string, isolateNativeParent bool) (fixtureResult, string) {
 	t.Helper()
-	root := t.TempDir()
+	root := fixtureRoot
+	if root == "" {
+		root = t.TempDir()
+	} else if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal("fixture root creation failed")
+	}
 	physical, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	root = physical
+	rootBinding, err := bindFixtureRoot(fixtureRootEvidence{
+		Root: root, Origin: "driver-created", RecordedBeforeRun: true,
+	})
+	if err != nil {
+		t.Fatal("fixture root binding refused")
+	}
 	manager, native, project := filepath.Join(root, "manager"), filepath.Join(root, "native"), filepath.Join(root, "project")
 	for _, dir := range []string{manager, native, project, filepath.Join(root, "operator"), filepath.Join(root, "xdg")} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -229,7 +411,7 @@ func runLegacyFixture(t testing.TB, c fixtureCase) fixtureResult {
 	t.Setenv("GIT_COMMITTER_DATE", "2000-01-01T00:00:00Z")
 	result := fixtureResult{Case: c}
 	if c.Operation != "managed" {
-		return runLegacySkills(t, c, root, manager, native, project)
+		return runLegacySkills(t, c, root, manager, native, project, rootBinding), root
 	}
 	profile := "sample"
 	contextSource := filepath.Join(root, "context-source")
@@ -272,6 +454,12 @@ func runLegacyFixture(t testing.TB, c fixtureCase) fixtureResult {
 			t.Fatal(err)
 		}
 	}
+	nativeParentHome := filepath.Join(native, c.ID+"-native-parent")
+	if c.State == "native-parent" {
+		if err := os.MkdirAll(nativeParentHome, 0o700); err != nil {
+			t.Fatal("fixture-owned native home setup failed")
+		}
+	}
 	// Synthetic credential targets are fixtures only; the comparator never
 	// follows these links or reads their contents through a managed home.
 	mustWrite(t, filepath.Join(nativeHomes["claude_code"], ".credentials.json"), []byte("fixture-only\n"), 0o600)
@@ -286,12 +474,30 @@ func runLegacyFixture(t testing.TB, c fixtureCase) fixtureResult {
 			mustWrite(t, filepath.Join(nativeHomes[c.ID], "settings.json"), []byte("{\"fixtureUnknown\":true}\n"), 0o640)
 		}
 	}
-	beforeNative := readTree(t, native, root)
-	beforeProject := readTree(t, project, root)
+	beforeNative := readTree(t, native, rootBinding)
+	beforeProject := readTree(t, project, rootBinding)
 	req := envprofile.ResolveRequest{Home: manager, Profile: profile, EnvID: c.ID, LaunchDir: project, Machine: envregistry.DefaultMachineConfig(), Repair: true, Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return nativeHomes[id], nil }, OperatorXDG: filepath.Join(root, "xdg")}
 	managed := envprofile.ManagedHomeDir(manager, profile, c.ID)
 	if c.State == "native-parent" {
-		req.NativeHomeOf = func(id string) (string, error) { return manager, nil }
+		// This home belongs to the fixture and is external to the manager's
+		// managed environments; never derive it from the caller's CODEX_HOME.
+		req.NativeHomeOf = func(string) (string, error) { return nativeParentHome, nil }
+	}
+	if isolateNativeParent {
+		if c.State != "native-parent" {
+			t.Fatal("native-parent isolation used for another fixture")
+		}
+		trustedPath := os.Getenv("PATH")
+		os.Clearenv()
+		if err := os.Setenv("HOME", filepath.Join(root, "operator")); err != nil {
+			t.Fatal("isolated fixture HOME unavailable")
+		}
+		if err := os.Setenv("PATH", trustedPath); err != nil {
+			t.Fatal("isolated fixture PATH unavailable")
+		}
+		if !onlyHomeAndPathEnvironment() {
+			t.Fatal("capture-driver/native-parent-environment-not-isolated")
+		}
 	}
 	resolved, resolveErr := envprofile.Resolve(req)
 	if resolveErr == nil {
@@ -328,29 +534,29 @@ func runLegacyFixture(t testing.TB, c fixtureCase) fixtureResult {
 	}
 	result.Executed = true
 	if resolveErr != nil {
-		result.Refusal = string(fixtureTemplate([]byte(resolveErr.Error()), root))
+		result.Refusal = string(mustProjectFixture(t, rootBinding, []byte(resolveErr.Error())))
 	}
 	if resolved != nil {
-		result.Document = fixtureTemplate(resolved.Document, root)
-		result.Notice = string(fixtureTemplate([]byte(resolved.Notice), root))
+		result.Document = mustProjectFixture(t, rootBinding, resolved.Document)
+		result.Notice = string(mustProjectFixture(t, rootBinding, []byte(resolved.Notice)))
 		for _, w := range resolved.Warnings {
-			result.Warnings = append(result.Warnings, string(fixtureTemplate([]byte(w), root)))
+			result.Warnings = append(result.Warnings, string(mustProjectFixture(t, rootBinding, []byte(w))))
 		}
 	}
-	result.Tree = readTree(t, managed, root)
-	result.Rendered = readTree(t, filepath.Join(envprofile.ProfileDir(manager, profile), "rendered", c.ID), root)
+	result.Tree = readTree(t, managed, rootBinding)
+	result.Rendered = readTree(t, filepath.Join(envprofile.ProfileDir(manager, profile), "rendered", c.ID), rootBinding)
 	// Legacy resolution also reconciles linked native views of the selected
 	// profile. Preserve those exact effects in the original baseline.
 	result.NativeBefore = beforeNative
-	result.NativeAfter = readTree(t, native, root)
+	result.NativeAfter = readTree(t, native, rootBinding)
 	result.ProjectBefore = beforeProject
-	result.ProjectAfter = readTree(t, project, root)
+	result.ProjectAfter = readTree(t, project, rootBinding)
 	result.NativePreserved = reflect.DeepEqual(result.NativeBefore, result.NativeAfter)
 	result.ProjectPreserved = reflect.DeepEqual(result.ProjectBefore, result.ProjectAfter)
-	return result
+	return result, root
 }
 
-func runLegacySkills(t testing.TB, c fixtureCase, root, manager, native, project string) fixtureResult {
+func runLegacySkills(t testing.TB, c fixtureCase, root, manager, native, project string, rootBinding fixtureRootBinding) fixtureResult {
 	t.Helper()
 	source := filepath.Join(root, "skill-source")
 	mustWrite(t, filepath.Join(source, "fixture-skill", "SKILL.md"), []byte("# Fixture skill\n"), 0o600)
@@ -358,7 +564,7 @@ func runLegacySkills(t testing.TB, c fixtureCase, root, manager, native, project
 	mirror, err := adapters.StageProject(stage, project, []string{c.ID}, []adapters.Group{{Root: source, Skills: []string{"fixture-skill"}}}, "copy")
 	result := fixtureResult{Case: c, Executed: true, NativePreserved: true, ProjectPreserved: true}
 	if err != nil {
-		result.Refusal = string(fixtureTemplate([]byte(err.Error()), root))
+		result.Refusal = string(mustProjectFixture(t, rootBinding, []byte(err.Error())))
 		return result
 	}
 	plan := mirror.Plan()
@@ -375,7 +581,7 @@ func runLegacySkills(t testing.TB, c fixtureCase, root, manager, native, project
 			t.Fatal(err)
 		}
 	}
-	result.Tree = readTree(t, project, root)
+	result.Tree = readTree(t, project, rootBinding)
 	if c.Operation == "native-skills" {
 		if !adapters.NativeDiscoveryAgents[c.ID] || !plan.Empty() {
 			t.Fatal("native-discovery no-mirror contract changed")
