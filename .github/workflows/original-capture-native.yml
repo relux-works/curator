@@ -620,6 +620,7 @@ jobs:
             reasonSelfCheckField = "sanitize/selfcheck-field-control"
             reasonSelfCheckCredential = "sanitize/selfcheck-credential-control"
             reasonSelfCheckPath = "sanitize/selfcheck-path-control"
+            reasonSelfCheckDiagnosticKey = "sanitize/selfcheck-diagnostic-key-control"
             reasonSelfCheckSplitPath = "sanitize/selfcheck-split-path-control"
             reasonSelfCheckBlob = "sanitize/selfcheck-decoded-blob-control"
             reasonSelfCheckManifest = "sanitize/selfcheck-manifest-control"
@@ -672,15 +673,6 @@ jobs:
 
           func refuse(code string, fileIndex, fileCount int, jsonPath string) error {
             return sanitizeFailure{code: code, fileIndex: fileIndex, fileCount: fileCount, jsonPath: jsonPath}
-          }
-
-          var safeJSONKey = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
-
-          func childPath(parent, key string) string {
-            if safeJSONKey.MatchString(key) {
-              return parent + "." + key
-            }
-            return parent
           }
 
           func arrayPath(parent string, index int) string {
@@ -843,19 +835,18 @@ jobs:
               sort.Strings(keys)
               for _, key := range keys {
                 child := current[key]
-                keyPath := childPath(path, key)
                 if sensitiveName(key) {
-                  return reasonUnsafeSensitiveKey, keyPath
+                  return reasonUnsafeSensitiveKey, path
                 }
                 if key == "bytes" || key == "document" {
                   if encoded, ok := child.(string); ok {
                     decoded, err := base64.StdEncoding.DecodeString(encoded)
                     if err == nil && unsafeBlob(decoded) != "" {
-                      return reasonUnsafeDecodedBlob, keyPath
+                      return reasonUnsafeDecodedBlob, path
                     }
                   }
                 }
-                if code, unsafePath := unsafeValue(child, keyPath); code != "" {
+                if code, unsafePath := unsafeValue(child, path); code != "" {
                   return code, unsafePath
                 }
               }
@@ -956,6 +947,17 @@ jobs:
                 return refuse(reasonSelfCheckField, 0, 0, "$")
               }
             }
+            hostileKey := "ghp_" + strings.Repeat("A", 30)
+            hostileKeyInput := map[string]any{
+              hostileKey: map[string]any{"nested": "/Users/runner/private"},
+            }
+            hostileKeyCode, hostileKeyPath := unsafeValue(hostileKeyInput, "$")
+            hostileKeyRefusal := refuse(hostileKeyCode, 1, 1, hostileKeyPath)
+            wantHostileKeyRefusal := "CAPTURE_REASON=" + reasonUnsafeText + " file=1/1 path=$"
+            if hostileKeyCode != reasonUnsafeText || hostileKeyPath != "$" ||
+                hostileKeyRefusal.Error() != wantHostileKeyRefusal || strings.Contains(hostileKeyRefusal.Error(), hostileKey) {
+              return refuse(reasonSelfCheckDiagnosticKey, 0, 0, "$")
+            }
             input := "safe prefix Bearer abcdefghijklmnop safe suffix"
             text, count := redactText(input)
             want := "safe prefix " + marker + " safe suffix"
@@ -993,48 +995,84 @@ jobs:
             }
             splitPath := "/Users/runner/" + "HOSTILE_SECRET_DIAGCONTROL" + "/repository"
             cleanedSplitPath, splitPathCount := redactText(splitPath)
-            if !unsafeText(splitPath) || splitPathCount < 1 || unsafeText(cleanedSplitPath) {
+            wantSplitPath := marker + marker + "/repository"
+            if !unsafeText(splitPath) || splitPathCount != 2 || cleanedSplitPath != wantSplitPath || unsafeText(cleanedSplitPath) {
               return refuse(reasonSelfCheckSplitPath, 0, 0, "$")
             }
             safeBlob := []byte(`{"payload":"ordinary"}`)
-            secretBlob := []byte(`{"payload":"/Users/runner/private"}`)
+            secretBlob := []byte(`{"payload":"/Users/runner/private","ordinary":"safe sibling"}`)
             safeBlobDigest := sha256.Sum256(safeBlob)
             secretBlobDigest := sha256.Sum256(secretBlob)
             safeShape := map[string]any{
               "bytes": base64.StdEncoding.EncodeToString(safeBlob),
               "sha256": hex.EncodeToString(safeBlobDigest[:]),
             }
+            safeShapeOriginal, err := json.Marshal(safeShape)
+            if err != nil {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            var expectedSafeShape any
+            if err := json.Unmarshal(safeShapeOriginal, &expectedSafeShape); err != nil {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            originalSafeCode, _ := unsafeValue(safeShape, "$")
             safeShapeCleaned, safeShapeCount := sanitizeValue(safeShape)
             safeShapeCode, _ := unsafeValue(safeShapeCleaned, "$")
-            originalSafeCode, _ := unsafeValue(safeShape, "$")
-            if originalSafeCode != "" || safeShapeCount != 0 || safeShapeCode != "" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            if originalSafeCode != "" || safeShapeCount != 0 || safeShapeCode != "" ||
+                !reflect.DeepEqual(safeShapeCleaned, expectedSafeShape) {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            safeShapeObject, ok := safeShapeCleaned.(map[string]any)
+            if !ok {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            safeEncoded, ok := safeShapeObject["bytes"].(string)
+            if !ok {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            cleanedSafeBlob, err := base64.StdEncoding.DecodeString(safeEncoded)
+            if err != nil {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            var originalSafePayload any
+            var cleanedSafePayload any
+            if json.Unmarshal(safeBlob, &originalSafePayload) != nil ||
+                json.Unmarshal(cleanedSafeBlob, &cleanedSafePayload) != nil ||
+                !reflect.DeepEqual(cleanedSafePayload, originalSafePayload) {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
             }
             secretShape := map[string]any{
               "bytes": base64.StdEncoding.EncodeToString(secretBlob),
               "sha256": hex.EncodeToString(secretBlobDigest[:]),
+              "ordinary": "outer safe sibling",
             }
             secretOriginalCode, _ := unsafeValue(secretShape, "$")
             secretShapeCleaned, secretShapeCount := sanitizeValue(secretShape)
             secretShapeObject, ok := secretShapeCleaned.(map[string]any)
-            if !ok || secretOriginalCode != reasonUnsafeDecodedBlob || secretShapeCount == 0 || unsafeBlob(secretBlob) == "" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+            if !ok || secretOriginalCode != reasonUnsafeDecodedBlob || secretShapeCount != 1 || unsafeBlob(secretBlob) == "" ||
+                secretShapeObject["ordinary"] != "outer safe sibling" {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
             }
             sanitizedEncoded, ok := secretShapeObject["bytes"].(string)
             if !ok {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
             }
             sanitizedBlob, err := base64.StdEncoding.DecodeString(sanitizedEncoded)
             if err != nil || unsafeBlob(sanitizedBlob) != "" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
+            }
+            var sanitizedBlobShape any
+            if err := json.Unmarshal(sanitizedBlob, &sanitizedBlobShape); err != nil ||
+                !reflect.DeepEqual(sanitizedBlobShape, map[string]any{"payload": marker, "ordinary": "safe sibling"}) {
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
             }
             sanitizedBlobDigest := sha256.Sum256(sanitizedBlob)
             if secretShapeObject["sha256"] != hex.EncodeToString(sanitizedBlobDigest[:]) {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
             }
             sanitizedShapeCode, _ := unsafeValue(secretShapeCleaned, "$")
             if sanitizedShapeCode != "" {
-              return refuse(reasonSelfCheckBlob, 0, 0, "$.bytes")
+              return refuse(reasonSelfCheckBlob, 0, 0, "$")
             }
             manifestDir, err := os.MkdirTemp("", "capture-manifest-check-")
             if err != nil {
@@ -1256,7 +1294,7 @@ jobs:
             if [[ "$sanitizer_metrics_invalid" == "true" ]]; then
               printf 'CAPTURE_REASON=sanitize/metrics-invalid\n' >&2
             else
-              reason_pattern='^CAPTURE_REASON=sanitize/[a-z0-9-]+( file=[0-9]+/[0-9]+)?( path=\$([A-Za-z0-9_.-]+|\[[0-9]+\])*)?$'
+              reason_pattern='^CAPTURE_REASON=sanitize/[a-z0-9-]+( file=[0-9]+/[0-9]+)?( path=\$(\[[0-9]+\])*)?$'
               reason_found=false
               while IFS= read -r line; do
                 if [[ "$line" =~ $reason_pattern ]]; then
@@ -1312,6 +1350,96 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
+          normalize_version() {
+            local kind="$1"
+            local status="$2"
+            local output="$3"
+            if [[ "$status" != "0" ]]; then
+              printf 'unavailable'
+              return
+            fi
+            case "$kind" in
+              go)
+                if [[ "$output" =~ ^go[[:space:]]version[[:space:]]go[0-9]+\.[0-9]+\.[0-9]+[[:space:]][[:alnum:]_]+/[[:alnum:]_]+$ ]]; then
+                  printf '%s' "$output"
+                else
+                  printf 'unavailable'
+                fi
+                ;;
+              git)
+                if [[ "$output" =~ ^git[[:space:]]version[[:space:]][0-9]+\.[0-9]+\.[0-9]+([.-][[:alnum:]_.+-]+|[[:space:]]\(Apple[[:space:]]Git-[0-9]+\))?$ ]]; then
+                  printf '%s' "$output"
+                else
+                  printf 'unavailable'
+                fi
+                ;;
+              *)
+                printf 'unavailable'
+                ;;
+            esac
+          }
+          capture_version_probe() {
+            local kind="$1"
+            shift
+            local raw=""
+            if raw="$(GOENV=off GOTOOLCHAIN=local "$@" 2>/dev/null)"; then
+              version_probe_exit=0
+            else
+              version_probe_exit=$?
+              raw=""
+            fi
+            version_probe_value="$(normalize_version "$kind" "$version_probe_exit" "$raw")"
+          }
+          version_probe_failure_fixture() {
+            printf '%s\n' 'go version go1.25.5 darwin/arm64'
+            printf '%s\n' '/Users/runner/PROBE_DIAGCONTROL' >&2
+            return 23
+          }
+          failed_probe_control="$(
+            {
+              capture_version_probe go version_probe_failure_fixture
+              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+            } 2>&1
+          )"
+          good_go_probe_control="$(
+            {
+              capture_version_probe go printf '%s\n' 'go version go1.25.5 darwin/arm64'
+              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+            } 2>&1
+          )"
+          good_windows_go_probe_control="$(
+            {
+              capture_version_probe go printf '%s\n' 'go version go1.25.5 windows/amd64'
+              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+            } 2>&1
+          )"
+          good_git_probe_control="$(
+            {
+              capture_version_probe git printf '%s\n' 'git version 2.50.1 (Apple Git-155)'
+              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+            } 2>&1
+          )"
+          good_windows_git_probe_control="$(
+            {
+              capture_version_probe git printf '%s\n' 'git version 2.50.1.windows.1'
+              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+            } 2>&1
+          )"
+          malformed_probe_control="$(
+            {
+              capture_version_probe git printf '%s\n' 'git version /Users/runner/PROBE_DIAGCONTROL'
+              printf '%s %s\n' "$version_probe_value" "$version_probe_exit"
+            } 2>&1
+          )"
+          if [[ "$failed_probe_control" != "unavailable 23" ||
+                "$good_go_probe_control" != "go version go1.25.5 darwin/arm64 0" ||
+                "$good_windows_go_probe_control" != "go version go1.25.5 windows/amd64 0" ||
+                "$good_git_probe_control" != "git version 2.50.1 (Apple Git-155) 0" ||
+                "$good_windows_git_probe_control" != "git version 2.50.1.windows.1 0" ||
+                "$malformed_probe_control" != "unavailable 0" ]]; then
+            printf 'CAPTURE_REASON=metadata/version-probe-control-failed\n' >&2
+            exit 2
+          fi
           go_version="unavailable"
           goos="unavailable"
           goarch="unavailable"
@@ -1319,9 +1447,10 @@ jobs:
           goos_exit=127
           goarch_exit=127
           if command -v go >/dev/null 2>&1; then
+            capture_version_probe go go version
+            go_version="$version_probe_value"
+            go_exit="$version_probe_exit"
             set +e
-            go_version="$(GOENV=off GOTOOLCHAIN=local go version 2>&1)"
-            go_exit=$?
             goos="$(GOENV=off GOTOOLCHAIN=local go env GOOS 2>/dev/null)"
             goos_exit=$?
             goarch="$(GOENV=off GOTOOLCHAIN=local go env GOARCH 2>/dev/null)"
@@ -1333,10 +1462,9 @@ jobs:
           git_version="unavailable"
           git_exit=127
           if command -v git >/dev/null 2>&1; then
-            set +e
-            git_version="$(git -C "$GITHUB_WORKSPACE" --version 2>&1)"
-            git_exit=$?
-            set -e
+            capture_version_probe git git -C "$GITHUB_WORKSPACE" --version
+            git_version="$version_probe_value"
+            git_exit="$version_probe_exit"
           fi
           base="ffd2cf65da2c0afdf46bf45a39aad74b3d59ab04"
           head=""
@@ -1429,7 +1557,7 @@ jobs:
           fi
 
       - name: Upload platform artifact
-        if: always() && steps.directories.outcome == 'success' && (steps.sanitize.outcome == 'success' || steps.setup_go.outcome != 'success')
+        if: always() && steps.directories.outcome == 'success' && steps.sanitize.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: original-capture-${{ matrix.runner }}
