@@ -1,0 +1,1111 @@
+name: Native original capture
+
+on:
+  push:
+    branches:
+      - capture/pr0-original-baseline-native
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    name: Capture (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - windows-latest
+          - macos-latest
+    steps:
+      - name: Checkout pushed commit
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Initialize private capture directories
+        id: directories
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_temp="$RUNNER_TEMP"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            runner_temp="$(cygpath -u "$RUNNER_TEMP")"
+          fi
+          capture_root="$runner_temp/original-capture-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          [[ "$capture_root" == "$runner_temp/original-capture-"* ]] || exit 1
+          umask 077
+          [[ ! -e "$capture_root" && ! -L "$capture_root" ]] || exit 1
+          mkdir -p "$capture_root/home/AppData/Roaming" "$capture_root/home/AppData/Local" \
+            "$capture_root/tmp" "$capture_root/gocache" "$capture_root/gomodcache" \
+            "$capture_root/gopath" "$capture_root/raw-output" "$capture_root/artifact/outputs"
+          : > "$capture_root/home/.gitconfig"
+          printf '%s\n' 'Source verification not run.' > "$capture_root/source-verification.log"
+          printf '%s\n' 'Module download not run.' > "$capture_root/module-download.raw.txt"
+          printf '%s\n' 'Test command not run.' > "$capture_root/test-output.raw.txt"
+          printf '%s\n' 'Capture audit not run.' > "$capture_root/audit-output.raw.txt"
+          printf '%s\n' 'Source verification not run.' > "$capture_root/artifact/source-verification.txt"
+          printf '%s\n' 'Module download not run.' > "$capture_root/artifact/module-download.txt"
+          printf '%s\n' 'Test command not run.' > "$capture_root/artifact/test-output.txt"
+          printf '%s\n' 'Capture audit not run.' > "$capture_root/artifact/audit-output.txt"
+          printf '%s\n' 'Lane metadata pending.' > "$capture_root/artifact/metadata.txt"
+          artifact_dir="$capture_root/artifact"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            artifact_dir="$(cygpath -w "$artifact_dir")"
+          fi
+          printf 'root_posix=%s\n' "$capture_root" >> "$GITHUB_OUTPUT"
+          printf 'artifact_dir=%s\n' "$artifact_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        id: setup_go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+
+      - name: Verify pinned drivers and copy the test package
+        id: verify_source
+        shell: bash
+        env:
+          CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          hash_file() {
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "$1" | awk '{print $1}'
+            elif command -v shasum >/dev/null 2>&1; then
+              shasum -a 256 "$1" | awk '{print $1}'
+            else
+              echo "No SHA-256 utility is available." >&2
+              return 2
+            fi
+          }
+          verify_file() {
+            expected="$1"
+            path="$2"
+            actual="$(hash_file "$path")"
+            if [[ "$actual" != "$expected" ]]; then
+              printf 'SHA-256 mismatch: %s\n' "$path" >&2
+              return 1
+            fi
+            printf 'OK %s %s\n' "$path" "$actual"
+          }
+          verify_all() {
+            prefix="$1"
+            while read -r expected file; do
+              [[ -n "$expected" ]] || continue
+              verify_file "$expected" "$prefix/$file"
+            done <<'PINS'
+          fe3b30a8ea09d56306ae7fdd20c8a5b1f9bdf5656b21fd679d6cb5ee927cfe6a capture_homes_test.go
+          e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
+          92c65dd911b8a95a77d1bdd3d46d71ff77d8452ee868665a0cfc0f030a6f7540 controls_test.go
+          adb6cda6a35a0db2d943787db323bde26e9d3244c3bbb7a71a8f349bb6a16fa7 launcher_fixture_test.go
+          b36fc5d0aa798784539da26b6dd0be0e70041058d7a0566bc07a0422798ba377 legacy_fixture_test.go
+          PINS
+          }
+          set +e
+          (
+            set -e
+            verify_all testdata/originalcapture
+            git -C "$GITHUB_WORKSPACE" check-ignore -q .temp/original-capture/harnessparity/capture_homes_test.go
+            mkdir -p .temp/original-capture/harnessparity
+            cp testdata/originalcapture/capture_homes_test.go \
+              testdata/originalcapture/capture_launchers_test.go \
+              testdata/originalcapture/controls_test.go \
+              testdata/originalcapture/launcher_fixture_test.go \
+              testdata/originalcapture/legacy_fixture_test.go \
+              .temp/original-capture/harnessparity/
+            verify_all .temp/original-capture/harnessparity
+          ) > "$CAPTURE_ROOT/source-verification.log" 2>&1
+          verify_exit=$?
+          set -e
+          printf 'exit_code=%s\n' "$verify_exit" >> "$GITHUB_OUTPUT"
+          exit "$verify_exit"
+
+      - name: Download public modules into the private cache
+        id: modules
+        shell: bash
+        env:
+          CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          native_path() {
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cygpath -w "$1"
+            else
+              printf '%s' "$1"
+            fi
+          }
+          go_dir="$(dirname "$(command -v go)")"
+          git_dir="$(dirname "$(command -v git)")"
+          trusted_path="$go_dir:$git_dir"
+          home_path="$(native_path "$CAPTURE_ROOT/home")"
+          temp_path="$(native_path "$CAPTURE_ROOT/tmp")"
+          cache_path="$(native_path "$CAPTURE_ROOT/gocache")"
+          modcache_path="$(native_path "$CAPTURE_ROOT/gomodcache")"
+          gopath_path="$(native_path "$CAPTURE_ROOT/gopath")"
+          gitconfig_path="$(native_path "$CAPTURE_ROOT/home/.gitconfig")"
+          clean_env=(
+            "HOME=$home_path"
+            "TMPDIR=$temp_path"
+            "TMP=$temp_path"
+            "TEMP=$temp_path"
+            "GOCACHE=$cache_path"
+            "GOMODCACHE=$modcache_path"
+            "GOPATH=$gopath_path"
+            "GIT_CONFIG_NOSYSTEM=1"
+            "GIT_CONFIG_GLOBAL=$gitconfig_path"
+            "GIT_TERMINAL_PROMPT=0"
+            "GCM_INTERACTIVE=Never"
+            "GOENV=off"
+            "GOTOOLCHAIN=local"
+            "PATH=$trusted_path"
+          )
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            systemroot="${SYSTEMROOT:-${WINDIR:-}}"
+            [[ -n "$systemroot" ]] || exit 2
+            trusted_path="$trusted_path:$(cygpath -u "$systemroot")/System32"
+            clean_env[13]="PATH=$trusted_path"
+            clean_env+=("SYSTEMROOT=$systemroot" "WINDIR=${WINDIR:-$systemroot}" \
+              "USERPROFILE=$home_path" "APPDATA=$home_path/AppData/Roaming" \
+              "LOCALAPPDATA=$home_path/AppData/Local")
+          else
+            trusted_path="$trusted_path:/usr/bin:/bin"
+            clean_env[13]="PATH=$trusted_path"
+          fi
+          set +e
+          env -i "${clean_env[@]}" GOPROXY=https://proxy.golang.org \
+            GOSUMDB=sum.golang.org go mod download \
+            > "$CAPTURE_ROOT/module-download.raw.txt" 2>&1
+          command_exit=$?
+          set -e
+          printf 'exit_code=%s\n' "$command_exit" >> "$GITHUB_OUTPUT"
+          exit "$command_exit"
+
+      - name: Run the complete capture suite
+        id: capture
+        shell: bash
+        env:
+          CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          cat > "$CAPTURE_ROOT/audit.go" <<'GO'
+          package main
+
+          import (
+            "bufio"
+            "fmt"
+            "io"
+            "os"
+            "path/filepath"
+            "strconv"
+            "strings"
+          )
+
+          type counts struct {
+            baseline, baselinePass, baselineFail, baselineSkip int
+            launchers, launcherPass, launcherFail, launcherSkip int
+            repeatSeen, repeatPass int
+            comparator, comparatorPass, comparatorFail, comparatorSkip int
+            mcpControlPass, launcherControlPass int
+            rootPass, windowsRootPass, allFails, allSkips int
+            outputFiles int
+          }
+
+          func parseLog(input io.Reader) (counts, error) {
+            var result counts
+            scanner := bufio.NewScanner(input)
+            scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
+            for scanner.Scan() {
+              fields := strings.Fields(scanner.Text())
+              if len(fields) < 3 || fields[0] != "---" {
+                continue
+              }
+              status, name := fields[1], fields[2]
+              if status == "FAIL:" { result.allFails++ }
+              if status == "SKIP:" { result.allSkips++ }
+              if strings.HasPrefix(name, "TestFreezeOriginalBaseline/") {
+                if name == "TestFreezeOriginalBaseline/repeat-determinism" {
+                  result.repeatSeen++
+                  if status == "PASS:" { result.repeatPass++ }
+                } else {
+                  result.baseline++
+                  if status == "PASS:" { result.baselinePass++ }
+                  if status == "FAIL:" { result.baselineFail++ }
+                  if status == "SKIP:" { result.baselineSkip++ }
+                }
+              }
+              if strings.HasPrefix(name, "TestFreezeOriginalLaunchers/") {
+                result.launchers++
+                if status == "PASS:" { result.launcherPass++ }
+                if status == "FAIL:" { result.launcherFail++ }
+                if status == "SKIP:" { result.launcherSkip++ }
+              }
+              if strings.HasPrefix(name, "TestOriginalComparatorControls/") {
+                result.comparator++
+                if status == "PASS:" { result.comparatorPass++ }
+                if status == "FAIL:" { result.comparatorFail++ }
+                if status == "SKIP:" { result.comparatorSkip++ }
+              }
+              if name == "TestOriginalComparatorControls/claude_code-mcp" && status == "PASS:" { result.mcpControlPass++ }
+              if name == "TestOriginalComparatorControls/claude-launcher-typed-projection" && status == "PASS:" { result.launcherControlPass++ }
+              if status == "PASS:" && (name == "TestFreezeOriginalBaseline" ||
+                  name == "TestFreezeOriginalLaunchers" ||
+                  name == "TestOriginalComparatorControls" ||
+                  name == "TestWindowsRootParameter") { result.rootPass++ }
+              if name == "TestWindowsRootParameter" && status == "PASS:" { result.windowsRootPass++ }
+            }
+            return result, scanner.Err()
+          }
+
+          func (value counts) valid(testExit int) bool {
+            executed := value.baseline + value.launchers
+            passed := value.baselinePass + value.launcherPass
+            failed := value.baselineFail + value.launcherFail
+            skipped := value.baselineSkip + value.launcherSkip
+            return testExit == 0 && value.baseline == 17 && value.launchers == 30 &&
+              executed == 47 && passed == 47 && failed == 0 && skipped == 0 &&
+              value.repeatSeen == 1 && value.repeatPass == 1 &&
+              value.comparator == 2 && value.comparatorPass == 2 &&
+              value.comparatorFail == 0 && value.comparatorSkip == 0 &&
+              value.mcpControlPass == 1 && value.launcherControlPass == 1 &&
+              value.rootPass == 4 && value.windowsRootPass == 1 &&
+              value.allFails == 0 && value.allSkips == 0 && value.outputFiles == 47
+          }
+
+          func selfCheck() error {
+            var sample strings.Builder
+            for index := 0; index < 17; index++ { fmt.Fprintf(&sample, "--- PASS: TestFreezeOriginalBaseline/case-%02d (0.00s)\n", index) }
+            sample.WriteString("--- PASS: TestFreezeOriginalBaseline/repeat-determinism (0.00s)\n")
+            for index := 0; index < 30; index++ { fmt.Fprintf(&sample, "--- PASS: TestFreezeOriginalLaunchers/case-%02d (0.00s)\n", index) }
+            sample.WriteString("--- PASS: TestOriginalComparatorControls/claude_code-mcp (0.00s)\n")
+            sample.WriteString("--- PASS: TestOriginalComparatorControls/claude-launcher-typed-projection (0.00s)\n")
+            sample.WriteString("--- PASS: TestFreezeOriginalBaseline (0.00s)\n")
+            sample.WriteString("--- PASS: TestFreezeOriginalLaunchers (0.00s)\n")
+            sample.WriteString("--- PASS: TestOriginalComparatorControls (0.00s)\n")
+            sample.WriteString("--- PASS: TestWindowsRootParameter (0.00s)\n")
+            parsed, err := parseLog(strings.NewReader(sample.String()))
+            if err != nil { return err }
+            parsed.outputFiles = 47
+            if !parsed.valid(0) { return fmt.Errorf("positive audit control failed") }
+            parsed.allSkips++
+            if parsed.valid(0) { return fmt.Errorf("skip rejection control failed") }
+            parsed.allSkips--
+            parsed.outputFiles = 46
+            if parsed.valid(0) { return fmt.Errorf("partial output rejection control failed") }
+            return nil
+          }
+
+          func run() error {
+            if err := selfCheck(); err != nil { return err }
+            if len(os.Args) != 4 { return fmt.Errorf("invalid audit arguments") }
+            testExit, err := strconv.Atoi(os.Args[3])
+            if err != nil { return fmt.Errorf("invalid test exit code") }
+            input, err := os.Open(os.Args[1])
+            if err != nil { return err }
+            result, parseErr := parseLog(input)
+            closeErr := input.Close()
+            if parseErr != nil { return parseErr }
+            if closeErr != nil { return closeErr }
+            entries, err := os.ReadDir(os.Args[2])
+            if err != nil { return err }
+            for _, entry := range entries {
+              if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+                return fmt.Errorf("unexpected capture output entry")
+              }
+              result.outputFiles++
+            }
+            executed := result.baseline + result.launchers
+            passed := result.baselinePass + result.launcherPass
+            failed := result.baselineFail + result.launcherFail
+            skipped := result.baselineSkip + result.launcherSkip
+            fmt.Printf("executed=%d\npassed=%d\nfailed=%d\nskipped=%d\n", executed, passed, failed, skipped)
+            fmt.Printf("baseline_rows=%d\nlauncher_rows=%d\n", result.baseline, result.launchers)
+            fmt.Printf("repeat_seen=%d\nrepeat_passed=%d\n", result.repeatSeen, result.repeatPass)
+            fmt.Printf("comparator_rows=%d\ncomparator_passed=%d\n", result.comparator, result.comparatorPass)
+            fmt.Printf("comparator_failed=%d\ncomparator_skipped=%d\n", result.comparatorFail, result.comparatorSkip)
+            fmt.Printf("comparator_mcp_control_passed=%d\ncomparator_launcher_control_passed=%d\n", result.mcpControlPass, result.launcherControlPass)
+            fmt.Printf("root_tests_passed=%d\nwindows_root_parameter_passed=%d\n", result.rootPass, result.windowsRootPass)
+            fmt.Printf("all_test_failures=%d\nall_test_skips=%d\noutput_json_files=%d\n", result.allFails, result.allSkips, result.outputFiles)
+            if !result.valid(testExit) { return fmt.Errorf("capture coverage or test verdict is incomplete") }
+            return nil
+          }
+
+          func main() {
+            if err := run(); err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+          }
+          GO
+          native_path() {
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cygpath -w "$1"
+            else
+              printf '%s' "$1"
+            fi
+          }
+          go_dir="$(dirname "$(command -v go)")"
+          git_dir="$(dirname "$(command -v git)")"
+          trusted_path="$go_dir:$git_dir"
+          home_path="$(native_path "$CAPTURE_ROOT/home")"
+          temp_path="$(native_path "$CAPTURE_ROOT/tmp")"
+          cache_path="$(native_path "$CAPTURE_ROOT/gocache")"
+          modcache_path="$(native_path "$CAPTURE_ROOT/gomodcache")"
+          gopath_path="$(native_path "$CAPTURE_ROOT/gopath")"
+          output_path="$(native_path "$CAPTURE_ROOT/raw-output")"
+          gitconfig_path="$(native_path "$CAPTURE_ROOT/home/.gitconfig")"
+          clean_env=(
+            "HOME=$home_path"
+            "TMPDIR=$temp_path"
+            "TMP=$temp_path"
+            "TEMP=$temp_path"
+            "GOCACHE=$cache_path"
+            "GOMODCACHE=$modcache_path"
+            "GOPATH=$gopath_path"
+            "GIT_CONFIG_NOSYSTEM=1"
+            "GIT_CONFIG_GLOBAL=$gitconfig_path"
+            "GIT_TERMINAL_PROMPT=0"
+            "GCM_INTERACTIVE=Never"
+            "GOENV=off"
+            "GOTOOLCHAIN=local"
+            "PATH=$trusted_path"
+          )
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            systemroot="${SYSTEMROOT:-${WINDIR:-}}"
+            [[ -n "$systemroot" ]] || exit 2
+            trusted_path="$trusted_path:$(cygpath -u "$systemroot")/System32"
+            clean_env[13]="PATH=$trusted_path"
+            clean_env+=("SYSTEMROOT=$systemroot" "WINDIR=${WINDIR:-$systemroot}" \
+              "USERPROFILE=$home_path" "APPDATA=$home_path/AppData/Roaming" \
+              "LOCALAPPDATA=$home_path/AppData/Local")
+          else
+            trusted_path="$trusted_path:/usr/bin:/bin"
+            clean_env[13]="PATH=$trusted_path"
+          fi
+          if [[ -n "$(find "$CAPTURE_ROOT/raw-output" -mindepth 1 -print -quit)" ]]; then
+            echo "The capture output directory is not empty." >&2
+            exit 2
+          fi
+          set +e
+          env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            HARNESS_CAPTURE_OUT="$output_path" \
+            go test -p 1 -count=1 -v ./.temp/original-capture/harnessparity \
+            > "$CAPTURE_ROOT/test-output.raw.txt" 2>&1
+          test_exit=$?
+          set -e
+          set +e
+          env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            go run "$CAPTURE_ROOT/audit.go" "$CAPTURE_ROOT/test-output.raw.txt" \
+            "$CAPTURE_ROOT/raw-output" "$test_exit" \
+            > "$CAPTURE_ROOT/audit-metrics.raw.txt" 2> "$CAPTURE_ROOT/audit-error.raw.txt"
+          audit_exit=$?
+          set -e
+          cat "$CAPTURE_ROOT/audit-metrics.raw.txt" "$CAPTURE_ROOT/audit-error.raw.txt" \
+            > "$CAPTURE_ROOT/audit-output.raw.txt"
+          audit_metrics=()
+          audit_metric_count=0
+          metrics_valid=true
+          while IFS= read -r line; do
+            if [[ "$line" =~ ^[a-z0-9_]+=[0-9]+$ ]]; then
+              audit_metrics+=("$line")
+              audit_metric_count=$((audit_metric_count + 1))
+            else
+              metrics_valid=false
+              break
+            fi
+          done < "$CAPTURE_ROOT/audit-metrics.raw.txt"
+          if [[ "$audit_metric_count" -ne 19 ]]; then metrics_valid=false; fi
+          if [[ "$metrics_valid" != "true" ]]; then audit_exit=2; fi
+          {
+            printf 'test_command_exit=%s\naudit_exit=%s\n' "$test_exit" "$audit_exit"
+            if [[ "$metrics_valid" == "true" ]]; then
+              printf '%s\n' "${audit_metrics[@]}"
+            fi
+          } >> "$GITHUB_OUTPUT"
+          {
+            printf '### Native capture: %s (%s)\n\n' "$RUNNER_OS" "$RUNNER_ARCH"
+            printf 'Test command exit: %s. Go audit command exit: %s.\n' "$test_exit" "$audit_exit"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$audit_exit"
+
+      - name: Sanitize and verify artifact contents
+        id: sanitize
+        if: always() && steps.directories.outcome == 'success' && steps.setup_go.outcome == 'success'
+        shell: bash
+        env:
+          CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
+          REQUIRE_47: ${{ steps.capture.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          cat > "$CAPTURE_ROOT/sanitize.go" <<'GO'
+          package main
+
+          import (
+            "crypto/sha256"
+            "encoding/base64"
+            "encoding/hex"
+            "encoding/json"
+            "fmt"
+            "os"
+            "path/filepath"
+            "regexp"
+            "reflect"
+            "sort"
+            "strings"
+          )
+
+          const marker = "<redacted:category>"
+
+          var valuePatterns = []*regexp.Regexp{
+            regexp.MustCompile("(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}"),
+            regexp.MustCompile("\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})\\b"),
+            regexp.MustCompile("\\bsk-[A-Za-z0-9_-]{20,}\\b"),
+            regexp.MustCompile("\\bxox[baprs]-[A-Za-z0-9-]{10,}\\b"),
+            regexp.MustCompile("\\bAKIA[0-9A-Z]{16}\\b"),
+            regexp.MustCompile("\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\b"),
+            regexp.MustCompile("(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----"),
+            regexp.MustCompile("(?i)HOSTILE_SECRET_[A-Z0-9_]+"),
+            regexp.MustCompile("(?i)\\b(?:AIza[0-9A-Za-z_-]{35}|sk_(?:live|test)_[A-Za-z0-9]{16,})\\b"),
+            regexp.MustCompile(`(?i)(?:[A-Za-z]:)?[/\\](?:[^/\\\s"'<>]+[/\\])*(?:Users|home)(?:[/\\][^\s"'<>]*)?`),
+          }
+          var assignmentPattern = regexp.MustCompile("(?i)[A-Za-z0-9_.-]*(?:secret|token|password|passwd|credential|authorization|api[_-]?key|access[_-]?key|refresh[_-]?token|private[_-]?key)[A-Za-z0-9_.-]*\\s*[:=]\\s*[^,;\\n}]+")
+
+          var redactedFields int
+          var redactedValues int
+
+          func sensitiveName(name string) bool {
+            lower := strings.ToLower(name)
+            normalized := strings.NewReplacer("_", "", "-", "", ".", "").Replace(lower)
+            for _, part := range []string{"secret", "token", "password", "passwd", "authorization", "apikey", "accesskey", "refreshtoken", "privatekey"} {
+              if strings.Contains(normalized, part) {
+                return true
+              }
+            }
+            return strings.Contains(normalized, "credential") && !strings.Contains(normalized, "credentialstore")
+          }
+
+          func addMarker(object map[string]any) {
+            prior, _ := object["_redacted"].([]any)
+            object["_redacted"] = append(prior, marker)
+          }
+
+          func redactText(input string) (string, int) {
+            count := 0
+            output := input
+            for _, pattern := range valuePatterns {
+              matches := pattern.FindAllStringIndex(output, -1)
+              if len(matches) > 0 {
+                count += len(matches)
+                output = pattern.ReplaceAllString(output, marker)
+              }
+            }
+            matches := assignmentPattern.FindAllStringIndex(output, -1)
+            if len(matches) > 0 {
+              count += len(matches)
+              output = assignmentPattern.ReplaceAllString(output, marker)
+            }
+            return output, count
+          }
+
+          func sanitizeBlob(input []byte) ([]byte, int) {
+            var value any
+            if json.Unmarshal(input, &value) == nil {
+              cleaned, count := sanitizeValue(value)
+              if count > 0 {
+                encoded, err := json.Marshal(cleaned)
+                if err == nil {
+                  return encoded, count
+                }
+              }
+              return input, count
+            }
+            cleaned, count := redactText(string(input))
+            redactedValues += count
+            return []byte(cleaned), count
+          }
+
+          func sanitizeValue(value any) (any, int) {
+            switch current := value.(type) {
+            case map[string]any:
+              count := 0
+              for key, child := range current {
+                if sensitiveName(key) {
+                  delete(current, key)
+                  addMarker(current)
+                  count++
+                  redactedFields++
+                  continue
+                }
+                if key == "bytes" || key == "document" {
+                  if encoded, ok := child.(string); ok {
+                    decoded, err := base64.StdEncoding.DecodeString(encoded)
+                    if err == nil {
+                      cleaned, found := sanitizeBlob(decoded)
+                      if found > 0 {
+                        current[key] = base64.StdEncoding.EncodeToString(cleaned)
+                        if key == "bytes" {
+                          digest := sha256.Sum256(cleaned)
+                          if _, exists := current["sha256"]; exists {
+                            current["sha256"] = hex.EncodeToString(digest[:])
+                          }
+                        }
+                        count += found
+                        continue
+                      }
+                    } else {
+                      cleaned, found := redactText(encoded)
+                      if found > 0 {
+                        current[key] = cleaned
+                        count += found
+                        redactedValues += found
+                        continue
+                      }
+                    }
+                  }
+                }
+                cleaned, found := sanitizeValue(child)
+                current[key] = cleaned
+                count += found
+              }
+              return current, count
+            case []any:
+              count := 0
+              for index, child := range current {
+                cleaned, found := sanitizeValue(child)
+                current[index] = cleaned
+                count += found
+              }
+              return current, count
+            case string:
+              cleaned, count := redactText(current)
+              redactedValues += count
+              return cleaned, count
+            default:
+              return value, 0
+            }
+          }
+
+          func unsafeText(value string) bool {
+            for _, pattern := range valuePatterns {
+              if pattern.MatchString(value) {
+                return true
+              }
+            }
+            return assignmentPattern.MatchString(value)
+          }
+
+          func unsafeBlob(data []byte) bool {
+            var value any
+            if json.Unmarshal(data, &value) == nil {
+              return unsafeValue(value)
+            }
+            return unsafeText(string(data))
+          }
+
+          func unsafeValue(value any) bool {
+            switch current := value.(type) {
+            case map[string]any:
+              for key, child := range current {
+                if sensitiveName(key) {
+                  return true
+                }
+                if key == "bytes" || key == "document" {
+                  if encoded, ok := child.(string); ok {
+                    decoded, err := base64.StdEncoding.DecodeString(encoded)
+                    if err == nil && unsafeBlob(decoded) {
+                      return true
+                    }
+                  }
+                }
+                if unsafeValue(child) {
+                  return true
+                }
+              }
+            case []any:
+              for _, child := range current {
+                if unsafeValue(child) {
+                  return true
+                }
+              }
+            case string:
+              return unsafeText(current)
+            }
+            return false
+          }
+
+          type manifestEntry struct {
+            Path string `json:"path"`
+            Bytes int64 `json:"bytes"`
+            SHA256 string `json:"sha256"`
+          }
+
+          type outputManifest struct {
+            Files []manifestEntry `json:"files"`
+          }
+
+          func buildManifest(directory string) (outputManifest, error) {
+            result := outputManifest{Files: []manifestEntry{}}
+            entries, err := os.ReadDir(directory)
+            if err != nil { return result, err }
+            for _, entry := range entries {
+              if entry.IsDir() {
+                return result, fmt.Errorf("unexpected output manifest entry")
+              }
+              if entry.Name() == "MANIFEST.json" {
+                continue
+              }
+              if filepath.Ext(entry.Name()) != ".json" {
+                return result, fmt.Errorf("unexpected output manifest entry")
+              }
+              data, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+              if err != nil { return result, err }
+              digest := sha256.Sum256(data)
+              result.Files = append(result.Files, manifestEntry{
+                Path: entry.Name(), Bytes: int64(len(data)), SHA256: hex.EncodeToString(digest[:]),
+              })
+            }
+            sort.Slice(result.Files, func(i, j int) bool { return result.Files[i].Path < result.Files[j].Path })
+            return result, nil
+          }
+
+          func writeVerifiedManifest(directory string) error {
+            expected, err := buildManifest(directory)
+            if err != nil { return err }
+            encoded, err := json.MarshalIndent(expected, "", "  ")
+            if err != nil { return err }
+            encoded = append(encoded, '\n')
+            path := filepath.Join(directory, "MANIFEST.json")
+            if err := os.WriteFile(path, encoded, 0600); err != nil { return err }
+            actualBytes, err := os.ReadFile(path)
+            if err != nil { return err }
+            var actual outputManifest
+            if err := json.Unmarshal(actualBytes, &actual); err != nil { return err }
+            recomputed, err := buildManifest(directory)
+            if err != nil { return err }
+            if !reflect.DeepEqual(expected, actual) || !reflect.DeepEqual(expected, recomputed) {
+              return fmt.Errorf("output manifest verification failed")
+            }
+            return nil
+          }
+
+          func sanitizeTextFile(source, destination string) error {
+            data, err := os.ReadFile(source)
+            if err != nil {
+              return err
+            }
+            cleaned, count := redactText(string(data))
+            redactedValues += count
+            if unsafeText(cleaned) {
+              return fmt.Errorf("unsafe text remains")
+            }
+            return os.WriteFile(destination, []byte(cleaned), 0600)
+          }
+
+          func selfCheck() error {
+            for _, key := range []string{"api_token", "apiKey", "privateKey", "refreshToken"} {
+              input := map[string]any{key: "ghp_" + strings.Repeat("A", 30), "safe": "ordinary"}
+              cleaned, count := sanitizeValue(input)
+              encoded, _ := json.Marshal(cleaned)
+              object, ok := cleaned.(map[string]any)
+              wantObject := map[string]any{"safe": "ordinary", "_redacted": []any{marker}}
+              if count != 1 || !ok || object["safe"] != "ordinary" || !reflect.DeepEqual(object, wantObject) ||
+                  strings.Contains(string(encoded), key) || strings.Contains(string(encoded), "ghp_") ||
+                  !strings.Contains(string(encoded), marker) {
+                return fmt.Errorf("field redaction control failed")
+              }
+            }
+            input := "safe prefix Bearer abcdefghijklmnop safe suffix"
+            text, count := redactText(input)
+            want := "safe prefix " + marker + " safe suffix"
+            if count != 1 || text != want || unsafeText(text) {
+              return fmt.Errorf("credential-value control failed")
+            }
+            for _, credential := range []string{
+              "sk_live_" + strings.Repeat("A", 16),
+              "sk_test_" + strings.Repeat("A", 16),
+              "AIza" + strings.Repeat("B", 35),
+            } {
+              input := "safe prefix " + credential + " safe suffix"
+              cleaned, count := redactText(input)
+              want := "safe prefix " + marker + " safe suffix"
+              if count != 1 || cleaned != want || unsafeText(cleaned) {
+                return fmt.Errorf("additional credential-value control failed")
+              }
+            }
+            windowsHome := "D:\\a\\_temp\\original-capture-123-1\\home\\.gitconfig"
+            homeInput := "safe prefix " + windowsHome + " safe suffix"
+            cleanedHome, pathCount := redactText(homeInput)
+            if pathCount != 1 || cleanedHome != "safe prefix "+marker+" safe suffix" || unsafeText(cleanedHome) {
+              return fmt.Errorf("Windows private-home control failed")
+            }
+            manifestDir, err := os.MkdirTemp("", "capture-manifest-check-")
+            if err != nil {
+              return err
+            }
+            defer os.RemoveAll(manifestDir)
+            fixture := []byte("{\"ok\":true}\n")
+            if err := os.WriteFile(filepath.Join(manifestDir, "one.json"), fixture, 0600); err != nil {
+              return err
+            }
+            if err := writeVerifiedManifest(manifestDir); err != nil {
+              return fmt.Errorf("positive manifest control failed: %w", err)
+            }
+            manifestBytes, err := os.ReadFile(filepath.Join(manifestDir, "MANIFEST.json"))
+            if err != nil {
+              return err
+            }
+            var manifest outputManifest
+            if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+              return err
+            }
+            digest := sha256.Sum256(fixture)
+            if len(manifest.Files) != 1 || manifest.Files[0].Path != "one.json" ||
+                manifest.Files[0].Bytes != int64(len(fixture)) ||
+                manifest.Files[0].SHA256 != hex.EncodeToString(digest[:]) {
+              return fmt.Errorf("positive manifest contents control failed")
+            }
+            return nil
+          }
+
+          func run() error {
+            if err := selfCheck(); err != nil {
+              return err
+            }
+            redactedFields = 0
+            redactedValues = 0
+            if len(os.Args) != 4 {
+              return fmt.Errorf("invalid sanitizer arguments")
+            }
+            rawDir, artifactDir := os.Args[1], os.Args[2]
+            require47 := os.Args[3] == "true"
+            outputDir := filepath.Join(artifactDir, "outputs")
+            if err := os.MkdirAll(outputDir, 0700); err != nil {
+              return err
+            }
+            entries, err := os.ReadDir(rawDir)
+            if err != nil {
+              return err
+            }
+            jsonCount := 0
+            for _, entry := range entries {
+              if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+                return fmt.Errorf("unexpected capture output entry")
+              }
+              input, err := os.ReadFile(filepath.Join(rawDir, entry.Name()))
+              if err != nil {
+                return err
+              }
+              var value any
+              if err := json.Unmarshal(input, &value); err != nil {
+                return fmt.Errorf("capture output is not valid JSON")
+              }
+              cleaned, found := sanitizeValue(value)
+              var output []byte
+              if found == 0 {
+                output = input
+              } else {
+                output, err = json.MarshalIndent(cleaned, "", "  ")
+                if err != nil {
+                  return err
+                }
+                output = append(output, '\n')
+              }
+              if err := os.WriteFile(filepath.Join(outputDir, entry.Name()), output, 0600); err != nil {
+                return err
+              }
+              jsonCount++
+            }
+            if jsonCount > 47 || (require47 && jsonCount != 47) {
+              return fmt.Errorf("capture output count is incomplete")
+            }
+            if err := writeVerifiedManifest(outputDir); err != nil {
+              return err
+            }
+            logs := []struct{ source, destination string }{
+              {filepath.Join(filepath.Dir(rawDir), "test-output.raw.txt"), filepath.Join(artifactDir, "test-output.txt")},
+              {filepath.Join(filepath.Dir(rawDir), "audit-output.raw.txt"), filepath.Join(artifactDir, "audit-output.txt")},
+              {filepath.Join(filepath.Dir(rawDir), "module-download.raw.txt"), filepath.Join(artifactDir, "module-download.txt")},
+              {filepath.Join(filepath.Dir(rawDir), "source-verification.log"), filepath.Join(artifactDir, "source-verification.txt")},
+            }
+            for _, log := range logs {
+              if err := sanitizeTextFile(log.source, log.destination); err != nil {
+                return err
+              }
+            }
+            for _, entry := range []string{"test-output.txt", "audit-output.txt", "module-download.txt", "source-verification.txt"} {
+              data, err := os.ReadFile(filepath.Join(artifactDir, entry))
+              if err != nil || unsafeText(string(data)) {
+                return fmt.Errorf("unsafe artifact log remains")
+              }
+            }
+            files, err := os.ReadDir(outputDir)
+            if err != nil {
+              return err
+            }
+            for _, entry := range files {
+              data, err := os.ReadFile(filepath.Join(outputDir, entry.Name()))
+              if err != nil {
+                return err
+              }
+              var value any
+              if err := json.Unmarshal(data, &value); err != nil || unsafeValue(value) {
+                return fmt.Errorf("unsafe capture output remains")
+              }
+            }
+            fmt.Printf("sanitized_json_files=%d\nredacted_fields=%d\nredacted_values=%d\n", jsonCount, redactedFields, redactedValues)
+            return nil
+          }
+
+          func main() {
+            if err := run(); err != nil {
+              fmt.Fprintln(os.Stderr, err)
+              os.Exit(1)
+            }
+          }
+          GO
+          native_path() {
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cygpath -w "$1"
+            else
+              printf '%s' "$1"
+            fi
+          }
+          go_dir="$(dirname "$(command -v go)")"
+          git_dir="$(dirname "$(command -v git)")"
+          trusted_path="$go_dir:$git_dir"
+          home_path="$(native_path "$CAPTURE_ROOT/home")"
+          temp_path="$(native_path "$CAPTURE_ROOT/tmp")"
+          cache_path="$(native_path "$CAPTURE_ROOT/gocache")"
+          modcache_path="$(native_path "$CAPTURE_ROOT/gomodcache")"
+          gopath_path="$(native_path "$CAPTURE_ROOT/gopath")"
+          gitconfig_path="$(native_path "$CAPTURE_ROOT/home/.gitconfig")"
+          clean_env=(
+            "HOME=$home_path"
+            "TMPDIR=$temp_path"
+            "TMP=$temp_path"
+            "TEMP=$temp_path"
+            "GOCACHE=$cache_path"
+            "GOMODCACHE=$modcache_path"
+            "GOPATH=$gopath_path"
+            "GIT_CONFIG_NOSYSTEM=1"
+            "GIT_CONFIG_GLOBAL=$gitconfig_path"
+            "GIT_TERMINAL_PROMPT=0"
+            "GCM_INTERACTIVE=Never"
+            "GOENV=off"
+            "GOTOOLCHAIN=local"
+            "PATH=$trusted_path"
+          )
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            systemroot="${SYSTEMROOT:-${WINDIR:-}}"
+            [[ -n "$systemroot" ]] || exit 2
+            trusted_path="$trusted_path:$(cygpath -u "$systemroot")/System32"
+            clean_env[13]="PATH=$trusted_path"
+            clean_env+=("SYSTEMROOT=$systemroot" "WINDIR=${WINDIR:-$systemroot}" \
+              "USERPROFILE=$home_path" "APPDATA=$home_path/AppData/Roaming" \
+              "LOCALAPPDATA=$home_path/AppData/Local")
+          else
+            trusted_path="$trusted_path:/usr/bin:/bin"
+            clean_env[13]="PATH=$trusted_path"
+          fi
+          set +e
+          env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            go run "$CAPTURE_ROOT/sanitize.go" \
+            "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/artifact" "$REQUIRE_47" \
+            > "$CAPTURE_ROOT/sanitizer.log" 2>&1
+          sanitize_exit=$?
+          set -e
+          sanitizer_metrics=()
+          sanitizer_metric_count=0
+          if [[ "$sanitize_exit" -eq 0 ]]; then
+            metrics_valid=true
+            while IFS= read -r line; do
+              case "$line" in
+                sanitized_json_files=*|redacted_fields=*|redacted_values=*)
+                  sanitizer_metrics+=("$line")
+                  sanitizer_metric_count=$((sanitizer_metric_count + 1))
+                  ;;
+                *)
+                  metrics_valid=false
+                  break
+                  ;;
+              esac
+            done < "$CAPTURE_ROOT/sanitizer.log"
+            if [[ "$metrics_valid" != "true" || "$sanitizer_metric_count" -ne 3 ]]; then
+              sanitize_exit=2
+            fi
+          fi
+          printf 'exit_code=%s\n' "$sanitize_exit" >> "$GITHUB_OUTPUT"
+          if [[ "$sanitize_exit" -eq 0 ]]; then
+            printf '%s\n' "${sanitizer_metrics[@]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Artifact sanitization failed; refusing export." >&2
+          fi
+          exit "$sanitize_exit"
+
+      - name: Record lane metadata
+        id: metadata
+        if: always() && steps.directories.outcome == 'success'
+        shell: bash
+        env:
+          CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
+          MATRIX_RUNNER: ${{ matrix.runner }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup_go.outcome }}
+          SOURCE_OUTCOME: ${{ steps.verify_source.outcome }}
+          SOURCE_EXIT: ${{ steps.verify_source.outputs.exit_code || 'not-run' }}
+          MODULE_OUTCOME: ${{ steps.modules.outcome }}
+          MODULE_EXIT: ${{ steps.modules.outputs.exit_code || 'not-run' }}
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          CAPTURE_EXIT: ${{ steps.capture.outputs.test_command_exit || 'not-run' }}
+          AUDIT_EXIT: ${{ steps.capture.outputs.audit_exit || 'not-run' }}
+          CASE_EXECUTED: ${{ steps.capture.outputs.executed || '0' }}
+          CASE_PASSED: ${{ steps.capture.outputs.passed || '0' }}
+          CASE_FAILED: ${{ steps.capture.outputs.failed || '0' }}
+          CASE_SKIPPED: ${{ steps.capture.outputs.skipped || '0' }}
+          REPEAT_SEEN: ${{ steps.capture.outputs.repeat_seen || '0' }}
+          REPEAT_PASSED: ${{ steps.capture.outputs.repeat_passed || '0' }}
+          COMPARATOR_SEEN: ${{ steps.capture.outputs.comparator_rows || '0' }}
+          COMPARATOR_PASSED: ${{ steps.capture.outputs.comparator_passed || '0' }}
+          COMPARATOR_FAILED: ${{ steps.capture.outputs.comparator_failed || '0' }}
+          COMPARATOR_SKIPPED: ${{ steps.capture.outputs.comparator_skipped || '0' }}
+          ROOT_TESTS_PASSED: ${{ steps.capture.outputs.root_tests_passed || '0' }}
+          WINDOWS_ROOT_PASSED: ${{ steps.capture.outputs.windows_root_parameter_passed || '0' }}
+          ALL_TEST_FAILURES: ${{ steps.capture.outputs.all_test_failures || '0' }}
+          ALL_TEST_SKIPS: ${{ steps.capture.outputs.all_test_skips || '0' }}
+          OUTPUT_JSON_FILES: ${{ steps.capture.outputs.output_json_files || '0' }}
+          SANITIZER_OUTCOME: ${{ steps.sanitize.outcome }}
+          SANITIZER_EXIT: ${{ steps.sanitize.outputs.exit_code || 'not-run' }}
+          REDACTED_FIELDS: ${{ steps.sanitize.outputs.redacted_fields || '0' }}
+          REDACTED_VALUES: ${{ steps.sanitize.outputs.redacted_values || '0' }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          go_version="unavailable"
+          goos="unavailable"
+          goarch="unavailable"
+          go_exit=127
+          goos_exit=127
+          goarch_exit=127
+          if command -v go >/dev/null 2>&1; then
+            set +e
+            go_version="$(GOENV=off GOTOOLCHAIN=local go version 2>&1)"
+            go_exit=$?
+            goos="$(GOENV=off GOTOOLCHAIN=local go env GOOS 2>/dev/null)"
+            goos_exit=$?
+            goarch="$(GOENV=off GOTOOLCHAIN=local go env GOARCH 2>/dev/null)"
+            goarch_exit=$?
+            set -e
+            [[ "$goos_exit" -eq 0 ]] || goos="unavailable"
+            [[ "$goarch_exit" -eq 0 ]] || goarch="unavailable"
+          fi
+          git_version="unavailable"
+          git_exit=127
+          if command -v git >/dev/null 2>&1; then
+            set +e
+            git_version="$(git -C "$GITHUB_WORKSPACE" --version 2>&1)"
+            git_exit=$?
+            set -e
+          fi
+          base="643e727edd2db21307ca6d8c0332935e33d50ac8"
+          head=""
+          head_exit=1
+          if head="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD 2>/dev/null)"; then head_exit=0; fi
+          head_parent=""
+          parent_exit=1
+          if head_parent="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD^ 2>/dev/null)"; then parent_exit=0; fi
+          working_status=""
+          working_status_exit=1
+          if working_status="$(git -C "$GITHUB_WORKSPACE" status --porcelain --untracked-files=all 2>/dev/null)"; then working_status_exit=0; fi
+          working_clean=false
+          if [[ "$working_status_exit" -eq 0 && -z "$working_status" ]]; then working_clean=true; fi
+          original_tree_clean=false
+          baseline_diff_exit=1
+          if [[ -n "$head" ]]; then
+            if git -C "$GITHUB_WORKSPACE" diff --quiet "$base" "$head" -- . \
+                ':(exclude)testdata/originalcapture/**' \
+                ':(exclude).github/workflows/original-capture-native.yml'; then
+              baseline_diff_exit=0
+              original_tree_clean=true
+            else
+              baseline_diff_exit=$?
+            fi
+          fi
+          expected_paths="$(printf '%s\n' \
+            '.github/workflows/original-capture-native.yml' \
+            'testdata/originalcapture/capture_homes_test.go' \
+            'testdata/originalcapture/capture_launchers_test.go' \
+            'testdata/originalcapture/controls_test.go' \
+            'testdata/originalcapture/launcher_fixture_test.go' \
+            'testdata/originalcapture/legacy_fixture_test.go' | LC_ALL=C sort)"
+          actual_paths=""
+          write_set_exit=1
+          if [[ -n "$head" ]]; then
+            if actual_paths="$(git -C "$GITHUB_WORKSPACE" diff --name-only "$base" "$head" 2>/dev/null | LC_ALL=C sort)"; then
+              write_set_exit=0
+            fi
+          fi
+          write_set_exact=false
+          if [[ "$write_set_exit" -eq 0 && "$actual_paths" == "$expected_paths" ]]; then write_set_exact=true; fi
+          base_is_parent=false
+          [[ "$head_parent" == "$base" ]] && base_is_parent=true
+          lane_verdict=fail
+          if [[ "$CHECKOUT_OUTCOME" == "success" && "$GO_SETUP_OUTCOME" == "success" &&
+                "$SOURCE_OUTCOME" == "success" && "$MODULE_OUTCOME" == "success" &&
+                "$CAPTURE_OUTCOME" == "success" && "$SANITIZER_OUTCOME" == "success" &&
+                "$working_clean" == "true" && "$original_tree_clean" == "true" &&
+                "$write_set_exact" == "true" && "$base_is_parent" == "true" ]]; then
+            lane_verdict=pass
+          fi
+          {
+            printf 'platform=%s\nrunner=%s\nverdict=%s\n' "$RUNNER_OS" "$MATRIX_RUNNER" "$lane_verdict"
+            printf 'workflow_run_id=%s\nworkflow_run_attempt=%s\nworkflow_run_url=https://github.com/%s/actions/runs/%s\n' \
+              "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf 'checkout_outcome=%s\ngo_setup_outcome=%s\n' "$CHECKOUT_OUTCOME" "$GO_SETUP_OUTCOME"
+            printf 'GOOS=%s\nGOARCH=%s\ngo_version=%s\ngo_version_exit=%s\ngoos_exit=%s\ngoarch_exit=%s\n' \
+              "$goos" "$goarch" "$go_version" "$go_exit" "$goos_exit" "$goarch_exit"
+            printf 'git_version=%s\ngit_version_exit=%s\nhead=%s\nparent=%s\n' "$git_version" "$git_exit" "$head" "$head_parent"
+            printf 'head_exit=%s\nparent_exit=%s\nworking_status_exit=%s\nbaseline_diff_exit=%s\nwrite_set_exit=%s\n' \
+              "$head_exit" "$parent_exit" "$working_status_exit" "$baseline_diff_exit" "$write_set_exit"
+            printf 'source_verification_outcome=%s\nsource_verification_exit=%s\n' "$SOURCE_OUTCOME" "$SOURCE_EXIT"
+            printf 'module_command=go mod download\nmodule_outcome=%s\nmodule_exit=%s\n' "$MODULE_OUTCOME" "$MODULE_EXIT"
+            printf 'test_command=go test -p 1 -count=1 -v ./.temp/original-capture/harnessparity\n'
+            printf 'test_outcome=%s\ntest_exit=%s\n' "$CAPTURE_OUTCOME" "$CAPTURE_EXIT"
+            printf 'audit_command=go run <runner-temp>/audit.go <test-log> <output-directory> <test-exit>\naudit_exit=%s\n' "$AUDIT_EXIT"
+            printf 'case_rows_executed=%s\ncase_rows_passed=%s\ncase_rows_failed=%s\ncase_rows_skipped=%s\n' \
+              "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
+            printf 'repeat_seen=%s\nrepeat_passed=%s\ncomparator_rows=%s\ncomparator_passed=%s\n' \
+              "$REPEAT_SEEN" "$REPEAT_PASSED" "$COMPARATOR_SEEN" "$COMPARATOR_PASSED"
+            printf 'comparator_failed=%s\ncomparator_skipped=%s\nroot_tests_passed=%s\n' \
+              "$COMPARATOR_FAILED" "$COMPARATOR_SKIPPED" "$ROOT_TESTS_PASSED"
+            printf 'windows_root_parameter_passed=%s\nall_test_failures=%s\nall_test_skips=%s\noutput_json_files=%s\n' \
+              "$WINDOWS_ROOT_PASSED" "$ALL_TEST_FAILURES" "$ALL_TEST_SKIPS" "$OUTPUT_JSON_FILES"
+            printf 'sanitizer_outcome=%s\nsanitizer_exit=%s\nredacted_fields=%s\nredacted_values=%s\n' \
+              "$SANITIZER_OUTCOME" "$SANITIZER_EXIT" "$REDACTED_FIELDS" "$REDACTED_VALUES"
+            printf 'working_tree_clean=%s\noriginal_tree_clean=%s\nwrite_set_exact=%s\nbase_is_parent=%s\n' \
+              "$working_clean" "$original_tree_clean" "$write_set_exact" "$base_is_parent"
+          } > "$CAPTURE_ROOT/artifact/metadata.txt"
+          {
+            printf '### Lane metadata: %s (%s)\n\n' "$RUNNER_OS" "$MATRIX_RUNNER"
+            printf 'Verdict: **%s**. Rows: %s executed, %s passed, %s failed, %s skipped.\n' \
+              "$lane_verdict" "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$working_clean" != "true" || "$original_tree_clean" != "true" ||
+                "$write_set_exact" != "true" || "$base_is_parent" != "true" ]]; then
+            exit 1
+          fi
+
+      - name: Upload platform artifact
+        if: always() && steps.directories.outcome == 'success' && (steps.sanitize.outcome == 'success' || steps.setup_go.outcome != 'success')
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-capture-${{ matrix.runner }}
+          path: ${{ steps.directories.outputs.artifact_dir }}
+          if-no-files-found: error
+          retention-days: 7
