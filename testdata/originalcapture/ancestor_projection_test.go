@@ -1021,79 +1021,44 @@ func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) 
 	}
 }
 
-func TestNativeCaptureFailureNameSummaryWithholdsNames(t *testing.T) {
+func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 	workflow, err := readBoundNativeCaptureWorkflow()
 	if err != nil {
 		t.Fatalf("read native capture workflow: %v", err)
 	}
-	script, err := nativeCaptureRunScript(workflow)
-	if err != nil {
-		t.Fatalf("extract native capture run script: %v", err)
-	}
-	if err := validateNativeCaptureFailureNameSummary(script); err != nil {
-		t.Fatalf("native capture failure-name summary: %v", err)
-	}
-}
-
-func TestNativeCaptureFailureNameSummaryRejectsBoundaryPlants(t *testing.T) {
-	workflow, err := readBoundNativeCaptureWorkflow()
-	if err != nil {
-		t.Fatalf("read native capture workflow: %v", err)
-	}
-	script, err := nativeCaptureRunScript(workflow)
-	if err != nil {
-		t.Fatalf("extract native capture run script: %v", err)
-	}
-	_, realEnd, err := nativeCaptureFailureNameSummaryRange(script)
-	if err != nil {
-		t.Fatalf("locate native capture failure-name summary: %v", err)
-	}
-
-	plants := []struct {
-		name  string
-		lines []string
+	text := string(workflow)
+	required := []struct {
+		name, fragment string
 	}{
-		{name: "duplicate allowed statement", lines: []string{"failure_name_count=0"}},
-		{name: "unknown reporter command", lines: []string{"unapproved_reporter"}},
-		{name: "quoted here-document marker before real marker", lines: []string{
-			"cat <<'CAPTURE_FAKE_END'",
-			"fi",
-			"exit \"$audit_exit\"",
-			"CAPTURE_FAKE_END",
-			"unapproved_reporter",
-		}},
-		{name: "comment marker before real marker", lines: []string{
-			"# exit \"$audit_exit\"",
-			"unapproved_reporter",
-		}},
+		{"failure events only", `if event.Action == "fail" && event.Test == "" {`},
+		{"name-only serialization", `fmt.Fprintf(&names, "CAPTURE_FAIL Package=%s Test=%s\n", failure.Package, failure.Test)`},
+		{"failing event carries withheld output control", "CAPTURE_PRIVATE_OUTPUT_CONTROL"},
+		{"fixture writes exactly the public name", `string(writtenFailureNames) != "CAPTURE_FAIL Package=public/package Test=TestPublicFailure\n"`},
+		{"name allowlist declaration", `var failureDiagnosticNameLinePattern = regexp.MustCompile(`},
+		{"name allowlist mirrors public alphabet", `^CAPTURE_FAIL Package=[A-Za-z0-9_./-]+ Test=[A-Za-z0-9_./-]*$`},
+		{"package failure may omit Test", `CAPTURE_FAIL Package=public/package Test=\n`},
+		{"long valid Test names are retained", `strings.Repeat("T", 300)`},
+		{"sanitizer accepts only matching name lines", `if failureDiagnosticNameLinePattern.MatchString(line) {`},
+		{"sanitizer positive name control", `CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=TestPublicFailure`},
+		{"malformed name with output is refused", `{"CAPTURE_FAIL Package=public/package Test=TestPublicFailure Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"}`},
+		{"sanitizer receives names file", `"$CAPTURE_ROOT/test-failures.names.txt" "$safe_failure_names"`},
+		{"only sanitized file is printed", `cat "$safe_failure_names"`},
+		{"existing reason allowlist remains", `if _, ok := failureDiagnosticReasonCodes[reason]; ok {`},
+		{"existing refusal fallback remains", `return "Failure detail withheld by the sanitizer."`},
 	}
-	for _, plant := range plants {
-		t.Run(plant.name, func(t *testing.T) {
-			mutated, err := insertNativeCaptureFailureNamePlant(script, plant.lines)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, end, err := nativeCaptureFailureNameSummaryRange(mutated)
-			if err != nil {
-				t.Fatalf("locate real marker after plant: %v", err)
-			}
-			if end != realEnd+len(plant.lines) {
-				t.Fatalf("selected end marker line %d, want real end marker at %d", end, realEnd+len(plant.lines))
-			}
-			if err := validateNativeCaptureFailureNameSummary(mutated); err == nil {
-				t.Fatal("boundary plant was accepted")
-			}
-		})
+	for _, check := range required {
+		if !strings.Contains(text, check.fragment) {
+			t.Errorf("native capture failure-name control %q is missing", check.name)
+		}
 	}
-
-	block, err := nativeCaptureFailureNameSummaryBlock(script)
-	if err != nil {
-		t.Fatalf("extract native capture failure-name summary: %v", err)
-	}
-	hereDocOnlyAttack := append([]string{"cat <<'CAPTURE_ATTACK'"}, block...)
-	hereDocOnlyAttack = append(hereDocOnlyAttack, "fi", "exit \"$audit_exit\"", "CAPTURE_ATTACK", "unapproved_reporter", "fi")
-	if err := validateNativeCaptureFailureNameSummary(strings.Join(hereDocOnlyAttack, "\n")); err == nil {
-		t.Fatal("a complete fake block inside a quoted here-document was accepted without executable markers")
+	for _, forbidden := range []string{
+		`if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then`,
+		`cat "$CAPTURE_ROOT/test-failures.names.txt"`,
+		`cat "$CAPTURE_ROOT/raw-output"`,
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Errorf("native capture workflow bypasses the failure-name sanitizer with %q", forbidden)
+		}
 	}
 }
 
@@ -1143,266 +1108,6 @@ func nativeCaptureRunScript(workflow []byte) (string, error) {
 		lines[i] = line[len("          "):]
 	}
 	return strings.Join(lines, "\n"), nil
-}
-
-const (
-	nativeCaptureFailureNameBlockStart = "if [[ \"$test_exit\" -ne 0 && -f \"$failed_names_file\" ]]; then"
-	nativeCaptureFailureNameBlockEnd   = "exit \"$audit_exit\""
-)
-
-type nativeCaptureHereDoc struct {
-	delimiter string
-	stripTabs bool
-}
-
-func nativeCaptureFailureNameSummaryRange(script string) (int, int, error) {
-	script = strings.ReplaceAll(script, "\r\n", "\n")
-	lines := strings.Split(script, "\n")
-	starts, ends, err := nativeCaptureExecutableMarkers(lines)
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(starts) != 1 {
-		return 0, 0, errors.New("native capture failure-name summary must have exactly one executable start marker")
-	}
-	if len(ends) != 1 {
-		return 0, 0, errors.New("native capture failure-name summary must have exactly one executable end marker")
-	}
-	if starts[0] >= ends[0] {
-		return 0, 0, errors.New("native capture failure-name summary markers are out of order")
-	}
-	if ends[0] == 0 || strings.TrimSpace(lines[ends[0]-1]) != "fi" {
-		return 0, 0, errors.New("native capture failure-name summary enclosing wrapper is missing")
-	}
-	return starts[0], ends[0], nil
-}
-
-func nativeCaptureExecutableMarkers(lines []string) ([]int, []int, error) {
-	var starts, ends []int
-	var pending, active []nativeCaptureHereDoc
-	var quote byte
-	continued := false
-	for lineNumber, line := range lines {
-		line = strings.TrimSuffix(line, "\r")
-		if len(active) != 0 {
-			delimiterLine := line
-			if active[0].stripTabs {
-				delimiterLine = strings.TrimLeft(delimiterLine, "\t")
-			}
-			if delimiterLine == active[0].delimiter {
-				active = active[1:]
-			}
-			continue
-		}
-
-		if quote == 0 && !continued && len(pending) == 0 {
-			switch strings.TrimSpace(line) {
-			case nativeCaptureFailureNameBlockStart:
-				starts = append(starts, lineNumber)
-			case nativeCaptureFailureNameBlockEnd:
-				ends = append(ends, lineNumber)
-			}
-		}
-
-		hereDocs, nextQuote, lineContinued, err := nativeCaptureShellLine(line, quote)
-		if err != nil {
-			return nil, nil, err
-		}
-		quote = nextQuote
-		pending = append(pending, hereDocs...)
-		continued = lineContinued
-		if !continued && len(pending) != 0 {
-			active = pending
-			pending = nil
-		}
-	}
-	if len(active) != 0 || len(pending) != 0 {
-		return nil, nil, errors.New("native capture run script has an unterminated here-document")
-	}
-	if quote != 0 || continued {
-		return nil, nil, errors.New("native capture run script has an unterminated shell quote or continuation")
-	}
-	return starts, ends, nil
-}
-
-func nativeCaptureShellLine(line string, quote byte) ([]nativeCaptureHereDoc, byte, bool, error) {
-	var hereDocs []nativeCaptureHereDoc
-	continued := false
-	for i := 0; i < len(line); i++ {
-		ch := line[i]
-		if quote == '\'' {
-			if ch == '\'' {
-				quote = 0
-			}
-			continue
-		}
-		if quote == '"' {
-			if ch == '\\' {
-				if i+1 == len(line) {
-					continued = true
-					break
-				}
-				i++
-				continue
-			}
-			if ch == '"' {
-				quote = 0
-			}
-			continue
-		}
-		switch {
-		case ch == '\\':
-			if i+1 == len(line) {
-				continued = true
-				break
-			}
-			i++
-		case ch == '\'' || ch == '"':
-			quote = ch
-		case ch == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t' || strings.ContainsRune(";&|()", rune(line[i-1]))):
-			return hereDocs, quote, continued, nil
-		case ch == '<' && i+1 < len(line) && line[i+1] == '<' && (i+2 == len(line) || line[i+2] != '<'):
-			hereDoc, next, err := nativeCaptureParseHereDoc(line, i+2)
-			if err != nil {
-				return nil, quote, false, err
-			}
-			hereDocs = append(hereDocs, hereDoc)
-			i = next - 1
-		case ch == '<' && i+2 < len(line) && line[i+1] == '<' && line[i+2] == '<':
-			i += 2
-		}
-	}
-	return hereDocs, quote, continued, nil
-}
-
-func nativeCaptureParseHereDoc(line string, index int) (nativeCaptureHereDoc, int, error) {
-	hereDoc := nativeCaptureHereDoc{}
-	if index < len(line) && line[index] == '-' {
-		hereDoc.stripTabs = true
-		index++
-	}
-	for index < len(line) && (line[index] == ' ' || line[index] == '\t') {
-		index++
-	}
-	var delimiter strings.Builder
-	var quote byte
-	for index < len(line) {
-		ch := line[index]
-		if quote == '\'' {
-			if ch == '\'' {
-				quote = 0
-			} else {
-				delimiter.WriteByte(ch)
-			}
-			index++
-			continue
-		}
-		if quote == '"' {
-			switch ch {
-			case '"':
-				quote = 0
-				index++
-			case '\\':
-				if index+1 == len(line) {
-					return nativeCaptureHereDoc{}, 0, errors.New("native capture run script has an invalid here-document delimiter")
-				}
-				delimiter.WriteByte(line[index+1])
-				index += 2
-			default:
-				delimiter.WriteByte(ch)
-				index++
-			}
-			continue
-		}
-		switch {
-		case ch == '\'' || ch == '"':
-			quote = ch
-			index++
-		case ch == '\\':
-			if index+1 == len(line) {
-				return nativeCaptureHereDoc{}, 0, errors.New("native capture run script has an invalid here-document delimiter")
-			}
-			delimiter.WriteByte(line[index+1])
-			index += 2
-		case ch == ' ' || ch == '\t' || strings.ContainsRune(";|&<>()", rune(ch)):
-			if delimiter.Len() == 0 {
-				return nativeCaptureHereDoc{}, 0, errors.New("native capture run script has an empty here-document delimiter")
-			}
-			hereDoc.delimiter = delimiter.String()
-			return hereDoc, index, nil
-		default:
-			delimiter.WriteByte(ch)
-			index++
-		}
-	}
-	if quote != 0 || delimiter.Len() == 0 {
-		return nativeCaptureHereDoc{}, 0, errors.New("native capture run script has an invalid here-document delimiter")
-	}
-	hereDoc.delimiter = delimiter.String()
-	return hereDoc, index, nil
-}
-
-func nativeCaptureFailureNameSummaryBlock(script string) ([]string, error) {
-	lines := strings.Split(strings.ReplaceAll(script, "\r\n", "\n"), "\n")
-	start, end, err := nativeCaptureFailureNameSummaryRange(script)
-	if err != nil {
-		return nil, err
-	}
-	return lines[start : end-1], nil
-}
-
-func validateNativeCaptureFailureNameSummary(script string) error {
-	block, err := nativeCaptureFailureNameSummaryBlock(script)
-	if err != nil {
-		return err
-	}
-	allowed := map[string]int{
-		nativeCaptureFailureNameBlockStart:                                         1,
-		"# Names and sanitized details are each capped at 200 lines per platform.": 1,
-		"failure_name_count=0":                                                     1,
-		"failure_names_truncated=false":                                            1,
-		"while IFS= read -r line; do":                                              1,
-		"if [[ \"$line\" =~ ^CAPTURE_FAIL\\ Package=([A-Za-z0-9_./-]+)\\ Test=([A-Za-z0-9_./-]*)$ ]]; then": 1,
-		"if [[ \"$failure_name_count\" -ge 199 ]]; then":                                                    1,
-		"failure_names_truncated=true":                                                                      1,
-		"break":                                                                                             1,
-		"printf '%s\\n' 'CAPTURE_FAIL Failure detail withheld by the sanitizer.' >&2":                       1,
-		"failure_name_count=$((failure_name_count + 1))":                                                    1,
-		"fi":                            4,
-		"done < \"$failed_names_file\"": 1,
-		"if [[ \"$failure_names_truncated\" == \"true\" ]]; then":                                         1,
-		"printf '%s\\n' 'CAPTURE_FAIL [remaining failing test names withheld at the 200-line limit]' >&2": 1,
-	}
-	for _, line := range block {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		if _, ok := allowed[trimmed]; !ok {
-			return errors.New("failure-name summary has an unapproved shell statement")
-		}
-		allowed[trimmed]--
-	}
-	for _, remaining := range allowed {
-		if remaining != 0 {
-			return errors.New("failure-name summary statement is missing or duplicated")
-		}
-	}
-	return nil
-}
-
-func insertNativeCaptureFailureNamePlant(script string, plant []string) (string, error) {
-	lines := strings.Split(strings.ReplaceAll(script, "\r\n", "\n"), "\n")
-	_, end, err := nativeCaptureFailureNameSummaryRange(script)
-	if err != nil {
-		return "", err
-	}
-	insertAt := end - 1
-	mutated := make([]string, 0, len(lines)+len(plant))
-	mutated = append(mutated, lines[:insertAt]...)
-	mutated = append(mutated, plant...)
-	mutated = append(mutated, lines[insertAt:]...)
-	return strings.Join(mutated, "\n"), nil
 }
 
 func TestNativeCaptureUploadConditionAcceptsLFAndCRLF(t *testing.T) {

@@ -99,7 +99,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          50ae7d2423927e963948d8f51d76bd0bc875dfa866bc336394815492c87b13cd ancestor_projection_test.go
+          f1a440631febbdbc0df88b568f42abe4b75674dd0c87b000975a0730b7024fb7 ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -412,6 +412,22 @@ jobs:
             _, failures, err := parseLog(strings.NewReader(failing + "\n"))
             if err != nil || len(failures) != 1 || failures[0].Package != "public/package" ||
                 failures[0].Test != "TestPublicFailure" || strings.Contains(fmt.Sprint(failures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+            }
+            failureNamesFile, err := os.CreateTemp("", "capture-failure-names-selfcheck-")
+            if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names") }
+            failureNamesPath := failureNamesFile.Name()
+            if err := failureNamesFile.Close(); err != nil {
+              os.Remove(failureNamesPath)
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+            }
+            defer os.Remove(failureNamesPath)
+            if err := writeFailureNames(failureNamesPath, failures); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+            }
+            writtenFailureNames, err := os.ReadFile(failureNamesPath)
+            if err != nil || string(writtenFailureNames) != "CAPTURE_FAIL Package=public/package Test=TestPublicFailure\n" ||
+                strings.Contains(string(writtenFailureNames), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
             }
             detailFailure := failureName{Package: "public/package", Test: "TestPublicFailure"}
@@ -1089,24 +1105,6 @@ jobs:
                 printf 'CAPTURE_COUNT %s\n' "$line" >&2
               done
             fi
-            if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then
-              # Names and sanitized details are each capped at 200 lines per platform.
-              failure_name_count=0
-              failure_names_truncated=false
-              while IFS= read -r line; do
-                if [[ "$line" =~ ^CAPTURE_FAIL\ Package=([A-Za-z0-9_./-]+)\ Test=([A-Za-z0-9_./-]*)$ ]]; then
-                  if [[ "$failure_name_count" -ge 199 ]]; then
-                    failure_names_truncated=true
-                    break
-                  fi
-                  printf '%s\n' 'CAPTURE_FAIL Failure detail withheld by the sanitizer.' >&2
-                  failure_name_count=$((failure_name_count + 1))
-                fi
-              done < "$failed_names_file"
-              if [[ "$failure_names_truncated" == "true" ]]; then
-                printf '%s\n' 'CAPTURE_FAIL [remaining failing test names withheld at the 200-line limit]' >&2
-              fi
-            fi
           fi
           exit "$audit_exit"
 
@@ -1160,7 +1158,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "50ae7d2423927e963948d8f51d76bd0bc875dfa866bc336394815492c87b13cd"},
+            {"ancestor_projection_test.go", "f1a440631febbdbc0df88b568f42abe4b75674dd0c87b000975a0730b7024fb7"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -2033,7 +2031,8 @@ jobs:
           }
 
 
-          // Source-derived exact reason codes. Package, test and source names stay withheld.
+          // Source-derived reason codes. Only exact failure-name records are separately allowlisted;
+          // failure output and source paths remain withheld.
           var failureDiagnosticReasonCodes = map[string]struct{}{
               "capture-driver/native-parent-environment-not-isolated": {},
               "capture/audit-child-output-read": {},
@@ -2097,10 +2096,15 @@ jobs:
               "sanitize/tool-command-failed": {},
           }
 
+          var failureDiagnosticNameLinePattern = regexp.MustCompile(`^CAPTURE_FAIL Package=[A-Za-z0-9_./-]+ Test=[A-Za-z0-9_./-]*$`)
+
           func allowFailureDiagnosticLine(line string) string {
               line = strings.TrimSpace(escapeFailureDiagnosticControls(line))
               reason := strings.TrimPrefix(line, "CAPTURE_REASON=")
               if _, ok := failureDiagnosticReasonCodes[reason]; ok {
+                  return line
+              }
+              if failureDiagnosticNameLinePattern.MatchString(line) {
                   return line
               }
               if line == "PASS" || line == "FAIL" {
@@ -2163,7 +2167,9 @@ jobs:
           }
 
           func checkFailureDiagnosticControls(caseDir string) error {
-              safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\n")
+              safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\nCAPTURE_FAIL Package=public/package Test=TestPublicFailure\nCAPTURE_FAIL Package=public/package Test=\n")
+              longTestName := strings.Repeat("T", 300)
+              safe = append(safe, []byte("CAPTURE_FAIL Package=public/package Test="+longTestName+"\n")...)
               rendered := string(failureDiagnosticLog(caseDir, safe))
               for _, visible := range []string{
                   "CAPTURE_DETAIL CAPTURE_REASON=capture/go-test-failed",
@@ -2171,6 +2177,9 @@ jobs:
                   "CAPTURE_DETAIL sanitize/input-repeat-set-invalid",
                   "CAPTURE_DETAIL PASS",
                   "CAPTURE_DETAIL FAIL",
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=TestPublicFailure",
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=",
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=" + longTestName,
               } {
                   if !strings.Contains(rendered, visible) {
                       return operational("selfcheck-failure-diagnostic-positive")
@@ -2192,7 +2201,7 @@ jobs:
               for _, control := range []struct{ line, value string }{
                   {"CAPTURE_REASON=capture/theme-dark", "theme-dark"},
                   {"CAPTURE_DETAIL Package=example/pkg Test=TestSettings/theme-dark", "theme-dark"},
-                  {"CAPTURE_FAIL Package=example/pkg Test=TestSettings/theme-dark", "theme-dark"},
+                  {"CAPTURE_FAIL Package=public/package Test=TestPublicFailure Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"},
                   {"=== RUN TestSettings/theme-dark", "theme-dark"},
                   {"--- FAIL: TestSettings/theme-dark (0.00s)", "theme-dark"},
                   {"theme-dark.go:17: setting=theme-dark", "theme-dark"},
@@ -4033,18 +4042,18 @@ jobs:
             printf 'export_seal=%s\nexport_seal_sha256=%s\n' "$export_seal" "$export_seal_sha256" >> "$GITHUB_OUTPUT"
           fi
           if [[ "$CAPTURE_OUTCOME" == "failure" ]]; then
-            safe_failure_diagnostics="$CAPTURE_ROOT/failure-diagnostics.log-safe.txt"
-            if [[ -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            safe_failure_names="$CAPTURE_ROOT/failure-names.log-safe.txt"
+            if [[ -s "$CAPTURE_ROOT/test-failures.names.txt" && -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
               "$sanitizer_binary" --failure-diagnostics "$CAPTURE_ROOT/raw-output" \
-              "$CAPTURE_ROOT/failure-details.txt" "$safe_failure_diagnostics" \
-              > "$CAPTURE_ROOT/failure-diagnostics.stdout" 2> "$CAPTURE_ROOT/failure-diagnostics.stderr"; then
-              if [[ -f "$safe_failure_diagnostics" ]]; then
-                cat "$safe_failure_diagnostics"
+              "$CAPTURE_ROOT/test-failures.names.txt" "$safe_failure_names" \
+              > "$CAPTURE_ROOT/failure-names.stdout" 2> "$CAPTURE_ROOT/failure-names.stderr"; then
+              if [[ -f "$safe_failure_names" ]]; then
+                cat "$safe_failure_names"
               else
-                printf '%s\n' 'CAPTURE_DETAIL Failure detail withheld; no safe diagnostic was produced.'
+                printf '%s\n' 'CAPTURE_DETAIL Failure names withheld; sanitizer produced no safe diagnostic.'
               fi
             else
-              printf '%s\n' 'CAPTURE_DETAIL Failure detail withheld; sanitizer did not produce a safe diagnostic.'
+              printf '%s\n' 'CAPTURE_DETAIL Failure names withheld; sanitizer did not produce a safe diagnostic.'
             fi
           fi
           exit "$sanitize_exit"
