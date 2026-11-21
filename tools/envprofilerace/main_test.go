@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/ciartifact"
 	"gopkg.in/yaml.v3"
 )
 
@@ -92,6 +94,50 @@ func TestStreamControls(t *testing.T) {
 				t.Fatalf("got %v, want %s", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestSanitizedArtifactIsAdmittedByRaceGate(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	destination := filepath.Join(root, "sanitized")
+	if err := os.Mkdir(source, 0755); err != nil {
+		t.Fatal("create source:", err)
+	}
+	const parent = "TestSanitizedArtifactAdmission"
+	var stream strings.Builder
+	for _, testName := range []string{
+		parent,
+		parent + "/worker.internal.invalid",
+		parent + "/child-/home/fixture/private",
+	} {
+		fmt.Fprintf(&stream, "{\"Action\":\"run\",\"Package\":%q,\"Test\":%q}\n", pkg, testName)
+	}
+	for _, testName := range []string{
+		parent + "/worker.internal.invalid",
+		parent + "/child-/home/fixture/private",
+		parent,
+	} {
+		fmt.Fprintf(&stream, "{\"Action\":\"pass\",\"Package\":%q,\"Test\":%q}\n", pkg, testName)
+	}
+	fmt.Fprintf(&stream, "{\"Action\":\"pass\",\"Package\":%q,\"Elapsed\":0.25}\n", pkg)
+	if err := os.WriteFile(filepath.Join(source, "go-test.json"), []byte(stream.String()), 0600); err != nil {
+		t.Fatal("write source evidence:", err)
+	}
+	if _, err := ciartifact.SanitizeTree(source, destination); err != nil {
+		t.Fatal("sanitize real-shaped artifact:", err)
+	}
+	clean, err := os.ReadFile(filepath.Join(destination, "go-test.json"))
+	if err != nil {
+		t.Fatal("read sanitized evidence:", err)
+	}
+	for _, forbidden := range []string{"worker.internal.invalid", "/home/fixture/private"} {
+		if bytes.Contains(clean, []byte(forbidden)) {
+			t.Fatalf("sanitized evidence retained a forbidden test value")
+		}
+	}
+	if _, err := validatePackageStream(clean, []string{parent}, pkg, 30); err != nil {
+		t.Fatalf("race gate rejected sanitized artifact: %v", err)
 	}
 }
 

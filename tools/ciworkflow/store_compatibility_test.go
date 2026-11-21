@@ -23,17 +23,20 @@ func checkStoreCompatibilityWiring(data []byte) error {
 	if !ok {
 		return fmt.Errorf("missing compatibility producer")
 	}
-	replay, upload := 0, 0
-	for _, s := range producer.Steps {
+	replay, sanitize, upload := 0, 0, 0
+	for i, s := range producer.Steps {
 		if strings.Contains(s.Run, "-run '^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive'") && strings.Contains(s.Run, "go test -json -count=1") && strings.Contains(s.Run, `test "$replay_rc" = 1`) && strings.Contains(s.Run, `go run ./tools/check-store-compatibility -dir "$evidence" -commit "$GITHUB_SHA"`) && strings.Contains(s.Run, "go test -count=1 ./internal/storecompatibility") && s.Env["CURATOR_CONFORMANCE_ROOT"] == "${{ github.workspace }}/protocol-spec/conformance/v1" {
 			replay++
 		}
-		if s.Uses == "actions/upload-artifact@v4" && s.With["name"] == "store-v1-compatibility" && s.With["if-no-files-found"] == "error" {
+		if s.If == "always()" && s.Shell == "bash" && strings.Contains(s.Run, "go run ./tools/sanitize-ci-evidence -source .temp/store-v1-compatibility -destination .temp/public-artifacts-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-store") {
+			sanitize = i + 1
+		}
+		if s.Uses == "actions/upload-artifact@v4" && s.With["name"] == "store-v1-compatibility" && s.With["path"] == ".temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-store/" && s.With["if-no-files-found"] == "error" && sanitize > 0 && sanitize-1 < i {
 			upload++
 		}
 	}
 	if replay != 1 || upload != 1 {
-		return fmt.Errorf("compatibility producer must replay and check exact IDs before upload")
+		return fmt.Errorf("compatibility producer must check replay before sanitized upload")
 	}
 	for _, name := range []string{"test", "race", "windows-test-shards", "unix-test-shards", "envprofile-race"} {
 		job := wf.Jobs[name]
@@ -77,7 +80,7 @@ func TestStoreCompatibilityWiring(t *testing.T) {
 		"wrong-family":       {`-run '^TestStoreBoundary(Resolve|DryRun|Repair|Status)VectorsDrive'`, `-run '^TestUnrelated'`},
 		"missing-dependency": {"needs: [store-v1-compatibility]", "needs: [unrelated]"},
 		"missing-proof":      {"CI_STORE_COMPATIBILITY: ${{ github.workspace }}/.temp/store-v1-compatibility", "CI_OTHER_COMPATIBILITY: unused"},
-		"wrong-artifact":     {"name: store-v1-compatibility\n          path: .temp/store-v1-compatibility", "name: unrelated\n          path: .temp/store-v1-compatibility"},
+		"wrong-artifact":     {"name: store-v1-compatibility\n          path: .temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-store/", "name: unrelated\n          path: .temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-store/"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			planted := strings.Replace(string(good), pair[0], pair[1], 1)

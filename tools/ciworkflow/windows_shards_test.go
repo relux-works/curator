@@ -63,7 +63,7 @@ func checkWindowsShards(data []byte) error {
 			if strings.Contains(s.Run, "go run ./tools/envprofilerace -lane windows-test -shard ${{ matrix.shard }}") && strings.Contains(s.Run, "-u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS") && strings.Contains(s.Run, "HOME=\"$(mktemp -d)\"") && s.If == "" && s.Env["CURATOR_CONFORMANCE_ROOT"] == "${{ github.workspace }}/protocol-spec/conformance/v1" {
 				run++
 			}
-			if s.Uses == "actions/upload-artifact@v4" && s.If == "always()" && s.With["name"] == "windows-test-shard-${{ matrix.shard }}" && s.With["path"] == ".temp/ci-evidence/windows-shard/" && s.With["if-no-files-found"] == "error" {
+			if s.Uses == "actions/upload-artifact@v4" && s.If == "always()" && s.With["name"] == "windows-test-shard-${{ matrix.shard }}" && s.With["path"] == ".temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-windows-${{ matrix.shard }}/" && s.With["if-no-files-found"] == "error" {
 				upload++
 			}
 			if s.With["repository"] == "relux-works/curator-spec" && s.With["ref"] == "${{ env.SPEC_PIN }}" {
@@ -94,14 +94,14 @@ func TestWindowsShardsWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pair := range map[string][2]string{
-		"lost-shard":         {"shard: [0, 1, 2, 3]", "shard: [0, 1, 2]"},
-		"success-only":       {"  test:\n    if: ${{ !cancelled() }}", "  test:\n    if: success()"},
+		"lost-shard":             {"shard: [0, 1, 2, 3]", "shard: [0, 1, 2]"},
+		"success-only":           {"  test:\n    if: ${{ !cancelled() }}", "  test:\n    if: success()"},
 		"wrong-dependency":       {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [envprofile-race, unix-test-shards]"},
 		"added-pr-deferred-gate": {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [windows-test-shards, unix-test-shards, store-v1-compatibility, curator-mutation-pr]"},
-		"lost-admission":     {"CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards", "CI_OTHER: .temp/windows-test-shards"},
-		"lost-upload":        {"name: windows-test-shard-${{ matrix.shard }}", "name: windows-test-shard-0"},
-		"lost-selector":      {"-lane windows-test -shard ${{ matrix.shard }}", "-lane windows-test -shard 0"},
-		"only-main":          {"  windows-test-shards:\n", "  windows-test-shards:\n    if: github.event_name == 'push'\n"},
+		"lost-admission":         {"CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards", "CI_OTHER: .temp/windows-test-shards"},
+		"lost-upload":            {"name: windows-test-shard-${{ matrix.shard }}", "name: windows-test-shard-0"},
+		"lost-selector":          {"-lane windows-test -shard ${{ matrix.shard }}", "-lane windows-test -shard 0"},
+		"only-main":              {"  windows-test-shards:\n", "  windows-test-shards:\n    if: github.event_name == 'push'\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := strings.Replace(string(good), pair[0], pair[1], 1)

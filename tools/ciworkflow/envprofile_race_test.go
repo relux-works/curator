@@ -44,7 +44,7 @@ func checkEnvprofileRace(data []byte) error {
 		if s.If == "" && s.Run == "env -u GIT_DIR -u GIT_WORK_TREE -u SSH_AUTH_SOCK -u GOFLAGS -u CODEX_HOME -u CLAUDE_CONFIG_DIR -u PI_CODING_AGENT_DIR -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME HOME=\"$(mktemp -d)\" go run ./tools/envprofilerace -shard ${{ matrix.shard }} -dir .temp/ci-evidence/envprofile" && s.Env["CURATOR_CONFORMANCE_ROOT"] == "${{ github.workspace }}/protocol-spec/conformance/v1" {
 			run++
 		}
-		if s.Uses == "actions/upload-artifact@v4" && s.If == "always()" && s.With["name"] == "envprofile-race-${{ matrix.os }}-${{ matrix.shard }}" && s.With["path"] == ".temp/ci-evidence/envprofile/" && s.With["if-no-files-found"] == "error" {
+		if s.Uses == "actions/upload-artifact@v4" && s.If == "always()" && s.With["name"] == "envprofile-race-${{ matrix.os }}-${{ matrix.shard }}" && s.With["path"] == ".temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-envprofile-${{ matrix.os }}-${{ matrix.shard }}/" && s.With["if-no-files-found"] == "error" {
 			upload++
 		}
 	}

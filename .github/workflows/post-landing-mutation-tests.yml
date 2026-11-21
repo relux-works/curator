@@ -45,9 +45,13 @@ jobs:
           bash .github/ci/isolated-test.sh go test -race -count=1 -timeout=60m -v \
             -run "$selector" ./cmd/curator \
             2>&1 | tee .temp/ci-evidence/post-landing-mutation/go-test.txt
+      - name: Sanitize uploaded evidence
+        if: always()
+        shell: bash
+        run: go run ./tools/sanitize-ci-evidence -source .temp/ci-evidence/post-landing-mutation -destination .temp/public-artifacts-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-post-landing
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: post-landing-mutation-evidence
-          path: .temp/ci-evidence/post-landing-mutation/
+          path: .temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-post-landing/
           if-no-files-found: warn

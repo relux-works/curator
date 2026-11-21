@@ -60,7 +60,7 @@ func checkUnixShards(data []byte) error {
 		if strings.Contains(s.Run, "go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }} -dir .temp/ci-evidence/unix-shard") && s.If == "" && checkAbsoluteTestHome(s.Run) && s.Env["CURATOR_CONFORMANCE_ROOT"] == "${{ github.workspace }}/protocol-spec/conformance/v1" {
 			run++
 		}
-		if s.Uses == "actions/upload-artifact@v4" && s.If == "always()" && s.With["name"] == "unix-test-shard-${{ matrix.os }}-${{ matrix.shard }}" && s.With["path"] == ".temp/ci-evidence/unix-shard/" && s.With["if-no-files-found"] == "error" {
+		if s.Uses == "actions/upload-artifact@v4" && s.If == "always()" && s.With["name"] == "unix-test-shard-${{ matrix.os }}-${{ matrix.shard }}" && s.With["path"] == ".temp/public-artifacts-${{ github.run_id }}-${{ github.run_attempt }}-unix-${{ matrix.os }}-${{ matrix.shard }}/" && s.With["if-no-files-found"] == "error" {
 			upload++
 		}
 		if s.With["repository"] == "relux-works/curator-spec" && s.With["ref"] == "${{ env.SPEC_PIN }}" {
