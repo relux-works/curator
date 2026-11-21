@@ -99,7 +99,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          a204244c2c45611108d73798df62da640c540cb882ce62887a8f67657bc66b20 ancestor_projection_test.go
+          1a7111b5e1f2c7f519ba8ba290c290d44d80260e453aeeff85cc23c73bc40b3f ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -276,9 +276,9 @@ jobs:
             Test string
           }
 
-          const maxFailureDetails = 4
+          const maxFailureDetails = 200
           const maxFailureDetailBytes = 1024
-          const maxFailureDetailsBytes = 8192
+          const maxFailureDetailsBytes = 64 * 1024
           const maxFailureAssertionBytes = 432
           const maxNativeParentStreamBytes = 512
           const maxNativeParentDetailStreamBytes = 240
@@ -428,15 +428,15 @@ jobs:
             if len(details[0].Output) > 1024 {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-bound")
             }
-            excessFailures := []failureName{
-              {Package: "public/package", Test: "TestFailure1"},
-              {Package: "public/package", Test: "TestFailure2"},
-              {Package: "public/package", Test: "TestFailure3"},
-              {Package: "public/package", Test: "TestFailure4"},
-              {Package: "public/package", Test: "TestFailure5"},
+            excessFailures := make([]failureName, maxFailureDetails+1)
+            for index := range excessFailures {
+              excessFailures[index] = failureName{
+                Package: "public/package",
+                Test: fmt.Sprintf("TestFailure%d", index+1),
+              }
             }
             capped, err := collectFailureDetails(strings.NewReader(""), excessFailures)
-            if err != nil || len(capped) != 4 {
+            if err != nil || len(capped) != maxFailureDetails {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-count")
             }
             longOutput := strings.Repeat("X", maxFailureDetailBytes+100)
@@ -460,7 +460,7 @@ jobs:
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
             }
             written, err := os.ReadFile(detailPath)
-            if err != nil || len(written) > 8192 || len(written) > maxFailureDetailsBytes ||
+            if err != nil || len(written) > maxFailureDetailsBytes ||
                 !strings.Contains(string(written), "SAFE_FAILURE_DETAIL_CONTROL") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
             }
@@ -468,7 +468,7 @@ jobs:
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail")
             }
             truncatedWritten, err := os.ReadFile(detailPath)
-            if err != nil || len(truncatedWritten) > 8192 ||
+            if err != nil || len(truncatedWritten) > maxFailureDetailsBytes ||
                 !strings.Contains(string(truncatedWritten), "Failure detail truncated by the capture limit.") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-bound")
             }
@@ -1088,11 +1088,22 @@ jobs:
               done
             fi
             if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then
+              # Names and sanitized details are each capped at 200 lines per platform.
+              failure_name_count=0
+              failure_names_truncated=false
               while IFS= read -r line; do
                 if [[ "$line" =~ ^CAPTURE_FAIL\ Package=([A-Za-z0-9_./-]+)\ Test=([A-Za-z0-9_./-]*)$ ]]; then
+                  if [[ "$failure_name_count" -ge 199 ]]; then
+                    failure_names_truncated=true
+                    break
+                  fi
                   printf 'CAPTURE_FAIL Package=%s Test=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" >&2
+                  failure_name_count=$((failure_name_count + 1))
                 fi
               done < "$failed_names_file"
+              if [[ "$failure_names_truncated" == "true" ]]; then
+                printf '%s\n' 'CAPTURE_FAIL [remaining failing test names withheld at the 200-line limit]' >&2
+              fi
             fi
           fi
           exit "$audit_exit"
@@ -1147,7 +1158,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "a204244c2c45611108d73798df62da640c540cb882ce62887a8f67657bc66b20"},
+            {"ancestor_projection_test.go", "1a7111b5e1f2c7f519ba8ba290c290d44d80260e453aeeff85cc23c73bc40b3f"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -1592,6 +1603,7 @@ jobs:
               "runtime"
               "sort"
               "strings"
+              "unicode"
 
               "github.com/relux-works/curator/internal/envmarker"
           )
@@ -1628,6 +1640,9 @@ jobs:
           }
 
           var assignmentPattern = regexp.MustCompile("(?i)[A-Za-z0-9_.-]*(?:secret|token|password|passwd|credential|authorization|api[_-]?key|access[_-]?key|refresh[_-]?token|private[_-]?key)[A-Za-z0-9_.-]*\\s*[:=]\\s*[^,;\\n}]+")
+
+          const maxFailureDiagnosticInputBytes = 64 * 1024
+          const maxFailureDiagnosticLogLines = 200
 
           func sensitiveName(name string) bool {
               lower := strings.ToLower(name)
@@ -2013,6 +2028,112 @@ jobs:
 
           func scanLog(data []byte, roots []string) error {
               return scanStructuredText(data, roots, 0)
+          }
+
+          func failureDiagnosticLog(caseDir string, detail []byte) []byte {
+              if len(detail) == 0 || len(detail) > maxFailureDiagnosticInputBytes ||
+                  scanLog(detail, fixtureRootForms(caseDir)) != nil {
+                  detail = []byte("Failure detail withheld by the sanitizer.\n")
+              }
+              lines := strings.Split(strings.TrimSuffix(string(detail), "\n"), "\n")
+              var report strings.Builder
+              for index, line := range lines {
+                  if index == maxFailureDiagnosticLogLines-1 {
+                      report.WriteString("CAPTURE_DETAIL [remaining failure output withheld at the 200-line limit]\n")
+                      break
+                  }
+                  report.WriteString("CAPTURE_DETAIL ")
+                  report.WriteString(escapeFailureDiagnosticControls(line))
+                  report.WriteByte('\n')
+              }
+              return []byte(report.String())
+          }
+
+          func escapeFailureDiagnosticControls(value string) string {
+              var escaped strings.Builder
+              for _, character := range value {
+                  if unicode.IsControl(character) || character == 0x2028 || character == 0x2029 {
+                      escaped.WriteRune(' ')
+                  } else {
+                      escaped.WriteRune(character)
+                  }
+              }
+              return escaped.String()
+          }
+
+          func writeFailureDiagnostic(caseDir, detailPath, outputPath string) error {
+              detail := []byte("No failing subtest output was captured.\n")
+              if file, err := readRegular(detailPath, "input-log-read-failed"); err == nil {
+                  detail = file.data
+              }
+              report := failureDiagnosticLog(caseDir, detail)
+              output, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+              if err != nil {
+                  return operational("failure-diagnostic-write")
+              }
+              if _, err := output.Write(report); err != nil {
+                  output.Close()
+                  os.Remove(outputPath)
+                  return operational("failure-diagnostic-write")
+              }
+              if err := output.Close(); err != nil {
+                  os.Remove(outputPath)
+                  return operational("failure-diagnostic-write")
+              }
+              return nil
+          }
+
+          func checkFailureDiagnosticControls(caseDir string) error {
+              safe := []byte("CAPTURE_DETAIL Package=public/package Test=TestPublicFailure\nSAFE_FAILURE_DETAIL_CONTROL\n")
+              rendered := string(failureDiagnosticLog(caseDir, safe))
+              if !strings.Contains(rendered, "SAFE_FAILURE_DETAIL_CONTROL") ||
+                  !strings.Contains(rendered, "CAPTURE_DETAIL Package=public/package Test=TestPublicFailure") {
+                  return operational("selfcheck-failure-diagnostic-positive")
+              }
+              diagnosticDir := filepath.Dir(caseDir)
+              if err := os.MkdirAll(diagnosticDir, 0700); err != nil {
+                  return operational("selfcheck-failure-diagnostic-setup")
+              }
+              detailPath := filepath.Join(diagnosticDir, "failure-details.txt")
+              outputPath := filepath.Join(diagnosticDir, "failure-details.log-safe.txt")
+              if err := os.WriteFile(detailPath, safe, 0600); err != nil {
+                  return operational("selfcheck-failure-diagnostic-setup")
+              }
+              if err := writeFailureDiagnostic(caseDir, detailPath, outputPath); err != nil {
+                  return operational("selfcheck-failure-diagnostic-write")
+              }
+              written, err := readRegular(outputPath, "input-log-read-failed")
+              if err != nil || !bytes.Equal(written.data, failureDiagnosticLog(caseDir, safe)) {
+                  return operational("selfcheck-failure-diagnostic-write")
+              }
+              if err := writeFailureDiagnostic(caseDir, detailPath, outputPath); err == nil {
+                  return operational("selfcheck-failure-diagnostic-overwrite")
+              }
+              afterRejectedOverwrite, err := readRegular(outputPath, "input-log-read-failed")
+              if err != nil || !bytes.Equal(afterRejectedOverwrite.data, written.data) {
+                  return operational("selfcheck-failure-diagnostic-overwrite")
+              }
+              for _, unsafe := range []string{"/Users/example/private/state", "credential_token=neutral-value"} {
+                  withheld := string(failureDiagnosticLog(caseDir, []byte(unsafe+"\n")))
+                  if strings.Contains(withheld, unsafe) || !strings.Contains(withheld, "withheld by the sanitizer") {
+                      return operational("selfcheck-failure-diagnostic-redaction")
+                  }
+              }
+              long := strings.Repeat("safe failure line\n", maxFailureDiagnosticLogLines+20)
+              bounded := string(failureDiagnosticLog(caseDir, []byte(long)))
+              if strings.Count(bounded, "\n") > maxFailureDiagnosticLogLines ||
+                  !strings.Contains(bounded, "remaining failure output withheld") {
+                  return operational("selfcheck-failure-diagnostic-bound")
+              }
+              controls := append([]byte("::error::neutral"), byte(27))
+              controls = append(controls, []byte("[31m")...)
+              controls = append(controls, 0xe2, 0x80, 0xa8, '\n')
+              escaped := string(failureDiagnosticLog(caseDir, controls))
+              if strings.Contains(escaped, string(rune(27))) || strings.ContainsRune(escaped, rune(0x2028)) ||
+                  !strings.HasPrefix(escaped, "CAPTURE_DETAIL ::error::neutral") {
+                  return operational("selfcheck-failure-diagnostic-controls")
+              }
+              return nil
           }
 
           func scanStructuredText(data []byte, roots []string, depth int) error {
@@ -2469,6 +2590,13 @@ jobs:
                       os.Exit(2)
                   }
                   fmt.Fprintln(os.Stdout, "path_exception_controls=PASS")
+                  return
+              }
+              if len(os.Args) == 5 && os.Args[1] == "--failure-diagnostics" {
+                  if err := writeFailureDiagnostic(os.Args[2], os.Args[3], os.Args[4]); err != nil {
+                      fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/failure-diagnostics-write-failed")
+                      os.Exit(2)
+                  }
                   return
               }
               dropRefusedDetail := os.Getenv("CAPTURE_DROP_REFUSED_FAILURE_DETAILS") == "1"
@@ -3148,6 +3276,9 @@ jobs:
                   return operational("selfcheck-temp-create-failed")
               }
               defer os.RemoveAll(base)
+              if err := checkFailureDiagnosticControls(filepath.Join(base, "failure-diagnostics", "raw-output")); err != nil {
+                  return err
+              }
               if err := checkModeControls(); err != nil {
                   return err
               }
@@ -3774,6 +3905,21 @@ jobs:
           else
             printf 'exit_code=0\nexport_gate=PASS\nexported_case_files=%s\nexported_repeat_observations=2\n' "$exported_case_files" >> "$GITHUB_OUTPUT"
             printf 'export_seal=%s\nexport_seal_sha256=%s\n' "$export_seal" "$export_seal_sha256" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ "$CAPTURE_OUTCOME" == "failure" ]]; then
+            safe_failure_diagnostics="$CAPTURE_ROOT/failure-diagnostics.log-safe.txt"
+            if [[ -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+              "$sanitizer_binary" --failure-diagnostics "$CAPTURE_ROOT/raw-output" \
+              "$CAPTURE_ROOT/failure-details.txt" "$safe_failure_diagnostics" \
+              > "$CAPTURE_ROOT/failure-diagnostics.stdout" 2> "$CAPTURE_ROOT/failure-diagnostics.stderr"; then
+              if [[ -f "$safe_failure_diagnostics" ]]; then
+                cat "$safe_failure_diagnostics"
+              else
+                printf '%s\n' 'CAPTURE_DETAIL Failure detail withheld; no safe diagnostic was produced.'
+              fi
+            else
+              printf '%s\n' 'CAPTURE_DETAIL Failure detail withheld; sanitizer did not produce a safe diagnostic.'
+            fi
           fi
           exit "$sanitize_exit"
 

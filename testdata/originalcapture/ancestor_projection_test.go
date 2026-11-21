@@ -148,6 +148,7 @@ func fixtureAncestorExpectedEntries(table fixtureAncestorCaseTable) ([]string, e
 			return nil, fixtureAncestorProjectionRefusal("fixture-ancestor/oracle-parent-unresolved")
 		}
 		allowedParents[canonicalParent] = struct{}{}
+		allowedParents[filepath.Clean(filepath.Join(canonicalParent, ".claude"))] = struct{}{}
 	}
 	managedCanonical, err := fixtureAncestorCanonicalCandidate(table.ManagedRoot)
 	if err != nil {
@@ -765,8 +766,13 @@ func TestFixturePlacementMustBeOutsideGitWorktree(t *testing.T) {
 		}
 		artifactDir := filepath.Join(t.TempDir(), "artifact")
 		err := writeFixturePlacementControlExport(artifactDir, project, 5*time.Second, fixtureGitSystemOps())
-		if err == nil || err.Error() != "fixture-root/git-metadata-found" {
+		if err == nil {
 			t.Fatal("uncertain Git metadata was treated as proof of outside-worktree")
+		}
+		switch err.Error() {
+		case "fixture-root/git-metadata-found", "fixture-root/git-query-failed", "fixture-root/git-query-malformed":
+		default:
+			t.Fatalf("uncertain Git metadata did not produce a named fail-closed refusal: %v", err)
 		}
 		if _, statErr := os.Lstat(artifactDir); !errors.Is(statErr, fs.ErrNotExist) {
 			t.Fatal("uncertain metadata refusal wrote an artifact directory")
@@ -975,12 +981,33 @@ func TestFixtureAncestorContractAuthoredPositiveJSON(t *testing.T) {
 	}
 }
 
+func TestFixtureAncestorFullJSONUsesFlatStringEntries(t *testing.T) {
+	expected := []string{"/tmp/cap07-root/CLAUDE.md", "/tmp/cap07-root/.claude/CLAUDE.md"}
+	input, _ := fixtureAncestorFullJSON(fixtureAncestorCaseClaudeEmpty, expected)
+	var decoded struct {
+		Excludes []string `json:"claudeMdExcludes"`
+	}
+	if err := json.Unmarshal(input, &decoded); err != nil {
+		t.Fatalf("full-JSON fixture did not encode excludes as a string array: %v", err)
+	}
+	want := append([]string{"before"}, expected...)
+	want = append(want, "after")
+	if len(decoded.Excludes) != len(want) {
+		t.Fatalf("full-JSON fixture has %d top-level excludes; want %d", len(decoded.Excludes), len(want))
+	}
+	for index, value := range want {
+		if decoded.Excludes[index] != value {
+			t.Fatalf("full-JSON fixture exclude %d = %q; want %q", index, decoded.Excludes[index], value)
+		}
+	}
+}
+
 func fixtureAncestorFullJSON(caseID string, entries []string) ([]byte, []byte) {
 	encoded, err := json.Marshal(entries)
 	if err != nil {
 		panic("contract fixture JSON encoding failed")
 	}
-	input := append([]byte(fmt.Sprintf("{\"case\":%q,\"keep\":{\"number\":1e2},\"claudeMdExcludes\":[\"before\",", caseID)), encoded...)
+	input := append([]byte(fmt.Sprintf("{\"case\":%q,\"keep\":{\"number\":1e2},\"claudeMdExcludes\":[\"before\",", caseID)), encoded[1:len(encoded)-1]...)
 	input = append(input, []byte(",\"after\"],\"tail\":17}")...)
 	want := []byte(fmt.Sprintf("{\"case\":%q,\"keep\":{\"number\":1e2},\"claudeMdExcludes\":[\"before\",\"%s\",\"after\"],\"tail\":17}", caseID, fixtureAncestorProjectionToken))
 	return input, want
@@ -1026,9 +1053,11 @@ func TestFixtureAncestorPreRunCaseTable(t *testing.T) {
 			t.Fatal("full managed settings path was not fixed in the pre-run case table")
 		}
 		for _, parent := range []string{root, canonicalRoot} {
-			expected := filepath.ToSlash(filepath.Join(parent, "CLAUDE.md"))
-			if _, ok := binding.expectedEntries[expected]; !ok {
-				t.Fatalf("independently bound ancestor set omitted the fixture-root form %q", expected)
+			for _, name := range []string{"CLAUDE.md", filepath.Join(".claude", "CLAUDE.md"), "CLAUDE.local.md"} {
+				expected := filepath.ToSlash(filepath.Join(parent, name))
+				if _, ok := binding.expectedEntries[expected]; !ok {
+					t.Fatalf("independently bound ancestor set omitted the fixture-root form %q", expected)
+				}
 			}
 		}
 	}
