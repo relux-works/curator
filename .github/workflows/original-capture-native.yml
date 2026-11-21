@@ -1073,8 +1073,10 @@ jobs:
           trap sanitize_shell_error ERR
           cd "$GITHUB_WORKSPACE"
           sanitizer_source_dir="$GITHUB_WORKSPACE/.temp/capture-exporter"
+          seal_source_dir="$GITHUB_WORKSPACE/.temp/capture-seal"
           mkdir -p "$sanitizer_source_dir"
-          cat > "$sanitizer_source_dir/seal.go" <<'GO'
+          mkdir -p "$seal_source_dir"
+          cat > "$seal_source_dir/seal.go" <<'GO'
           package main
 
           import (
@@ -3494,7 +3496,7 @@ jobs:
           if ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$sanitizer_binary" ./.temp/capture-exporter > "$sanitizer_build_stdout" 2> "$sanitizer_build_stderr"; then
             sanitize_exit=2
             printf 'CAPTURE_REASON=sanitize/build-failed\n' > "$sanitizer_stderr"
-          elif ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$seal_binary" "$sanitizer_source_dir/seal.go" > "$seal_build_stdout" 2> "$seal_build_stderr"; then
+          elif ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$seal_binary" "$seal_source_dir/seal.go" > "$seal_build_stdout" 2> "$seal_build_stderr"; then
             sanitize_exit=2
             printf 'CAPTURE_REASON=sanitize/seal-build-failed\n' > "$sanitizer_stderr"
           elif ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$seal_binary" --self-check "$CAPTURE_ROOT" \
