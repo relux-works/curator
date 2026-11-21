@@ -1138,6 +1138,7 @@ jobs:
           )
 
           const driverRevision = "805517ccc4bc77614e9ccb3e35e47876f054f629"
+          const legacyBaseRevision = "267bbf477354f4f3d35c9530ec8da0503cd86b8a"
 
           type sourcePin struct {
             Path   string `json:"path"`
@@ -1171,11 +1172,17 @@ jobs:
             Files                    []fileSeal `json:"files"`
           }
 
+          type toolVersionSeal struct {
+            Go  string `json:"go"`
+            Git string `json:"git"`
+          }
+
           type workflowSeal struct {
             Head     string `json:"head"`
             Tree     string `json:"tree"`
             Platform string `json:"platform"`
             Runner   string `json:"runner"`
+            Tools    toolVersionSeal `json:"tool_versions"`
           }
 
           type driverSeal struct {
@@ -1193,12 +1200,15 @@ jobs:
 
           type sealDocument struct {
             Schema       string       `json:"schema"`
+            LegacyBase   string       `json:"legacy_base"`
             Workflow     workflowSeal `json:"workflow"`
             DriverSource driverSeal   `json:"driver_source"`
             Capture      captureSeal  `json:"capture"`
+            NotBound     []string     `json:"not_bound"`
           }
 
           var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+          var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
           func sha256Hex(data []byte) string {
             digest := sha256.Sum256(data)
@@ -1271,7 +1281,7 @@ jobs:
             ordered := append([]byteFile(nil), files...)
             sort.Slice(ordered, func(i, j int) bool { return ordered[i].name < ordered[j].name })
             var encoded bytes.Buffer
-            encoded.WriteString("{\"files\":[")
+            fmt.Fprintf(&encoded, "{\"schema\":\"capture-manifest/v2\",\"legacy_base\":%q,\"files\":[", legacyBaseRevision)
             for index, file := range ordered {
               if index > 0 { encoded.WriteByte(',') }
               name, _ := json.Marshal(file.name)
@@ -1356,8 +1366,9 @@ jobs:
             return nil
           }
 
-          func validMetadata(head, tree, platform, runner, umask, probeMode string) bool {
+          func validMetadata(head, tree, platform, runner, umask, probeMode, goVersion, gitVersion string) bool {
             if !shaPattern.MatchString(head) || !shaPattern.MatchString(tree) { return false }
+            if !versionPattern.MatchString(goVersion) || !versionPattern.MatchString(gitVersion) { return false }
             expectedPlatforms := map[string]string{
               "ubuntu-latest": "Linux", "macos-latest": "macOS", "windows-latest": "Windows",
             }
@@ -1367,8 +1378,8 @@ jobs:
           }
 
           func buildSeal(caseDir, repeatDir, artifactDir, sourceLog, sourceDir, copyDir,
-            head, tree, platform, runner, umask, probeMode string) (sealDocument, error) {
-            if !validMetadata(head, tree, platform, runner, umask, probeMode) {
+            head, tree, platform, runner, umask, probeMode, goVersion, gitVersion string) (sealDocument, error) {
+            if !validMetadata(head, tree, platform, runner, umask, probeMode, goVersion, gitVersion) {
               return sealDocument{}, fmt.Errorf("seal/metadata-invalid")
             }
             if err := verifyArtifactRoot(artifactDir); err != nil { return sealDocument{}, err }
@@ -1378,8 +1389,10 @@ jobs:
             repeats, err := sealGroup(repeatDir, filepath.Join(artifactDir, "repeat-observations"), 2)
             if err != nil { return sealDocument{}, err }
             return sealDocument{
-              Schema: "capture-export-seal/v1",
-              Workflow: workflowSeal{Head: head, Tree: tree, Platform: platform, Runner: runner},
+              Schema: "capture-export-seal/v2",
+              LegacyBase: legacyBaseRevision,
+              Workflow: workflowSeal{Head: head, Tree: tree, Platform: platform, Runner: runner,
+                Tools: toolVersionSeal{Go: goVersion, Git: gitVersion}},
               DriverSource: driverSeal{
                 Revision: driverRevision,
                 Scope: "The five pinned source files below are verified; the full source tree is not asserted.",
@@ -1388,6 +1401,11 @@ jobs:
               Capture: captureSeal{
                 Umask: umask, ProbeDirectoryMode: probeMode,
                 Cases: cases, RepeatObservations: repeats,
+              },
+              NotBound: []string{
+                "runner image and host patch-level digest",
+                "tool executable bytes beyond normalized Go and Git version strings",
+                "driver source files beyond the five pinned files",
               },
             }, nil
           }
@@ -1452,15 +1470,17 @@ jobs:
             sourceLog := filepath.Join(artifact, "source-verification.log")
             if err := writeRegular(sourceLog, expectedLog()); err != nil { return err }
             baseArgs := []string{rawCases, rawRepeat, artifact, sourceLog, src, copied,
-              strings.Repeat("a", 40), strings.Repeat("b", 40), "Linux", "ubuntu-latest", "0077", "0700"}
+              strings.Repeat("a", 40), strings.Repeat("b", 40), "Linux", "ubuntu-latest", "0077", "0700", "1.25.5", "2.50.1"}
             build := func(args []string) error {
-              _, err := buildSeal(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+              _, err := buildSeal(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13])
               return err
             }
             positive, err := buildSeal(baseArgs[0], baseArgs[1], baseArgs[2], baseArgs[3], baseArgs[4], baseArgs[5],
-              baseArgs[6], baseArgs[7], baseArgs[8], baseArgs[9], baseArgs[10], baseArgs[11])
+              baseArgs[6], baseArgs[7], baseArgs[8], baseArgs[9], baseArgs[10], baseArgs[11], baseArgs[12], baseArgs[13])
             if err != nil || positive.Workflow.Head != baseArgs[6] || positive.Workflow.Tree != baseArgs[7] ||
               positive.DriverSource.Revision != driverRevision || !strings.Contains(positive.DriverSource.Scope, "full source tree is not asserted") ||
+              positive.LegacyBase != legacyBaseRevision || positive.Workflow.Tools.Go != baseArgs[12] || positive.Workflow.Tools.Git != baseArgs[13] ||
+              strings.Join(positive.NotBound, "|") != "runner image and host patch-level digest|tool executable bytes beyond normalized Go and Git version strings|driver source files beyond the five pinned files" ||
               positive.Capture.Cases.Count != 47 || len(positive.Capture.Cases.Files) != 47 ||
               positive.Capture.RepeatObservations.Count != 2 || len(positive.Capture.RepeatObservations.Files) != 2 {
               return fmt.Errorf("seal/control-positive-failed")
@@ -1476,6 +1496,11 @@ jobs:
             manifestPath := filepath.Join(artifact, "outputs", "MANIFEST.json")
             manifestBytes, err := readRegular(manifestPath)
             if err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            wrongBase := []byte(strings.Replace(string(manifestBytes), legacyBaseRevision, strings.Repeat("a", 40), 1))
+            if bytes.Equal(wrongBase, manifestBytes) { return fmt.Errorf("seal/control-setup-failed") }
+            if err := writeRegular(manifestPath, wrongBase); err != nil { return err }
+            if err := expectReject("legacy-base", func() error { return build(baseArgs) }); err != nil { return err }
+            if err := writeRegular(manifestPath, manifestBytes); err != nil { return err }
             if err := writeRegular(manifestPath, append(manifestBytes, 'x')); err != nil { return err }
             if err := expectReject("manifest", func() error { return build(baseArgs) }); err != nil { return err }
             if err := writeRegular(manifestPath, manifestBytes); err != nil { return err }
@@ -1493,6 +1518,12 @@ jobs:
             invalidMode := append([]string(nil), baseArgs...)
             invalidMode[11] = "0755"
             if err := expectReject("probe-mode", func() error { return build(invalidMode) }); err != nil { return err }
+            invalidGoVersion := append([]string(nil), baseArgs...)
+            invalidGoVersion[12] = "unavailable"
+            if err := expectReject("go-version", func() error { return build(invalidGoVersion) }); err != nil { return err }
+            invalidGitVersion := append([]string(nil), baseArgs...)
+            invalidGitVersion[13] = "2.50"
+            if err := expectReject("git-version", func() error { return build(invalidGitVersion) }); err != nil { return err }
             missingCase := filepath.Join(rawCases, "case-00.json")
             if err := os.Remove(missingCase); err != nil { return fmt.Errorf("seal/control-setup-failed") }
             if err := expectReject("case-count", func() error { return build(baseArgs) }); err != nil { return err }
@@ -1505,8 +1536,8 @@ jobs:
           }
 
           func writeSeal(args []string) error {
-            if len(args) != 12 { return fmt.Errorf("seal/invalid-arguments") }
-            document, err := buildSeal(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+            if len(args) != 14 { return fmt.Errorf("seal/invalid-arguments") }
+            document, err := buildSeal(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13])
             if err != nil { return err }
             encoded, err := json.MarshalIndent(document, "", "  ")
             if err != nil { return fmt.Errorf("seal/encode-failed") }
@@ -1531,7 +1562,7 @@ jobs:
               fmt.Println("seal_controls=PASS")
               return
             }
-            if len(os.Args) != 14 || os.Args[1] != "--write" {
+            if len(os.Args) != 16 || os.Args[1] != "--write" {
               fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/seal-invalid-arguments")
               os.Exit(2)
             }
@@ -1562,6 +1593,8 @@ jobs:
 
               "github.com/relux-works/curator/internal/envmarker"
           )
+
+          const legacyBaseRevision = "267bbf477354f4f3d35c9530ec8da0503cd86b8a"
 
           type gateError struct {
               code     string
@@ -2246,7 +2279,7 @@ jobs:
           func writeManifest(directory string, files []inputFile) error {
               entries := manifestFor(files)
               var encoded bytes.Buffer
-              encoded.WriteString("{\"files\":[")
+              fmt.Fprintf(&encoded, "{\"schema\":\"capture-manifest/v2\",\"legacy_base\":%q,\"files\":[", legacyBaseRevision)
               for index, entry := range entries {
                   if index > 0 {
                       encoded.WriteByte(',')
@@ -2668,7 +2701,7 @@ jobs:
 
           func expectedManifest(files []inputFile) []byte {
               var encoded bytes.Buffer
-              encoded.WriteString("{\"files\":[")
+              fmt.Fprintf(&encoded, "{\"schema\":\"capture-manifest/v2\",\"legacy_base\":%q,\"files\":[", legacyBaseRevision)
               ordered := append([]inputFile(nil), files...)
               sort.Slice(ordered, func(i, j int) bool { return ordered[i].name < ordered[j].name })
               for index, file := range ordered {
@@ -2794,6 +2827,30 @@ jobs:
               return nil
           }
 
+          func expectLegacyBaseCorruptionRejected(paths controlPaths) error {
+              path := filepath.Join(paths.artifact, "outputs", "MANIFEST.json")
+              original, err := os.ReadFile(path)
+              if err != nil || !bytes.Contains(original, []byte(legacyBaseRevision)) {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              corrupted := bytes.Replace(original, []byte(legacyBaseRevision), []byte(strings.Repeat("a", 40)), 1)
+              if bytes.Equal(corrupted, original) {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              if err := os.WriteFile(path, corrupted, 0600); err != nil {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              gate, ok := verifyControlArtifact(paths).(gateError)
+              restoreErr := os.WriteFile(path, original, 0600)
+              if restoreErr != nil {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              if !ok || gate.code != "sanitize/selfcheck-manifest-failed" {
+                  return operational("selfcheck-negative-control-failed")
+              }
+              return nil
+          }
+
           func expectAllByteCorruptionsRejected(paths controlPaths) error {
               if len(paths.caseFiles) == 0 || len(paths.repeatData) == 0 || len(paths.logData) == 0 {
                   return operational("selfcheck-negative-control-failed")
@@ -2815,6 +2872,9 @@ jobs:
                   if err := expectByteCorruptionRejected(paths, path, file); err != nil {
                       return err
                   }
+              }
+              if err := expectLegacyBaseCorruptionRejected(paths); err != nil {
+                  return err
               }
               if err := verifyControlArtifact(paths); err != nil {
                   return operational("selfcheck-negative-control-failed")
@@ -3634,6 +3694,16 @@ jobs:
           if [[ "$sanitize_exit" -eq 0 && "$CAPTURE_OUTCOME" == "success" ]]; then
             actual_workflow_head=""
             actual_workflow_tree=""
+            seal_go_version="unavailable"
+            seal_git_version="unavailable"
+            if seal_go_raw="$(GOENV=off GOTOOLCHAIN=local go version 2>/dev/null)" && \
+               [[ "$seal_go_raw" =~ ^go[[:space:]]version[[:space:]]go([0-9]+\.[0-9]+\.[0-9]+)[[:space:]](darwin|linux|windows)/(amd64|arm64)$ ]]; then
+              seal_go_version="${BASH_REMATCH[1]}"
+            fi
+            if seal_git_raw="$(git -C "$GITHUB_WORKSPACE" --version 2>/dev/null)" && \
+               [[ "$seal_git_raw" =~ ^git[[:space:]]version[[:space:]]([0-9]+\.[0-9]+\.[0-9]+)([[:space:]]\(Apple[[:space:]]Git-[0-9]+\)|\.windows\.[0-9]+)?$ ]]; then
+              seal_git_version="${BASH_REMATCH[1]}"
+            fi
             if actual_workflow_head="$(git -C "$GITHUB_WORKSPACE" rev-parse --verify HEAD 2>/dev/null)" && \
                actual_workflow_tree="$(git -C "$GITHUB_WORKSPACE" rev-parse --verify 'HEAD^{tree}' 2>/dev/null)" && \
                [[ "$actual_workflow_head" == "$WORKFLOW_HEAD" && "$WORKFLOW_HEAD" == "$GITHUB_SHA" ]]; then
@@ -3643,7 +3713,7 @@ jobs:
                 "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/repeat-raw" "$CAPTURE_ROOT/artifact" \
                 "$CAPTURE_ROOT/source-verification.log" "$GITHUB_WORKSPACE/testdata/originalcapture" \
                 "$GITHUB_WORKSPACE/.temp/original-capture/harnessparity" "$actual_workflow_head" "$actual_workflow_tree" \
-                "$RUNNER_OS" "$MATRIX_RUNNER" "$CAPTURE_UMASK" "$CAPTURE_PROBE_MODE" \
+                "$RUNNER_OS" "$MATRIX_RUNNER" "$CAPTURE_UMASK" "$CAPTURE_PROBE_MODE" "$seal_go_version" "$seal_git_version" \
                 > "$seal_stdout" 2> "$seal_stderr"; then
                 export_seal_sha256="$(sed -n 's/^export_seal_sha256=//p' "$seal_stdout")"
                 seal_expected="$CAPTURE_ROOT/seal.expected"
@@ -3983,7 +4053,7 @@ jobs:
         if: always() && steps.directories.outcome == 'success' && steps.sanitize.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: original-capture-05-${{ matrix.runner }}
+          name: original-capture-06-${{ matrix.runner }}
           path: ${{ steps.directories.outputs.artifact_dir }}
           if-no-files-found: error
           retention-days: 7
