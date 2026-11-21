@@ -1033,14 +1033,17 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 		{"failure events only", `if event.Action == "fail" && event.Test == "" {`},
 		{"name-only serialization", `fmt.Fprintf(&names, "CAPTURE_FAIL Package=%s Test=%s\n", failure.Package, failure.Test)`},
 		{"failing event carries withheld output control", "CAPTURE_PRIVATE_OUTPUT_CONTROL"},
-		{"fixture writes exactly the public name", `string(writtenFailureNames) != "CAPTURE_FAIL Package=public/package Test=TestPublicFailure\n"`},
-		{"name allowlist declaration", `var failureDiagnosticNameLinePattern = regexp.MustCompile(`},
-		{"name allowlist mirrors public alphabet", `^CAPTURE_FAIL Package=[A-Za-z0-9_./-]+ Test=[A-Za-z0-9_./-]*$`},
-		{"package failure may omit Test", `CAPTURE_FAIL Package=public/package Test=\n`},
-		{"long valid Test names are retained", `strings.Repeat("T", 300)`},
-		{"sanitizer accepts only matching name lines", `if failureDiagnosticNameLinePattern.MatchString(line) {`},
-		{"sanitizer positive name control", `CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=TestPublicFailure`},
-		{"malformed name with output is refused", `{"CAPTURE_FAIL Package=public/package Test=TestPublicFailure Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"}`},
+		{"static package allowlist in both programs", `const publicCapturePackage = "github.com/relux-works/curator/.temp/original-capture/harnessparity"`},
+		{"static test root allowlist in both programs", `var publicTestRoots = map[string]struct{}{`},
+		{"static slash-name allowlist in both programs", `"TestOriginalComparatorControls/claude_code-mcp": {}`},
+		{"unknown subtests reduce to an allowed root", `if _, ok := publicTestRoots[root]; ok {`},
+		{"auditor accepts every mapped root and subtest", `for publicName := range publicFailureSubtests {`},
+		{"sanitizer accepts every mapped name", `if allowFailureDiagnosticLine(line) != line {`},
+		{"auditor positive control is a static slash test", `const staticFailureTest = "TestOriginalComparatorControls/claude_code-mcp"`},
+		{"sanitizer positive control is a static slash test", `staticSlashName := "TestOriginalComparatorControls/claude_code-mcp"`},
+		{"failure name controls reject a host-shaped value", `"TestOriginalComparatorControls/example-host.local"`},
+		{"failure name controls reject an account-shaped value", `"TestOriginalComparatorControls/example-user"`},
+		{"malformed name with output is refused", `" Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"`},
 		{"sanitizer receives names file", `"$CAPTURE_ROOT/test-failures.names.txt" "$safe_failure_names"`},
 		{"only sanitized file is printed", `cat "$safe_failure_names"`},
 		{"existing reason allowlist remains", `if _, ok := failureDiagnosticReasonCodes[reason]; ok {`},
@@ -1051,15 +1054,174 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 			t.Errorf("native capture failure-name control %q is missing", check.name)
 		}
 	}
+	if got := strings.Count(text, `"test-output.raw.txt"`); got != 1 ||
+		!strings.Contains(text, `filepath.Join(paths.root, "test-output.raw.txt")`) {
+		t.Errorf("raw-output sentinel fixture count = %d, want exactly one self-check fixture", got)
+	}
+	if got := strings.Count(text, `const publicCapturePackage = "github.com/relux-works/curator/.temp/original-capture/harnessparity"`); got != 2 {
+		t.Errorf("public failure package allowlist appears %d times, want one auditor and one sanitizer copy", got)
+	}
+	if got := strings.Count(text, `var publicFailureSubtests = func() map[string]struct{} {`); got != 2 {
+		t.Errorf("public failure subtest allowlist appears %d times, want one auditor and one sanitizer copy", got)
+	}
+	for _, check := range []string{
+		`for publicName := range publicTestRoots {`,
+		`for publicName := range publicFailureSubtests {`,
+	} {
+		if got := strings.Count(text, check); got != 2 {
+			t.Errorf("public failure positive control %q appears %d times, want one auditor and one sanitizer copy", check, got)
+		}
+	}
 	for _, forbidden := range []string{
 		`if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then`,
 		`cat "$CAPTURE_ROOT/test-failures.names.txt"`,
 		`cat "$CAPTURE_ROOT/raw-output"`,
+		`failureDiagnosticNameLinePattern`,
+		`[A-Za-z0-9_./-]+`,
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Errorf("native capture workflow bypasses the failure-name sanitizer with %q", forbidden)
 		}
 	}
+}
+
+func TestNativeCapturePrivateLogCannotReachOutput(t *testing.T) {
+	if fixture := os.Getenv("CAPTURE_PRIVATE_LOG_PRINT_FIXTURE"); fixture != "" {
+		data, err := os.ReadFile(fixture)
+		if err != nil {
+			t.Fatal("private-log/output-control-read-failed")
+		}
+		writer := io.Writer(os.Stdout)
+		if os.Getenv("CAPTURE_PRIVATE_LOG_PRINT_STREAM") == "stderr" {
+			writer = os.Stderr
+		}
+		if _, err := writer.Write(data); err != nil {
+			t.Fatal("private-log/output-control-write-failed")
+		}
+		return
+	}
+
+	workflow, err := readBoundNativeCaptureWorkflow()
+	if err != nil {
+		t.Fatalf("read native capture workflow: %v", err)
+	}
+	script, err := nativeCaptureRunScript(workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkNativeCapturePrivateLogRoutes(script); err != nil {
+		t.Fatalf("private test log has an unapproved output route: %v", err)
+	}
+
+	const assignment = `private_test_log="$CAPTURE_ROOT/test-output.private.raw.txt"`
+	for _, plantedRoute := range []string{
+		`cat "$private_test_log"`,
+		`cat "$CAPTURE_ROOT/test-output.private.raw.txt" >&2`,
+		`tee "$CAPTURE_ROOT/output.log" < "$private_test_log"`,
+		`cp "$private_test_log" "$CAPTURE_ROOT/test-output.raw.txt"`,
+		`cat "$CAPTURE_ROOT"/*.raw.txt`,
+		`cat "$CAPTURE_ROOT"/*`,
+		`find "$CAPTURE_ROOT" -type f -name '*.raw.txt' -exec cat {} \;`,
+	} {
+		plant := strings.Replace(script, assignment+"\n", assignment+"\n"+plantedRoute+"\n", 1)
+		if plant == script {
+			t.Fatal("private-log/output-control-plant-point-missing")
+		}
+		if err := checkNativeCapturePrivateLogRoutes(plant); err == nil {
+			t.Fatalf("private-log/output-control-plant-accepted route=%q", plantedRoute)
+		}
+	}
+
+	fixturePath := filepath.Join(t.TempDir(), "private-test-log.raw.txt")
+	const sentinel = "CAPTURE_PRIVATE_LOG_OUTPUT_CONTROL"
+	if err := os.WriteFile(fixturePath, []byte(sentinel+"\n"), 0o600); err != nil {
+		t.Fatal("private-log/output-control-fixture-write-failed")
+	}
+	for _, stream := range []string{"stdout", "stderr"} {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestNativeCapturePrivateLogCannotReachOutput$")
+		cmd.Env = withEnvironment(os.Environ(), map[string]string{
+			"CAPTURE_PRIVATE_LOG_PRINT_FIXTURE": fixturePath,
+			"CAPTURE_PRIVATE_LOG_PRINT_STREAM":  stream,
+		})
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("private-log/output-control-child-failed stream=%s", stream)
+		}
+		observed := stdout.Bytes()
+		if stream == "stderr" {
+			observed = stderr.Bytes()
+		}
+		if !bytes.Contains(observed, []byte(sentinel)) {
+			t.Fatalf("private-log/output-control-plant-not-observed stream=%s", stream)
+		}
+	}
+}
+
+func checkNativeCapturePrivateLogRoutes(script string) error {
+	const assignment = `private_test_log="$CAPTURE_ROOT/test-output.private.raw.txt"`
+	const testLogRedirection = `> "$private_test_log" 2>&1; then`
+	const auditLogArgument = `go run "$CAPTURE_ROOT/audit.go" "$private_test_log" `
+	seen := map[string]int{"assignment": 0, "test-log-redirection": 0, "audit-log-argument": 0}
+	for _, line := range strings.Split(script, "\n") {
+		trimmed := strings.TrimSpace(line)
+		privateLogMarkers := []string{
+			"private_test_log", "test-output.private.raw.txt", "test-output.raw.txt",
+			"*.raw.txt", `"$CAPTURE_ROOT"/*`,
+		}
+		containsPrivateRoute := false
+		for _, marker := range privateLogMarkers {
+			if strings.Contains(trimmed, marker) {
+				containsPrivateRoute = true
+				break
+			}
+		}
+		if strings.Contains(trimmed, `find "$CAPTURE_ROOT" -type f`) ||
+			strings.Contains(trimmed, `find "$CAPTURE_ROOT" -name`) {
+			return fmt.Errorf("unapproved private-log enumeration")
+		}
+		if !containsPrivateRoute {
+			continue
+		}
+		switch {
+		case trimmed == assignment:
+			seen["assignment"]++
+		case trimmed == testLogRedirection:
+			seen["test-log-redirection"]++
+		case strings.HasPrefix(trimmed, auditLogArgument) && len(trimmed) == len(auditLogArgument)+1 && trimmed[len(trimmed)-1] == '\\':
+			seen["audit-log-argument"]++
+		default:
+			return fmt.Errorf("unapproved private-log reference")
+		}
+	}
+	for _, reference := range []string{"assignment", "test-log-redirection", "audit-log-argument"} {
+		if seen[reference] != 1 {
+			return fmt.Errorf("expected one approved private-log reference")
+		}
+	}
+	for _, required := range []string{
+		`> "$CAPTURE_ROOT/audit-metrics.raw.txt" 2> "$CAPTURE_ROOT/audit-error.raw.txt"; then`,
+		`cat "$CAPTURE_ROOT/audit-metrics.raw.txt" > "$CAPTURE_ROOT/audit-output.raw.txt"`,
+	} {
+		if !strings.Contains(script, required) {
+			return fmt.Errorf("approved sanitized output path missing")
+		}
+	}
+	return nil
+}
+
+func withEnvironment(environment []string, values map[string]string) []string {
+	result := make([]string, 0, len(environment)+len(values))
+	for _, entry := range environment {
+		key, _, ok := strings.Cut(entry, "=")
+		if _, replaced := values[key]; !ok || !replaced {
+			result = append(result, entry)
+		}
+	}
+	for key, value := range values {
+		result = append(result, key+"="+value)
+	}
+	return result
 }
 
 func TestNativeCaptureRunScriptRequiresRunWithinNamedStep(t *testing.T) {

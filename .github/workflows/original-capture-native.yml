@@ -48,7 +48,6 @@ jobs:
           : > "$capture_root/home/.gitconfig"
           printf '%s\n' 'Source verification not run.' > "$capture_root/source-verification.log"
           printf '%s\n' 'Module download not run.' > "$capture_root/module-download.raw.txt"
-          printf '%s\n' 'Test command not run.' > "$capture_root/test-output.raw.txt"
           printf '%s\n' 'Capture audit not run.' > "$capture_root/audit-output.raw.txt"
           printf '%s\n' 'No failing subtest detail.' > "$capture_root/failure-details.txt"
           artifact_dir="$capture_root/artifact"
@@ -99,7 +98,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          f1a440631febbdbc0df88b568f42abe4b75674dd0c87b000975a0730b7024fb7 ancestor_projection_test.go
+          797b1849687ccc53dd23d85c6f773d7821113734e1ee01a7c440d138f938bb55 ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -286,7 +285,77 @@ jobs:
 
           var nativeParentDetailDir string
 
-          var publicTestName = regexp.MustCompile(`^[A-Za-z0-9_./-]+$`)
+          const publicCapturePackage = "github.com/relux-works/curator/.temp/original-capture/harnessparity"
+
+          var publicTestRoots = map[string]struct{}{
+            "TestCaptureDriverRejectsCallerSelectors": {},
+            "TestFreezeOriginalBaseline": {},
+            "TestFreezeOriginalLaunchers": {},
+            "TestOriginalComparatorControls": {},
+            "TestWindowsRootParameter": {},
+            "TestFixtureAncestorProjectionControls": {},
+            "TestFixtureAncestorProjectionRefusals": {},
+            "TestFixturePlacementMustBeOutsideGitWorktree": {},
+            "TestFixtureAncestorContractAuthoredPositiveJSON": {},
+            "TestFixtureAncestorFullJSONUsesFlatStringEntries": {},
+            "TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer": {},
+            "TestNativeCaptureFailureNamesPassThroughSanitizer": {},
+            "TestNativeCapturePrivateLogCannotReachOutput": {},
+            "TestNativeCaptureRunScriptRequiresRunWithinNamedStep": {},
+            "TestNativeCaptureUploadConditionAcceptsLFAndCRLF": {},
+            "TestNativeCaptureWorkflowPathNormalizesMixedSeparators": {},
+            "TestNativeCaptureUploadMissingWorkflowBindingFailsClosed": {},
+            "TestFixtureAncestorPreRunCaseTable": {},
+            "TestFixtureAncestorSymlinkCanonicalBindings": {},
+            "TestFixtureAncestorUnresolvedLinkRefusesWithoutExport": {},
+            "TestFixtureAncestorGlobLiteralContractFixture": {},
+            "TestFixtureAncestorAdjacentPrivatePathRemainsUnprojected": {},
+            "TestFixtureAncestorCanonicalTargetOutsideChainRefusesWithoutExport": {},
+            "TestFixtureGitQueryUncertaintyRefusesWithoutExport": {},
+          }
+
+          var publicFailureSubtests = func() map[string]struct{} {
+            names := map[string]struct{}{
+              "TestFreezeOriginalBaseline/repeat-determinism": {},
+              "TestOriginalComparatorControls/claude_code-mcp": {},
+              "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
+            }
+            for _, name := range []string{
+              "claude_code-empty", "codex_cli-empty", "opencode-empty", "muse-empty", "pi-empty",
+              "cursor-project-mirror", "gemini-project-mirror", "windsurf-native-discovery", "opencode-native-discovery",
+              "codex_cli-user-settings", "codex_cli-current", "codex_cli-modified", "codex_cli-missing-state",
+              "codex_cli-unreadable-state", "codex_cli-malformed-state", "codex_cli-native-parent", "claude_code-mcp",
+            } {
+              names["TestFreezeOriginalBaseline/"+name] = struct{}{}
+            }
+            for _, name := range []string{
+              "normal-edit", "typed-projection", "valid-00", "valid-01", "valid-02", "valid-03", "valid-04",
+              "invalid-00", "invalid-01", "invalid-02", "invalid-03", "invalid-04", "invalid-05", "invalid-06",
+              "invalid-07", "invalid-08", "invalid-09", "invalid-10", "invalid-11", "invalid-12", "invalid-13",
+              "old-version-1", "old-version-2", "old-version-3", "old-version-5", "old-version-6",
+              "system-authority", "cli-edits", "cli-refusal", "cli-arguments",
+            } {
+              names["TestFreezeOriginalLaunchers/claude-launcher-"+name] = struct{}{}
+            }
+            return names
+          }()
+
+          func publicFailureTestName(name string) string {
+            if _, ok := publicFailureSubtests[name]; ok {
+              return name
+            }
+            root, _, hasSubtest := strings.Cut(name, "/")
+            if hasSubtest {
+              if _, ok := publicTestRoots[root]; ok {
+                return root
+              }
+              return ""
+            }
+            if _, ok := publicTestRoots[name]; ok {
+              return name
+            }
+            return ""
+          }
 
           type counts struct {
             baseline, baselinePass, baselineFail, baselineSkip int
@@ -309,7 +378,7 @@ jobs:
                 return result, nil, auditFailure("CAPTURE_REASON=capture/audit-invalid-test-event")
               }
               if event.Action == "fail" && event.Test == "" {
-                if publicTestName.MatchString(event.Package) {
+                if event.Package == publicCapturePackage {
                   failures = append(failures, failureName{Package: event.Package})
                 }
                 continue
@@ -323,8 +392,10 @@ jobs:
               }
               if status == "FAIL:" {
                 result.allFails++
-                if publicTestName.MatchString(event.Package) && publicTestName.MatchString(event.Test) {
-                  failures = append(failures, failureName{Package: event.Package, Test: event.Test})
+                if event.Package == publicCapturePackage {
+                  if testName := publicFailureTestName(event.Test); testName != "" {
+                    failures = append(failures, failureName{Package: event.Package, Test: testName})
+                  }
                 }
               }
               if status == "SKIP:" { result.allSkips++ }
@@ -408,11 +479,33 @@ jobs:
             parsed.allSkips--
             parsed.outputFiles = 46
             if parsed.valid(0) { return auditFailure("CAPTURE_REASON=capture/audit-self-check-count") }
-            failing := `{"Action":"fail","Package":"public/package","Test":"TestPublicFailure","Output":"CAPTURE_PRIVATE_OUTPUT_CONTROL"}`
+            const staticFailureTest = "TestOriginalComparatorControls/claude_code-mcp"
+            for publicName := range publicTestRoots {
+              if publicFailureTestName(publicName) != publicName {
+                return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+              }
+            }
+            for publicName := range publicFailureSubtests {
+              if publicFailureTestName(publicName) != publicName {
+                return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+              }
+            }
+            failing := fmt.Sprintf(`{"Action":"fail","Package":%q,"Test":%q,"Output":"CAPTURE_PRIVATE_OUTPUT_CONTROL"}`, samplePackage, staticFailureTest)
             _, failures, err := parseLog(strings.NewReader(failing + "\n"))
-            if err != nil || len(failures) != 1 || failures[0].Package != "public/package" ||
-                failures[0].Test != "TestPublicFailure" || strings.Contains(fmt.Sprint(failures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
+            if err != nil || len(failures) != 1 || failures[0].Package != samplePackage ||
+                failures[0].Test != staticFailureTest || strings.Contains(fmt.Sprint(failures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+            }
+            for _, dynamicName := range []string{
+              "TestOriginalComparatorControls/example-host.local",
+              "TestOriginalComparatorControls/example-user",
+            } {
+              event := fmt.Sprintf(`{"Action":"fail","Package":%q,"Test":%q}`, samplePackage, dynamicName)
+              _, names, err := parseLog(strings.NewReader(event + "\n"))
+              if err != nil || len(names) != 1 || names[0].Test != "TestOriginalComparatorControls" ||
+                  strings.Contains(fmt.Sprint(names), "example-host.local") || strings.Contains(fmt.Sprint(names), "example-user") {
+                return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+              }
             }
             failureNamesFile, err := os.CreateTemp("", "capture-failure-names-selfcheck-")
             if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names") }
@@ -426,15 +519,15 @@ jobs:
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
             }
             writtenFailureNames, err := os.ReadFile(failureNamesPath)
-            if err != nil || string(writtenFailureNames) != "CAPTURE_FAIL Package=public/package Test=TestPublicFailure\n" ||
+            if err != nil || string(writtenFailureNames) != "CAPTURE_FAIL Package="+samplePackage+" Test="+staticFailureTest+"\n" ||
                 strings.Contains(string(writtenFailureNames), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
             }
-            detailFailure := failureName{Package: "public/package", Test: "TestPublicFailure"}
+            detailFailure := failureName{Package: samplePackage, Test: staticFailureTest}
             detailEvents := strings.Join([]string{
-              `{"Action":"output","Package":"public/package","Test":"TestPassing","Output":"PASSING_TEST_DETAIL_MUST_NOT_APPEAR\n"}`,
-              `{"Action":"output","Package":"public/package","Test":"TestPublicFailure","Output":"SAFE_FAILURE_DETAIL_CONTROL\n"}`,
-              `{"Action":"fail","Package":"public/package","Test":"TestPublicFailure"}`,
+              fmt.Sprintf(`{"Action":"output","Package":%q,"Test":"TestFreezeOriginalBaseline","Output":"PASSING_TEST_DETAIL_MUST_NOT_APPEAR\n"}`, samplePackage),
+              fmt.Sprintf(`{"Action":"output","Package":%q,"Test":%q,"Output":"SAFE_FAILURE_DETAIL_CONTROL\n"}`, samplePackage, staticFailureTest),
+              fmt.Sprintf(`{"Action":"fail","Package":%q,"Test":%q}`, samplePackage, staticFailureTest),
             }, "\n")
             details, err := collectFailureDetails(strings.NewReader(detailEvents), []failureName{detailFailure})
             if err != nil || len(details) != 1 || details[0].Package != detailFailure.Package ||
@@ -445,15 +538,7 @@ jobs:
             if len(details[0].Output) > 1024 {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-bound")
             }
-            excessFailures := make([]failureName, maxFailureDetails+1)
-            for index := range excessFailures {
-              excessFailures[index] = failureName{
-                Package: "public/package",
-                Test: fmt.Sprintf("TestFailure%d", index+1),
-              }
-            }
-            capped, err := collectFailureDetails(strings.NewReader(""), excessFailures)
-            if err != nil || len(capped) != maxFailureDetails {
+            if len(publicTestRoots)+len(publicFailureSubtests) > maxFailureDetails {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-detail-count")
             }
             longOutput := strings.Repeat("X", maxFailureDetailBytes+100)
@@ -549,7 +634,7 @@ jobs:
             for _, failure := range failures {
               key := detailKey{Package: failure.Package, Test: failure.Test}
               if failure.Test == "" || len(failure.Package) > 256 || len(failure.Test) > 256 ||
-                  !publicTestName.MatchString(failure.Package) || !publicTestName.MatchString(failure.Test) || selectedKeys[key] {
+                  failure.Package != publicCapturePackage || publicFailureTestName(failure.Test) != failure.Test || selectedKeys[key] {
                 continue
               }
               if len(selected) == maxFailureDetails {
@@ -645,8 +730,8 @@ jobs:
             if err := os.WriteFile(stderrPath, []byte("SAFE_CHILD_STDERR_CONTROL\\n"), 0600); err != nil {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
             }
-            event := fmt.Sprintf(`{"Action":"output","Package":"public/package","Test":%q,"Output":"SAFE_ASSERTION_CONTROL\\n"}`, testName)
-            detail, err := collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: "public/package", Test: testName}})
+            event := fmt.Sprintf(`{"Action":"output","Package":%q,"Test":%q,"Output":"SAFE_ASSERTION_CONTROL\\n"}`, publicCapturePackage, testName)
+            detail, err := collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: publicCapturePackage, Test: testName}})
             if err != nil || len(detail) != 1 || !strings.Contains(detail[0].Output, "SAFE_ASSERTION_CONTROL") ||
                 !strings.Contains(detail[0].Output, "SAFE_CHILD_STDOUT_CONTROL") ||
                 !strings.Contains(detail[0].Output, "SAFE_CHILD_STDERR_CONTROL") || len(detail[0].Output) > maxFailureDetailBytes {
@@ -659,7 +744,7 @@ jobs:
             if err := os.WriteFile(stderrPath, []byte(longOutput), 0600); err != nil {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
             }
-            detail, err = collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: "public/package", Test: testName}})
+            detail, err = collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: publicCapturePackage, Test: testName}})
             if err != nil || len(detail) != 1 || !detail[0].Truncated || len(detail[0].Output) > maxFailureDetailBytes {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-bound")
             }
@@ -670,7 +755,7 @@ jobs:
             var report strings.Builder
             for _, detail := range details {
               if len(detail.Package) > 256 || len(detail.Test) > 256 ||
-                  !publicTestName.MatchString(detail.Package) || !publicTestName.MatchString(detail.Test) {
+                  detail.Package != publicCapturePackage || publicFailureTestName(detail.Test) != detail.Test {
                 continue
               }
               header := fmt.Sprintf("CAPTURE_DETAIL Package=%s Test=%s\n", detail.Package, detail.Test)
@@ -1050,12 +1135,6 @@ jobs:
           else
             audit_exit=$?
           fi
-          if [[ "$test_exit" -eq 0 && "$audit_exit" -eq 0 ]]; then
-            cp "$private_test_log" "$CAPTURE_ROOT/test-output.raw.txt"
-          else
-            printf '%s\n' 'Full test log withheld; see sanitized failure-details.txt.' \
-              > "$CAPTURE_ROOT/test-output.raw.txt"
-          fi
           cat "$CAPTURE_ROOT/audit-metrics.raw.txt" > "$CAPTURE_ROOT/audit-output.raw.txt"
           audit_metrics=()
           audit_metric_count=0
@@ -1158,7 +1237,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "f1a440631febbdbc0df88b568f42abe4b75674dd0c87b000975a0730b7024fb7"},
+            {"ancestor_projection_test.go", "797b1849687ccc53dd23d85c6f773d7821113734e1ee01a7c440d138f938bb55"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -1341,7 +1420,7 @@ jobs:
             expected := map[string]bool{
               "outputs": true, "repeat-observations": true,
               "audit-output.raw.txt": true, "module-download.raw.txt": true,
-              "source-verification.log": true, "test-output.raw.txt": true, "failure-details.txt": true,
+              "source-verification.log": true, "failure-details.txt": true,
             }
             entries, err := os.ReadDir(directory)
             if err != nil || len(entries) != len(expected) { return fmt.Errorf("seal/artifact-root-shape-invalid") }
@@ -1477,7 +1556,7 @@ jobs:
             }
             if err := prepareFiles(rawCases, filepath.Join(artifact, "outputs"), "case", 47); err != nil { return err }
             if err := prepareFiles(rawRepeat, filepath.Join(artifact, "repeat-observations"), "repeat", 2); err != nil { return err }
-            for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "test-output.raw.txt", "failure-details.txt"} {
+            for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "failure-details.txt"} {
               if err := writeRegular(filepath.Join(artifact, name), []byte("neutral control log\n")); err != nil { return err }
             }
             sourceLog := filepath.Join(artifact, "source-verification.log")
@@ -1643,6 +1722,7 @@ jobs:
 
           const maxFailureDiagnosticInputBytes = 64 * 1024
           const maxFailureDiagnosticLogLines = 200
+          const privateOutputSentinel = "CAPTURE_PRIVATE_PASSING_OUTPUT_SENTINEL"
 
           func sensitiveName(name string) bool {
               lower := strings.ToLower(name)
@@ -2096,7 +2176,86 @@ jobs:
               "sanitize/tool-command-failed": {},
           }
 
-          var failureDiagnosticNameLinePattern = regexp.MustCompile(`^CAPTURE_FAIL Package=[A-Za-z0-9_./-]+ Test=[A-Za-z0-9_./-]*$`)
+          const publicCapturePackage = "github.com/relux-works/curator/.temp/original-capture/harnessparity"
+
+          var publicTestRoots = map[string]struct{}{
+              "TestCaptureDriverRejectsCallerSelectors": {},
+              "TestFreezeOriginalBaseline": {},
+              "TestFreezeOriginalLaunchers": {},
+              "TestOriginalComparatorControls": {},
+              "TestWindowsRootParameter": {},
+              "TestFixtureAncestorProjectionControls": {},
+              "TestFixtureAncestorProjectionRefusals": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON": {},
+              "TestFixtureAncestorFullJSONUsesFlatStringEntries": {},
+              "TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer": {},
+              "TestNativeCaptureFailureNamesPassThroughSanitizer": {},
+              "TestNativeCapturePrivateLogCannotReachOutput": {},
+              "TestNativeCaptureRunScriptRequiresRunWithinNamedStep": {},
+              "TestNativeCaptureUploadConditionAcceptsLFAndCRLF": {},
+              "TestNativeCaptureWorkflowPathNormalizesMixedSeparators": {},
+              "TestNativeCaptureUploadMissingWorkflowBindingFailsClosed": {},
+              "TestFixtureAncestorPreRunCaseTable": {},
+              "TestFixtureAncestorSymlinkCanonicalBindings": {},
+              "TestFixtureAncestorUnresolvedLinkRefusesWithoutExport": {},
+              "TestFixtureAncestorGlobLiteralContractFixture": {},
+              "TestFixtureAncestorAdjacentPrivatePathRemainsUnprojected": {},
+              "TestFixtureAncestorCanonicalTargetOutsideChainRefusesWithoutExport": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport": {},
+          }
+
+          var publicFailureSubtests = func() map[string]struct{} {
+              names := map[string]struct{}{
+                  "TestFreezeOriginalBaseline/repeat-determinism": {},
+                  "TestOriginalComparatorControls/claude_code-mcp": {},
+                  "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
+              }
+              for _, name := range []string{
+                  "claude_code-empty", "codex_cli-empty", "opencode-empty", "muse-empty", "pi-empty",
+                  "cursor-project-mirror", "gemini-project-mirror", "windsurf-native-discovery", "opencode-native-discovery",
+                  "codex_cli-user-settings", "codex_cli-current", "codex_cli-modified", "codex_cli-missing-state",
+                  "codex_cli-unreadable-state", "codex_cli-malformed-state", "codex_cli-native-parent", "claude_code-mcp",
+              } {
+                  names["TestFreezeOriginalBaseline/"+name] = struct{}{}
+              }
+              for _, name := range []string{
+                  "normal-edit", "typed-projection", "valid-00", "valid-01", "valid-02", "valid-03", "valid-04",
+                  "invalid-00", "invalid-01", "invalid-02", "invalid-03", "invalid-04", "invalid-05", "invalid-06",
+                  "invalid-07", "invalid-08", "invalid-09", "invalid-10", "invalid-11", "invalid-12", "invalid-13",
+                  "old-version-1", "old-version-2", "old-version-3", "old-version-5", "old-version-6",
+                  "system-authority", "cli-edits", "cli-refusal", "cli-arguments",
+              } {
+                  names["TestFreezeOriginalLaunchers/claude-launcher-"+name] = struct{}{}
+              }
+              return names
+          }()
+
+          func publicFailureTestName(name string) string {
+              if _, ok := publicFailureSubtests[name]; ok {
+                  return name
+              }
+              root, _, hasSubtest := strings.Cut(name, "/")
+              if hasSubtest {
+                  if _, ok := publicTestRoots[root]; ok {
+                      return root
+                  }
+                  return ""
+              }
+              if _, ok := publicTestRoots[name]; ok {
+                  return name
+              }
+              return ""
+          }
+
+          func publicFailureNameLine(line string) bool {
+              const prefix = "CAPTURE_FAIL Package=" + publicCapturePackage + " Test="
+              if !strings.HasPrefix(line, prefix) {
+                  return false
+              }
+              name := strings.TrimPrefix(line, prefix)
+              return name == "" || publicFailureTestName(name) == name
+          }
 
           func allowFailureDiagnosticLine(line string) string {
               line = strings.TrimSpace(escapeFailureDiagnosticControls(line))
@@ -2104,7 +2263,7 @@ jobs:
               if _, ok := failureDiagnosticReasonCodes[reason]; ok {
                   return line
               }
-              if failureDiagnosticNameLinePattern.MatchString(line) {
+              if publicFailureNameLine(line) {
                   return line
               }
               if line == "PASS" || line == "FAIL" {
@@ -2167,9 +2326,15 @@ jobs:
           }
 
           func checkFailureDiagnosticControls(caseDir string) error {
-              safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\nCAPTURE_FAIL Package=public/package Test=TestPublicFailure\nCAPTURE_FAIL Package=public/package Test=\n")
+              staticSlashName := "TestOriginalComparatorControls/claude_code-mcp"
+              safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\n")
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test="+staticSlashName+"\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestOriginalComparatorControls/example-host.local\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestOriginalComparatorControls/example-user\n")...)
               longTestName := strings.Repeat("T", 300)
-              safe = append(safe, []byte("CAPTURE_FAIL Package=public/package Test="+longTestName+"\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test="+longTestName+"\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package=example/package Test="+staticSlashName+"\n")...)
               rendered := string(failureDiagnosticLog(caseDir, safe))
               for _, visible := range []string{
                   "CAPTURE_DETAIL CAPTURE_REASON=capture/go-test-failed",
@@ -2177,11 +2342,26 @@ jobs:
                   "CAPTURE_DETAIL sanitize/input-repeat-set-invalid",
                   "CAPTURE_DETAIL PASS",
                   "CAPTURE_DETAIL FAIL",
-                  "CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=TestPublicFailure",
-                  "CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=",
-                  "CAPTURE_DETAIL CAPTURE_FAIL Package=public/package Test=" + longTestName,
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=" + staticSlashName,
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=",
               } {
                   if !strings.Contains(rendered, visible) {
+                      return operational("selfcheck-failure-diagnostic-positive")
+                  }
+              }
+              if strings.Contains(rendered, "example-host.local") || strings.Contains(rendered, "example-user") ||
+                  strings.Contains(rendered, longTestName) {
+                  return operational("selfcheck-failure-diagnostic-allowlist")
+              }
+              for publicName := range publicTestRoots {
+                  line := "CAPTURE_FAIL Package=" + publicCapturePackage + " Test=" + publicName
+                  if allowFailureDiagnosticLine(line) != line {
+                      return operational("selfcheck-failure-diagnostic-positive")
+                  }
+              }
+              for publicName := range publicFailureSubtests {
+                  line := "CAPTURE_FAIL Package=" + publicCapturePackage + " Test=" + publicName
+                  if allowFailureDiagnosticLine(line) != line {
                       return operational("selfcheck-failure-diagnostic-positive")
                   }
               }
@@ -2201,7 +2381,7 @@ jobs:
               for _, control := range []struct{ line, value string }{
                   {"CAPTURE_REASON=capture/theme-dark", "theme-dark"},
                   {"CAPTURE_DETAIL Package=example/pkg Test=TestSettings/theme-dark", "theme-dark"},
-                  {"CAPTURE_FAIL Package=public/package Test=TestPublicFailure Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"},
+                  {"CAPTURE_FAIL Package=" + publicCapturePackage + " Test=" + staticSlashName + " Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"},
                   {"=== RUN TestSettings/theme-dark", "theme-dark"},
                   {"--- FAIL: TestSettings/theme-dark (0.00s)", "theme-dark"},
                   {"theme-dark.go:17: setting=theme-dark", "theme-dark"},
@@ -2604,7 +2784,7 @@ jobs:
                   return err
               }
               parent := filepath.Dir(caseDir)
-              logNames := []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt", "failure-details.txt"}
+              logNames := []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "failure-details.txt"}
               logs := make([]inputFile, 0, len(logNames))
               for _, name := range logNames {
                   file, err := readRegular(filepath.Join(parent, name), "input-log-read-failed")
@@ -2815,13 +2995,17 @@ jobs:
                   }
                   paths.repeatData = append(paths.repeatData, file)
               }
-              for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "test-output.raw.txt", "failure-details.txt"} {
+              for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "source-verification.log", "failure-details.txt"} {
                   data := []byte("neutral control log\n")
                   file := inputFile{name: name, data: data, mode: 0600}
                   if err := writeFile(filepath.Join(paths.root, name), data, file.mode); err != nil {
                       return paths, operational("selfcheck-fixture-setup-failed")
                   }
                   paths.logData = append(paths.logData, file)
+              }
+              privateLog := []byte("{\"Action\":\"output\",\"Package\":\"public/package\",\"Test\":\"TestPublicFailure\",\"Output\":\"" + privateOutputSentinel + "\"}\n")
+              if err := writeFile(filepath.Join(paths.root, "test-output.raw.txt"), privateLog, 0600); err != nil {
+                  return paths, operational("selfcheck-fixture-setup-failed")
               }
               return paths, nil
           }
@@ -2982,14 +3166,18 @@ jobs:
           }
 
           func verifyControlArtifact(paths controlPaths) error {
+              containsSentinel, err := artifactContainsSentinel(paths.artifact)
+              if err != nil || containsSentinel {
+                  return operational("selfcheck-private-output-sentinel")
+              }
               entries, err := os.ReadDir(paths.artifact)
-              if err != nil || len(entries) != 7 {
+              if err != nil || len(entries) != 6 {
                   return operational("selfcheck-output-shape-failed")
               }
               expectedRoot := map[string]bool{
                   "outputs": true, "repeat-observations": true,
                   "audit-output.raw.txt": true, "module-download.raw.txt": true,
-                  "source-verification.log": true, "test-output.raw.txt": true, "failure-details.txt": true,
+                  "source-verification.log": true, "failure-details.txt": true,
               }
               for _, entry := range entries {
                   if !expectedRoot[entry.Name()] {
@@ -3036,6 +3224,38 @@ jobs:
                   }
               }
               return nil
+          }
+
+          func artifactContainsSentinel(directory string) (bool, error) {
+              entries, err := os.ReadDir(directory)
+              if err != nil {
+                  return false, err
+              }
+              for _, entry := range entries {
+                  path := filepath.Join(directory, entry.Name())
+                  info, err := os.Lstat(path)
+                  if err != nil {
+                      return false, err
+                  }
+                  if info.IsDir() {
+                      found, err := artifactContainsSentinel(path)
+                      if err != nil || found {
+                          return found, err
+                      }
+                      continue
+                  }
+                  if !info.Mode().IsRegular() {
+                      return false, fmt.Errorf("artifact/control-entry-invalid")
+                  }
+                  data, err := os.ReadFile(path)
+                  if err != nil {
+                      return false, err
+                  }
+                  if bytes.Contains(data, []byte(privateOutputSentinel)) {
+                      return true, nil
+                  }
+              }
+              return false, nil
           }
 
           func controlModePreserved(got, want os.FileMode) bool {
@@ -3451,6 +3671,24 @@ jobs:
               if err := expectPass(neutral, false); err != nil {
                   return err
               }
+              artifactLogPath := filepath.Join(neutral.artifact, "audit-output.raw.txt")
+              artifactLog, err := readRegular(artifactLogPath, "selfcheck-fixture-setup-failed")
+              if err != nil {
+                  return operational("selfcheck-private-output-control-failed")
+              }
+              plantedArtifactLog := append(append([]byte(nil), artifactLog.data...), []byte(privateOutputSentinel)...)
+              if err := writeFile(artifactLogPath, plantedArtifactLog, artifactLog.mode); err != nil {
+                  return operational("selfcheck-private-output-control-failed")
+              }
+              if err := verifyControlArtifact(neutral); err == nil || err.Error() != "sanitize/selfcheck-private-output-sentinel" {
+                  return operational("selfcheck-private-output-control-failed")
+              }
+              if err := writeFile(artifactLogPath, artifactLog.data, artifactLog.mode); err != nil {
+                  return operational("selfcheck-private-output-control-failed")
+              }
+              if err := verifyControlArtifact(neutral); err != nil {
+                  return err
+              }
               detailControl, err := prepareControl(filepath.Join(base, "failure-detail-safe"), 1)
               if err != nil {
                   return err
@@ -3688,7 +3926,6 @@ jobs:
                   {"log", "audit-output.raw.txt"},
                   {"log", "module-download.raw.txt"},
                   {"log", "source-verification.log"},
-                  {"log", "test-output.raw.txt"},
                   {"log", "failure-details.txt"},
               }
               for index, trigger := range triggers {
