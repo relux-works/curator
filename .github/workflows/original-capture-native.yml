@@ -278,7 +278,8 @@ jobs:
           const maxFailureDetailBytes = 1024
           const maxFailureDetailsBytes = 8192
           const maxFailureAssertionBytes = 432
-          const maxNativeParentStderrBytes = 512
+          const maxNativeParentStreamBytes = 512
+          const maxNativeParentDetailStreamBytes = 240
 
           var nativeParentDetailDir string
 
@@ -498,6 +499,31 @@ jobs:
             return current + prefix, true
           }
 
+          func readNativeParentStream(caseName, stream string) ([]byte, bool, error) {
+            childPath := filepath.Join(nativeParentDetailDir, caseName+"."+stream+".raw.txt")
+            info, statErr := os.Lstat(childPath)
+            if os.IsNotExist(statErr) {
+              return []byte(fmt.Sprintf("[Child %s was not captured.]\n", stream)), false, nil
+            }
+            if statErr != nil || !info.Mode().IsRegular() {
+              return nil, false, auditFailure("CAPTURE_REASON=capture/audit-child-output-read")
+            }
+            childFile, openErr := os.Open(childPath)
+            if openErr != nil {
+              return nil, false, auditFailure("CAPTURE_REASON=capture/audit-child-output-read")
+            }
+            output, readErr := io.ReadAll(io.LimitReader(childFile, int64(maxNativeParentStreamBytes+1)))
+            closeErr := childFile.Close()
+            if readErr != nil || closeErr != nil {
+              return nil, false, auditFailure("CAPTURE_REASON=capture/audit-child-output-read")
+            }
+            truncated := len(output) > maxNativeParentStreamBytes
+            if truncated {
+              output = output[:maxNativeParentStreamBytes]
+            }
+            return output, truncated, nil
+          }
+
           func collectFailureDetails(input io.Reader, failures []failureName) ([]failureDetail, error) {
             selected := make([]failureName, 0, maxFailureDetails)
             selectedKeys := make(map[detailKey]bool)
@@ -554,40 +580,24 @@ jobs:
               caseName := strings.TrimPrefix(failure.Test, parentTestPrefix)
               if nativeParentDetailDir != "" && caseName != failure.Test &&
                   !strings.Contains(caseName, "/") && regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(caseName) {
-                childPath := filepath.Join(nativeParentDetailDir, caseName+".stderr.raw.txt")
-                info, statErr := os.Lstat(childPath)
-                if statErr != nil && !os.IsNotExist(statErr) {
-                  return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
+                childStdout, rawStdoutTruncated, stdoutErr := readNativeParentStream(caseName, "stdout")
+                if stdoutErr != nil {
+                  return nil, stdoutErr
                 }
-                var childStderr []byte
-                rawStderrTruncated := false
-                if os.IsNotExist(statErr) {
-                  childStderr = []byte("[Child stderr was not captured.]\n")
-                } else {
-                  if !info.Mode().IsRegular() {
-                    return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
-                  }
-                  childFile, openErr := os.Open(childPath)
-                  if openErr != nil {
-                    return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
-                  }
-                  childStderr, statErr = io.ReadAll(io.LimitReader(childFile, int64(maxNativeParentStderrBytes+1)))
-                  childCloseErr := childFile.Close()
-                  if statErr != nil || childCloseErr != nil {
-                    return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
-                  }
-                  if len(childStderr) > maxNativeParentStderrBytes {
-                    rawStderrTruncated = true
-                    childStderr = childStderr[:maxNativeParentStderrBytes]
-                  }
+                childStderr, rawStderrTruncated, stderrErr := readNativeParentStream(caseName, "stderr")
+                if stderrErr != nil {
+                  return nil, stderrErr
                 }
                 boundedAssertion, assertionCut := appendBounded("", detail, maxFailureAssertionBytes)
-                boundedStderr, stderrCut := appendBounded("", string(childStderr), maxNativeParentStderrBytes)
+                boundedStdout, stdoutCut := appendBounded("", string(childStdout), maxNativeParentDetailStreamBytes)
+                boundedStderr, stderrCut := appendBounded("", string(childStderr), maxNativeParentDetailStreamBytes)
                 childDetail := "Assertion text (limit 432 bytes):\n" + boundedAssertion +
-                  "\nChild stderr (limit 512 bytes):\n" + boundedStderr
+                  "\nChild stdout (limit 240 bytes):\n" + boundedStdout +
+                  "\nChild stderr (limit 240 bytes):\n" + boundedStderr
                 boundedDetail, detailCut := appendBounded("", childDetail, maxFailureDetailBytes)
                 detail = boundedDetail
-                wasTruncated = wasTruncated || assertionCut || stderrCut || detailCut || rawStderrTruncated
+                wasTruncated = wasTruncated || assertionCut || stdoutCut || stderrCut || detailCut ||
+                  rawStdoutTruncated || rawStderrTruncated
               }
               details = append(details, failureDetail{
                 Package: failure.Package, Test: failure.Test,
@@ -597,10 +607,10 @@ jobs:
             return details, nil
           }
 
-          func checkFailureDetailChildStderr() error {
-            base, err := os.MkdirTemp("", "capture-audit-child-stderr-control-")
+          func checkFailureDetailChildOutput() error {
+            base, err := os.MkdirTemp("", "capture-audit-child-output-control-")
             if err != nil {
-              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-setup")
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
             }
             defer os.RemoveAll(base)
             previous := nativeParentDetailDir
@@ -608,23 +618,31 @@ jobs:
             defer func() { nativeParentDetailDir = previous }()
 
             const testName = "TestFreezeOriginalBaseline/codex_cli-native-parent"
-            detailPath := filepath.Join(base, "codex_cli-native-parent.stderr.raw.txt")
-            if err := os.WriteFile(detailPath, []byte("SAFE_CHILD_STDERR_CONTROL\\n"), 0600); err != nil {
-              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-setup")
+            stdoutPath := filepath.Join(base, "codex_cli-native-parent.stdout.raw.txt")
+            stderrPath := filepath.Join(base, "codex_cli-native-parent.stderr.raw.txt")
+            if err := os.WriteFile(stdoutPath, []byte("SAFE_CHILD_STDOUT_CONTROL\\n"), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
+            }
+            if err := os.WriteFile(stderrPath, []byte("SAFE_CHILD_STDERR_CONTROL\\n"), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
             }
             event := fmt.Sprintf(`{"Action":"output","Package":"public/package","Test":%q,"Output":"SAFE_ASSERTION_CONTROL\\n"}`, testName)
             detail, err := collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: "public/package", Test: testName}})
             if err != nil || len(detail) != 1 || !strings.Contains(detail[0].Output, "SAFE_ASSERTION_CONTROL") ||
+                !strings.Contains(detail[0].Output, "SAFE_CHILD_STDOUT_CONTROL") ||
                 !strings.Contains(detail[0].Output, "SAFE_CHILD_STDERR_CONTROL") || len(detail[0].Output) > maxFailureDetailBytes {
-              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr")
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output")
             }
-            longStderr := strings.Repeat("S", maxNativeParentStderrBytes+64)
-            if err := os.WriteFile(detailPath, []byte(longStderr), 0600); err != nil {
-              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-setup")
+            longOutput := strings.Repeat("S", maxNativeParentDetailStreamBytes+64)
+            if err := os.WriteFile(stdoutPath, []byte(longOutput), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
+            }
+            if err := os.WriteFile(stderrPath, []byte(longOutput), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-setup")
             }
             detail, err = collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: "public/package", Test: testName}})
             if err != nil || len(detail) != 1 || !detail[0].Truncated || len(detail[0].Output) > maxFailureDetailBytes {
-              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-bound")
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-output-bound")
             }
             return nil
           }
@@ -681,7 +699,7 @@ jobs:
             if err := selfCheck(); err != nil { return err }
             if len(os.Args) != 7 { return auditFailure("CAPTURE_REASON=capture/audit-invalid-arguments") }
             nativeParentDetailDir = os.Args[6]
-            if err := checkFailureDetailChildStderr(); err != nil { return err }
+            if err := checkFailureDetailChildOutput(); err != nil { return err }
             testExit, err := strconv.Atoi(os.Args[3])
             if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-invalid-test-exit") }
             input, err := os.Open(os.Args[1])
@@ -743,7 +761,9 @@ jobs:
           )
 
           const maxChildStderrBytes = 512
+          const maxChildStdoutBytes = 512
           const childStderrTruncation = "\n[child stderr truncated at 512 bytes]\n"
+          const childStdoutTruncation = "\n[child stdout truncated at 512 bytes]\n"
 
           type cappedWriter struct {
             writer    io.Writer
@@ -818,6 +838,15 @@ jobs:
             return caseName
           }
 
+          func openChildStream(detailDir, caseName, stream string, limit int, marker string) (*os.File, *cappedWriter, error) {
+            path := filepath.Join(detailDir, caseName+"."+stream+".raw.txt")
+            file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+            if err != nil {
+              return nil, nil, err
+            }
+            return file, &cappedWriter{writer: file, remaining: limit - len(marker)}, nil
+          }
+
           func runRealEnv(arguments []string) int {
             realEnv := os.Getenv("CAPTURE_NATIVE_PARENT_REAL_ENV")
             if realEnv == "" {
@@ -847,31 +876,47 @@ jobs:
               return runRealEnv(arguments)
             }
             if err := os.MkdirAll(detailDir, 0700); err != nil {
-              fmt.Fprintln(os.Stderr, "native-parent stderr capture setup failed")
+              fmt.Fprintln(os.Stderr, "native-parent output capture setup failed")
               return 125
             }
-            detailPath := filepath.Join(detailDir, caseName+".stderr.raw.txt")
-            detailFile, err := os.OpenFile(detailPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+            stdoutFile, childStdout, err := openChildStream(
+              detailDir, caseName, "stdout", maxChildStdoutBytes, childStdoutTruncation,
+            )
             if err != nil {
-              fmt.Fprintln(os.Stderr, "native-parent stderr capture setup failed")
+              fmt.Fprintln(os.Stderr, "native-parent output capture setup failed")
               return 125
             }
-            payloadLimit := maxChildStderrBytes - len(childStderrTruncation)
-            childStderr := &cappedWriter{writer: detailFile, remaining: payloadLimit}
+            stderrFile, childStderr, err := openChildStream(
+              detailDir, caseName, "stderr", maxChildStderrBytes, childStderrTruncation,
+            )
+            if err != nil {
+              _ = stdoutFile.Close()
+              fmt.Fprintln(os.Stderr, "native-parent output capture setup failed")
+              return 125
+            }
             command := exec.Command(program, programArgs...)
             command.Env = environment
             command.Stdin = os.Stdin
-            command.Stdout = io.Discard
+            command.Stdout = childStdout
             command.Stderr = childStderr
             runErr := command.Run()
-            if childStderr.truncated {
-              if _, err := io.WriteString(detailFile, childStderrTruncation); err != nil && runErr == nil {
+            if childStdout.truncated {
+              if _, err := io.WriteString(stdoutFile, childStdoutTruncation); err != nil && runErr == nil {
                 runErr = err
               }
             }
-            closeErr := detailFile.Close()
-            if closeErr != nil && runErr == nil {
-              runErr = closeErr
+            if childStderr.truncated {
+              if _, err := io.WriteString(stderrFile, childStderrTruncation); err != nil && runErr == nil {
+                runErr = err
+              }
+            }
+            stdoutCloseErr := stdoutFile.Close()
+            stderrCloseErr := stderrFile.Close()
+            if stdoutCloseErr != nil && runErr == nil {
+              runErr = stdoutCloseErr
+            }
+            if stderrCloseErr != nil && runErr == nil {
+              runErr = stderrCloseErr
             }
             if runErr == nil {
               return 0
@@ -2971,28 +3016,41 @@ jobs:
                   return err
               }
 
-              detail, err := prepareControl(filepath.Join(base, "refused-detail-only"), 1)
-              if err != nil {
-                  return err
-              }
-              refusedDetail := []byte("CAPTURE_DETAIL Package=public/package Test=TestPrivatePath\n/Users/example/private/state\n")
-              if err := plantControl(detail, "log", "failure-details.txt", refusedDetail); err != nil {
-                  return operational("selfcheck-path-control-fixture-failed")
-              }
-              var stdout, stderr bytes.Buffer
-              code := runGateWithFailureDetailPolicy(
-                  []string{detail.caseDir, detail.repeatDir, detail.artifact, "false"}, &stdout, &stderr, true,
-              )
-              if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "export_gate=PASS") {
-                  return operational("selfcheck-refused-detail-export-failed")
-              }
-              exportedCase, err := os.ReadFile(filepath.Join(detail.artifact, "outputs", "case-00.json"))
-              if err != nil || !bytes.Equal(exportedCase, detail.caseFiles[0].data) {
-                  return operational("selfcheck-refused-detail-case-lost")
-              }
-              exportedDetail, err := os.ReadFile(filepath.Join(detail.artifact, "failure-details.txt"))
-              if err != nil || !bytes.Equal(exportedDetail, []byte("Failure detail withheld by the sanitizer.\n")) {
-                  return operational("selfcheck-refused-detail-not-withheld")
+              for _, control := range []struct {
+                  name   string
+                  detail []byte
+              }{
+                  {
+                      name:   "private-path",
+                      detail: []byte("CAPTURE_DETAIL Package=public/package Test=TestPrivatePath\n/Users/example/private/state\n"),
+                  },
+                  {
+                      name:   "credential-value",
+                      detail: []byte("CAPTURE_DETAIL Package=public/package Test=TestCredentialValue\ncredential_token=neutral-value\n"),
+                  },
+              } {
+                  detail, err := prepareControl(filepath.Join(base, "refused-detail-"+control.name), 1)
+                  if err != nil {
+                      return err
+                  }
+                  if err := plantControl(detail, "log", "failure-details.txt", control.detail); err != nil {
+                      return operational("selfcheck-path-control-fixture-failed")
+                  }
+                  var stdout, stderr bytes.Buffer
+                  code := runGateWithFailureDetailPolicy(
+                      []string{detail.caseDir, detail.repeatDir, detail.artifact, "false"}, &stdout, &stderr, true,
+                  )
+                  if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "export_gate=PASS") {
+                      return operational("selfcheck-refused-detail-export-failed")
+                  }
+                  exportedCase, err := os.ReadFile(filepath.Join(detail.artifact, "outputs", "case-00.json"))
+                  if err != nil || !bytes.Equal(exportedCase, detail.caseFiles[0].data) {
+                      return operational("selfcheck-refused-detail-case-lost")
+                  }
+                  exportedDetail, err := os.ReadFile(filepath.Join(detail.artifact, "failure-details.txt"))
+                  if err != nil || !bytes.Equal(exportedDetail, []byte("Failure detail withheld by the sanitizer.\n")) {
+                      return operational("selfcheck-refused-detail-not-withheld")
+                  }
               }
               return nil
           }
@@ -3044,16 +3102,44 @@ jobs:
               if err != nil {
                   return err
               }
-              safeDetail := []byte("CAPTURE_DETAIL Package=public/package Test=TestPlantedFailure\nSAFE_FAILURE_DETAIL_CONTROL\n")
+              safeDetail := []byte("CAPTURE_DETAIL Package=public/package Test=TestPlantedFailure\nSAFE_CHILD_STDOUT_CONTROL\nSAFE_CHILD_STDERR_CONTROL\n")
               if err := plantExpectedLog(&detailControl, "failure-details.txt", safeDetail); err != nil {
                   return err
+              }
+              privateRawDir := filepath.Join(detailControl.root, "native-parent-details")
+              if err := os.Mkdir(privateRawDir, 0700); err != nil {
+                  return operational("selfcheck-child-output-scratch-setup-failed")
+              }
+              for _, output := range []struct{ name, text string }{
+                  {"codex_cli-native-parent.stdout.raw.txt", "C:\\Users\\example\\private\\state\\n"},
+                  {"codex_cli-native-parent.stderr.raw.txt", "credential_token=neutral-value\\n"},
+              } {
+                  if err := writeFile(filepath.Join(privateRawDir, output.name), []byte(output.text), 0600); err != nil {
+                      return operational("selfcheck-child-output-scratch-setup-failed")
+                  }
               }
               if err := expectPass(detailControl, false); err != nil {
                   return err
               }
               exportedDetail, err := os.ReadFile(filepath.Join(detailControl.artifact, "failure-details.txt"))
-              if err != nil || !bytes.Contains(exportedDetail, []byte("SAFE_FAILURE_DETAIL_CONTROL")) {
+              if err != nil || !bytes.Contains(exportedDetail, []byte("SAFE_CHILD_STDOUT_CONTROL")) ||
+                  !bytes.Contains(exportedDetail, []byte("SAFE_CHILD_STDERR_CONTROL")) {
                   return operational("selfcheck-failure-detail-positive-failed")
+              }
+              err = filepath.Walk(detailControl.artifact, func(path string, info os.FileInfo, walkErr error) error {
+                  if walkErr != nil {
+                      return walkErr
+                  }
+                  if info.IsDir() {
+                      return nil
+                  }
+                  if strings.HasSuffix(info.Name(), ".stdout.raw.txt") || strings.HasSuffix(info.Name(), ".stderr.raw.txt") {
+                      return operational("selfcheck-child-output-exported")
+                  }
+                  return nil
+              })
+              if err != nil {
+                  return operational("selfcheck-child-output-exported")
               }
               privateDetailControl, err := prepareControl(filepath.Join(base, "failure-detail-private-path"), 1)
               if err != nil {
