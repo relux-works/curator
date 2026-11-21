@@ -1037,22 +1037,30 @@ func TestNativeCaptureFailureNameSummaryWithholdsNames(t *testing.T) {
 	if end < 0 {
 		t.Fatal("native capture failure-name summary block is incomplete")
 	}
-	block := text[start : start+end]
+	if strings.Contains(text[start+end+len(blockEnd):], blockEnd) {
+		t.Fatal("native capture failure-name summary end marker is duplicated")
+	}
+	block := strings.TrimSpace(text[start : start+end])
+	lastLine := strings.LastIndex(block, "\n")
+	if lastLine < 0 || strings.TrimSpace(block[lastLine+1:]) != "fi" {
+		t.Fatal("native capture failure-name summary enclosing wrapper is missing")
+	}
+	block = block[:lastLine]
 	allowed := map[string]int{
-		`if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then`: 1,
+		`if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then`:             1,
 		`# Names and sanitized details are each capped at 200 lines per platform.`: 1,
-		`failure_name_count=0`: 1,
+		`failure_name_count=0`:          1,
 		`failure_names_truncated=false`: 1,
-		`while IFS= read -r line; do`: 1,
+		`while IFS= read -r line; do`:   1,
 		`if [[ "$line" =~ ^CAPTURE_FAIL\ Package=([A-Za-z0-9_./-]+)\ Test=([A-Za-z0-9_./-]*)$ ]]; then`: 1,
-		`if [[ "$failure_name_count" -ge 199 ]]; then`: 1,
-		`failure_names_truncated=true`: 1,
-		`break`: 1,
-		`printf '%s\n' 'CAPTURE_FAIL Failure detail withheld by the sanitizer.' >&2`: 1,
-		`failure_name_count=$((failure_name_count + 1))`: 1,
-		`fi`: 4,
+		`if [[ "$failure_name_count" -ge 199 ]]; then`:                                                  1,
+		`failure_names_truncated=true`:                                                                  1,
+		`break`:                                                                                         1,
+		`printf '%s\n' 'CAPTURE_FAIL Failure detail withheld by the sanitizer.' >&2`:                    1,
+		`failure_name_count=$((failure_name_count + 1))`:                                                1,
+		`fi`:                          4,
 		`done < "$failed_names_file"`: 1,
-		`if [[ "$failure_names_truncated" == "true" ]]; then`: 1,
+		`if [[ "$failure_names_truncated" == "true" ]]; then`:                                            1,
 		`printf '%s\n' 'CAPTURE_FAIL [remaining failing test names withheld at the 200-line limit]' >&2`: 1,
 	}
 	for _, line := range strings.Split(block, "\n") {
