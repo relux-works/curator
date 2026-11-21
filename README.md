@@ -684,14 +684,19 @@ adds manager settings, explicit empty MCP, receipts and a version-bound launch
 contribution. Run `env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/projectcontext -run TestClaude -count=1`
 and the documented `CURATOR_PROJECT_CLAUDE_MUTANTS=1` lane; store logs in `.temp/`.
 The typed certification report keeps unsupported strict tuples refused.
-Claude homes also program `claudeMdExcludes` with the absolute native
-`.claude/CLAUDE.md` path and `.claude/rules/**` subtree under the operator's
-home. Both paths quote literal glob metacharacters; the rules suffix alone
-recurses. Ordinary provisioning and repair preserve existing settings and exclusions; project composition adds the
-same exclusions to its generated settings. Project and profile instruction files
-remain eligible. Existing homes missing either exclusion require `env resolve
---repair`. Run the merge and repair checks with
-`env -u GIT_DIR -u GIT_WORK_TREE go test ./internal/claudememory ./internal/envprofile -run 'TestMerge|TestClaudeNativeMemory|TestClaudeNativeRulesMissingIsStale' -count=1`.
+Claude homes program `claudeMdExcludes` with the operator's native
+`.claude/CLAUDE.md` and `.claude/rules/**`, plus `CLAUDE.md`,
+`.claude/CLAUDE.md` and `CLAUDE.local.md` in strict ancestors of the launch
+project's Git toplevel (the launch directory outside Git). Lexical and
+canonical paths match literally; only the native rules suffix recurses.
+Project files, all `AGENTS.md` forms and the composed profile remain eligible.
+The two operator-native patterns remain excluded even for a project rooted
+at the operator home. Repair preserves user exclusions and unrelated settings,
+and refreshes Curator-owned ancestor entries when the project changes.
+Project composition retains its existing native-memory exclusions separately.
+See [the settings and ownership contract](docs/environment-config.md#claude-instruction-exclusions).
+Missing policy entries require `env resolve --repair`. Run focused checks with
+`env -u GIT_DIR -u GIT_WORK_TREE go test -p 1 ./internal/claudememory ./internal/envprofile -run 'TestMerge|TestReconcile|TestAncestor|TestProjectRoot|TestMissingAncestor|TestClaudeAncestor|TestClaudeNativeMemory|TestClaudeNativeRulesMissingIsStale' -count=1`.
 The optional `TestPinnedClaudeMemoryExclusion` additionally needs Node.js and
 `CURATOR_CLAUDE_MEMORY_SPECIMEN` pointing to the exact Claude Code 2.1.314
 distribution checked by the test. It executes only the extracted memory filter

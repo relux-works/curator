@@ -73,7 +73,7 @@ func TestClaudeNativeMemoryPreflightNarrowingMutant(t *testing.T) {
 // selected. Normalize Git checkout line endings before counting or replacing.
 func claudeMemoryPreflightMutantSource(data []byte) ([]byte, error) {
 	source := strings.ReplaceAll(string(data), "\r\n", "\n")
-	const guard = "\t\tif _, err := prepareClaudeSettings(root, homeRel); err != nil {\n\t\t\treturn err\n\t\t}"
+	const guard = "\t\tif _, err := prepareClaudeAncestorSettings(req); err != nil {\n\t\t\treturn err\n\t\t}"
 	const boundary = "\t\t// This callback holds the repair lock and precedes journal recovery,\n" +
 		"\t\t// store rebuilding and legacy identity migration. Later refreshes do\n" +
 		"\t\t// not replace this early refusal gate."
@@ -95,7 +95,7 @@ func TestClaudeNativeMemoryPreflightMutationAnchor(t *testing.T) {
 	lf := strings.ReplaceAll(string(data), "\r\n", "\n")
 	// This independent expected edit deliberately omits the boundary from its
 	// search: the fixture must distinguish the gate from an unrelated copy.
-	guard := "\t\tif _, err := prepareClaudeSettings(root, homeRel); err != nil {\n\t\t\treturn err\n\t\t}"
+	guard := "\t\tif _, err := prepareClaudeAncestorSettings(req); err != nil {\n\t\t\treturn err\n\t\t}"
 	const marker = "// This callback holds the repair lock and precedes journal recovery,"
 	if strings.Count(lf, guard) != 1 || strings.Count(lf, marker) != 1 {
 		t.Fatal("source fixture does not expose exactly one early guard and boundary")

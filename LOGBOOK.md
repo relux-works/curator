@@ -3,6 +3,18 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-11-19
+
+### 1403 — Portable managed state paths
+- ROOT CAUSE: `filepath.Join` emitted host-native backslashes for Claude state paths on Windows; managed relative paths require slash-separated segments.
+- FIX: `claudeMemoryStateRel` uses `path.Join` (`internal/envprofile/claude_ancestor_settings.go:32`). The fixed-key control accepts the produced path and rejects backslashes and traversal (`internal/envprofile/claude_ancestor_settings_test.go:37`).
+- STATUS: Focused race regression passes; Windows runtime remains to be verified.
+
+### 1403 — Guarded ancestor metadata reads
+- ROOT CAUSE: Three Claude ancestor readers used raw `os.Lstat` for absence decisions, outside the shared absent-versus-unreadable policy.
+- FIX: `canonicalMemoryPath`, `ProjectRoot` and `prepareClaudeAncestorSettings` use `stateread.Lstat`/`Stat`; blocked or unreadable paths remain errors.
+- STATUS: The manager-owned absence-read guard passes under race.
+
 ## 2026-10-18 — Canonical ownership is separate from build validity
 
 BUG-261017-47xdyt: a field report exposed deletion of unowned stale siblings

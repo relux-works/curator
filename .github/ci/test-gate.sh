@@ -35,6 +35,8 @@
 #                            measured slow packages; admits their complete union
 #   CI_UNIX_TEST_SHARDS      native Linux/macOS ordinary artifacts, verified by
 #                            the same admission engine at the unchanged 60m budget
+#   CI_SKIP_POST_LANDING_TESTS 1 = inventory cmd/curator and pass its exact
+#                                post-landing selector as a separate -skip argument
 #
 # The gate never rewrites, relaxes or retries a failing run.
 
@@ -43,6 +45,11 @@ set -u
 GO="${GO:-go}"
 GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-60m}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+CI_SKIP_POST_LANDING_TESTS="${CI_SKIP_POST_LANDING_TESTS:-0}"
+case "$CI_SKIP_POST_LANDING_TESTS" in
+	0|1) ;;
+	*) echo 'test-gate: CI_SKIP_POST_LANDING_TESTS must be 0 or 1' >&2; exit 2 ;;
+esac
 
 # Presence, including an empty value, cannot replace the canonical gate with
 # the separate explicitly pinned store-qualification rehearsal.
@@ -74,6 +81,16 @@ mkdir -p "$EVIDENCE" || exit 2
 ROOT="$CURATOR_CONFORMANCE_ROOT"
 MODULE="$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)"
 [ -n "$MODULE" ] || { echo 'test-gate: cannot determine the module path' >&2; exit 2; }
+POST_LANDING_SKIP_ARGS=()
+POST_LANDING_SELECTOR=""
+if [ "$CI_SKIP_POST_LANDING_TESTS" = 1 ]; then
+	if ! POST_LANDING_SELECTOR="$("$GO" run ./tools/mutationinventory -mode post-landing-selector)"; then
+		echo 'test-gate: could not load the canonical post-landing selector' >&2
+		exit 1
+	fi
+	[ -n "$POST_LANDING_SELECTOR" ] || { echo 'test-gate: canonical post-landing selector is empty' >&2; exit 1; }
+	POST_LANDING_SKIP_ARGS=(-skip "$POST_LANDING_SELECTOR")
+fi
 
 # Every go test stage runs git under an empty, gate-owned global config and
 # no system config: a runner whose ~/.gitconfig signs commits or rewrites
@@ -125,6 +142,14 @@ short_names() { sed -e "s#^$MODULE/##" -e "s#^$MODULE\$#.#" "$1" | tr '\n' ' '; 
 run_stage() {
 	stage="$1"; shift
 	out="$EVIDENCE/go-test-$stage.json"
+	if [ "$CI_SKIP_POST_LANDING_TESTS" = 1 ]; then
+		verify="$EVIDENCE/post-landing-invocation-$stage.txt"
+		if ! "$GO" run ./tools/mutationinventory -mode verify-invocation -- "$@" >"$verify" 2>&1; then
+			cat "$verify" >&2
+			echo "test-gate: stage $stage lacks the canonical separate post-landing -skip" >&2
+			return 2
+		fi
+	fi
 	# The gate command runs as its own process, unpiped, so $? is its real status.
 	# shellcheck disable=SC2086
 	"$@" >"$out" 2>&1
@@ -132,6 +157,32 @@ run_stage() {
 	cat "$out" >>"$JSON"
 	echo "test-gate: stage $stage exit=$rc (stream: $out)"
 	return $rc
+}
+
+inventory_curator_stage() {
+	stage="$1"; packages="$2"; root_mode="$3"
+	package="$MODULE/cmd/curator"
+	if ! grep -qxF "$package" "$packages"; then
+		return 0
+	fi
+	log="$EVIDENCE/post-landing-inventory-$stage.log"
+	args=(run ./tools/mutationinventory -mode inventory -package "$package" \
+		-timeout "$GO_TEST_TIMEOUT" -go-test-flags "${GO_TEST_FLAGS:-}" \
+		-extra-go-test-flags "${STORE_COMPAT_FLAGS[*]+"${STORE_COMPAT_FLAGS[*]}"}" -evidence "$EVIDENCE/post-landing-inventory/$stage")
+	if [ "$root_mode" = served ]; then
+		env ${STORE_COMPAT_ENV[@]+"${STORE_COMPAT_ENV[@]}"} CURATOR_CONFORMANCE_ROOT="$ROOT" \
+			"$GO" "${args[@]}" >"$log" 2>&1
+	else
+		env -u CURATOR_CONFORMANCE_ROOT ${STORE_COMPAT_ENV[@]+"${STORE_COMPAT_ENV[@]}"} \
+			"$GO" "${args[@]}" >"$log" 2>&1
+	fi
+	rc=$?
+	if [ "$rc" -ne 0 ]; then
+		cat "$log" >&2
+		echo "test-gate: $stage cmd/curator inventory exit=$rc" >&2
+		return "$rc"
+	fi
+	cat "$log"
 }
 
 TEST_RC=0
@@ -188,11 +239,20 @@ if [ -n "${CI_ENVPROFILE_SHARDS:-}" ]; then
 	SERVED="$EVIDENCE/plan-served-remaining.txt"
 fi
 
+# Record the unfiltered inventory and exact three-way partition before every
+# full cmd/curator stage. Ordinary shards record it in their manifests and merge
+# evidence as well.
+if [ "$CI_SKIP_POST_LANDING_TESTS" = 1 ]; then
+	inventory_curator_stage served "$SERVED" served || exit $?
+	inventory_curator_stage deferred "$DEFERRED" deferred || exit $?
+fi
+
 # --- served: the root is exported ------------------------------------------
 if [ -s "$SERVED" ]; then
 	# shellcheck disable=SC2046,SC2086
 	run_stage served env ${STORE_COMPAT_ENV[@]+"${STORE_COMPAT_ENV[@]}"} CURATOR_CONFORMANCE_ROOT="$ROOT" \
-		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${STORE_COMPAT_FLAGS[@]+"${STORE_COMPAT_FLAGS[@]}"} ${GO_TEST_FLAGS:-} $(cat "$SERVED")
+		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${STORE_COMPAT_FLAGS[@]+"${STORE_COMPAT_FLAGS[@]}"} ${GO_TEST_FLAGS:-} \
+		${POST_LANDING_SKIP_ARGS[@]+"${POST_LANDING_SKIP_ARGS[@]}"} $(cat "$SERVED")
 	rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
 else
 	echo 'test-gate: no served packages' >&2
@@ -203,7 +263,8 @@ fi
 if [ -s "$DEFERRED" ]; then
 	# shellcheck disable=SC2046,SC2086
 	run_stage deferred env -u CURATOR_CONFORMANCE_ROOT \
-		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} $(cat "$DEFERRED")
+		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} \
+		${POST_LANDING_SKIP_ARGS[@]+"${POST_LANDING_SKIP_ARGS[@]}"} $(cat "$DEFERRED")
 	rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
 fi
 
@@ -214,7 +275,7 @@ if [ -s "$ASSERT" ]; then
 		# shellcheck disable=SC2086
 		run_stage "assert-$(basename "$importpath")" env CURATOR_CONFORMANCE_ROOT="$ROOT" \
 			"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} \
-			-run "^${assertcase}\$" "$importpath"
+			${POST_LANDING_SKIP_ARGS[@]+"${POST_LANDING_SKIP_ARGS[@]}"} -run "^${assertcase}\$" "$importpath"
 		rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
 	done <"$ASSERT"
 fi

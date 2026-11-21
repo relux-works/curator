@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,6 +128,127 @@ func requireGlobalCommand(t *testing.T, fixture globalLockCLIFixture, want int, 
 		t.Fatalf("curator %v = %d, want %d\nstdout:\n%s\nstderr:\n%s", args, code, want, stdout, stderr)
 	}
 	return stdout, stderr
+}
+
+// Global add/install/sync can compose from A, but the launcher's explicit-B
+// env-resolve repair must remove A's generated policy, never render A's files
+// into the managed root or grant A trust. This checks launch preparation, not
+// another native vendor invocation; native loading has separate witnesses.
+func TestGlobalCommandsMemoryPolicyDoesNotFollowPreviousCWD(t *testing.T) {
+	for _, command := range []string{"add", "install", "sync"} {
+		t.Run(command, func(t *testing.T) {
+			fixture := newGlobalLockCLIFixture(t)
+			const profile = "memory-scope"
+			const composed = "fixture-composed-root-control"
+			pkg := t.TempDir()
+			writeContextPackage(t, pkg, profile, "1.0.0", composed+"\n")
+			requireGlobalCommand(t, fixture, exitOK, "profile", "install", pkg, "--use")
+			ancestorA := t.TempDir()
+			launchA := filepath.Join(ancestorA, "project-a")
+			ancestorB := t.TempDir()
+			launchB := filepath.Join(ancestorB, "project-b")
+			for _, dir := range []string{launchA, launchB} {
+				if err := os.Mkdir(dir, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			const sentinel = "fixture-A-ancestor-policy-must-not-be-rendered"
+			for _, name := range []string{"CLAUDE.md", "AGENTS.md"} {
+				writeFile(t, filepath.Join(ancestorA, name), sentinel+"\n")
+			}
+			writeFile(t, filepath.Join(ancestorB, "CLAUDE.md"), "fixture-B-ancestor\n")
+			t.Chdir(launchA)
+			cwdA, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch command {
+			case "add":
+				requireGlobalCommand(t, fixture, exitOK, "global", "add", "new-skill", "--git", fixture.gitURL, "--tag", "v1")
+			case "install":
+				fixture.writeLegacyGlobalDeclaration(t)
+				requireGlobalCommand(t, fixture, exitOK, "global", "install")
+			case "sync":
+				requireGlobalCommand(t, fixture, exitOK, "profile", "sync")
+			}
+			home := envprofile.ManagedHomeDir(fixture.home, profile, "claude_code")
+			read := func(name string) []byte {
+				t.Helper()
+				data, err := os.ReadFile(filepath.Join(home, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				return data
+			}
+			excludes := func() []string {
+				t.Helper()
+				var document struct {
+					Excludes []string `json:"claudeMdExcludes"`
+				}
+				if err := json.Unmarshal(read("settings.json"), &document); err != nil {
+					t.Fatal(err)
+				}
+				return document.Excludes
+			}
+			contains := func(values []string, value string) bool {
+				for _, candidate := range values {
+					if candidate == value {
+						return true
+					}
+				}
+				return false
+			}
+			loaderA := filepath.ToSlash(filepath.Join(filepath.Dir(cwdA), "CLAUDE.md"))
+			if !contains(excludes(), loaderA) {
+				t.Fatal("global-CWD positive control did not compose A's ancestor policy")
+			}
+			assertNoATrust := func() {
+				t.Helper()
+				var document struct {
+					Projects map[string]json.RawMessage `json:"projects"`
+				}
+				if err := json.Unmarshal(read(".claude.json"), &document); err != nil {
+					t.Fatal(err)
+				}
+				for _, path := range []string{launchA, cwdA} {
+					if _, exists := document.Projects[path]; exists {
+						t.Fatal("global-CWD policy granted A project trust")
+					}
+				}
+			}
+			assertNoATrust()
+			t.Chdir(launchB)
+			cwdB, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// curator-run prepares a fresh fragment with this CLI command in B.
+			requireGlobalCommand(t, fixture, exitOK, "env", "resolve", "claude_code", "--profile", profile, "--repair", "--format", "json")
+			policyB := excludes()
+			for _, pattern := range policyB {
+				if strings.Contains(pattern, filepath.ToSlash(ancestorA)) || strings.Contains(pattern, filepath.ToSlash(filepath.Dir(cwdA))) {
+					t.Fatal("explicit-B launch preparation retained A's ancestor policy")
+				}
+			}
+			if !contains(policyB, filepath.ToSlash(filepath.Join(filepath.Dir(cwdB), "CLAUDE.md"))) {
+				t.Fatal("explicit-B positive control did not compose B's ancestor policy")
+			}
+			root := string(read("CLAUDE.md"))
+			if !strings.Contains(root, composed) || strings.Contains(root, sentinel) {
+				t.Fatal("rendered home lost composed policy or contains A's ancestor contents")
+			}
+			assertNoATrust()
+			var seeded struct {
+				Projects map[string]struct {
+					Trusted bool `json:"hasTrustDialogAccepted"`
+				} `json:"projects"`
+			}
+			if err := json.Unmarshal(read(".claude.json"), &seeded); err != nil || !seeded.Projects[cwdB].Trusted {
+				t.Fatalf("explicit-B launch preparation did not retain B trust: %v", err)
+			}
+			requireGlobalCommand(t, fixture, exitOK, "env", "resolve", "claude_code", "--profile", profile, "--format", "json")
+		})
+	}
 }
 
 // Global add publishes its exact lock before native and managed skill links become current.

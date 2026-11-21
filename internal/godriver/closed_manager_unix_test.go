@@ -96,6 +96,11 @@ func exitReport(t *testing.T, w *rawWorker, barrier string, pids []int) (status 
 		}
 	}
 	t.Logf("domain result %s: worker=%q descendants_alive=%d survival_markers=%d", t.Name(), status, alive, markers)
+	// A marker proves an acknowledged descendant ran after the worker exited;
+	// survivor count is incidental to scheduling and process reaping.
+	if markers != 0 {
+		t.Errorf("acknowledged descendant survived worker teardown")
+	}
 	if status != "signal killed" || alive != 0 || markers != 0 {
 		t.Errorf("domain closure: status=%s alive=%d markers=%d", status, alive, markers)
 	}

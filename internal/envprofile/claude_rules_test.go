@@ -35,7 +35,7 @@ func TestClaudeNativeRulesMissingIsStale(t *testing.T) {
 			if err := os.WriteFile(settings, input, 0600); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), "native memory exclusion") {
+			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), "memory exclusions") {
 				t.Fatalf("missing native rules did not make home stale: %v", err)
 			}
 			if !bytes.Equal(input, readClaudeState(t, settings)) {

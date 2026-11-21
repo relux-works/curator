@@ -117,13 +117,14 @@ func TestUnixShardsWiring(t *testing.T) {
 		"lost-fifth-macos-shard":   {"          - {os: macos-latest, shard: 4}\n", ""},
 		"package-cross-product":    {"          - {os: ubuntu-latest, shard: 2}\n", "          - {os: ubuntu-latest, shard: 2}\n        package: [envprofile, install]\n"},
 		"only-main":                {"  unix-test-shards:\n", "  unix-test-shards:\n    if: github.event_name == 'push'\n"},
+		"added-pr-deferred-gate":   {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [windows-test-shards, unix-test-shards, store-v1-compatibility, curator-mutation-pr]"},
 		"lost-admission":           {"CI_UNIX_TEST_SHARDS: .temp/unix-test-shards", "CI_OTHER: .temp/unix-test-shards"},
 		"lost-upload":              {"name: unix-test-shard-${{ matrix.os }}-${{ matrix.shard }}", "name: unix-test-shard-fixed"},
 		"wrong-platform-artifacts": {"pattern: unix-test-shard-${{ matrix.os }}-*", "pattern: unix-test-shard-*"},
 		"lost-selector":            {"-lane unix-test -shard ${{ matrix.shard }}", "-lane unix-test -shard 0"},
-		"lost-boundary":            {"bash .github/ci/isolated-test.sh go run", "go run"},
+		"lost-boundary":            {"bash .github/ci/isolated-test.sh go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }}", "go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }}"},
 		"lost-consumer-boundary":   {"bash .github/ci/isolated-test.sh bash .github/ci/test-gate.sh", "bash .github/ci/test-gate.sh"},
-		"relative-home":            {"bash .github/ci/isolated-test.sh go run", "HOME=.temp/home go run"},
+		"relative-home":            {"bash .github/ci/isolated-test.sh go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }}", "HOME=.temp/home go run ./tools/envprofilerace -lane unix-test -shard ${{ matrix.shard }}"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := strings.Replace(string(good), pair[0], pair[1], 1)

@@ -48,9 +48,10 @@ func TestClaudeReadOnlySettingsFresh(t *testing.T) {
 	}
 }
 
-// All three settings preserve bytes on mode repair. Open descriptors retain
-// the old inode, bytes and mode across replacement, proving repair never
-// chmods or writes the live entry. Protected tool state retains bytes/modes.
+// With memory policy already current, all three settings preserve bytes on
+// mode repair. Open descriptors retain the old inode, bytes and mode across
+// replacement, proving repair never chmods or writes the live entry.
+// Protected tool state retains bytes/modes.
 func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 	fx := writeManagedFixture(t, "acme")
 	seedLiveNativeCredentials(t, fx)
@@ -60,6 +61,7 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 		t.Fatal(err)
 	}
 	home := ManagedHomeDir(fx.home, fx.profile, req.EnvID)
+	fixtureBytes := claudeSettingsFixtureBytes(t, home)
 	protected := map[string][]byte{}
 	for _, path := range []string{".claude.json", ".credentials.json", "policy-limits.json", "remote-settings.json", "policy-limits.json.etag", "remote-settings.json.etag", "policy-limits.json.lock", "remote-settings.json.lock"} {
 		full := filepath.Join(home, path)
@@ -92,7 +94,7 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 	enableClaudeReadOnly(&req)
 	for _, path := range claudeSettingsPaths {
 		full := filepath.Join(home, path)
-		if err := os.WriteFile(full, claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":1}\n")), 0o600); err != nil {
+		if err := os.WriteFile(full, fixtureBytes(path, []byte("{\"operator\":1}\n")), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -148,7 +150,7 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 		}
 		assertManagedMode(t, full, 0o400)
 		data, err := io.ReadAll(old)
-		if err != nil || string(data) != string(claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":1}\n"))) {
+		if err != nil || string(data) != string(fixtureBytes(path, []byte("{\"operator\":1}\n"))) {
 			t.Fatalf("old bytes changed: %q %v", data, err)
 		}
 		// Exercise a content update through the same atomic writer used by repair.
@@ -156,14 +158,14 @@ func TestClaudeReadOnlySettingsRepairAtomicAndProtected(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := atomicManagedFile(EnvRoot(fx.home), rel, claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":2}\n")), claudeReadOnlySettingsMode); err != nil {
+		if err := atomicManagedFile(EnvRoot(fx.home), rel, fixtureBytes(path, []byte("{\"operator\":2}\n")), claudeReadOnlySettingsMode); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Resolve(req); err != nil {
 			t.Fatal(err)
 		}
 		data, err = os.ReadFile(full)
-		if err != nil || string(data) != string(claudeSettingsFixtureBytes(t, path, []byte("{\"operator\":2}\n"))) {
+		if err != nil || string(data) != string(fixtureBytes(path, []byte("{\"operator\":2}\n"))) {
 			t.Fatalf("updated bytes lost: %q %v", data, err)
 		}
 		assertManagedMode(t, full, 0o400)
@@ -206,7 +208,7 @@ func TestClaudeReadOnlySettingsScope(t *testing.T) {
 				path := filepath.Join(home, "settings.json")
 				payload := []byte("{\"operator\":true}\n")
 				if id == envregistry.ClaudeCode {
-					payload = claudeSettingsFixtureBytes(t, "settings.json", payload)
+					payload = claudeSettingsFixtureBytes(t, home)("settings.json", payload)
 				}
 				if err := os.WriteFile(path, payload, 0o600); err != nil {
 					t.Fatal(err)
@@ -252,6 +254,7 @@ func TestClaudeReadOnlySettingsNonregular(t *testing.T) {
 					t.Fatal(err)
 				}
 				home := ManagedHomeDir(fx.home, fx.profile, req.EnvID)
+				fixtureBytes := claudeSettingsFixtureBytes(t, home)
 				markerPath := filepath.Join(home, ".agent-environment.json")
 				marker, err := os.ReadFile(markerPath)
 				if err != nil {
@@ -277,7 +280,7 @@ func TestClaudeReadOnlySettingsNonregular(t *testing.T) {
 						t.Fatal(err)
 					}
 				case "regular":
-					if err := os.WriteFile(full, claudeSettingsFixtureBytes(t, path, []byte("{}\n")), 0o444); err != nil {
+					if err := os.WriteFile(full, fixtureBytes(path, []byte("{}\n")), 0o444); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -319,9 +322,10 @@ func TestClaudeReadOnlySettingsWriteBits(t *testing.T) {
 		t.Fatal(err)
 	}
 	home := ManagedHomeDir(fx.home, fx.profile, req.EnvID)
+	fixtureBytes := claudeSettingsFixtureBytes(t, home)
 	for _, path := range claudeSettingsPaths {
 		full := filepath.Join(home, path)
-		if err := atomicManagedFile(EnvRoot(fx.home), mustSettingsRel(t, fx.home, full), claudeSettingsFixtureBytes(t, path, []byte("{}\n")), 0o444); err != nil {
+		if err := atomicManagedFile(EnvRoot(fx.home), mustSettingsRel(t, fx.home, full), fixtureBytes(path, []byte("{}\n")), 0o444); err != nil {
 			t.Fatal(err)
 		}
 		readOnly := req
@@ -355,28 +359,37 @@ func mustSettingsRel(t *testing.T, home, full string) string {
 	return rel
 }
 
-// Permission witnesses start with the independently specified native exclusions
-// already satisfied; optional settings have no native-memory ownership clause.
-func claudeSettingsFixtureBytes(t *testing.T, path string, input []byte) []byte {
+// Freeze the successfully composed policy before permission mutations. These
+// fixtures isolate mode/atomicity behavior; ancestor tests check policy coverage.
+func claudeSettingsFixtureBytes(t *testing.T, home string) func(string, []byte) []byte {
 	t.Helper()
-	if path != "settings.json" {
-		return input
-	}
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(input, &object); err != nil {
-		t.Fatal(err)
-	}
-	home, err := os.UserHomeDir()
+	data, err := os.ReadFile(filepath.Join(home, "settings.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	object["claudeMdExcludes"], err = json.Marshal([]string{filepath.ToSlash(filepath.Join(home, ".claude", "CLAUDE.md")), filepath.ToSlash(filepath.Join(home, ".claude", "rules")) + "/**"})
-	if err != nil {
+	var composed map[string]json.RawMessage
+	if err := json.Unmarshal(data, &composed); err != nil {
 		t.Fatal(err)
 	}
-	result, err := json.Marshal(object)
-	if err != nil {
-		t.Fatal(err)
+	policy := composed["claudeMdExcludes"]
+	var excludes []string
+	if err := json.Unmarshal(policy, &excludes); err != nil || len(excludes) == 0 {
+		t.Fatalf("composed fixture has no memory policy: %s, %v", policy, err)
 	}
-	return append(result, '\n')
+	return func(path string, input []byte) []byte {
+		t.Helper()
+		if path != "settings.json" {
+			return input
+		}
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(input, &object); err != nil {
+			t.Fatal(err)
+		}
+		object["claudeMdExcludes"] = policy
+		result, err := json.Marshal(object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return append(result, '\n')
+	}
 }

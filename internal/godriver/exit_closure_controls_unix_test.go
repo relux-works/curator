@@ -18,7 +18,7 @@ func TestWorkerExitNarrowingControls(t *testing.T) {
 	for _, p := range []struct{ name, file, before, after, witness, reason string }{
 		{"ignored-SIGPIPE", "orphan_unix.go", "signal.Notify(c, syscall.SIGPIPE)", "signal.Ignore(syscall.SIGPIPE)", "TestWorkerPipeHandlerDoesNotLeakToExec", "exec child inherited ignored SIGPIPE"},
 		{"coded-cause-first", "workerclient.go", "if client.command != nil && client.command.ProcessState != nil && client.command.ProcessState.ExitCode() == exitWorkerTeardownFailed {", "if DiagnosticCode(cause) != \"\" { return cause }; if client.command != nil && client.command.ProcessState != nil && client.command.ProcessState.ExitCode() == exitWorkerTeardownFailed {", "TestWorkerCodedCauseKeepsTeardownStatus", "coded cause diagnostic=build_execution_worker_protocol_invalid"},
-		{"main-failure-closed-output", "workerserver.go", "session.fail(err)\n\t\tstopOrphanedWorkerDomain()", "session.fail(err)", "TestWorkerClosedManagerPipes/session-failure", "domain closure: status=exit 4 alive=2 markers=2"},
+		{"main-failure-closed-output", "workerserver.go", "session.fail(err)\n\t\tstopOrphanedWorkerDomain()", "session.fail(err)", "TestWorkerClosedManagerPipes/session-failure", "acknowledged descendant survived worker teardown"},
 		{"fatal-SIGPIPE", "orphan_unix.go", "signal.Notify(c, syscall.SIGPIPE)", "signal.Stop(c); _ = syscall.SIGPIPE", "TestWorkerClosedManagerPipes/header", "domain closure: status=signal broken pipe"},
 		{"no-worker-deadline", "workerserver.go", "default:\n\t\t\t}\n\t\t\tstopOrphanedWorkerDomain()", "default:\n\t\t\t}\n\t\t\t// omitted watcher kill", "TestWorkerIndependentDeadline", "worker deadline watcher did not terminate domain"},
 		{"no-success-teardown", "orphan_unix.go", "func finishWorkerDomain() { stopOrphanedWorkerDomain() }", "func finishWorkerDomain() {}", "TestWorkerSuccessfulShutdownKillsDescendants", "domain closure: status=exit 0"},
@@ -38,11 +38,11 @@ func TestWorkerExitNarrowingControls(t *testing.T) {
 				testtoolchain.InheritHostGOROOTLock(t, c)
 				b, err := c.CombinedOutput()
 				if overlay == "" {
-					if err != nil || !strings.Contains(string(b), "--- PASS:") {
+					if err != nil || !strings.Contains(string(b), "--- PASS: "+p.witness) {
 						t.Fatalf("positive control: %v\n%s", err, b)
 					}
 				} else {
-					if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !strings.Contains(string(b), p.reason) || !strings.Contains(string(b), "--- FAIL:") {
+					if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || !strings.Contains(string(b), p.reason) || !strings.Contains(string(b), "--- FAIL: "+p.witness) {
 						t.Fatalf("plant failed outside intended assertion: %v\n%s", err, b)
 					}
 				}

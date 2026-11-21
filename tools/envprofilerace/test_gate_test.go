@@ -77,7 +77,15 @@ esac
 `)
 			cmd := exec.Command("bash", ".github/ci/test-gate.sh", "evidence")
 			cmd.Dir = dir
-			cmd.Env = append(os.Environ(), "CI_STORE_COMPATIBILITY=compatibility", "GITHUB_SHA="+strings.Repeat("a", 40), "COMPAT_REFUSED=0",
+			// This fixture covers ordinary gate behavior, independent of the
+			// post-landing inventory lane selected by the outer CI workflow.
+			env := make([]string, 0, len(os.Environ())+1)
+			for _, entry := range os.Environ() {
+				if !strings.HasPrefix(entry, "CI_SKIP_POST_LANDING_TESTS=") {
+					env = append(env, entry)
+				}
+			}
+			cmd.Env = append(env, "CI_STORE_COMPATIBILITY=compatibility", "CI_SKIP_POST_LANDING_TESTS=0", "GITHUB_SHA="+strings.Repeat("a", 40), "COMPAT_REFUSED=0",
 				"GO="+filepath.ToSlash(filepath.Join(dir, "fake-go")),
 				"CURATOR_CONFORMANCE_ROOT="+filepath.ToSlash(dir), "CONTROL="+control,
 				"CI_WINDOWS_TEST_SHARDS=", "CI_UNIX_TEST_SHARDS=", "CI_ENVPROFILE_SHARDS=", "GO_TEST_FLAGS=", "GO_TEST_TIMEOUT="+c.timeout, "LANE="+c.lane,

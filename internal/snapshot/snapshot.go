@@ -23,7 +23,12 @@ var ErrDestinationConflict = errors.New("snapshot destination conflicts with imm
 // destination-open failures. Production uses transaction.DigestPath.
 var digestSnapshotDestination = transaction.DigestPath
 
-const destinationSharingViolationRetries = 3
+// destinationSharingViolation keeps the platform classifier injectable for
+// deterministic retry controls on hosts without Windows error codes.
+var destinationSharingViolation = isDestinationSharingViolation
+
+// Allow up to 100 ms of retry delays when concurrent readers contend on Windows.
+const destinationSharingViolationRetries = 10
 const destinationSharingViolationRetryDelay = 10 * time.Millisecond
 
 // Dir returns the cache location for a source at a commit.
@@ -200,7 +205,7 @@ func authenticateDestination(expected, destination string) error {
 func digestDestinationWithSharingRetry(destination string) (string, error) {
 	for retry := 0; ; retry++ {
 		digest, err := digestSnapshotDestination(destination)
-		if err == nil || !isDestinationSharingViolation(err) || retry == destinationSharingViolationRetries {
+		if err == nil || !destinationSharingViolation(err) || retry == destinationSharingViolationRetries {
 			return digest, err
 		}
 		time.Sleep(destinationSharingViolationRetryDelay)

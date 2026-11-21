@@ -188,7 +188,7 @@ func TestClaudeNativeMemoryStagingResidueDetector(t *testing.T) {
 func TestClaudeNativeMemorySettingsFileKinds(t *testing.T) {
 	for _, kind := range []string{"absent", "directory", "symlink", "dangling-symlink"} {
 		t.Run(kind, func(t *testing.T) {
-			root := t.TempDir()
+			op, req, root := claudeMemoryPublicationFixture(t)
 			path := filepath.Join(root, "settings.json")
 			target := filepath.Join(t.TempDir(), "target.json")
 			if err := os.WriteFile(target, []byte(`{"unrelated":true}`), 0600); err != nil {
@@ -210,12 +210,12 @@ func TestClaudeNativeMemorySettingsFileKinds(t *testing.T) {
 				}
 			}
 			before, _ := os.Lstat(path)
-			err := publishClaudeSettings(root, ".")
+			err := publishClaudeAncestorSettings(op, req)
 			if kind == "absent" {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if plan, err := prepareClaudeSettings(root, "."); err != nil || plan.payload != nil {
+				if plan, err := prepareClaudeAncestorSettings(req); err != nil || plan.settings.payload != nil {
 					t.Fatalf("created settings do not satisfy exclusion: %v", err)
 				}
 			} else {
@@ -253,7 +253,7 @@ func TestClaudeNativeMemoryChangedHome(t *testing.T) {
 			nextHome := tc.next
 			t.Setenv("HOME", nextHome)
 			t.Setenv("USERPROFILE", nextHome)
-			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), DiagHomeStale) || !strings.Contains(err.Error(), "native memory exclusion") {
+			if _, err := Resolve(req); err == nil || !strings.Contains(err.Error(), DiagHomeStale) || !strings.Contains(err.Error(), "memory exclusions") {
 				t.Fatalf("changed home must refuse the stale exclusion: %v", err)
 			}
 			if !bytes.Equal(beforeRoot, readClaudeState(t, root)) || !bytes.Equal(beforeSeed, readClaudeState(t, seed)) || !bytes.Equal(beforeSettings, readClaudeState(t, settings)) {

@@ -303,11 +303,11 @@ func installVectorPathOverlay(t *testing.T, home, root string, policy Policy) {
 	}
 }
 
-func resolveVectorPath(t *testing.T, home, profile string, policy Policy) *ResolveResult {
+func resolveVectorPath(t *testing.T, home, profile string, policy Policy, launchDir string) *ResolveResult {
 	t.Helper()
 	result, err := Resolve(ResolveRequest{
 		Home: home, Profile: profile, EnvID: "claude_code", Machine: envregistry.DefaultMachineConfig(),
-		Policy: policy, LaunchDir: t.TempDir(), Repair: true, Format: "json",
+		Policy: policy, LaunchDir: launchDir, Repair: true, Format: "json",
 		Detect:       func(envregistry.Adapter) string { return "unknown" },
 		NativeHomeOf: func(id string) (string, error) { return filepath.Join(home, "native", id), nil },
 		OperatorXDG:  t.TempDir(),
@@ -320,12 +320,13 @@ func resolveVectorPath(t *testing.T, home, profile string, policy Policy) *Resol
 
 func assertPathResolveCurrent(t *testing.T, home, profile string, policy Policy, tc pathBoundaryVector) *ResolveResult {
 	t.Helper()
-	result := resolveVectorPath(t, home, profile, policy)
+	launchDir := t.TempDir()
+	result := resolveVectorPath(t, home, profile, policy, launchDir)
 	if len(result.Document) == 0 || !tc.Fragment || !tc.Current || tc.Diagnostic != "" {
 		t.Fatalf("trusted path source did not emit a current fragment: vector=%+v result=%s", tc, result.Document)
 	}
 	status, err := StatusOf(StatusRequest{
-		Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, LaunchDir: gitFixtureHome(t),
+		Home: home, Machine: envregistry.DefaultMachineConfig(), Policy: policy, LaunchDir: launchDir,
 		Detect:       func(envregistry.Adapter) string { return "unknown" },
 		NativeHomeOf: func(id string) (string, error) { return filepath.Join(home, "native", id), nil },
 		OperatorXDG:  filepath.Join(home, "xdg"),

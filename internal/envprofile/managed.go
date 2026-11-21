@@ -1432,7 +1432,7 @@ func applyPlan(op *operation, req *ResolveRequest, plan *homePlan, seeds *seedBu
 	// or link replacement. Staging/rename I/O errors after this boundary are
 	// not an all-or-nothing home transaction (see atomicManagedFile).
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		if _, err := prepareClaudeSettings(root, homeRel); err != nil {
+		if _, err := prepareClaudeAncestorSettings(req); err != nil {
 			return op.recoveryRefusal(err)
 		}
 		seeds.claudePrepared, err = refreshClaudeSeed(op.claudePrepared, root, homeRel, req.LaunchDir, plan.form)
@@ -1728,7 +1728,7 @@ func finalizeMarker(op *operation, req *ResolveRequest, plan *homePlan, seeds *s
 		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
-		if err := publishClaudeSettings(root, homeRel); err != nil {
+		if err := publishClaudeAncestorSettings(op, req); err != nil {
 			return nil, err
 		}
 		if !seenSeeds["settings.json"] {
@@ -2595,11 +2595,14 @@ func (v *verification) checkClaudeProject(req *ResolveRequest, plan *homePlan) {
 	if plan.adapter.ID != envregistry.ClaudeCode {
 		return
 	}
-	settings, settingsErr := prepareClaudeSettings(plan.homeDir, ".")
+	settings, settingsErr := prepareClaudeAncestorSettings(req)
 	if settingsErr != nil {
 		v.reasons = append(v.reasons, settingsErr.Error())
-	} else if settings.payload != nil {
-		v.reasons = append(v.reasons, "managed Claude settings lack the native memory exclusion")
+	} else if settings.settings.payload != nil {
+		v.reasons = append(v.reasons, "managed Claude memory exclusions need reconciliation")
+		v.reasons = append(v.reasons, settings.ancestorDiagnostics...)
+	} else if settings.statePayload != nil {
+		v.reasons = append(v.reasons, "managed Claude memory ownership needs reconciliation")
 	}
 	entries, err := claudeProjects(plan.homeDir)
 	if err != nil {
@@ -3281,7 +3284,7 @@ func (req *ResolveRequest) beginRepairOperation() (*operation, error) {
 		if err != nil {
 			return err
 		}
-		if _, err := prepareClaudeSettings(root, homeRel); err != nil {
+		if _, err := prepareClaudeAncestorSettings(req); err != nil {
 			return err
 		}
 		// This callback holds the repair lock and precedes journal recovery,

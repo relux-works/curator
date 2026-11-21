@@ -94,13 +94,14 @@ func TestWindowsShardsWiring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pair := range map[string][2]string{
-		"lost-shard":       {"shard: [0, 1, 2, 3]", "shard: [0, 1, 2]"},
-		"success-only":     {"  test:\n    if: ${{ !cancelled() }}", "  test:\n    if: success()"},
-		"wrong-dependency": {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [envprofile-race, unix-test-shards]"},
-		"lost-admission":   {"CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards", "CI_OTHER: .temp/windows-test-shards"},
-		"lost-upload":      {"name: windows-test-shard-${{ matrix.shard }}", "name: windows-test-shard-0"},
-		"lost-selector":    {"-lane windows-test -shard ${{ matrix.shard }}", "-lane windows-test -shard 0"},
-		"only-main":        {"  windows-test-shards:\n", "  windows-test-shards:\n    if: github.event_name == 'push'\n"},
+		"lost-shard":         {"shard: [0, 1, 2, 3]", "shard: [0, 1, 2]"},
+		"success-only":       {"  test:\n    if: ${{ !cancelled() }}", "  test:\n    if: success()"},
+		"wrong-dependency":       {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [envprofile-race, unix-test-shards]"},
+		"added-pr-deferred-gate": {"needs: [windows-test-shards, unix-test-shards, store-v1-compatibility]", "needs: [windows-test-shards, unix-test-shards, store-v1-compatibility, curator-mutation-pr]"},
+		"lost-admission":     {"CI_WINDOWS_TEST_SHARDS: .temp/windows-test-shards", "CI_OTHER: .temp/windows-test-shards"},
+		"lost-upload":        {"name: windows-test-shard-${{ matrix.shard }}", "name: windows-test-shard-0"},
+		"lost-selector":      {"-lane windows-test -shard ${{ matrix.shard }}", "-lane windows-test -shard 0"},
+		"only-main":          {"  windows-test-shards:\n", "  windows-test-shards:\n    if: github.event_name == 'push'\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := strings.Replace(string(good), pair[0], pair[1], 1)

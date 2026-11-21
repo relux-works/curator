@@ -1,0 +1,53 @@
+name: Post-landing curator deferred tests
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  curator-deferred-tests:
+    name: macOS cmd/curator deferred race tests
+    runs-on: macos-latest
+    timeout-minutes: 70
+    env:
+      GOTOOLCHAIN: local
+      GOENV: "off"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+      - name: Inventory PR and post-landing test sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/ci/isolated-test.sh go run ./tools/mutationinventory \
+            -mode inventory -package ./cmd/curator -timeout 60m \
+            -go-test-flags=-race -require-all \
+            -evidence .temp/ci-evidence/post-landing-mutation
+      - name: Run post-landing mutation and exhaustive tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          selector="$(go run ./tools/mutationinventory -mode post-landing-selector)"
+          bash .github/ci/isolated-test.sh go test -race -count=1 -timeout=60m -v \
+            -run "$selector" ./cmd/curator \
+            2>&1 | tee .temp/ci-evidence/post-landing-mutation/go-test.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: post-landing-mutation-evidence
+          path: .temp/ci-evidence/post-landing-mutation/
+          if-no-files-found: warn

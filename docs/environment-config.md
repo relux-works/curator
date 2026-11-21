@@ -188,17 +188,48 @@ the existing rename helper and its residual preparation window. External writers
 do not share the manager lock: scheduling between the final read and rename can
 still race, so this is not an atomic compare-and-swap guarantee.
 
-Claude `settings.json` carries separate manager-owned `claudeMdExcludes`
-entries for the operator's native `.claude/CLAUDE.md` and `.claude/rules/**`.
-Both paths come from the OS user home, independently of `CLAUDE_CONFIG_DIR`;
-path metacharacters are quoted, while the rules suffix recurses. Curator does
-not read or move native memory. Provisioning and repair merge these entries
-into the managed settings, preserving existing exclusions and unrelated values; satisfied settings retain their bytes. Malformed settings or
-nonregular destinations refuse rather than being replaced with defaults.
-Read-only resolve reports either missing entry as stale. The publication uses the
-same prepare-before-final-read rename boundary described above, with the same
-external-writer race limit. This exclusion does not match project or managed
-profile instruction files and does not disable managed policy memory.
+### Claude instruction exclusions
+
+Claude `settings.json` carries literal `claudeMdExcludes` entries for
+`CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` in every strict ancestor
+of the launch project's Git toplevel, through filesystem root. Outside Git,
+the launch directory is the project root. Nested launch directories therefore
+retain their project's own instruction files. Lexical and canonical path forms
+are covered when symlinks differ. Path glob metacharacters match literally.
+Curator inspects path metadata, never instruction contents. Broken repository
+metadata or an unresolved existing path refuses instead of guessing a root.
+When global composition omits the launch directory, memory discovery uses the
+process working directory without adding trust for that directory. An explicit
+relative or invalid launch directory still refuses.
+
+No project file, `AGENTS.md` form, composed managed root or managed-policy
+memory is newly excluded. Exactly two operator-native patterns are exceptions:
+the real-home `.claude/CLAUDE.md` and `.claude/rules/**`, in lexical and
+canonical form, remain excluded even when the project root is the operator
+home or its ancestor. Only the rules suffix recurses. `CLAUDE_CONFIG_DIR` does
+not change the operator home. Excluding an ancestor loader also prevents its
+imports from being loaded through that file; imports from allowed files remain
+outside this policy.
+
+Repair preserves unrelated settings and user exclusions. A private ownership
+record under `state/claude-memory/v1/` identifies only exact entries appended
+by Curator. Changing project roots removes one previously owned occurrence
+before adding the new required entries; a user duplicate survives. Without a
+record, all existing entries remain user-owned, including matching patterns.
+This conservative migration never guesses who originally added an entry.
+The version-1 record has `version: 1` and an `owned_patterns` string array;
+unknown fields/versions, duplicate keys/patterns, nonliteral paths and invalid
+file kinds refuse before publication. It is not a vendor settings extension.
+
+Settings and ownership publish through the existing manager lock and durable
+transaction journal. Their existing modes are preserved, and interrupted
+publication uses normal recovery. Inputs are re-read before publication and
+pinned preimages are checked by the transaction engine; external writers do
+not share the lock, so no filesystem compare-and-swap guarantee is claimed.
+Satisfied settings retain their bytes. Read-only resolve reports missing
+policy or ownership as stale, naming existing ancestor paths whose exact
+entries are missing. This diagnostic does not claim the vendor loaded them:
+a broader user exclusion may already cover a path.
 
 ## Logging in to managed homes
 
@@ -479,8 +510,8 @@ curator env config unset claude_settings_mode.example
 ```
 
 With `read-only`, repair/provisioning creates an absent `settings.json` with the
-required native-memory exclusions. Existing `settings.json` retains unrelated
-values and exclusions; only missing native-memory exclusions are added. The
+required instruction exclusions. Existing `settings.json` retains unrelated
+values and user exclusions; Curator-owned ancestor entries are refreshed. The
 exclusion publisher preserves the file's existing mode. Permission repair makes
 it and present `cowork_settings.json` and legacy `.config.json` regular `0400`
 files on Unix; those optional files retain their exact bytes.

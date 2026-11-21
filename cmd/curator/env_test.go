@@ -810,7 +810,7 @@ func TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates(t *testing
 	if err != nil {
 		t.Fatalf("locate fixture Go toolchain: %v", err)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+filepath.Join(strings.TrimSpace(string(goRoot)), "bin"))
+	t.Setenv("PATH", cliTestPath(bin)+string(os.PathListSeparator)+filepath.Join(strings.TrimSpace(string(goRoot)), "bin"))
 	writeNativeCredentials(t)
 	prepareNativeMuse(t)
 	pkg := t.TempDir()

@@ -29,17 +29,8 @@ func (engine *Engine) stageTarget(journal *Journal, targetIndex int) error {
 		if err := engine.saveJournal(journal); err != nil {
 			return err
 		}
-		if err := engine.createStagingEntry(journal, targetIndex, entry); err != nil {
+		if err := engine.stageEntry(journal, targetIndex, entry); err != nil {
 			return err
-		}
-		target.StagingCreated = true
-		if err := engine.saveJournal(journal); err != nil {
-			return err
-		}
-		if entry.Kind == "file" {
-			if err := engine.copyStagingFile(journal, targetIndex, entry); err != nil {
-				return err
-			}
 		}
 		path := stagingEntryPath(target.StagedPath, entry.RelativePath)
 		info, err := os.Lstat(path)
@@ -63,64 +54,85 @@ func (engine *Engine) stageTarget(journal *Journal, targetIndex int) error {
 	return nil
 }
 
-func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entry RemovalEntry) error {
+// Keep the exclusively created descriptor while copying. The desired mode may
+// be read-only; reopening that path for writing would fail. The descriptor
+// preserves write access without ever relaxing the staged or live inode mode.
+func (engine *Engine) stageEntry(journal *Journal, targetIndex int, entry RemovalEntry) (result error) {
+	file, err := engine.createStagingEntry(journal, targetIndex, entry)
+	if err != nil {
+		return err
+	}
+	if file != nil {
+		defer func() { result = errors.Join(result, file.Close()) }()
+	}
+	journal.Targets[targetIndex].StagingCreated = true
+	if err := engine.saveJournal(journal); err != nil {
+		return err
+	}
+	if file != nil {
+		return engine.copyStagingFile(journal, targetIndex, entry, file)
+	}
+	return nil
+}
+
+func (engine *Engine) createStagingEntry(journal *Journal, targetIndex int, entry RemovalEntry) (file *os.File, result error) {
+	defer func() {
+		if result != nil && file != nil {
+			result = errors.Join(result, file.Close())
+			file = nil
+		}
+	}()
 	target := &journal.Targets[targetIndex]
 	destination := stagingEntryPath(target.StagedPath, entry.RelativePath)
 	source := stagingEntryPath(target.StagedSource, entry.RelativePath)
 	if _, err := os.Lstat(destination); err == nil {
-		return corruptionf("staging entry already exists before creation: %s", destination)
+		return nil, corruptionf("staging entry already exists before creation: %s", destination)
 	} else if !os.IsNotExist(err) {
-		return err
+		return nil, err
 	}
 	switch entry.Kind {
 	case "link":
-		// A link is created complete in one step: its destination string is its
-		// whole content, so there is no partial state to write ahead.
+		// Link creation is complete: its destination string is all its content.
 		if err := os.Symlink(entry.LinkTarget, destination); err != nil {
-			return err
+			return nil, err
 		}
 	case "directory":
 		if err := makePublicationDirectory(destination, 0); err != nil {
-			return err
+			return nil, err
 		}
 		if err := os.Chmod(destination, os.FileMode(entry.Mode)); err != nil {
-			return err
+			return nil, err
 		}
 		if err := syncDirectory(destination); err != nil {
-			return err
+			return nil, err
 		}
 	case "file":
 		info, err := os.Lstat(source)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := verifyRemovalEntry(source, info, entry); err != nil {
-			return corruptionf("staging source entry changed before copy: %s", source)
+			return nil, corruptionf("staging source entry changed before copy: %s", source)
 		}
 		if target.PrivateFile {
 			if err := privatedir.ValidateFile(source); err != nil {
-				return fmt.Errorf("private transaction source: %w", err)
+				return nil, fmt.Errorf("private transaction source: %w", err)
 			}
 		}
-		file, err := createStagingFile(destination, target.PrivateFile)
-		if err != nil {
-			return err
+		file, result = createStagingFile(destination, target.PrivateFile)
+		if result != nil {
+			return file, result
 		}
-		if err := file.Chmod(os.FileMode(entry.Mode)); err != nil {
-			_ = file.Close()
-			return err
+		if result = file.Chmod(os.FileMode(entry.Mode)); result != nil {
+			return file, result
 		}
-		if err := file.Sync(); err != nil {
-			_ = file.Close()
-			return err
-		}
-		if err := file.Close(); err != nil {
-			return err
+		if result = file.Sync(); result != nil {
+			return file, result
 		}
 	default:
-		return journalf("unknown staging entry kind %q", entry.Kind)
+		return nil, journalf("unknown staging entry kind %q", entry.Kind)
 	}
-	return syncDirectory(filepath.Dir(destination))
+	return file, syncDirectory(filepath.Dir(destination))
 }
 
 func createStagingFile(path string, private bool) (*os.File, error) {
@@ -139,20 +151,14 @@ func validatePrivateReplacement(target *TargetRecord, path string) error {
 	return nil
 }
 
-func (engine *Engine) copyStagingFile(journal *Journal, targetIndex int, entry RemovalEntry) (result error) {
+func (engine *Engine) copyStagingFile(journal *Journal, targetIndex int, entry RemovalEntry, destination *os.File) (result error) {
 	target := &journal.Targets[targetIndex]
 	sourcePath := stagingEntryPath(target.StagedSource, entry.RelativePath)
-	destinationPath := stagingEntryPath(target.StagedPath, entry.RelativePath)
 	source, err := os.Open(sourcePath) // #nosec G304 -- caller-selected private staging source
 	if err != nil {
 		return err
 	}
 	defer func() { result = errors.Join(result, source.Close()) }()
-	destination, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_APPEND, 0) // #nosec G304 -- transaction-owned sidecar
-	if err != nil {
-		return err
-	}
-	defer func() { result = errors.Join(result, destination.Close()) }()
 	buffer := make([]byte, stagingCopyChunkSize)
 	prefix := sha256.New()
 	_, _ = prefix.Write(stagingPrefixDigestDomain)

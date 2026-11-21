@@ -40,6 +40,8 @@ func replaceDestinationDigestForTest(replacement func(string) (string, error)) f
 	return func() { digestSnapshotDestination = previous }
 }
 
+// Concurrent publication recovers from one injected native sharing error;
+// incidental native contention may require further bounded retries.
 func TestConcurrentGetRetriesInjectedWindowsSharingViolation(t *testing.T) {
 	firstHome, repo, commit := windowsSharingFixture(t)
 	const repetitions = 5
@@ -98,6 +100,7 @@ func TestConcurrentGetRetriesInjectedWindowsSharingViolation(t *testing.T) {
 	}
 }
 
+// A persistent native sharing error refuses after the configured attempt bound.
 func TestGetFailsClosedAfterPersistentWindowsSharingViolation(t *testing.T) {
 	home, repo, commit := windowsSharingFixture(t)
 	if _, err := Get(home, "internal/skill-a", repo, commit); err != nil {
@@ -123,6 +126,7 @@ func TestGetFailsClosedAfterPersistentWindowsSharingViolation(t *testing.T) {
 	}
 }
 
+// Native access denied refuses on its first attempt and retains the cause.
 func TestGetDoesNotRetryWindowsAccessDenied(t *testing.T) {
 	home, repo, commit := windowsSharingFixture(t)
 	if _, err := Get(home, "internal/skill-a", repo, commit); err != nil {
