@@ -18,6 +18,7 @@ jobs:
         runner:
           - windows-latest
           - macos-latest
+          - ubuntu-latest
     steps:
       - name: Checkout pushed commit
         id: checkout
@@ -211,6 +212,23 @@ jobs:
             fi
             printf 'posix_umask=%s\n' "$effective_umask" >> "$GITHUB_OUTPUT"
           fi
+          probe_dir="$CAPTURE_ROOT/probe"
+          probe_dir_mode=not-applicable
+          if [[ "$RUNNER_OS" != "Windows" ]]; then
+            mkdir -m 700 "$probe_dir"
+            case "$RUNNER_OS" in
+              Linux) observed_probe_mode="$(stat -c '%a' "$probe_dir")" ;;
+              macOS) observed_probe_mode="$(stat -f '%Lp' "$probe_dir")" ;;
+              *) printf 'CAPTURE_REASON=capture/probe-platform-unsupported\n' >&2; exit 1 ;;
+            esac
+            if [[ "$observed_probe_mode" != "700" ]]; then
+              printf 'probe_dir_mode=invalid\n' >> "$GITHUB_OUTPUT"
+              printf 'CAPTURE_REASON=capture/probe-mode-mismatch\n' >&2
+              exit 1
+            fi
+            probe_dir_mode=0700
+          fi
+          printf 'probe_dir_mode=%s\n' "$probe_dir_mode" >> "$GITHUB_OUTPUT"
           cd "$GITHUB_WORKSPACE"
           cat > "$CAPTURE_ROOT/audit.go" <<'GO'
           package main
@@ -1039,6 +1057,11 @@ jobs:
         env:
           CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
           REQUIRE_47: ${{ steps.capture.outcome == 'success' }}
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          WORKFLOW_HEAD: ${{ github.sha }}
+          MATRIX_RUNNER: ${{ matrix.runner }}
+          CAPTURE_UMASK: ${{ steps.capture.outputs.posix_umask || 'not-recorded' }}
+          CAPTURE_PROBE_MODE: ${{ steps.capture.outputs.probe_dir_mode || 'not-recorded' }}
         run: |
           set -euo pipefail
           sanitize_shell_error() {
@@ -1051,6 +1074,426 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           sanitizer_source_dir="$GITHUB_WORKSPACE/.temp/capture-exporter"
           mkdir -p "$sanitizer_source_dir"
+          cat > "$sanitizer_source_dir/seal.go" <<'GO'
+          package main
+
+          import (
+            "bytes"
+            "crypto/sha256"
+            "encoding/hex"
+            "encoding/json"
+            "fmt"
+            "os"
+            "path/filepath"
+            "regexp"
+            "sort"
+            "strings"
+          )
+
+          const driverRevision = "805517ccc4bc77614e9ccb3e35e47876f054f629"
+
+          type sourcePin struct {
+            Path   string `json:"path"`
+            SHA256 string `json:"sha256"`
+          }
+
+          var driverPins = []sourcePin{
+            {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
+            {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
+            {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
+            {"launcher_fixture_test.go", "deaefe19fadacd5d449176bfab0aa60d029c842f14c5070fbea7e9f0e539e983"},
+            {"legacy_fixture_test.go", "e9250a474e897a0d8aa9e0ee6f01afd0a42d8532ae6e8d812148810a4ffae911"},
+          }
+
+          type byteFile struct {
+            name string
+            data []byte
+          }
+
+          type fileSeal struct {
+            Path              string `json:"path"`
+            Bytes             int    `json:"bytes"`
+            ObservedSHA256    string `json:"observed_sha256"`
+            ExportedSHA256    string `json:"exported_sha256"`
+          }
+
+          type groupSeal struct {
+            Count                    int        `json:"count"`
+            ObservedManifestSHA256   string     `json:"observed_manifest_sha256"`
+            ExportedManifestSHA256   string     `json:"exported_manifest_sha256"`
+            Files                    []fileSeal `json:"files"`
+          }
+
+          type workflowSeal struct {
+            Head     string `json:"head"`
+            Tree     string `json:"tree"`
+            Platform string `json:"platform"`
+            Runner   string `json:"runner"`
+          }
+
+          type driverSeal struct {
+            Revision string      `json:"revision"`
+            Scope    string      `json:"scope"`
+            Files    []sourcePin `json:"files"`
+          }
+
+          type captureSeal struct {
+            Umask             string    `json:"umask"`
+            ProbeDirectoryMode string   `json:"probe_directory_mode"`
+            Cases             groupSeal `json:"cases"`
+            RepeatObservations groupSeal `json:"repeat_observations"`
+          }
+
+          type sealDocument struct {
+            Schema       string       `json:"schema"`
+            Workflow     workflowSeal `json:"workflow"`
+            DriverSource driverSeal   `json:"driver_source"`
+            Capture      captureSeal  `json:"capture"`
+          }
+
+          var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+          func sha256Hex(data []byte) string {
+            digest := sha256.Sum256(data)
+            return hex.EncodeToString(digest[:])
+          }
+
+          func readRegular(path string) ([]byte, error) {
+            info, err := os.Lstat(path)
+            if err != nil || !info.Mode().IsRegular() {
+              return nil, fmt.Errorf("seal/input-invalid")
+            }
+            data, err := os.ReadFile(path)
+            if err != nil {
+              return nil, fmt.Errorf("seal/input-invalid")
+            }
+            return data, nil
+          }
+
+          func writeRegular(path string, data []byte) error {
+            if err := os.WriteFile(path, data, 0600); err != nil {
+              return fmt.Errorf("seal/control-setup-failed")
+            }
+            if err := os.Chmod(path, 0600); err != nil {
+              return fmt.Errorf("seal/control-setup-failed")
+            }
+            return nil
+          }
+
+          func readGroup(directory string, expected int, exported bool) ([]byteFile, []byte, error) {
+            info, err := os.Lstat(directory)
+            if err != nil || !info.IsDir() {
+              return nil, nil, fmt.Errorf("seal/group-invalid")
+            }
+            entries, err := os.ReadDir(directory)
+            if err != nil || len(entries) != expected+btoi(exported) {
+              return nil, nil, fmt.Errorf("seal/group-count-invalid")
+            }
+            files := make([]byteFile, 0, expected)
+            var manifest []byte
+            for _, entry := range entries {
+              if entry.Name() == "MANIFEST.json" && exported {
+                manifest, err = readRegular(filepath.Join(directory, entry.Name()))
+                if err != nil {
+                  return nil, nil, err
+                }
+                continue
+              }
+              if entry.Name() == "MANIFEST.json" || filepath.Base(entry.Name()) != entry.Name() || filepath.Ext(entry.Name()) != ".json" {
+                return nil, nil, fmt.Errorf("seal/group-entry-invalid")
+              }
+              data, err := readRegular(filepath.Join(directory, entry.Name()))
+              if err != nil {
+                return nil, nil, err
+              }
+              files = append(files, byteFile{name: entry.Name(), data: data})
+            }
+            if len(files) != expected || (exported && manifest == nil) {
+              return nil, nil, fmt.Errorf("seal/group-count-invalid")
+            }
+            sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
+            return files, manifest, nil
+          }
+
+          func btoi(value bool) int {
+            if value { return 1 }
+            return 0
+          }
+
+          func canonicalManifest(files []byteFile) []byte {
+            ordered := append([]byteFile(nil), files...)
+            sort.Slice(ordered, func(i, j int) bool { return ordered[i].name < ordered[j].name })
+            var encoded bytes.Buffer
+            encoded.WriteString("{\"files\":[")
+            for index, file := range ordered {
+              if index > 0 { encoded.WriteByte(',') }
+              name, _ := json.Marshal(file.name)
+              fmt.Fprintf(&encoded, "{\"path\":%s,\"bytes\":%d,\"sha256\":%q}", name, len(file.data), sha256Hex(file.data))
+            }
+            encoded.WriteString("]}\n")
+            return encoded.Bytes()
+          }
+
+          func sealGroup(rawDir, exportedDir string, count int) (groupSeal, error) {
+            observed, _, err := readGroup(rawDir, count, false)
+            if err != nil { return groupSeal{}, err }
+            exported, exportedManifest, err := readGroup(exportedDir, count, true)
+            if err != nil { return groupSeal{}, err }
+            if len(observed) != len(exported) { return groupSeal{}, fmt.Errorf("seal/group-shape-mismatch") }
+            files := make([]fileSeal, 0, count)
+            for index := range observed {
+              if observed[index].name != exported[index].name || !bytes.Equal(observed[index].data, exported[index].data) {
+                return groupSeal{}, fmt.Errorf("seal/payload-mismatch")
+              }
+              observedHash := sha256Hex(observed[index].data)
+              exportedHash := sha256Hex(exported[index].data)
+              if observedHash != exportedHash { return groupSeal{}, fmt.Errorf("seal/payload-hash-mismatch") }
+              files = append(files, fileSeal{
+                Path: observed[index].name, Bytes: len(observed[index].data),
+                ObservedSHA256: observedHash, ExportedSHA256: exportedHash,
+              })
+            }
+            observedManifest := canonicalManifest(observed)
+            if !bytes.Equal(observedManifest, exportedManifest) {
+              return groupSeal{}, fmt.Errorf("seal/manifest-mismatch")
+            }
+            return groupSeal{
+              Count: count,
+              ObservedManifestSHA256: sha256Hex(observedManifest),
+              ExportedManifestSHA256: sha256Hex(exportedManifest),
+              Files: files,
+            }, nil
+          }
+
+          func verifyArtifactRoot(directory string) error {
+            info, err := os.Lstat(directory)
+            if err != nil || !info.IsDir() { return fmt.Errorf("seal/artifact-root-invalid") }
+            expected := map[string]bool{
+              "outputs": true, "repeat-observations": true,
+              "audit-output.raw.txt": true, "module-download.raw.txt": true,
+              "source-verification.log": true, "test-output.raw.txt": true, "failure-details.txt": true,
+            }
+            entries, err := os.ReadDir(directory)
+            if err != nil || len(entries) != len(expected) { return fmt.Errorf("seal/artifact-root-shape-invalid") }
+            for _, entry := range entries {
+              if !expected[entry.Name()] { return fmt.Errorf("seal/artifact-root-shape-invalid") }
+              item, err := os.Lstat(filepath.Join(directory, entry.Name()))
+              if err != nil { return fmt.Errorf("seal/artifact-root-shape-invalid") }
+              if entry.Name() == "outputs" || entry.Name() == "repeat-observations" {
+                if !item.IsDir() { return fmt.Errorf("seal/artifact-root-shape-invalid") }
+              } else if !item.Mode().IsRegular() {
+                return fmt.Errorf("seal/artifact-root-shape-invalid")
+              }
+            }
+            return nil
+          }
+
+          func verifyDriver(sourceDir, copyDir, sourceLog string) error {
+            expectedLines := make([]string, 0, len(driverPins)*2)
+            for _, item := range []struct{ root, prefix string }{
+              {sourceDir, "testdata/originalcapture"},
+              {copyDir, ".temp/original-capture/harnessparity"},
+            } {
+              for _, pin := range driverPins {
+                data, err := readRegular(filepath.Join(item.root, pin.Path))
+                if err != nil || sha256Hex(data) != pin.SHA256 {
+                  return fmt.Errorf("seal/driver-pin-mismatch")
+                }
+                expectedLines = append(expectedLines, fmt.Sprintf("OK %s/%s %s", item.prefix, pin.Path, pin.SHA256))
+              }
+            }
+            logData, err := readRegular(sourceLog)
+            if err != nil || string(logData) != strings.Join(expectedLines, "\n")+"\n" {
+              return fmt.Errorf("seal/driver-verification-log-mismatch")
+            }
+            return nil
+          }
+
+          func validMetadata(head, tree, platform, runner, umask, probeMode string) bool {
+            if !shaPattern.MatchString(head) || !shaPattern.MatchString(tree) { return false }
+            expectedPlatforms := map[string]string{
+              "ubuntu-latest": "Linux", "macos-latest": "macOS", "windows-latest": "Windows",
+            }
+            if expectedPlatforms[runner] != platform { return false }
+            if platform == "Windows" { return umask == "not-applicable" && probeMode == "not-applicable" }
+            return umask == "0077" && probeMode == "0700"
+          }
+
+          func buildSeal(caseDir, repeatDir, artifactDir, sourceLog, sourceDir, copyDir,
+            head, tree, platform, runner, umask, probeMode string) (sealDocument, error) {
+            if !validMetadata(head, tree, platform, runner, umask, probeMode) {
+              return sealDocument{}, fmt.Errorf("seal/metadata-invalid")
+            }
+            if err := verifyArtifactRoot(artifactDir); err != nil { return sealDocument{}, err }
+            if err := verifyDriver(sourceDir, copyDir, sourceLog); err != nil { return sealDocument{}, err }
+            cases, err := sealGroup(caseDir, filepath.Join(artifactDir, "outputs"), 47)
+            if err != nil { return sealDocument{}, err }
+            repeats, err := sealGroup(repeatDir, filepath.Join(artifactDir, "repeat-observations"), 2)
+            if err != nil { return sealDocument{}, err }
+            return sealDocument{
+              Schema: "capture-export-seal/v1",
+              Workflow: workflowSeal{Head: head, Tree: tree, Platform: platform, Runner: runner},
+              DriverSource: driverSeal{
+                Revision: driverRevision,
+                Scope: "The five pinned source files below are verified; the full source tree is not asserted.",
+                Files: append([]sourcePin(nil), driverPins...),
+              },
+              Capture: captureSeal{
+                Umask: umask, ProbeDirectoryMode: probeMode,
+                Cases: cases, RepeatObservations: repeats,
+              },
+            }, nil
+          }
+
+          func expectedLog() []byte {
+            lines := make([]string, 0, len(driverPins)*2)
+            for _, pin := range driverPins {
+              lines = append(lines, fmt.Sprintf("OK testdata/originalcapture/%s %s", pin.Path, pin.SHA256))
+            }
+            for _, pin := range driverPins {
+              lines = append(lines, fmt.Sprintf("OK .temp/original-capture/harnessparity/%s %s", pin.Path, pin.SHA256))
+            }
+            return []byte(strings.Join(lines, "\n") + "\n")
+          }
+
+          func prepareFiles(rawDir, exportedDir, prefix string, count int) error {
+            if err := os.MkdirAll(rawDir, 0700); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            if err := os.MkdirAll(exportedDir, 0700); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            files := make([]byteFile, 0, count)
+            for index := 0; index < count; index++ {
+              name := fmt.Sprintf("%s-%02d.json", prefix, index)
+              data := []byte(fmt.Sprintf("{\"control\":%d}\n", index))
+              if err := writeRegular(filepath.Join(rawDir, name), data); err != nil { return err }
+              if err := writeRegular(filepath.Join(exportedDir, name), data); err != nil { return err }
+              files = append(files, byteFile{name: name, data: data})
+            }
+            return writeRegular(filepath.Join(exportedDir, "MANIFEST.json"), canonicalManifest(files))
+          }
+
+          func expectReject(label string, check func() error) error {
+            if err := check(); err == nil { return fmt.Errorf("seal/control-failed-%s", label) }
+            return nil
+          }
+
+          func selfCheck(base, sourceDir, originalCopyDir string) error {
+            root, err := os.MkdirTemp(base, ".seal-self-check-")
+            if err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            defer os.RemoveAll(root)
+            src := filepath.Join(root, "driver-source")
+            copied := filepath.Join(root, "driver-copy")
+            if err := os.MkdirAll(src, 0700); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            if err := os.MkdirAll(copied, 0700); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            for _, pin := range driverPins {
+              data, err := readRegular(filepath.Join(sourceDir, pin.Path))
+              if err != nil { return fmt.Errorf("seal/control-source-unavailable") }
+              if err := writeRegular(filepath.Join(src, pin.Path), data); err != nil { return err }
+              copiedData, err := readRegular(filepath.Join(originalCopyDir, pin.Path))
+              if err != nil { return fmt.Errorf("seal/control-source-unavailable") }
+              if err := writeRegular(filepath.Join(copied, pin.Path), copiedData); err != nil { return err }
+            }
+            artifact := filepath.Join(root, "artifact")
+            rawCases := filepath.Join(root, "raw-cases")
+            rawRepeat := filepath.Join(root, "raw-repeat")
+            for _, directory := range []string{artifact, filepath.Join(artifact, "outputs"), filepath.Join(artifact, "repeat-observations")} {
+              if err := os.MkdirAll(directory, 0700); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            }
+            if err := prepareFiles(rawCases, filepath.Join(artifact, "outputs"), "case", 47); err != nil { return err }
+            if err := prepareFiles(rawRepeat, filepath.Join(artifact, "repeat-observations"), "repeat", 2); err != nil { return err }
+            for _, name := range []string{"audit-output.raw.txt", "module-download.raw.txt", "test-output.raw.txt", "failure-details.txt"} {
+              if err := writeRegular(filepath.Join(artifact, name), []byte("neutral control log\n")); err != nil { return err }
+            }
+            sourceLog := filepath.Join(artifact, "source-verification.log")
+            if err := writeRegular(sourceLog, expectedLog()); err != nil { return err }
+            baseArgs := []string{rawCases, rawRepeat, artifact, sourceLog, src, copied,
+              strings.Repeat("a", 40), strings.Repeat("b", 40), "Linux", "ubuntu-latest", "0077", "0700"}
+            build := func(args []string) error {
+              _, err := buildSeal(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+              return err
+            }
+            positive, err := buildSeal(baseArgs[0], baseArgs[1], baseArgs[2], baseArgs[3], baseArgs[4], baseArgs[5],
+              baseArgs[6], baseArgs[7], baseArgs[8], baseArgs[9], baseArgs[10], baseArgs[11])
+            if err != nil || positive.Workflow.Head != baseArgs[6] || positive.Workflow.Tree != baseArgs[7] ||
+              positive.DriverSource.Revision != driverRevision || !strings.Contains(positive.DriverSource.Scope, "full source tree is not asserted") ||
+              positive.Capture.Cases.Count != 47 || len(positive.Capture.Cases.Files) != 47 ||
+              positive.Capture.RepeatObservations.Count != 2 || len(positive.Capture.RepeatObservations.Files) != 2 {
+              return fmt.Errorf("seal/control-positive-failed")
+            }
+
+            casePath := filepath.Join(artifact, "outputs", "case-00.json")
+            caseBytes, err := readRegular(casePath)
+            if err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            if err := writeRegular(casePath, append(caseBytes, 'x')); err != nil { return err }
+            if err := expectReject("payload", func() error { return build(baseArgs) }); err != nil { return err }
+            if err := writeRegular(casePath, caseBytes); err != nil { return err }
+
+            manifestPath := filepath.Join(artifact, "outputs", "MANIFEST.json")
+            manifestBytes, err := readRegular(manifestPath)
+            if err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            if err := writeRegular(manifestPath, append(manifestBytes, 'x')); err != nil { return err }
+            if err := expectReject("manifest", func() error { return build(baseArgs) }); err != nil { return err }
+            if err := writeRegular(manifestPath, manifestBytes); err != nil { return err }
+
+            driverPath := filepath.Join(copied, driverPins[0].Path)
+            driverBytes, err := readRegular(driverPath)
+            if err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            if err := writeRegular(driverPath, append(driverBytes, 'x')); err != nil { return err }
+            if err := expectReject("driver-pin", func() error { return build(baseArgs) }); err != nil { return err }
+            if err := writeRegular(driverPath, driverBytes); err != nil { return err }
+
+            invalidHead := append([]string(nil), baseArgs...)
+            invalidHead[6] = "not-a-commit"
+            if err := expectReject("head", func() error { return build(invalidHead) }); err != nil { return err }
+            invalidMode := append([]string(nil), baseArgs...)
+            invalidMode[11] = "0755"
+            if err := expectReject("probe-mode", func() error { return build(invalidMode) }); err != nil { return err }
+            missingCase := filepath.Join(rawCases, "case-00.json")
+            if err := os.Remove(missingCase); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            if err := expectReject("case-count", func() error { return build(baseArgs) }); err != nil { return err }
+            if err := writeRegular(missingCase, caseBytes); err != nil { return err }
+            unexpected := filepath.Join(artifact, "unreviewed.txt")
+            if err := writeRegular(unexpected, []byte("neutral\n")); err != nil { return err }
+            if err := expectReject("artifact-shape", func() error { return build(baseArgs) }); err != nil { return err }
+            if err := os.Remove(unexpected); err != nil { return fmt.Errorf("seal/control-setup-failed") }
+            return nil
+          }
+
+          func writeSeal(args []string) error {
+            if len(args) != 12 { return fmt.Errorf("seal/invalid-arguments") }
+            document, err := buildSeal(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+            if err != nil { return err }
+            encoded, err := json.MarshalIndent(document, "", "  ")
+            if err != nil { return fmt.Errorf("seal/encode-failed") }
+            encoded = append(encoded, '\n')
+            path := filepath.Join(args[2], "export-seal.json")
+            file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+            if err != nil { return fmt.Errorf("seal/write-failed") }
+            if _, err := file.Write(encoded); err != nil { file.Close(); os.Remove(path); return fmt.Errorf("seal/write-failed") }
+            if err := file.Close(); err != nil { os.Remove(path); return fmt.Errorf("seal/write-failed") }
+            got, err := readRegular(path)
+            if err != nil || !bytes.Equal(got, encoded) { os.Remove(path); return fmt.Errorf("seal/readback-failed") }
+            fmt.Printf("export_seal=PASS\nexport_seal_sha256=%s\n", sha256Hex(encoded))
+            return nil
+          }
+
+          func main() {
+            if len(os.Args) == 5 && os.Args[1] == "--self-check" {
+              if err := selfCheck(os.Args[2], os.Args[3], os.Args[4]); err != nil {
+                fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/seal-self-check-failed")
+                os.Exit(2)
+              }
+              fmt.Println("seal_controls=PASS")
+              return
+            }
+            if len(os.Args) != 14 || os.Args[1] != "--write" {
+              fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/seal-invalid-arguments")
+              os.Exit(2)
+            }
+            if err := writeSeal(os.Args[2:]); err != nil {
+              fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/seal-generation-failed")
+              os.Exit(2)
+            }
+          }
+          GO
           cat > "$sanitizer_source_dir/main.go" <<'GO'
           package main
 
@@ -3034,13 +3477,41 @@ jobs:
           path_controls_stdout="$CAPTURE_ROOT/path-controls.stdout"
           path_controls_stderr="$CAPTURE_ROOT/path-controls.stderr"
           path_controls_expected="$CAPTURE_ROOT/path-controls.expected"
+          seal_controls_stdout="$CAPTURE_ROOT/seal-controls.stdout"
+          seal_controls_stderr="$CAPTURE_ROOT/seal-controls.stderr"
+          seal_controls_expected="$CAPTURE_ROOT/seal-controls.expected"
+          seal_build_stdout="$CAPTURE_ROOT/seal-build.stdout"
+          seal_build_stderr="$CAPTURE_ROOT/seal-build.stderr"
           sanitizer_binary="$CAPTURE_ROOT/sanitize"
+          seal_binary="$CAPTURE_ROOT/seal"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             sanitizer_binary="$CAPTURE_ROOT/sanitize.exe"
+            seal_binary="$CAPTURE_ROOT/seal.exe"
           fi
           : > "$sanitizer_stdout"
           : > "$sanitizer_stderr"
-          if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$sanitizer_binary" ./.temp/capture-exporter > "$sanitizer_build_stdout" 2> "$sanitizer_build_stderr"; then
+          sanitize_exit=0
+          if ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$sanitizer_binary" ./.temp/capture-exporter > "$sanitizer_build_stdout" 2> "$sanitizer_build_stderr"; then
+            sanitize_exit=2
+            printf 'CAPTURE_REASON=sanitize/build-failed\n' > "$sanitizer_stderr"
+          elif ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$seal_binary" "$sanitizer_source_dir/seal.go" > "$seal_build_stdout" 2> "$seal_build_stderr"; then
+            sanitize_exit=2
+            printf 'CAPTURE_REASON=sanitize/seal-build-failed\n' > "$sanitizer_stderr"
+          elif ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$seal_binary" --self-check "$CAPTURE_ROOT" \
+            "$GITHUB_WORKSPACE/testdata/originalcapture" "$GITHUB_WORKSPACE/.temp/original-capture/harnessparity" \
+            > "$seal_controls_stdout" 2> "$seal_controls_stderr"; then
+            sanitize_exit=2
+            printf 'CAPTURE_REASON=sanitize/seal-self-check-failed\n' > "$sanitizer_stderr"
+          else
+            printf 'seal_controls=PASS\n' > "$seal_controls_expected"
+            if ! cmp -s "$seal_controls_expected" "$seal_controls_stdout" || [[ -s "$seal_controls_stderr" ]]; then
+              sanitize_exit=2
+              printf 'CAPTURE_REASON=sanitize/seal-self-check-failed\n' > "$sanitizer_stderr"
+            else
+              printf 'seal_controls=PASS\n' >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          if [[ "$sanitize_exit" -eq 0 ]]; then
             if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$sanitizer_binary" --path-exception-controls > "$path_controls_stdout" 2> "$path_controls_stderr"; then
               printf 'path_exception_controls=PASS\n' > "$path_controls_expected"
               if cmp -s "$path_controls_expected" "$path_controls_stdout" && [[ ! -s "$path_controls_stderr" ]]; then
@@ -3060,8 +3531,6 @@ jobs:
               sanitize_exit=2
               printf 'CAPTURE_REASON=sanitize/path-exception-controls-failed\n' > "$sanitizer_stderr"
             fi
-          else
-            sanitize_exit=2
           fi
           if [[ "$sanitize_exit" -eq 0 ]]; then
             exported_case_files="$(sed -n 's/^exported_case_files=//p' "$sanitizer_stdout")"
@@ -3070,21 +3539,56 @@ jobs:
             if ! cmp -s "$expected_stdout" "$sanitizer_stdout" || [[ -s "$sanitizer_stderr" ]] || [[ ! "$exported_case_files" =~ ^(0|[1-9][0-9]?)$ ]] || (( exported_case_files > 47 )); then
               sanitize_exit=2
               printf 'CAPTURE_REASON=sanitize/pass-output-invalid\n' >&2
-            else
-              {
-                printf 'exit_code=0\nexport_gate=PASS\n'
-                printf 'exported_case_files=%s\nexported_repeat_observations=2\n' "$exported_case_files"
-              } >> "$GITHUB_OUTPUT"
             fi
           fi
+          export_seal=FAIL
+          export_seal_sha256=not-produced
+          if [[ "$sanitize_exit" -eq 0 && "$CAPTURE_OUTCOME" == "success" ]]; then
+            actual_workflow_head=""
+            actual_workflow_tree=""
+            if actual_workflow_head="$(git -C "$GITHUB_WORKSPACE" rev-parse --verify HEAD 2>/dev/null)" && \
+               actual_workflow_tree="$(git -C "$GITHUB_WORKSPACE" rev-parse --verify 'HEAD^{tree}' 2>/dev/null)" && \
+               [[ "$actual_workflow_head" == "$WORKFLOW_HEAD" && "$WORKFLOW_HEAD" == "$GITHUB_SHA" ]]; then
+              seal_stdout="$CAPTURE_ROOT/seal.stdout"
+              seal_stderr="$CAPTURE_ROOT/seal.stderr"
+              if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$seal_binary" --write \
+                "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/repeat-raw" "$CAPTURE_ROOT/artifact" \
+                "$CAPTURE_ROOT/source-verification.log" "$GITHUB_WORKSPACE/testdata/originalcapture" \
+                "$GITHUB_WORKSPACE/.temp/original-capture/harnessparity" "$actual_workflow_head" "$actual_workflow_tree" \
+                "$RUNNER_OS" "$MATRIX_RUNNER" "$CAPTURE_UMASK" "$CAPTURE_PROBE_MODE" \
+                > "$seal_stdout" 2> "$seal_stderr"; then
+                export_seal_sha256="$(sed -n 's/^export_seal_sha256=//p' "$seal_stdout")"
+                seal_expected="$CAPTURE_ROOT/seal.expected"
+                printf 'export_seal=PASS\nexport_seal_sha256=%s\n' "$export_seal_sha256" > "$seal_expected"
+                if [[ "$export_seal_sha256" =~ ^[0-9a-f]{64}$ ]] && cmp -s "$seal_expected" "$seal_stdout" && [[ ! -s "$seal_stderr" ]]; then
+                  export_seal=PASS
+                else
+                  sanitize_exit=2
+                  printf 'CAPTURE_REASON=sanitize/seal-output-invalid\n' >&2
+                fi
+              else
+                sanitize_exit=2
+                printf 'CAPTURE_REASON=sanitize/seal-generation-failed\n' >&2
+              fi
+            else
+              sanitize_exit=2
+              printf 'CAPTURE_REASON=sanitize/seal-workflow-identity-invalid\n' >&2
+            fi
+          elif [[ "$sanitize_exit" -eq 0 ]]; then
+            export_seal=not-produced-incomplete-capture
+          fi
           if [[ "$sanitize_exit" -ne 0 ]]; then
-            printf 'exit_code=%s\n' "$sanitize_exit" >> "$GITHUB_OUTPUT"
+            printf 'exit_code=%s\nexport_seal=%s\nexport_seal_sha256=%s\n' \
+              "$sanitize_exit" "$export_seal" "$export_seal_sha256" >> "$GITHUB_OUTPUT"
             reason_line=""
             if [[ ! -s "$sanitizer_stdout" ]] && [[ "$(wc -l < "$sanitizer_stderr" | tr -d ' ')" == 1 ]] && IFS= read -r reason_line < "$sanitizer_stderr" && [[ "$reason_line" =~ ^CAPTURE_REASON=sanitize/[a-z0-9-]+$ ]]; then
               printf '%s\n' "$reason_line" >&2
             else
               printf 'CAPTURE_REASON=sanitize/tool-command-failed\n' >&2
             fi
+          else
+            printf 'exit_code=0\nexport_gate=PASS\nexported_case_files=%s\nexported_repeat_observations=2\n' "$exported_case_files" >> "$GITHUB_OUTPUT"
+            printf 'export_seal=%s\nexport_seal_sha256=%s\n' "$export_seal" "$export_seal_sha256" >> "$GITHUB_OUTPUT"
           fi
           exit "$sanitize_exit"
 
@@ -3103,6 +3607,7 @@ jobs:
           MODULE_EXIT: ${{ steps.modules.outputs.exit_code || 'not-run' }}
           CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
           CAPTURE_UMASK: ${{ steps.capture.outputs.posix_umask || 'not-recorded' }}
+          CAPTURE_PROBE_MODE: ${{ steps.capture.outputs.probe_dir_mode || 'not-recorded' }}
           CAPTURE_EXIT: ${{ steps.capture.outputs.test_command_exit || 'not-run' }}
           AUDIT_EXIT: ${{ steps.capture.outputs.audit_exit || 'not-run' }}
           CASE_EXECUTED: ${{ steps.capture.outputs.executed || '0' }}
@@ -3115,6 +3620,8 @@ jobs:
           COMPARATOR_PASSED: ${{ steps.capture.outputs.comparator_passed || '0' }}
           COMPARATOR_FAILED: ${{ steps.capture.outputs.comparator_failed || '0' }}
           COMPARATOR_SKIPPED: ${{ steps.capture.outputs.comparator_skipped || '0' }}
+          COMPARATOR_MCP_CONTROL_PASSED: ${{ steps.capture.outputs.comparator_mcp_control_passed || '0' }}
+          COMPARATOR_LAUNCHER_CONTROL_PASSED: ${{ steps.capture.outputs.comparator_launcher_control_passed || '0' }}
           ROOT_TESTS_PASSED: ${{ steps.capture.outputs.root_tests_passed || '0' }}
           WINDOWS_ROOT_PASSED: ${{ steps.capture.outputs.windows_root_parameter_passed || '0' }}
           ALL_TEST_FAILURES: ${{ steps.capture.outputs.all_test_failures || '0' }}
@@ -3125,6 +3632,8 @@ jobs:
           EXPORT_GATE: ${{ steps.sanitize.outputs.export_gate || 'not-run' }}
           EXPORTED_CASE_FILES: ${{ steps.sanitize.outputs.exported_case_files || '0' }}
           EXPORTED_REPEAT_OBSERVATIONS: ${{ steps.sanitize.outputs.exported_repeat_observations || '0' }}
+          EXPORT_SEAL: ${{ steps.sanitize.outputs.export_seal || 'not-produced' }}
+          EXPORT_SEAL_SHA256: ${{ steps.sanitize.outputs.export_seal_sha256 || 'not-produced' }}
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -3135,7 +3644,7 @@ jobs:
               printf 'unavailable'
               return
             fi
-            if [[ "$output" =~ ^go[[:space:]]version[[:space:]]go([0-9]+\.[0-9]+\.[0-9]+)[[:space:]](darwin|windows)/(amd64|arm64)$ ]]; then
+            if [[ "$output" =~ ^go[[:space:]]version[[:space:]]go([0-9]+\.[0-9]+\.[0-9]+)[[:space:]](darwin|linux|windows)/(amd64|arm64)$ ]]; then
               printf '%s' "${BASH_REMATCH[1]}"
             else
               printf 'unavailable'
@@ -3149,7 +3658,7 @@ jobs:
               return
             fi
             case "$value" in
-              darwin|windows) printf '%s' "$value" ;;
+              darwin|linux|windows) printf '%s' "$value" ;;
               *) printf 'unavailable' ;;
             esac
           }
@@ -3220,6 +3729,12 @@ jobs:
               printf '%s %s %s %s\n' "$version_probe_value" "$version_probe_exit" "$(normalize_goos 0 windows)" "$(normalize_goarch 0 amd64)"
             } 2>&1
           )"
+          good_linux_go_probe_control="$(
+            {
+              capture_version_probe go printf '%s\n' 'go version go1.25.5 linux/amd64'
+              printf '%s %s %s %s\n' "$version_probe_value" "$version_probe_exit" "$(normalize_goos 0 linux)" "$(normalize_goarch 0 amd64)"
+            } 2>&1
+          )"
           good_git_probe_control="$(
             {
               capture_version_probe git printf '%s\n' 'git version 2.50.1 (Apple Git-155)'
@@ -3244,6 +3759,7 @@ jobs:
           if [[ "$failed_probe_control" != "unavailable 23" ||
                 "$good_go_probe_control" != "1.25.5 0 darwin arm64" ||
                 "$good_windows_go_probe_control" != "1.25.5 0 windows amd64" ||
+                "$good_linux_go_probe_control" != "1.25.5 0 linux amd64" ||
                 "$good_git_probe_control" != "2.50.1 0" ||
                 "$good_windows_git_probe_control" != "2.50.1 0" ||
                 "$token_goos_probe_control" != "unavailable" ||
@@ -3287,6 +3803,13 @@ jobs:
           if [[ "$head" =~ ^[0-9a-f]{40}$ && "$pushed_sha" =~ ^[0-9a-f]{40}$ && "$head" == "$pushed_sha" ]]; then
             head_matches_pushed_sha=true
           fi
+          tree=""
+          tree_exit=1
+          if tree="$(git -C "$GITHUB_WORKSPACE" rev-parse --verify 'HEAD^{tree}' 2>/dev/null)"; then tree_exit=0; fi
+          tree_matches_head=false
+          if [[ "$tree" =~ ^[0-9a-f]{40}$ && "$head" =~ ^[0-9a-f]{40}$ && "$tree_exit" -eq 0 ]]; then
+            tree_matches_head=true
+          fi
           working_status=""
           working_status_exit=1
           if working_status="$(git -C "$GITHUB_WORKSPACE" status --porcelain --untracked-files=all 2>/dev/null)"; then working_status_exit=0; fi
@@ -3294,16 +3817,27 @@ jobs:
           if [[ "$working_status_exit" -eq 0 && -z "$working_status" ]]; then working_clean=true; fi
           umask_valid=false
           if [[ "$RUNNER_OS" == "Windows" && "$CAPTURE_UMASK" == "not-applicable" ]]; then
+            if [[ "$CAPTURE_PROBE_MODE" == "not-applicable" ]]; then umask_valid=true; fi
+          elif [[ ( "$RUNNER_OS" == "macOS" || "$RUNNER_OS" == "Linux" ) &&
+                  "$CAPTURE_UMASK" == "0077" && "$CAPTURE_PROBE_MODE" == "0700" ]]; then
             umask_valid=true
-          elif [[ "$RUNNER_OS" == "macOS" && "$CAPTURE_UMASK" == "0077" ]]; then
-            umask_valid=true
+          fi
+          capture_counts_valid=false
+          if [[ "$CASE_EXECUTED" == "47" && "$CASE_PASSED" == "47" && "$CASE_FAILED" == "0" && "$CASE_SKIPPED" == "0" &&
+                "$REPEAT_SEEN" == "1" && "$REPEAT_PASSED" == "1" && "$COMPARATOR_SEEN" == "2" && "$COMPARATOR_PASSED" == "2" &&
+                "$COMPARATOR_FAILED" == "0" && "$COMPARATOR_SKIPPED" == "0" && "$COMPARATOR_MCP_CONTROL_PASSED" == "1" &&
+                "$COMPARATOR_LAUNCHER_CONTROL_PASSED" == "1" && "$ROOT_TESTS_PASSED" == "4" && "$WINDOWS_ROOT_PASSED" == "1" &&
+                "$ALL_TEST_FAILURES" == "0" && "$ALL_TEST_SKIPS" == "0" && "$OUTPUT_JSON_FILES" == "47" &&
+                "$EXPORTED_CASE_FILES" == "47" && "$EXPORTED_REPEAT_OBSERVATIONS" == "2" &&
+                "$EXPORT_SEAL" == "PASS" && "$EXPORT_SEAL_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            capture_counts_valid=true
           fi
           lane_verdict=fail
           if [[ "$CHECKOUT_OUTCOME" == "success" && "$GO_SETUP_OUTCOME" == "success" &&
                 "$SOURCE_OUTCOME" == "success" && "$MODULE_OUTCOME" == "success" &&
                 "$CAPTURE_OUTCOME" == "success" && "$SANITIZER_OUTCOME" == "success" &&
                 "$working_clean" == "true" && "$head_matches_pushed_sha" == "true" &&
-                "$umask_valid" == "true" ]]; then
+                "$tree_matches_head" == "true" && "$umask_valid" == "true" && "$capture_counts_valid" == "true" ]]; then
             lane_verdict=pass
           fi
           {
@@ -3311,11 +3845,11 @@ jobs:
             printf 'workflow_run_id=%s\nworkflow_run_attempt=%s\nworkflow_run_url=https://github.com/%s/actions/runs/%s\n' \
               "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             printf 'checkout_outcome=%s\ngo_setup_outcome=%s\n' "$CHECKOUT_OUTCOME" "$GO_SETUP_OUTCOME"
-            printf 'posix-umask=%s\n' "$CAPTURE_UMASK"
+            printf 'posix-umask=%s\nprobe-dir-mode=%s\n' "$CAPTURE_UMASK" "$CAPTURE_PROBE_MODE"
             printf 'GOOS=%s\nGOARCH=%s\ngo_version=%s\ngo_version_exit=%s\ngoos_exit=%s\ngoarch_exit=%s\n' \
               "$goos" "$goarch" "$go_version" "$go_exit" "$goos_exit" "$goarch_exit"
-            printf 'git_version=%s\ngit_version_exit=%s\nhead=%s\nhead_exit=%s\nhead_matches_pushed_sha=%s\n' \
-              "$git_version" "$git_exit" "$head" "$head_exit" "$head_matches_pushed_sha"
+            printf 'git_version=%s\ngit_version_exit=%s\nhead=%s\nhead_exit=%s\nhead_matches_pushed_sha=%s\ntree=%s\ntree_exit=%s\ntree_matches_head=%s\n' \
+              "$git_version" "$git_exit" "$head" "$head_exit" "$head_matches_pushed_sha" "$tree" "$tree_exit" "$tree_matches_head"
             printf 'working_status_exit=%s\n' "$working_status_exit"
             printf 'source_verification_outcome=%s\nsource_verification_exit=%s\n' "$SOURCE_OUTCOME" "$SOURCE_EXIT"
             printf 'module_command=go mod download\nmodule_outcome=%s\nmodule_exit=%s\n' "$MODULE_OUTCOME" "$MODULE_EXIT"
@@ -3328,11 +3862,15 @@ jobs:
               "$REPEAT_SEEN" "$REPEAT_PASSED" "$COMPARATOR_SEEN" "$COMPARATOR_PASSED"
             printf 'comparator_failed=%s\ncomparator_skipped=%s\nroot_tests_passed=%s\n' \
               "$COMPARATOR_FAILED" "$COMPARATOR_SKIPPED" "$ROOT_TESTS_PASSED"
+            printf 'comparator_mcp_control_passed=%s\ncomparator_launcher_control_passed=%s\n' \
+              "$COMPARATOR_MCP_CONTROL_PASSED" "$COMPARATOR_LAUNCHER_CONTROL_PASSED"
             printf 'windows_root_parameter_passed=%s\nall_test_failures=%s\nall_test_skips=%s\noutput_json_files=%s\n' \
               "$WINDOWS_ROOT_PASSED" "$ALL_TEST_FAILURES" "$ALL_TEST_SKIPS" "$OUTPUT_JSON_FILES"
             printf 'export_gate=%s\nsanitizer_outcome=%s\nsanitizer_exit=%s\nexported_case_files=%s\nexported_repeat_observations=%s\n' \
               "$EXPORT_GATE" "$SANITIZER_OUTCOME" "$SANITIZER_EXIT" "$EXPORTED_CASE_FILES" "$EXPORTED_REPEAT_OBSERVATIONS"
             printf 'working_tree_clean=%s\n' "$working_clean"
+            printf 'export_seal=%s\nexport_seal_sha256=%s\n' "$EXPORT_SEAL" "$EXPORT_SEAL_SHA256"
+            printf 'capture_counts_valid=%s\n' "$capture_counts_valid"
           } > "$CAPTURE_ROOT/lane-metadata.txt"
           {
             printf '### Lane metadata: %s (%s)\n\n' "$RUNNER_OS" "$MATRIX_RUNNER"
@@ -3340,6 +3878,9 @@ jobs:
               "$lane_verdict" "$CASE_EXECUTED" "$CASE_PASSED" "$CASE_FAILED" "$CASE_SKIPPED"
             printf 'Export gate: %s; %s case files and %s repeat observations.\n' \
               "$EXPORT_GATE" "$EXPORTED_CASE_FILES" "$EXPORTED_REPEAT_OBSERVATIONS"
+            printf 'Workflow head/tree: %s / %s. umask: %s; probe directory mode: %s.\n' \
+              "$head" "$tree" "$CAPTURE_UMASK" "$CAPTURE_PROBE_MODE"
+            printf 'Export seal: %s (%s).\n' "$EXPORT_SEAL" "$EXPORT_SEAL_SHA256"
           } >> "$GITHUB_STEP_SUMMARY"
           if [[ "$head_matches_pushed_sha" != "true" ]]; then
             printf 'CAPTURE_REASON=metadata/head-mismatch\n' >&2
