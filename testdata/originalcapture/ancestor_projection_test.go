@@ -1021,6 +1021,44 @@ func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) 
 	}
 }
 
+func TestNativeCaptureFailureNameSummaryWithholdsNames(t *testing.T) {
+	workflow, err := readBoundNativeCaptureWorkflow()
+	if err != nil {
+		t.Fatalf("read native capture workflow: %v", err)
+	}
+	text := string(workflow)
+	const blockStart = `if [[ "$test_exit" -ne 0 && -f "$failed_names_file" ]]; then`
+	start := strings.Index(text, blockStart)
+	if start < 0 {
+		t.Fatal("native capture failure-name summary block is missing")
+	}
+	const blockEnd = `done < "$failed_names_file"`
+	end := strings.Index(text[start:], blockEnd)
+	if end < 0 {
+		t.Fatal("native capture failure-name summary loop is incomplete")
+	}
+	block := text[start : start+end+len(blockEnd)]
+	allowed := map[string]int{
+		`printf '%s\n' 'CAPTURE_FAIL Failure detail withheld by the sanitizer.' >&2`: 0,
+		`printf '%s\n' 'CAPTURE_FAIL [remaining failing test names withheld at the 200-line limit]' >&2`: 0,
+	}
+	for _, line := range strings.Split(block, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "printf ") || strings.HasPrefix(trimmed, "echo ") {
+			if _, ok := allowed[trimmed]; !ok {
+				t.Errorf("failure-name summary has an unapproved output command: %s", trimmed)
+				continue
+			}
+			allowed[trimmed]++
+		}
+	}
+	for command, count := range allowed {
+		if count != 1 {
+			t.Errorf("failure-name summary output %q appears %d times, want once", command, count)
+		}
+	}
+}
+
 func TestNativeCaptureUploadConditionAcceptsLFAndCRLF(t *testing.T) {
 	const workflow = "      - name: Upload platform artifact\n        if: ${{ steps.capture.outcome == 'success' && steps.sanitize.outcome == 'success' }}\n      - name: Next step\n"
 	for _, newline := range []string{"\n", "\r\n"} {
