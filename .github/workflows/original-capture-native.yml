@@ -99,7 +99,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          13638b38fa34c86dd01f63eee51b0e957672a33994c984aa6e92d7d4015de948 ancestor_projection_test.go
+          50ae7d2423927e963948d8f51d76bd0bc875dfa866bc336394815492c87b13cd ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -1160,7 +1160,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "13638b38fa34c86dd01f63eee51b0e957672a33994c984aa6e92d7d4015de948"},
+            {"ancestor_projection_test.go", "50ae7d2423927e963948d8f51d76bd0bc875dfa866bc336394815492c87b13cd"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
