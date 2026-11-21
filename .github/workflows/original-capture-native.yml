@@ -99,7 +99,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          a7884187f433a0afc80582ab708f72915332122f43d9b402f3890325ed0634fd ancestor_projection_test.go
+          4a5e7919908b3748ca775b4fe8a2fb0074d4d8935ca7f3bd3766a3ac179874f0 ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -193,6 +193,7 @@ jobs:
         shell: bash
         env:
           CAPTURE_ROOT: ${{ steps.directories.outputs.root_posix }}
+          CAPTURE_WORKFLOW_PATH: ${{ github.workspace }}/.github/workflows/original-capture-native.yml
         run: |
           set -euo pipefail
           capture_shell_error() {
@@ -1017,6 +1018,7 @@ jobs:
             HARNESS_REPEAT_CAPTURE_OUT="$repeat_path" \
             CAPTURE_NATIVE_PARENT_DETAIL_DIR="$native_parent_detail_path" \
             CAPTURE_NATIVE_PARENT_REAL_ENV="$real_env_path" \
+            "CAPTURE_WORKFLOW_PATH=$CAPTURE_WORKFLOW_PATH" \
             go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity \
             > "$private_test_log" 2>&1; then
             test_exit=0
@@ -1158,7 +1160,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "a7884187f433a0afc80582ab708f72915332122f43d9b402f3890325ed0634fd"},
+            {"ancestor_projection_test.go", "4a5e7919908b3748ca775b4fe8a2fb0074d4d8935ca7f3bd3766a3ac179874f0"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -2030,6 +2032,36 @@ jobs:
               return scanStructuredText(data, roots, 0)
           }
 
+          var failureDiagnosticPackageLine = regexp.MustCompile(`^CAPTURE_DETAIL Package=([A-Za-z0-9_./-]+) Test=([A-Za-z0-9_./-]+)$`)
+          var failureDiagnosticFailNameLine = regexp.MustCompile(`^CAPTURE_FAIL Package=([A-Za-z0-9_./-]+) Test=([A-Za-z0-9_./-]*)$`)
+          var failureDiagnosticReasonLine = regexp.MustCompile(`^(?:CAPTURE_REASON=)?(?:capture|capture-driver|sanitize)/[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*$`)
+          var failureDiagnosticRunLine = regexp.MustCompile(`^=== RUN[ \t]+([A-Za-z0-9_./-]+)$`)
+          var failureDiagnosticResultLine = regexp.MustCompile(`^--- (PASS|FAIL): ([A-Za-z0-9_./-]+)(?: \([0-9.]+s\))?$`)
+          var failureDiagnosticSourceLine = regexp.MustCompile(`^([A-Za-z0-9_.-]+\.go:[1-9][0-9]*):`)
+
+          func allowFailureDiagnosticLine(line string) string {
+              line = strings.TrimSpace(escapeFailureDiagnosticControls(line))
+              if match := failureDiagnosticPackageLine.FindStringSubmatch(line); match != nil {
+                  return fmt.Sprintf("Package=%s Test=%s", match[1], match[2])
+              }
+              if failureDiagnosticFailNameLine.MatchString(line) || failureDiagnosticReasonLine.MatchString(line) {
+                  return line
+              }
+              if match := failureDiagnosticRunLine.FindStringSubmatch(line); match != nil {
+                  return "=== RUN " + match[1]
+              }
+              if match := failureDiagnosticResultLine.FindStringSubmatch(line); match != nil {
+                  return fmt.Sprintf("--- %s: %s", match[1], match[2])
+              }
+              if match := failureDiagnosticSourceLine.FindStringSubmatch(line); match != nil {
+                  return match[1] + ": Failure detail withheld by the sanitizer."
+              }
+              if line == "PASS" || line == "FAIL" {
+                  return line
+              }
+              return "Failure detail withheld by the sanitizer."
+          }
+
           func failureDiagnosticLog(caseDir string, detail []byte) []byte {
               if len(detail) == 0 || len(detail) > maxFailureDiagnosticInputBytes ||
                   scanLog(detail, fixtureRootForms(caseDir)) != nil {
@@ -2043,7 +2075,7 @@ jobs:
                       break
                   }
                   report.WriteString("CAPTURE_DETAIL ")
-                  report.WriteString(escapeFailureDiagnosticControls(line))
+                  report.WriteString(allowFailureDiagnosticLine(line))
                   report.WriteByte('\n')
               }
               return []byte(report.String())
@@ -2084,11 +2116,25 @@ jobs:
           }
 
           func checkFailureDiagnosticControls(caseDir string) error {
-              safe := []byte("CAPTURE_DETAIL Package=public/package Test=TestPublicFailure\nSAFE_FAILURE_DETAIL_CONTROL\n")
+              safe := []byte("CAPTURE_DETAIL Package=public/package Test=TestPublicFailure\nCAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\n=== RUN   TestPublicFailure\n--- FAIL: TestPublicFailure (0.00s)\n--- PASS: TestPublicPositive (0.00s)\nmain_test.go:17: fixture-control-value\nPASS\n")
               rendered := string(failureDiagnosticLog(caseDir, safe))
-              if !strings.Contains(rendered, "SAFE_FAILURE_DETAIL_CONTROL") ||
-                  !strings.Contains(rendered, "CAPTURE_DETAIL Package=public/package Test=TestPublicFailure") {
-                  return operational("selfcheck-failure-diagnostic-positive")
+              for _, visible := range []string{
+                  "CAPTURE_DETAIL Package=public/package Test=TestPublicFailure",
+                  "CAPTURE_DETAIL CAPTURE_REASON=capture/go-test-failed",
+                  "CAPTURE_DETAIL capture-driver/native-parent-environment-not-isolated",
+                  "CAPTURE_DETAIL sanitize/input-repeat-set-invalid",
+                  "CAPTURE_DETAIL === RUN TestPublicFailure",
+                  "CAPTURE_DETAIL --- FAIL: TestPublicFailure",
+                  "CAPTURE_DETAIL --- PASS: TestPublicPositive",
+                  "CAPTURE_DETAIL main_test.go:17: Failure detail withheld by the sanitizer.",
+                  "CAPTURE_DETAIL PASS",
+              } {
+                  if !strings.Contains(rendered, visible) {
+                      return operational("selfcheck-failure-diagnostic-positive")
+                  }
+              }
+              if strings.Contains(rendered, "fixture-control-value") {
+                  return operational("selfcheck-failure-diagnostic-ordinary-value-leak")
               }
               diagnosticDir := filepath.Dir(caseDir)
               if err := os.MkdirAll(diagnosticDir, 0700); err != nil {
@@ -2113,10 +2159,15 @@ jobs:
               if err != nil || !bytes.Equal(afterRejectedOverwrite.data, written.data) {
                   return operational("selfcheck-failure-diagnostic-overwrite")
               }
-              for _, unsafe := range []string{"/Users/example/private/state", "credential_token=neutral-value"} {
+              for _, unsafe := range []string{
+                  "/Users/example/private/state",
+                  "credential_token=neutral-value",
+                  `Settings mismatch: {"model":"fixture-control-value"}`,
+                  "plain fixture text fixture-control-value",
+              } {
                   withheld := string(failureDiagnosticLog(caseDir, []byte(unsafe+"\n")))
                   if strings.Contains(withheld, unsafe) || !strings.Contains(withheld, "withheld by the sanitizer") {
-                      return operational("selfcheck-failure-diagnostic-redaction")
+                      return operational("selfcheck-failure-diagnostic-allowlist")
                   }
               }
               long := strings.Repeat("safe failure line\n", maxFailureDiagnosticLogLines+20)
@@ -2130,7 +2181,7 @@ jobs:
               controls = append(controls, 0xe2, 0x80, 0xa8, '\n')
               escaped := string(failureDiagnosticLog(caseDir, controls))
               if strings.Contains(escaped, string(rune(27))) || strings.ContainsRune(escaped, rune(0x2028)) ||
-                  !strings.HasPrefix(escaped, "CAPTURE_DETAIL ::error::neutral") {
+                  !strings.HasPrefix(escaped, "CAPTURE_DETAIL Failure detail withheld by the sanitizer.") {
                   return operational("selfcheck-failure-diagnostic-controls")
               }
               return nil

@@ -1003,7 +1003,7 @@ func TestFixtureAncestorFullJSONUsesFlatStringEntries(t *testing.T) {
 }
 
 func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) {
-	workflow, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "original-capture-native.yml"))
+	workflow, err := readBoundNativeCaptureWorkflow()
 	if err != nil {
 		t.Fatalf("read native capture workflow: %v", err)
 	}
@@ -1033,6 +1033,21 @@ func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) 
 			t.Errorf("artifact upload condition %q does not require %s", condition, required)
 		}
 	}
+}
+
+func TestNativeCaptureUploadMissingWorkflowBindingFailsClosed(t *testing.T) {
+	t.Setenv("CAPTURE_WORKFLOW_PATH", "")
+	if _, err := readBoundNativeCaptureWorkflow(); err == nil {
+		t.Fatal("missing CAPTURE_WORKFLOW_PATH binding was accepted")
+	}
+}
+
+func readBoundNativeCaptureWorkflow() ([]byte, error) {
+	path := os.Getenv("CAPTURE_WORKFLOW_PATH")
+	if path == "" {
+		return nil, errors.New("CAPTURE_WORKFLOW_PATH is required")
+	}
+	return os.ReadFile(path)
 }
 
 func fixtureAncestorFullJSON(caseID string, entries []string) ([]byte, []byte) {
