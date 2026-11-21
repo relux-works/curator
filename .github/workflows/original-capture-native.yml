@@ -99,7 +99,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          4a5e7919908b3748ca775b4fe8a2fb0074d4d8935ca7f3bd3766a3ac179874f0 ancestor_projection_test.go
+          db9023f28536c3ac88fc2c237b7d6afbe34107776aa0c288508225db5dd32d1d ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -1099,7 +1099,7 @@ jobs:
                     failure_names_truncated=true
                     break
                   fi
-                  printf 'CAPTURE_FAIL Package=%s Test=%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" >&2
+                  printf '%s\n' 'CAPTURE_FAIL Failure detail withheld by the sanitizer.' >&2
                   failure_name_count=$((failure_name_count + 1))
                 fi
               done < "$failed_names_file"
@@ -1160,7 +1160,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "4a5e7919908b3748ca775b4fe8a2fb0074d4d8935ca7f3bd3766a3ac179874f0"},
+            {"ancestor_projection_test.go", "db9023f28536c3ac88fc2c237b7d6afbe34107776aa0c288508225db5dd32d1d"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -2032,29 +2032,76 @@ jobs:
               return scanStructuredText(data, roots, 0)
           }
 
-          var failureDiagnosticPackageLine = regexp.MustCompile(`^CAPTURE_DETAIL Package=([A-Za-z0-9_./-]+) Test=([A-Za-z0-9_./-]+)$`)
-          var failureDiagnosticFailNameLine = regexp.MustCompile(`^CAPTURE_FAIL Package=([A-Za-z0-9_./-]+) Test=([A-Za-z0-9_./-]*)$`)
-          var failureDiagnosticReasonLine = regexp.MustCompile(`^(?:CAPTURE_REASON=)?(?:capture|capture-driver|sanitize)/[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*$`)
-          var failureDiagnosticRunLine = regexp.MustCompile(`^=== RUN[ \t]+([A-Za-z0-9_./-]+)$`)
-          var failureDiagnosticResultLine = regexp.MustCompile(`^--- (PASS|FAIL): ([A-Za-z0-9_./-]+)(?: \([0-9.]+s\))?$`)
-          var failureDiagnosticSourceLine = regexp.MustCompile(`^([A-Za-z0-9_.-]+\.go:[1-9][0-9]*):`)
+
+          // Source-derived exact reason codes. Package, test and source names stay withheld.
+          var failureDiagnosticReasonCodes = map[string]struct{}{
+              "capture-driver/native-parent-environment-not-isolated": {},
+              "capture/audit-child-output-read": {},
+              "capture/audit-command-failed": {},
+              "capture/audit-failure-detail-bound": {},
+              "capture/audit-failure-detail-close": {},
+              "capture/audit-failure-detail-open": {},
+              "capture/audit-failure-detail-read": {},
+              "capture/audit-failure-detail-write": {},
+              "capture/audit-failure-name-write": {},
+              "capture/audit-internal-failure": {},
+              "capture/audit-invalid-arguments": {},
+              "capture/audit-invalid-failure-detail-event": {},
+              "capture/audit-invalid-test-event": {},
+              "capture/audit-invalid-test-exit": {},
+              "capture/audit-metrics-invalid": {},
+              "capture/audit-output-count-incomplete": {},
+              "capture/audit-output-entry-unexpected": {},
+              "capture/audit-output-list": {},
+              "capture/audit-row-counts-incomplete": {},
+              "capture/audit-self-check-child-output": {},
+              "capture/audit-self-check-child-output-bound": {},
+              "capture/audit-self-check-child-output-setup": {},
+              "capture/audit-self-check-count": {},
+              "capture/audit-self-check-failure-detail": {},
+              "capture/audit-self-check-failure-detail-bound": {},
+              "capture/audit-self-check-failure-detail-count": {},
+              "capture/audit-self-check-failure-names": {},
+              "capture/audit-self-check-json": {},
+              "capture/audit-self-check-positive": {},
+              "capture/audit-self-check-skip": {},
+              "capture/audit-test-log-close": {},
+              "capture/audit-test-log-open": {},
+              "capture/audit-test-log-read": {},
+              "capture/go-test-failed": {},
+              "capture/native-parent-env-wrapper-build-failed": {},
+              "capture/output-directory-not-empty": {},
+              "capture/output-directory-scan-failed": {},
+              "capture/probe-mode-mismatch": {},
+              "capture/probe-platform-unsupported": {},
+              "capture/shell-command-failed": {},
+              "capture/systemroot-missing": {},
+              "capture/umask-mismatch": {},
+              "sanitize/build-failed": {},
+              "sanitize/failure-diagnostics-write-failed": {},
+              "sanitize/input-repeat-set-invalid": {},
+              "sanitize/internal-failure": {},
+              "sanitize/invalid-arguments": {},
+              "sanitize/pass-output-invalid": {},
+              "sanitize/path-exception-controls-failed": {},
+              "sanitize/seal-build-failed": {},
+              "sanitize/seal-generation-failed": {},
+              "sanitize/seal-invalid-arguments": {},
+              "sanitize/seal-output-invalid": {},
+              "sanitize/seal-self-check-failed": {},
+              "sanitize/seal-workflow-identity-invalid": {},
+              "sanitize/selfcheck-byte-preservation-failed": {},
+              "sanitize/selfcheck-manifest-failed": {},
+              "sanitize/shell-command-failed": {},
+              "sanitize/systemroot-missing": {},
+              "sanitize/tool-command-failed": {},
+          }
 
           func allowFailureDiagnosticLine(line string) string {
               line = strings.TrimSpace(escapeFailureDiagnosticControls(line))
-              if match := failureDiagnosticPackageLine.FindStringSubmatch(line); match != nil {
-                  return fmt.Sprintf("Package=%s Test=%s", match[1], match[2])
-              }
-              if failureDiagnosticFailNameLine.MatchString(line) || failureDiagnosticReasonLine.MatchString(line) {
+              reason := strings.TrimPrefix(line, "CAPTURE_REASON=")
+              if _, ok := failureDiagnosticReasonCodes[reason]; ok {
                   return line
-              }
-              if match := failureDiagnosticRunLine.FindStringSubmatch(line); match != nil {
-                  return "=== RUN " + match[1]
-              }
-              if match := failureDiagnosticResultLine.FindStringSubmatch(line); match != nil {
-                  return fmt.Sprintf("--- %s: %s", match[1], match[2])
-              }
-              if match := failureDiagnosticSourceLine.FindStringSubmatch(line); match != nil {
-                  return match[1] + ": Failure detail withheld by the sanitizer."
               }
               if line == "PASS" || line == "FAIL" {
                   return line
@@ -2116,25 +2163,53 @@ jobs:
           }
 
           func checkFailureDiagnosticControls(caseDir string) error {
-              safe := []byte("CAPTURE_DETAIL Package=public/package Test=TestPublicFailure\nCAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\n=== RUN   TestPublicFailure\n--- FAIL: TestPublicFailure (0.00s)\n--- PASS: TestPublicPositive (0.00s)\nmain_test.go:17: fixture-control-value\nPASS\n")
+              safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\n")
               rendered := string(failureDiagnosticLog(caseDir, safe))
               for _, visible := range []string{
-                  "CAPTURE_DETAIL Package=public/package Test=TestPublicFailure",
                   "CAPTURE_DETAIL CAPTURE_REASON=capture/go-test-failed",
                   "CAPTURE_DETAIL capture-driver/native-parent-environment-not-isolated",
                   "CAPTURE_DETAIL sanitize/input-repeat-set-invalid",
-                  "CAPTURE_DETAIL === RUN TestPublicFailure",
-                  "CAPTURE_DETAIL --- FAIL: TestPublicFailure",
-                  "CAPTURE_DETAIL --- PASS: TestPublicPositive",
-                  "CAPTURE_DETAIL main_test.go:17: Failure detail withheld by the sanitizer.",
                   "CAPTURE_DETAIL PASS",
+                  "CAPTURE_DETAIL FAIL",
               } {
                   if !strings.Contains(rendered, visible) {
                       return operational("selfcheck-failure-diagnostic-positive")
                   }
               }
-              if strings.Contains(rendered, "fixture-control-value") {
-                  return operational("selfcheck-failure-diagnostic-ordinary-value-leak")
+              var allReasonRecords strings.Builder
+              for code := range failureDiagnosticReasonCodes {
+                  allReasonRecords.WriteString(code + "\n")
+                  allReasonRecords.WriteString("CAPTURE_REASON=" + code + "\n")
+              }
+              reasonOutput := string(failureDiagnosticLog(caseDir, []byte(allReasonRecords.String())))
+              for code := range failureDiagnosticReasonCodes {
+                  for _, record := range []string{code, "CAPTURE_REASON=" + code} {
+                      if !strings.Contains(reasonOutput, "CAPTURE_DETAIL "+record+"\n") {
+                          return operational("selfcheck-failure-diagnostic-positive")
+                      }
+                  }
+              }
+              for _, control := range []struct{ line, value string }{
+                  {"CAPTURE_REASON=capture/theme-dark", "theme-dark"},
+                  {"CAPTURE_DETAIL Package=example/pkg Test=TestSettings/theme-dark", "theme-dark"},
+                  {"CAPTURE_FAIL Package=example/pkg Test=TestSettings/theme-dark", "theme-dark"},
+                  {"=== RUN TestSettings/theme-dark", "theme-dark"},
+                  {"--- FAIL: TestSettings/theme-dark (0.00s)", "theme-dark"},
+                  {"theme-dark.go:17: setting=theme-dark", "theme-dark"},
+              } {
+                  withheld := string(failureDiagnosticLog(caseDir, []byte(control.line+"\n")))
+                  if strings.Contains(withheld, control.value) || !strings.Contains(withheld, "Failure detail withheld by the sanitizer.") {
+                      return operational("selfcheck-failure-diagnostic-allowlist")
+                  }
+              }
+              for _, unsafe := range []string{
+                  `Settings mismatch: {"model":"fixture-control-value"}`,
+                  "plain fixture text fixture-control-value",
+              } {
+                  withheld := string(failureDiagnosticLog(caseDir, []byte(unsafe+"\n")))
+                  if strings.Contains(withheld, "fixture-control-value") || !strings.Contains(withheld, "Failure detail withheld by the sanitizer.") {
+                      return operational("selfcheck-failure-diagnostic-ordinary-value-leak")
+                  }
               }
               diagnosticDir := filepath.Dir(caseDir)
               if err := os.MkdirAll(diagnosticDir, 0700); err != nil {

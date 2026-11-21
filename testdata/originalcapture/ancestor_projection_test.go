@@ -1007,23 +1007,9 @@ func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) 
 	if err != nil {
 		t.Fatalf("read native capture workflow: %v", err)
 	}
-
-	const stepStart = "      - name: Upload platform artifact\n"
-	start := strings.Index(string(workflow), stepStart)
-	if start < 0 {
-		t.Fatal("native capture artifact upload step is missing")
-	}
-	step := string(workflow[start+len(stepStart):])
-	if next := strings.Index(step, "\n      - name:"); next >= 0 {
-		step = step[:next]
-	}
-	var condition string
-	for _, line := range strings.Split(step, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "if:") {
-			condition = trimmed
-			break
-		}
+	condition, err := nativeCaptureUploadCondition(workflow)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, required := range []string{
 		"steps.capture.outcome == 'success'",
@@ -1032,6 +1018,33 @@ func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) 
 		if !strings.Contains(condition, required) {
 			t.Errorf("artifact upload condition %q does not require %s", condition, required)
 		}
+	}
+}
+
+func TestNativeCaptureUploadConditionAcceptsLFAndCRLF(t *testing.T) {
+	const workflow = "      - name: Upload platform artifact\n        if: ${{ steps.capture.outcome == 'success' && steps.sanitize.outcome == 'success' }}\n      - name: Next step\n"
+	for _, newline := range []string{"\n", "\r\n"} {
+		input := []byte(strings.ReplaceAll(workflow, "\n", newline))
+		condition, err := nativeCaptureUploadCondition(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, required := range []string{
+			"steps.capture.outcome == 'success'",
+			"steps.sanitize.outcome == 'success'",
+		} {
+			if !strings.Contains(condition, required) {
+				t.Errorf("condition %q does not require %s", condition, required)
+			}
+		}
+	}
+}
+
+func TestNativeCaptureWorkflowPathNormalizesMixedSeparators(t *testing.T) {
+	const mixed = `D:\a\curator\curator/.github/workflows/original-capture-native.yml`
+	want := filepath.Clean(strings.ReplaceAll(mixed, `\`, string(os.PathSeparator)))
+	if got := normalizeNativeCaptureWorkflowPath(mixed); got != want {
+		t.Fatalf("normalized workflow path = %q, want %q", got, want)
 	}
 }
 
@@ -1047,7 +1060,32 @@ func readBoundNativeCaptureWorkflow() ([]byte, error) {
 	if path == "" {
 		return nil, errors.New("CAPTURE_WORKFLOW_PATH is required")
 	}
-	return os.ReadFile(path)
+	return os.ReadFile(normalizeNativeCaptureWorkflowPath(path))
+}
+
+func normalizeNativeCaptureWorkflowPath(path string) string {
+	path = strings.ReplaceAll(path, `\`, string(os.PathSeparator))
+	return filepath.Clean(filepath.FromSlash(path))
+}
+
+func nativeCaptureUploadCondition(workflow []byte) (string, error) {
+	text := strings.ReplaceAll(string(workflow), "\r\n", "\n")
+	const stepStart = "      - name: Upload platform artifact\n"
+	start := strings.Index(text, stepStart)
+	if start < 0 {
+		return "", errors.New("native capture artifact upload step is missing")
+	}
+	step := text[start+len(stepStart):]
+	if next := strings.Index(step, "\n      - name:"); next >= 0 {
+		step = step[:next]
+	}
+	for _, line := range strings.Split(step, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "if:") {
+			return trimmed, nil
+		}
+	}
+	return "", errors.New("native capture artifact upload condition is missing")
 }
 
 func fixtureAncestorFullJSON(caseID string, entries []string) ([]byte, []byte) {
