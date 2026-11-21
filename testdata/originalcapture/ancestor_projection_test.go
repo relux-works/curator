@@ -1002,6 +1002,39 @@ func TestFixtureAncestorFullJSONUsesFlatStringEntries(t *testing.T) {
 	}
 }
 
+func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) {
+	workflow, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "original-capture-native.yml"))
+	if err != nil {
+		t.Fatalf("read native capture workflow: %v", err)
+	}
+
+	const stepStart = "      - name: Upload platform artifact\n"
+	start := strings.Index(string(workflow), stepStart)
+	if start < 0 {
+		t.Fatal("native capture artifact upload step is missing")
+	}
+	step := string(workflow[start+len(stepStart):])
+	if next := strings.Index(step, "\n      - name:"); next >= 0 {
+		step = step[:next]
+	}
+	var condition string
+	for _, line := range strings.Split(step, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "if:") {
+			condition = trimmed
+			break
+		}
+	}
+	for _, required := range []string{
+		"steps.capture.outcome == 'success'",
+		"steps.sanitize.outcome == 'success'",
+	} {
+		if !strings.Contains(condition, required) {
+			t.Errorf("artifact upload condition %q does not require %s", condition, required)
+		}
+	}
+}
+
 func fixtureAncestorFullJSON(caseID string, entries []string) ([]byte, []byte) {
 	encoded, err := json.Marshal(entries)
 	if err != nil {
