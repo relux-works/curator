@@ -259,6 +259,10 @@ jobs:
           const maxFailureDetails = 4
           const maxFailureDetailBytes = 1024
           const maxFailureDetailsBytes = 8192
+          const maxFailureAssertionBytes = 432
+          const maxNativeParentStderrBytes = 512
+
+          var nativeParentDetailDir string
 
           var publicTestName = regexp.MustCompile(`^[A-Za-z0-9_./-]+$`)
 
@@ -527,12 +531,84 @@ jobs:
               if !seen[key] || detail == "" {
                 detail = "[No output event was recorded.]\n"
               }
+              wasTruncated := truncated[key]
+              const parentTestPrefix = "TestFreezeOriginalBaseline/"
+              caseName := strings.TrimPrefix(failure.Test, parentTestPrefix)
+              if nativeParentDetailDir != "" && caseName != failure.Test &&
+                  !strings.Contains(caseName, "/") && regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(caseName) {
+                childPath := filepath.Join(nativeParentDetailDir, caseName+".stderr.raw.txt")
+                info, statErr := os.Lstat(childPath)
+                if statErr != nil && !os.IsNotExist(statErr) {
+                  return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
+                }
+                var childStderr []byte
+                rawStderrTruncated := false
+                if os.IsNotExist(statErr) {
+                  childStderr = []byte("[Child stderr was not captured.]\n")
+                } else {
+                  if !info.Mode().IsRegular() {
+                    return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
+                  }
+                  childFile, openErr := os.Open(childPath)
+                  if openErr != nil {
+                    return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
+                  }
+                  childStderr, statErr = io.ReadAll(io.LimitReader(childFile, int64(maxNativeParentStderrBytes+1)))
+                  childCloseErr := childFile.Close()
+                  if statErr != nil || childCloseErr != nil {
+                    return nil, auditFailure("CAPTURE_REASON=capture/audit-child-stderr-read")
+                  }
+                  if len(childStderr) > maxNativeParentStderrBytes {
+                    rawStderrTruncated = true
+                    childStderr = childStderr[:maxNativeParentStderrBytes]
+                  }
+                }
+                boundedAssertion, assertionCut := appendBounded("", detail, maxFailureAssertionBytes)
+                boundedStderr, stderrCut := appendBounded("", string(childStderr), maxNativeParentStderrBytes)
+                childDetail := "Assertion text (limit 432 bytes):\n" + boundedAssertion +
+                  "\nChild stderr (limit 512 bytes):\n" + boundedStderr
+                boundedDetail, detailCut := appendBounded("", childDetail, maxFailureDetailBytes)
+                detail = boundedDetail
+                wasTruncated = wasTruncated || assertionCut || stderrCut || detailCut || rawStderrTruncated
+              }
               details = append(details, failureDetail{
                 Package: failure.Package, Test: failure.Test,
-                Output: detail, Truncated: truncated[key],
+                Output: detail, Truncated: wasTruncated,
               })
             }
             return details, nil
+          }
+
+          func checkFailureDetailChildStderr() error {
+            base, err := os.MkdirTemp("", "capture-audit-child-stderr-control-")
+            if err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-setup")
+            }
+            defer os.RemoveAll(base)
+            previous := nativeParentDetailDir
+            nativeParentDetailDir = base
+            defer func() { nativeParentDetailDir = previous }()
+
+            const testName = "TestFreezeOriginalBaseline/codex_cli-native-parent"
+            detailPath := filepath.Join(base, "codex_cli-native-parent.stderr.raw.txt")
+            if err := os.WriteFile(detailPath, []byte("SAFE_CHILD_STDERR_CONTROL\\n"), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-setup")
+            }
+            event := fmt.Sprintf(`{"Action":"output","Package":"public/package","Test":%q,"Output":"SAFE_ASSERTION_CONTROL\\n"}`, testName)
+            detail, err := collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: "public/package", Test: testName}})
+            if err != nil || len(detail) != 1 || !strings.Contains(detail[0].Output, "SAFE_ASSERTION_CONTROL") ||
+                !strings.Contains(detail[0].Output, "SAFE_CHILD_STDERR_CONTROL") || len(detail[0].Output) > maxFailureDetailBytes {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr")
+            }
+            longStderr := strings.Repeat("S", maxNativeParentStderrBytes+64)
+            if err := os.WriteFile(detailPath, []byte(longStderr), 0600); err != nil {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-setup")
+            }
+            detail, err = collectFailureDetails(strings.NewReader(event+"\n"), []failureName{{Package: "public/package", Test: testName}})
+            if err != nil || len(detail) != 1 || !detail[0].Truncated || len(detail[0].Output) > maxFailureDetailBytes {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-child-stderr-bound")
+            }
+            return nil
           }
 
           func writeFailureDetails(path string, details []failureDetail) error {
@@ -585,7 +661,9 @@ jobs:
 
           func run() error {
             if err := selfCheck(); err != nil { return err }
-            if len(os.Args) != 6 { return auditFailure("CAPTURE_REASON=capture/audit-invalid-arguments") }
+            if len(os.Args) != 7 { return auditFailure("CAPTURE_REASON=capture/audit-invalid-arguments") }
+            nativeParentDetailDir = os.Args[6]
+            if err := checkFailureDetailChildStderr(); err != nil { return err }
             testExit, err := strconv.Atoi(os.Args[3])
             if err != nil { return auditFailure("CAPTURE_REASON=capture/audit-invalid-test-exit") }
             input, err := os.Open(os.Args[1])
@@ -633,6 +711,161 @@ jobs:
               os.Exit(1)
             }
           }
+          GO
+          cat > "$CAPTURE_ROOT/native-parent-env.go" <<'GO'
+          package main
+
+          import (
+            "fmt"
+            "io"
+            "os"
+            "os/exec"
+            "path/filepath"
+            "strings"
+          )
+
+          const maxChildStderrBytes = 512
+          const childStderrTruncation = "\n[child stderr truncated at 512 bytes]\n"
+
+          type cappedWriter struct {
+            writer    io.Writer
+            remaining int
+            truncated bool
+          }
+
+          func (writer *cappedWriter) Write(data []byte) (int, error) {
+            originalLength := len(data)
+            if writer.remaining <= 0 {
+              if originalLength > 0 {
+                writer.truncated = true
+              }
+              return originalLength, nil
+            }
+            if len(data) > writer.remaining {
+              data = data[:writer.remaining]
+              writer.truncated = true
+            }
+            written, err := writer.writer.Write(data)
+            writer.remaining -= written
+            if err != nil {
+              return written, err
+            }
+            if written != len(data) {
+              return written, io.ErrShortWrite
+            }
+            return originalLength, nil
+          }
+
+          func childEnvironment(arguments []string) ([]string, string, []string, bool) {
+            if len(arguments) < 3 || arguments[0] != "-i" {
+              return nil, "", nil, false
+            }
+            index := 1
+            environment := make([]string, 0, 2)
+            for index < len(arguments) {
+              assignment := arguments[index]
+              separator := strings.IndexByte(assignment, '=')
+              if separator <= 0 {
+                break
+              }
+              environment = append(environment, assignment)
+              index++
+            }
+            if index >= len(arguments) || len(environment) == 0 {
+              return nil, "", nil, false
+            }
+            return environment, arguments[index], arguments[index+1:], true
+          }
+
+          func nativeParentCase(arguments []string) string {
+            caseName := ""
+            hasResult := false
+            for _, argument := range arguments {
+              if strings.HasPrefix(argument, "-native-parent-worker-case=") {
+                caseName = strings.TrimPrefix(argument, "-native-parent-worker-case=")
+              }
+              if strings.HasPrefix(argument, "-native-parent-worker-result=") {
+                hasResult = true
+              }
+            }
+            if !hasResult || caseName == "" || strings.ContainsAny(caseName, `/\\`) {
+              return ""
+            }
+            for _, char := range caseName {
+              if !(char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' ||
+                char >= '0' && char <= '9' || char == '_' || char == '-') {
+                return ""
+              }
+            }
+            return caseName
+          }
+
+          func runRealEnv(arguments []string) int {
+            realEnv := os.Getenv("CAPTURE_NATIVE_PARENT_REAL_ENV")
+            if realEnv == "" {
+              fmt.Fprintln(os.Stderr, "native-parent env wrapper has no real env utility")
+              return 127
+            }
+            command := exec.Command(realEnv, arguments...)
+            command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+            if err := command.Run(); err != nil {
+              if exit, ok := err.(*exec.ExitError); ok {
+                return exit.ExitCode()
+              }
+              fmt.Fprintln(os.Stderr, "native-parent env utility could not start")
+              return 127
+            }
+            return 0
+          }
+
+          func runChild(arguments []string) int {
+            environment, program, programArgs, ok := childEnvironment(arguments)
+            if !ok {
+              return runRealEnv(arguments)
+            }
+            caseName := nativeParentCase(programArgs)
+            detailDir := os.Getenv("CAPTURE_NATIVE_PARENT_DETAIL_DIR")
+            if caseName == "" || detailDir == "" {
+              return runRealEnv(arguments)
+            }
+            if err := os.MkdirAll(detailDir, 0700); err != nil {
+              fmt.Fprintln(os.Stderr, "native-parent stderr capture setup failed")
+              return 125
+            }
+            detailPath := filepath.Join(detailDir, caseName+".stderr.raw.txt")
+            detailFile, err := os.OpenFile(detailPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+            if err != nil {
+              fmt.Fprintln(os.Stderr, "native-parent stderr capture setup failed")
+              return 125
+            }
+            payloadLimit := maxChildStderrBytes - len(childStderrTruncation)
+            childStderr := &cappedWriter{writer: detailFile, remaining: payloadLimit}
+            command := exec.Command(program, programArgs...)
+            command.Env = environment
+            command.Stdin = os.Stdin
+            command.Stdout = io.Discard
+            command.Stderr = childStderr
+            runErr := command.Run()
+            if childStderr.truncated {
+              if _, err := io.WriteString(detailFile, childStderrTruncation); err != nil && runErr == nil {
+                runErr = err
+              }
+            }
+            closeErr := detailFile.Close()
+            if closeErr != nil && runErr == nil {
+              runErr = closeErr
+            }
+            if runErr == nil {
+              return 0
+            }
+            if exit, ok := runErr.(*exec.ExitError); ok {
+              return exit.ExitCode()
+            }
+            fmt.Fprintln(os.Stderr, "native-parent child command could not start")
+            return 127
+          }
+
+          func main() { os.Exit(runChild(os.Args[1:])) }
           GO
           native_path() {
             if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -684,6 +917,25 @@ jobs:
             trusted_path="$trusted_path:/usr/bin:/bin"
             clean_env[13]="PATH=$trusted_path"
           fi
+          native_parent_wrapper_dir="$CAPTURE_ROOT/native-parent-wrapper"
+          native_parent_detail_dir="$CAPTURE_ROOT/native-parent-details"
+          mkdir -p "$native_parent_wrapper_dir" "$native_parent_detail_dir"
+          trusted_path="$native_parent_wrapper_dir:$trusted_path"
+          clean_env[13]="PATH=$trusted_path"
+          native_parent_detail_path="$(native_path "$native_parent_detail_dir")"
+          real_env_path="$(native_path "$(command -v env)")"
+          native_parent_env_binary="$native_parent_wrapper_dir/env"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            native_parent_env_binary="$native_parent_env_binary.exe"
+          fi
+          wrapper_build_stdout="$CAPTURE_ROOT/native-parent-env-build.stdout"
+          wrapper_build_stderr="$CAPTURE_ROOT/native-parent-env-build.stderr"
+          if ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            go build -o "$native_parent_env_binary" "$CAPTURE_ROOT/native-parent-env.go" \
+            > "$wrapper_build_stdout" 2> "$wrapper_build_stderr"; then
+            printf 'CAPTURE_REASON=capture/native-parent-env-wrapper-build-failed\n' >&2
+            exit 1
+          fi
           if ! find "$CAPTURE_ROOT/raw-output" -mindepth 1 -print -quit > "$CAPTURE_ROOT/output-entry-check.raw.txt"; then
             printf 'CAPTURE_REASON=capture/output-directory-scan-failed\n' >&2
             exit 1
@@ -698,6 +950,8 @@ jobs:
           if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             HARNESS_CAPTURE_OUT="$output_path" \
             HARNESS_REPEAT_CAPTURE_OUT="$repeat_path" \
+            CAPTURE_NATIVE_PARENT_DETAIL_DIR="$native_parent_detail_path" \
+            CAPTURE_NATIVE_PARENT_REAL_ENV="$real_env_path" \
             go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity \
             > "$private_test_log" 2>&1; then
             test_exit=0
@@ -707,6 +961,7 @@ jobs:
           if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
             go run "$CAPTURE_ROOT/audit.go" "$private_test_log" \
             "$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" "$failure_details_file" \
+            "$native_parent_detail_path" \
             > "$CAPTURE_ROOT/audit-metrics.raw.txt" 2> "$CAPTURE_ROOT/audit-error.raw.txt"; then
             audit_exit=0
           else
@@ -938,6 +1193,163 @@ jobs:
               return false
           }
 
+          type textRange struct {
+              start int
+              end int
+          }
+
+          const fixtureRootToken = "${FIXTURE_ROOT}"
+          const syntheticProjectPath = "/synthetic/project"
+
+          // Source: pinned testdata/originalcapture/legacy_fixture_test.go:290,471
+          // at 805517cc, blob a1dc4599e6eac9a8c32117688e2ae19925842991.
+          // The driver emits the fixture token at line 290 and writes the exact
+          // synthetic TOML project path at line 471. Keep these exceptions literal.
+          func fixtureRootRelativeRange(value string, tokenStart int) (textRange, bool) {
+              tokenEnd := tokenStart + len(fixtureRootToken)
+              if tokenStart < 0 || tokenEnd > len(value) || value[tokenStart:tokenEnd] != fixtureRootToken ||
+                  !pathBoundaryBefore(value, tokenStart) || tokenEnd >= len(value) {
+                  return textRange{}, false
+              }
+              separator := value[tokenEnd]
+              if separator != '/' && separator != '\\' {
+                  return textRange{}, false
+              }
+              pathStart := tokenEnd + 1
+              pathEnd := pathStart
+              for pathEnd < len(value) && !strings.ContainsRune(" \t\r\n\"'<> ", rune(value[pathEnd])) {
+                  pathEnd++
+              }
+              remainder := value[pathStart:pathEnd]
+              if remainder == "" || strings.HasPrefix(remainder, "/") || strings.HasPrefix(remainder, "\\") ||
+                  strings.HasSuffix(remainder, "/") || strings.HasSuffix(remainder, "\\") ||
+                  strings.Contains(remainder, "//") || strings.Contains(remainder, "\\\\") ||
+                  strings.Contains(remainder, "/\\") || strings.Contains(remainder, "\\/") ||
+                  strings.Contains(remainder, fixtureRootToken) {
+                  return textRange{}, false
+              }
+              components := strings.FieldsFunc(remainder, func(char rune) bool { return char == '/' || char == '\\' })
+              if len(components) == 0 {
+                  return textRange{}, false
+              }
+              for _, component := range components {
+                  drivePrefix := len(component) >= 2 && ((component[0] >= 'A' && component[0] <= 'Z') ||
+                      (component[0] >= 'a' && component[0] <= 'z')) && component[1] == ':'
+                  if component == "" || component == "." || component == ".." || drivePrefix {
+                      return textRange{}, false
+                  }
+              }
+              return textRange{start: tokenStart, end: pathEnd}, true
+          }
+
+          func fixtureRootRanges(value string) ([]textRange, bool) {
+              ranges := make([]textRange, 0, 1)
+              for offset := 0; offset < len(value); {
+                  found := strings.Index(value[offset:], fixtureRootToken)
+                  if found < 0 {
+                      break
+                  }
+                  at := offset + found
+                  tokenEnd := at + len(fixtureRootToken)
+                  if tokenEnd < len(value) && (value[tokenEnd] == '/' || value[tokenEnd] == '\\') {
+                      span, valid := fixtureRootRelativeRange(value, at)
+                      if !valid {
+                          return nil, true
+                      }
+                      ranges = append(ranges, span)
+                  }
+                  offset = at + len(fixtureRootToken)
+              }
+              return ranges, false
+          }
+
+          func rangeContainsPathMatch(rootRange, match textRange) bool {
+              tokenEnd := rootRange.start + len(fixtureRootToken)
+              return match.start >= tokenEnd && match.end <= rootRange.end
+          }
+
+          func beginsAbsolutePath(value string) bool {
+              if value == "" {
+                  return false
+              }
+              if value[0] == '/' || value[0] == '\\' {
+                  return true
+              }
+              return len(value) >= 3 && ((value[0] >= 'A' && value[0] <= 'Z') ||
+                  (value[0] >= 'a' && value[0] <= 'z')) && value[1] == ':' &&
+                  (value[2] == '/' || value[2] == '\\')
+          }
+
+          func absolutePathStart(value string, match textRange) (int, bool) {
+              if match.start >= match.end || match.end > len(value) {
+                  return 0, false
+              }
+              if beginsAbsolutePath(value[match.start:match.end]) {
+                  return match.start, true
+              }
+              if match.start+1 < match.end && beginsAbsolutePath(value[match.start+1:match.end]) {
+                  return match.start + 1, true
+              }
+              return 0, false
+          }
+
+          func syntheticProjectPathAllowed(value string, pathStart, pathEnd int) bool {
+              if pathEnd-pathStart != len(syntheticProjectPath) || value[pathStart:pathEnd] != syntheticProjectPath ||
+                  !pathBoundaryBefore(value, pathStart) {
+                  return false
+              }
+              if pathEnd == len(value) {
+                  return true
+              }
+              switch value[pathEnd] {
+              case '"', '\'', ' ', '\t', '\n', '\r', ',', ';', ')', ']', '}':
+                  return true
+              default:
+                  return false
+              }
+          }
+
+          func hasPrivateHomeOutsideFixtureRoot(value string, pattern *regexp.Regexp, roots []textRange) bool {
+              for _, match := range pattern.FindAllStringIndex(value, -1) {
+                  candidate := textRange{start: match[0], end: match[1]}
+                  allowed := false
+                  for _, root := range roots {
+                      if rangeContainsPathMatch(root, candidate) {
+                          allowed = true
+                          break
+                      }
+                  }
+                  if !allowed {
+                      return true
+                  }
+              }
+              return false
+          }
+
+          func hasAbsolutePathOutsideExceptions(value string, pattern *regexp.Regexp, roots []textRange) bool {
+              for _, matchIndices := range pattern.FindAllStringIndex(value, -1) {
+                  match := textRange{start: matchIndices[0], end: matchIndices[1]}
+                  pathStart, ok := absolutePathStart(value, match)
+                  if !ok {
+                      return true
+                  }
+                  if syntheticProjectPathAllowed(value, pathStart, match.end) {
+                      continue
+                  }
+                  allowedFixturePath := false
+                  for _, root := range roots {
+                      if root.start+len(fixtureRootToken) == pathStart && root.end == match.end {
+                          allowedFixturePath = true
+                          break
+                      }
+                  }
+                  if !allowedFixturePath {
+                      return true
+                  }
+              }
+              return false
+          }
+
           func unsafeText(value string, roots []string) error {
               if err := unsafeTextPatterns(value, roots); err != nil {
                   return err
@@ -952,7 +1364,23 @@ jobs:
               if hasFixtureRoot(value, roots) {
                   return refusal("path-fixture-root-leak")
               }
+              fixturePaths, invalidFixturePath := fixtureRootRanges(value)
+              if invalidFixturePath {
+                  return refusal("path-absolute")
+              }
               for _, item := range detectors {
+                  if item.code == "path-private-home" {
+                      if hasPrivateHomeOutsideFixtureRoot(value, item.pattern, fixturePaths) {
+                          return refusal(item.code)
+                      }
+                      continue
+                  }
+                  if item.code == "path-absolute" {
+                      if hasAbsolutePathOutsideExceptions(value, item.pattern, fixturePaths) {
+                          return refusal(item.code)
+                      }
+                      continue
+                  }
                   if item.pattern.MatchString(value) {
                       return refusal(item.code)
                   }
@@ -1375,6 +1803,10 @@ jobs:
           }
 
           func exportGate(caseDir, repeatDir, artifactDir string, require47 bool) error {
+              return exportGateWithFailureDetailPolicy(caseDir, repeatDir, artifactDir, require47, false)
+          }
+
+          func exportGateWithFailureDetailPolicy(caseDir, repeatDir, artifactDir string, require47, dropRefusedDetail bool) error {
               empty, err := directoryEmpty(artifactDir)
               if err != nil {
                   return err
@@ -1420,10 +1852,25 @@ jobs:
                       return err
                   }
               }
-              for _, file := range logs {
+              detailIndex := -1
+              for index, file := range logs {
+                  if file.name == "failure-details.txt" {
+                      detailIndex = index
+                      continue
+                  }
                   if err := scanLog(file.data, roots); err != nil {
                       return err
                   }
+              }
+              if detailIndex < 0 {
+                  return operational("input-log-read-failed")
+              }
+              if err := scanLog(logs[detailIndex].data, roots); err != nil {
+                  failure, typed := err.(gateError)
+                  if !dropRefusedDetail || !typed || !failure.security {
+                      return err
+                  }
+                  logs[detailIndex].data = []byte("Failure detail withheld by the sanitizer.\n")
               }
               stage, err := os.MkdirTemp(filepath.Dir(artifactDir), ".capture-export-stage-")
               if err != nil {
@@ -1491,10 +1938,23 @@ jobs:
                   }
                   os.Exit(2)
               }
-              os.Exit(runGate(os.Args[1:], os.Stdout, os.Stderr))
+              if len(os.Args) == 2 && os.Args[1] == "--path-exception-controls" {
+                  if err := runPathExceptionControls(); err != nil {
+                      fmt.Fprintln(os.Stderr, "CAPTURE_REASON=sanitize/path-exception-controls-failed")
+                      os.Exit(2)
+                  }
+                  fmt.Fprintln(os.Stdout, "path_exception_controls=PASS")
+                  return
+              }
+              dropRefusedDetail := os.Getenv("CAPTURE_DROP_REFUSED_FAILURE_DETAILS") == "1"
+              os.Exit(runGateWithFailureDetailPolicy(os.Args[1:], os.Stdout, os.Stderr, dropRefusedDetail))
           }
 
           func runGate(args []string, stdout, stderr io.Writer) int {
+              return runGateWithFailureDetailPolicy(args, stdout, stderr, false)
+          }
+
+          func runGateWithFailureDetailPolicy(args []string, stdout, stderr io.Writer, dropRefusedDetail bool) int {
               if len(args) != 4 {
                   fmt.Fprintln(stderr, "CAPTURE_REASON=sanitize/invalid-arguments")
                   return 2
@@ -1504,7 +1964,7 @@ jobs:
                   fmt.Fprintln(stderr, "CAPTURE_REASON=sanitize/invalid-arguments")
                   return 2
               }
-              if err := exportGate(args[0], args[1], args[2], require47); err != nil {
+              if err := exportGateWithFailureDetailPolicy(args[0], args[1], args[2], require47, dropRefusedDetail); err != nil {
                   failure, typed := err.(gateError)
                   if !typed {
                       fmt.Fprintln(stderr, "CAPTURE_REASON=sanitize/internal-failure")
@@ -1880,6 +2340,216 @@ jobs:
                   return operational("selfcheck-positive-control-failed")
               }
               return verifyControlArtifact(paths)
+          }
+
+          func knownCaptureCaseNames() []string {
+              names := make([]string, 0, 47)
+              for _, id := range []string{"claude_code", "codex_cli", "opencode", "muse", "pi"} {
+                  names = append(names, id+"-empty")
+              }
+              for _, id := range []string{"cursor", "gemini"} {
+                  names = append(names, id+"-project-mirror")
+              }
+              for _, id := range []string{"windsurf", "opencode"} {
+                  names = append(names, id+"-native-discovery")
+              }
+              for _, state := range []string{"user-settings", "current", "modified", "missing-state", "unreadable-state", "malformed-state", "native-parent"} {
+                  names = append(names, "codex_cli-"+state)
+              }
+              names = append(names, "claude_code-mcp", "claude-launcher-normal-edit", "claude-launcher-typed-projection")
+              for index := 0; index < 5; index++ {
+                  names = append(names, fmt.Sprintf("claude-launcher-valid-%02d", index))
+              }
+              for index := 0; index < 14; index++ {
+                  names = append(names, fmt.Sprintf("claude-launcher-invalid-%02d", index))
+              }
+              for _, version := range []string{"1", "2", "3", "5", "6"} {
+                  names = append(names, "claude-launcher-old-version-"+version)
+              }
+              names = append(names, "claude-launcher-system-authority", "claude-launcher-cli-edits",
+                  "claude-launcher-cli-refusal", "claude-launcher-cli-arguments")
+              return names
+          }
+
+          func pathPayloadCase(field, value string) []byte {
+              observed := []byte(field + " = " + value + "\n")
+              digest := sha256.Sum256(observed)
+              object := map[string]any{
+                  field: value,
+                  "bytes": base64.StdEncoding.EncodeToString(observed),
+                  "document": base64.StdEncoding.EncodeToString(observed),
+                  "sha256": hex.EncodeToString(digest[:]),
+              }
+              encoded, _ := json.Marshal(object)
+              return append(encoded, '\n')
+          }
+
+          func writeKnownCaptureControl(paths *controlPaths) ([]byte, string, error) {
+              names := knownCaptureCaseNames()
+              if len(names) != 47 || len(paths.caseFiles) != len(names) {
+                  return nil, "", operational("selfcheck-known-case-set-invalid")
+              }
+              observed := []byte("model = \"fixture-model\"\n[projects.\"/synthetic/project\"]\nfixture = \"${FIXTURE_ROOT}/home/codex_cli/config.toml\"\nwindows_fixture = \"${FIXTURE_ROOT}\\home\\codex_cli\\config.toml\"\n")
+              observedHash := sha256.Sum256(observed)
+              caseName := "codex_cli-native-parent"
+              for index, name := range names {
+                  oldName := fmt.Sprintf("case-%02d.json", index)
+                  oldPath := filepath.Join(paths.caseDir, oldName)
+                  newName := name + ".json"
+                  newPath := filepath.Join(paths.caseDir, newName)
+                  if err := os.Rename(oldPath, newPath); err != nil {
+                      return nil, "", operational("selfcheck-known-case-set-fixture-failed")
+                  }
+                  data := []byte(fmt.Sprintf("{\"case\":%q}\n", name))
+                  if name == caseName {
+                      object := map[string]any{
+                          "case": name,
+                          "bytes": base64.StdEncoding.EncodeToString(observed),
+                          "document": base64.StdEncoding.EncodeToString(observed),
+                          "sha256": hex.EncodeToString(observedHash[:]),
+                      }
+                      encoded, err := json.Marshal(object)
+                      if err != nil {
+                          return nil, "", operational("selfcheck-known-case-set-fixture-failed")
+                      }
+                      data = append(encoded, '\n')
+                  }
+                  if err := writeFile(newPath, data, 0600); err != nil {
+                      return nil, "", operational("selfcheck-known-case-set-fixture-failed")
+                  }
+                  paths.caseFiles[index] = inputFile{name: newName, data: data, mode: 0600}
+              }
+              return observed, caseName + ".json", nil
+          }
+
+          func checkDecodedPayloadHashes(path string, observed []byte) error {
+              payload, err := os.ReadFile(path)
+              if err != nil {
+                  return operational("selfcheck-decoded-payload-read-failed")
+              }
+              value, err := parseJSON(payload)
+              if err != nil {
+                  return operational("selfcheck-decoded-payload-invalid")
+              }
+              object, ok := value.(map[string]any)
+              if !ok {
+                  return operational("selfcheck-decoded-payload-invalid")
+              }
+              observedHash := sha256.Sum256(observed)
+              for _, field := range []string{"bytes", "document"} {
+                  encoded, ok := object[field].(string)
+                  if !ok {
+                      return operational("selfcheck-decoded-payload-missing")
+                  }
+                  decoded, err := base64.StdEncoding.DecodeString(encoded)
+                  if err != nil {
+                      return operational("selfcheck-decoded-payload-invalid")
+                  }
+                  exportedHash := sha256.Sum256(decoded)
+                  if !bytes.Equal(decoded, observed) || !bytes.Equal(exportedHash[:], observedHash[:]) {
+                      return operational("selfcheck-decoded-payload-hash-mismatch")
+                  }
+              }
+              return nil
+          }
+
+          func expectPathRefusal(base, name, field, value string) error {
+              paths, err := prepareControl(filepath.Join(base, name), 1)
+              if err != nil {
+                  return err
+              }
+              data := pathPayloadCase(field, value)
+              if err := plantControl(paths, "case", "case-00.json", data); err != nil {
+                  return operational("selfcheck-path-control-fixture-failed")
+              }
+              paths.caseFiles[0].data = data
+              return expectRefusal(paths, "path-absolute")
+          }
+
+          func runPathExceptionControls() error {
+              base, err := os.MkdirTemp("", "capture-path-exception-control-")
+              if err != nil {
+                  return operational("selfcheck-path-control-setup-failed")
+              }
+              defer os.RemoveAll(base)
+
+              known, err := prepareControl(filepath.Join(base, "known-case-set"), 47)
+              if err != nil {
+                  return err
+              }
+              observed, caseName, err := writeKnownCaptureControl(&known)
+              if err != nil {
+                  return err
+              }
+              if err := expectPass(known, true); err != nil {
+                  return operational("selfcheck-known-case-set-export-failed")
+              }
+              if err := checkDecodedPayloadHashes(filepath.Join(known.artifact, "outputs", caseName), observed); err != nil {
+                  return err
+              }
+
+              for _, control := range []struct{ name, field, value string }{
+                  {"runner-temp-root", "value", `D:\a\_temp\runner\private-state`},
+                  {"home-field", "HOME", `D:\runner-profile\alexis`},
+                  {"workspace-field", "value", `D:\a\curator\workspace`},
+                  {"synthetic-extra-segment", "value", `/synthetic/project/extra`},
+                  {"synthetic-changed-character", "value", `/synthetic/projecx`},
+                  {"fixture-root-absolute-remainder", "value", `${FIXTURE_ROOT}//absolute/path`},
+                  {"fixture-root-drive-remainder", "value", `${FIXTURE_ROOT}/C:/outside/path`},
+                  {"fixture-root-unc-remainder", "value", `${FIXTURE_ROOT}/\\server\share`},
+                  {"fixture-root-parent-traversal", "value", `${FIXTURE_ROOT}/../outside`},
+                  {"fixture-root-nested-traversal", "value", `${FIXTURE_ROOT}/safe/../outside`},
+                  {"fixture-root-second-root", "value", `${FIXTURE_ROOT}/${FIXTURE_ROOT}/outside`},
+              } {
+                  if err := expectPathRefusal(base, control.name, control.field, control.value); err != nil {
+                      return err
+                  }
+              }
+
+              mixed := []byte("fixture=\"${FIXTURE_ROOT}/relative/config.toml\"\nrunner=\"D:\\a\\_temp\\private-state\"\n")
+              mixedPath, err := prepareControl(filepath.Join(base, "fixture-root-plus-private-path"), 1)
+              if err != nil {
+                  return err
+              }
+              mixedObject := map[string]any{
+                  "document": base64.StdEncoding.EncodeToString(mixed),
+                  "bytes": base64.StdEncoding.EncodeToString(mixed),
+              }
+              mixedDigest := sha256.Sum256(mixed)
+              mixedObject["sha256"] = hex.EncodeToString(mixedDigest[:])
+              mixedJSON, _ := json.Marshal(mixedObject)
+              mixedJSON = append(mixedJSON, '\n')
+              if err := plantControl(mixedPath, "case", "case-00.json", mixedJSON); err != nil {
+                  return operational("selfcheck-path-control-fixture-failed")
+              }
+              if err := expectRefusal(mixedPath, "path-absolute"); err != nil {
+                  return err
+              }
+
+              detail, err := prepareControl(filepath.Join(base, "refused-detail-only"), 1)
+              if err != nil {
+                  return err
+              }
+              refusedDetail := []byte("CAPTURE_DETAIL Package=public/package Test=TestPrivatePath\n/Users/example/private/state\n")
+              if err := plantControl(detail, "log", "failure-details.txt", refusedDetail); err != nil {
+                  return operational("selfcheck-path-control-fixture-failed")
+              }
+              var stdout, stderr bytes.Buffer
+              code := runGateWithFailureDetailPolicy(
+                  []string{detail.caseDir, detail.repeatDir, detail.artifact, "false"}, &stdout, &stderr, true,
+              )
+              if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "export_gate=PASS") {
+                  return operational("selfcheck-refused-detail-export-failed")
+              }
+              exportedCase, err := os.ReadFile(filepath.Join(detail.artifact, "outputs", "case-00.json"))
+              if err != nil || !bytes.Equal(exportedCase, detail.caseFiles[0].data) {
+                  return operational("selfcheck-refused-detail-case-lost")
+              }
+              exportedDetail, err := os.ReadFile(filepath.Join(detail.artifact, "failure-details.txt"))
+              if err != nil || !bytes.Equal(exportedDetail, []byte("Failure detail withheld by the sanitizer.\n")) {
+                  return operational("selfcheck-refused-detail-not-withheld")
+              }
+              return nil
           }
 
           func selfCheck() error {
@@ -2361,6 +3031,9 @@ jobs:
           sanitizer_stderr="$CAPTURE_ROOT/sanitizer.stderr"
           sanitizer_build_stdout="$CAPTURE_ROOT/sanitizer-build.stdout"
           sanitizer_build_stderr="$CAPTURE_ROOT/sanitizer-build.stderr"
+          path_controls_stdout="$CAPTURE_ROOT/path-controls.stdout"
+          path_controls_stderr="$CAPTURE_ROOT/path-controls.stderr"
+          path_controls_expected="$CAPTURE_ROOT/path-controls.expected"
           sanitizer_binary="$CAPTURE_ROOT/sanitize"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             sanitizer_binary="$CAPTURE_ROOT/sanitize.exe"
@@ -2368,10 +3041,24 @@ jobs:
           : > "$sanitizer_stdout"
           : > "$sanitizer_stderr"
           if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off go build -o "$sanitizer_binary" ./.temp/capture-exporter > "$sanitizer_build_stdout" 2> "$sanitizer_build_stderr"; then
-            if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$sanitizer_binary" "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/repeat-raw" "$CAPTURE_ROOT/artifact" "$REQUIRE_47" > "$sanitizer_stdout" 2> "$sanitizer_stderr"; then
-              sanitize_exit=0
+            if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off "$sanitizer_binary" --path-exception-controls > "$path_controls_stdout" 2> "$path_controls_stderr"; then
+              printf 'path_exception_controls=PASS\n' > "$path_controls_expected"
+              if cmp -s "$path_controls_expected" "$path_controls_stdout" && [[ ! -s "$path_controls_stderr" ]]; then
+                printf 'path_exception_controls=PASS\n' >> "$GITHUB_OUTPUT"
+                if env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off CAPTURE_DROP_REFUSED_FAILURE_DETAILS=1 \
+                  "$sanitizer_binary" "$CAPTURE_ROOT/raw-output" "$CAPTURE_ROOT/repeat-raw" "$CAPTURE_ROOT/artifact" "$REQUIRE_47" \
+                  > "$sanitizer_stdout" 2> "$sanitizer_stderr"; then
+                  sanitize_exit=0
+                else
+                  sanitize_exit=$?
+                fi
+              else
+                sanitize_exit=2
+                printf 'CAPTURE_REASON=sanitize/path-exception-controls-failed\n' > "$sanitizer_stderr"
+              fi
             else
-              sanitize_exit=$?
+              sanitize_exit=2
+              printf 'CAPTURE_REASON=sanitize/path-exception-controls-failed\n' > "$sanitizer_stderr"
             fi
           else
             sanitize_exit=2
