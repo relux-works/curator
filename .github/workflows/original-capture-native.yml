@@ -99,11 +99,12 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
+          a204244c2c45611108d73798df62da640c540cb882ce62887a8f67657bc66b20 ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
           deaefe19fadacd5d449176bfab0aa60d029c842f14c5070fbea7e9f0e539e983 launcher_fixture_test.go
-          e9250a474e897a0d8aa9e0ee6f01afd0a42d8532ae6e8d812148810a4ffae911 legacy_fixture_test.go
+          b96b012122f3ecb70537e2f64ca5fefbbdf6225123ce11f3ff7d6fc038c3a6eb legacy_fixture_test.go
           PINS
           }
           set +e
@@ -112,7 +113,8 @@ jobs:
             verify_all testdata/originalcapture
             git -C "$GITHUB_WORKSPACE" check-ignore -q .temp/original-capture/harnessparity/capture_homes_test.go
             mkdir -p .temp/original-capture/harnessparity
-            cp testdata/originalcapture/capture_homes_test.go \
+            cp testdata/originalcapture/ancestor_projection_test.go \
+              testdata/originalcapture/capture_homes_test.go \
               testdata/originalcapture/capture_launchers_test.go \
               testdata/originalcapture/controls_test.go \
               testdata/originalcapture/launcher_fixture_test.go \
@@ -1137,7 +1139,6 @@ jobs:
             "strings"
           )
 
-          const driverRevision = "805517ccc4bc77614e9ccb3e35e47876f054f629"
           const legacyBaseRevision = "267bbf477354f4f3d35c9530ec8da0503cd86b8a"
 
           type sourcePin struct {
@@ -1146,11 +1147,12 @@ jobs:
           }
 
           var driverPins = []sourcePin{
+            {"ancestor_projection_test.go", "a204244c2c45611108d73798df62da640c540cb882ce62887a8f67657bc66b20"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
             {"launcher_fixture_test.go", "deaefe19fadacd5d449176bfab0aa60d029c842f14c5070fbea7e9f0e539e983"},
-            {"legacy_fixture_test.go", "e9250a474e897a0d8aa9e0ee6f01afd0a42d8532ae6e8d812148810a4ffae911"},
+            {"legacy_fixture_test.go", "b96b012122f3ecb70537e2f64ca5fefbbdf6225123ce11f3ff7d6fc038c3a6eb"},
           }
 
           type byteFile struct {
@@ -1394,8 +1396,8 @@ jobs:
               Workflow: workflowSeal{Head: head, Tree: tree, Platform: platform, Runner: runner,
                 Tools: toolVersionSeal{Go: goVersion, Git: gitVersion}},
               DriverSource: driverSeal{
-                Revision: driverRevision,
-                Scope: "The five pinned source files below are verified; the full source tree is not asserted.",
+                Revision: head,
+                Scope: "The six pinned source files below are verified; the full source tree is not asserted.",
                 Files: append([]sourcePin(nil), driverPins...),
               },
               Capture: captureSeal{
@@ -1405,7 +1407,7 @@ jobs:
               NotBound: []string{
                 "runner image and host patch-level digest",
                 "tool executable bytes beyond normalized Go and Git version strings",
-                "driver source files beyond the five pinned files",
+                "driver source files beyond the six pinned files",
               },
             }, nil
           }
@@ -1478,9 +1480,9 @@ jobs:
             positive, err := buildSeal(baseArgs[0], baseArgs[1], baseArgs[2], baseArgs[3], baseArgs[4], baseArgs[5],
               baseArgs[6], baseArgs[7], baseArgs[8], baseArgs[9], baseArgs[10], baseArgs[11], baseArgs[12], baseArgs[13])
             if err != nil || positive.Workflow.Head != baseArgs[6] || positive.Workflow.Tree != baseArgs[7] ||
-              positive.DriverSource.Revision != driverRevision || !strings.Contains(positive.DriverSource.Scope, "full source tree is not asserted") ||
+              positive.DriverSource.Revision != baseArgs[6] || !strings.Contains(positive.DriverSource.Scope, "full source tree is not asserted") ||
               positive.LegacyBase != legacyBaseRevision || positive.Workflow.Tools.Go != baseArgs[12] || positive.Workflow.Tools.Git != baseArgs[13] ||
-              strings.Join(positive.NotBound, "|") != "runner image and host patch-level digest|tool executable bytes beyond normalized Go and Git version strings|driver source files beyond the five pinned files" ||
+              strings.Join(positive.NotBound, "|") != "runner image and host patch-level digest|tool executable bytes beyond normalized Go and Git version strings|driver source files beyond the six pinned files" ||
               positive.Capture.Cases.Count != 47 || len(positive.Capture.Cases.Files) != 47 ||
               positive.Capture.RepeatObservations.Count != 2 || len(positive.Capture.RepeatObservations.Files) != 2 {
               return fmt.Errorf("seal/control-positive-failed")
@@ -3073,6 +3075,31 @@ jobs:
                   return operational("selfcheck-path-control-fixture-failed")
               }
               if err := expectRefusal(mixedPath, "path-absolute"); err != nil {
+                  return err
+              }
+
+              ancestorPrivateControl, err := prepareControl(filepath.Join(base, "ancestor-token-plus-private-path"), 1)
+              if err != nil {
+                  return err
+              }
+              ancestorSettings := []byte("{\"claudeMdExcludes\":[\"${FIXTURE_ROOT_ANCESTORS}\",\"/Users/example/private/state\"]}")
+              ancestorDigest := sha256.Sum256(ancestorSettings)
+              ancestorObject := map[string]any{
+                  "case": "case-00",
+                  "bytes": base64.StdEncoding.EncodeToString(ancestorSettings),
+                  "document": base64.StdEncoding.EncodeToString(ancestorSettings),
+                  "sha256": hex.EncodeToString(ancestorDigest[:]),
+              }
+              ancestorJSON, err := json.Marshal(ancestorObject)
+              if err != nil {
+                  return operational("selfcheck-path-control-fixture-failed")
+              }
+              ancestorJSON = append(ancestorJSON, '\n')
+              if err := plantControl(ancestorPrivateControl, "case", "case-00.json", ancestorJSON); err != nil {
+                  return operational("selfcheck-path-control-fixture-failed")
+              }
+              ancestorPrivateControl.caseFiles[0].data = ancestorJSON
+              if err := expectRefusal(ancestorPrivateControl, "path-private-home"); err != nil {
                   return err
               }
 

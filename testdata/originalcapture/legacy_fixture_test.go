@@ -319,8 +319,13 @@ func mustProjectFixture(t testing.TB, binding fixtureRootBinding, payload []byte
 }
 
 func readTree(t testing.TB, dir string, binding fixtureRootBinding) []treeNode {
+	return readTreeWithAncestorProjection(t, dir, binding, nil)
+}
+
+func readTreeWithAncestorProjection(t testing.TB, dir string, binding fixtureRootBinding, ancestorBinding *fixtureAncestorProjectionBinding) []treeNode {
 	t.Helper()
 	var nodes []treeNode
+	projectedManagedSettings := false
 	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -351,6 +356,16 @@ func readTree(t testing.TB, dir string, binding fixtureRootBinding) []treeNode {
 			if err != nil {
 				return err
 			}
+			if ancestorBinding != nil && filepath.Clean(path) == filepath.Clean(ancestorBinding.table.ManagedSettingsPath) {
+				if projectedManagedSettings {
+					t.Fatal("capture-driver/fixture-ancestor/managed-settings-duplicate")
+				}
+				payload, err = projectFixtureAncestorSettings(ancestorBinding.table.CaseID, path, payload, *ancestorBinding)
+				if err != nil {
+					t.Fatalf("capture-driver/%s", err)
+				}
+				projectedManagedSettings = true
+			}
 			node.Bytes = mustProjectFixture(t, binding, payload)
 			node.SHA256 = hashBytes(node.Bytes)
 		default:
@@ -361,6 +376,9 @@ func readTree(t testing.TB, dir string, binding fixtureRootBinding) []treeNode {
 	})
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
+	}
+	if ancestorBinding != nil && !projectedManagedSettings {
+		t.Fatal("capture-driver/fixture-ancestor/managed-settings-not-observed")
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Path < nodes[j].Path })
 	return nodes
@@ -383,11 +401,14 @@ func runLegacyFixtureAtRoot(t testing.TB, c fixtureCase, fixtureRoot string, iso
 	} else if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal("fixture root creation failed")
 	}
+	root = filepath.Clean(root)
+	fixtureRootLexical := root
 	physical, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	root = physical
+	canonicalRoot := filepath.Clean(physical)
+	root = canonicalRoot
 	rootBinding, err := bindFixtureRoot(fixtureRootEvidence{
 		Root: root, Origin: "driver-created", RecordedBeforeRun: true,
 	})
@@ -395,6 +416,7 @@ func runLegacyFixtureAtRoot(t testing.TB, c fixtureCase, fixtureRoot string, iso
 		t.Fatal("fixture root binding refused")
 	}
 	manager, native, project := filepath.Join(root, "manager"), filepath.Join(root, "native"), filepath.Join(root, "project")
+	launchDir := project
 	for _, dir := range []string{manager, native, project, filepath.Join(root, "operator"), filepath.Join(root, "xdg")} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)
@@ -413,7 +435,40 @@ func runLegacyFixtureAtRoot(t testing.TB, c fixtureCase, fixtureRoot string, iso
 	if c.Operation != "managed" {
 		return runLegacySkills(t, c, root, manager, native, project, rootBinding), root
 	}
+	if c.Name == fixtureAncestorCaseClaudeEmpty || c.Name == fixtureAncestorCaseClaudeMCP {
+		manager = filepath.Join(fixtureRootLexical, "manager")
+	}
 	profile := "sample"
+	var ancestorBinding *fixtureAncestorProjectionBinding
+	if c.Name == fixtureAncestorCaseClaudeEmpty || c.Name == fixtureAncestorCaseClaudeMCP {
+		launchDir = filepath.Join(fixtureRootLexical, "project")
+		canonicalProjectRoot, err := filepath.EvalSymlinks(launchDir)
+		if err != nil {
+			t.Fatalf("capture-driver/fixture-ancestor-project-root-unresolved")
+		}
+		managedHome := filepath.Join(manager, "environments", profile, c.ID)
+		table := fixtureAncestorCaseTable{
+			CaseID:               c.Name,
+			Home:                 manager,
+			Profile:              profile,
+			EnvID:                c.ID,
+			FixtureRootLexical:   fixtureRootLexical,
+			FixtureRootCanonical: canonicalRoot,
+			ProjectRoot:          launchDir,
+			CanonicalProjectRoot: filepath.Clean(canonicalProjectRoot),
+			LaunchDir:            launchDir,
+			ManagedSettingsPath:  filepath.Join(managedHome, fixtureAncestorManagedSettingsPath),
+			ManagedRoot:          filepath.Join(managedHome, "CLAUDE.md"),
+		}
+		bound, err := bindFixtureAncestorProjection(table)
+		if err != nil {
+			t.Fatalf("capture-driver/%s", err)
+		}
+		if err := requireFixtureProjectOutsideGitWorktree(launchDir); err != nil {
+			t.Fatalf("capture-driver/%s", err)
+		}
+		ancestorBinding = &bound
+	}
 	contextSource := filepath.Join(root, "context-source")
 	mustWrite(t, filepath.Join(contextSource, "agent-context.json"), []byte(`{"schema_version":1,"name":"sample","version":"1.0.0","context":{"modules":[{"path":"a.md"},{"path":"s.md","class":"system"}]}}`), 0o600)
 	mustWrite(t, filepath.Join(contextSource, "context", "a.md"), []byte("Fixture root context.\n"), 0o600)
@@ -476,7 +531,7 @@ func runLegacyFixtureAtRoot(t testing.TB, c fixtureCase, fixtureRoot string, iso
 	}
 	beforeNative := readTree(t, native, rootBinding)
 	beforeProject := readTree(t, project, rootBinding)
-	req := envprofile.ResolveRequest{Home: manager, Profile: profile, EnvID: c.ID, LaunchDir: project, Machine: envregistry.DefaultMachineConfig(), Repair: true, Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return nativeHomes[id], nil }, OperatorXDG: filepath.Join(root, "xdg")}
+	req := envprofile.ResolveRequest{Home: manager, Profile: profile, EnvID: c.ID, LaunchDir: launchDir, Machine: envregistry.DefaultMachineConfig(), Repair: true, Detect: func(envregistry.Adapter) string { return "unknown" }, NativeHomeOf: func(id string) (string, error) { return nativeHomes[id], nil }, OperatorXDG: filepath.Join(root, "xdg")}
 	managed := envprofile.ManagedHomeDir(manager, profile, c.ID)
 	if c.State == "native-parent" {
 		// This home belongs to the fixture and is external to the manager's
@@ -543,7 +598,7 @@ func runLegacyFixtureAtRoot(t testing.TB, c fixtureCase, fixtureRoot string, iso
 			result.Warnings = append(result.Warnings, string(mustProjectFixture(t, rootBinding, []byte(w))))
 		}
 	}
-	result.Tree = readTree(t, managed, rootBinding)
+	result.Tree = readTreeWithAncestorProjection(t, managed, rootBinding, ancestorBinding)
 	result.Rendered = readTree(t, filepath.Join(envprofile.ProfileDir(manager, profile), "rendered", c.ID), rootBinding)
 	// Legacy resolution also reconciles linked native views of the selected
 	// profile. Preserve those exact effects in the original baseline.
