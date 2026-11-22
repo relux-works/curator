@@ -316,6 +316,7 @@ jobs:
 
           var publicFailureSubtests = func() map[string]struct{} {
             names := map[string]struct{}{
+              "TestFixtureAncestorFullJSONUsesFlatStringEntries/shadowed-static-probe": {},
               "TestFreezeOriginalBaseline/repeat-determinism": {},
               "TestOriginalComparatorControls/claude_code-mcp": {},
               "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
@@ -2304,6 +2305,7 @@ jobs:
 
           var publicFailureSubtests = func() map[string]struct{} {
             names := map[string]struct{}{
+              "TestFixtureAncestorFullJSONUsesFlatStringEntries/shadowed-static-probe": {},
               "TestFreezeOriginalBaseline/repeat-determinism": {},
               "TestOriginalComparatorControls/claude_code-mcp": {},
               "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
@@ -2519,6 +2521,7 @@ jobs:
               staticSlashNames := []string{
                   "TestFixtureAncestorProjectionControls/macos-var-private-var-aliases",
                   "TestFixtureAncestorProjectionRefusals/expected-entry-duplicated",
+                  "TestFixtureAncestorFullJSONUsesFlatStringEntries/shadowed-static-probe",
                   "TestOriginalComparatorControls/claude_code-mcp",
               }
               safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\n")

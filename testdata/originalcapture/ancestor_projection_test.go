@@ -986,6 +986,14 @@ func TestFixtureAncestorContractAuthoredPositiveJSON(t *testing.T) {
 }
 
 func TestFixtureAncestorFullJSONUsesFlatStringEntries(t *testing.T) {
+	{
+		alias := t
+		alias.Run("shadowed-static-probe", func(t *testing.T) {})
+	}
+	{
+		alias := 1
+		_ = alias
+	}
 	expected := []string{"/tmp/cap07-root/CLAUDE.md", "/tmp/cap07-root/.claude/CLAUDE.md"}
 	input, _ := fixtureAncestorFullJSON(fixtureAncestorCaseClaudeEmpty, expected)
 	var decoded struct {
@@ -1047,6 +1055,7 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 	verdictPositiveNames := []string{
 		"TestFixtureAncestorProjectionControls/macos-var-private-var-aliases",
 		"TestFixtureAncestorProjectionRefusals/expected-entry-duplicated",
+		"TestFixtureAncestorFullJSONUsesFlatStringEntries/shadowed-static-probe",
 	}
 	for _, program := range programs {
 		source, err := staticCaptureWorkflowGoProgram(text, program.marker)
@@ -1450,7 +1459,7 @@ func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
 			continue
 		}
 		path := filepath.Join(sourceDir, entry.Name())
-		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		file, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
 			return nil, nil, fmt.Errorf("parse capture test source: %w", err)
 		}
@@ -1513,10 +1522,10 @@ func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
 						break
 					}
 					receiver, ok := selector.X.(*ast.Ident)
-					if ok && hasStaticCaptureName(testReceivers, receiver.Name) {
+					if ok && hasStaticCaptureObject(testReceivers, receiver.Obj) {
 						runSelectors[selector] = struct{}{}
 					}
-					if ok && hasStaticCaptureName(testReceivers, receiver.Name) && len(node.Args) >= 1 {
+					if ok && hasStaticCaptureObject(testReceivers, receiver.Obj) && len(node.Args) >= 1 {
 						runs = append(runs, node)
 					}
 				}
@@ -1529,7 +1538,7 @@ func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
 					return true
 				}
 				receiver, ok := selector.X.(*ast.Ident)
-				if !ok || !hasStaticCaptureName(testReceivers, receiver.Name) {
+				if !ok || !hasStaticCaptureObject(testReceivers, receiver.Obj) {
 					return true
 				}
 				if _, called := runSelectors[selector]; !called {
@@ -1542,18 +1551,18 @@ func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
 				return nil, nil, fmt.Errorf("%s: t.Run is not a direct call with an inventoried static name", fset.Position(function.Pos()))
 			}
 			for _, run := range runs {
-				environment := map[string][]staticCaptureNameRow{}
+				environment := map[*ast.Object][]staticCaptureNameRow{}
 				for _, loop := range ranges {
 					if loop.Body.Pos() > run.Pos() || run.End() > loop.Body.End() {
 						continue
 					}
 					variable, ok := loop.Value.(*ast.Ident)
-					if !ok {
+					if !ok || variable.Obj == nil {
 						continue
 					}
 					rows, ok := staticCaptureRows(loop.X, locals, constants, typeFields, 0)
 					if ok {
-						environment[variable.Name] = rows
+					environment[variable.Obj] = rows
 					}
 				}
 				names, ok := staticCaptureNameValues(run.Args[0], environment, constants)
@@ -1572,8 +1581,8 @@ func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
 	return staticCaptureUnique(roots), staticCaptureUnique(subtests), nil
 }
 
-func staticCaptureTestingTNames(function *ast.FuncDecl) map[string]struct{} {
-	names := map[string]struct{}{}
+func staticCaptureTestingTNames(function *ast.FuncDecl) map[*ast.Object]struct{} {
+	names := map[*ast.Object]struct{}{}
 	addParameters := func(fields *ast.FieldList) {
 		if fields == nil {
 			return
@@ -1592,8 +1601,8 @@ func staticCaptureTestingTNames(function *ast.FuncDecl) map[string]struct{} {
 				continue
 			}
 			for _, parameter := range field.Names {
-				if parameter.Name != "_" {
-					names[parameter.Name] = struct{}{}
+				if parameter.Name != "_" && parameter.Obj != nil {
+					names[parameter.Obj] = struct{}{}
 				}
 			}
 		}
@@ -1608,19 +1617,19 @@ func staticCaptureTestingTNames(function *ast.FuncDecl) map[string]struct{} {
 	locals := staticCaptureLocalExpressions(function.Body)
 	for changed := true; changed; {
 		changed = false
-		for name, expression := range locals {
+		for object, expression := range locals {
 			identifier, ok := expression.(*ast.Ident)
-			if !ok || !hasStaticCaptureName(names, identifier.Name) || hasStaticCaptureName(names, name) {
+			if !ok || !hasStaticCaptureObject(names, identifier.Obj) || hasStaticCaptureObject(names, object) {
 				continue
 			}
-			names[name] = struct{}{}
+			names[object] = struct{}{}
 			changed = true
 		}
 	}
 	return names
 }
 
-func staticCaptureHasTestRun(body ast.Node, receivers map[string]struct{}) bool {
+func staticCaptureHasTestRun(body ast.Node, receivers map[*ast.Object]struct{}) bool {
 	found := false
 	ast.Inspect(body, func(node ast.Node) bool {
 		selector, ok := node.(*ast.SelectorExpr)
@@ -1628,7 +1637,7 @@ func staticCaptureHasTestRun(body ast.Node, receivers map[string]struct{}) bool 
 			return true
 		}
 		receiver, ok := selector.X.(*ast.Ident)
-		if ok && hasStaticCaptureName(receivers, receiver.Name) {
+		if ok && hasStaticCaptureObject(receivers, receiver.Obj) {
 			found = true
 			return false
 		}
@@ -1637,8 +1646,11 @@ func staticCaptureHasTestRun(body ast.Node, receivers map[string]struct{}) bool 
 	return found
 }
 
-func hasStaticCaptureName(names map[string]struct{}, name string) bool {
-	_, ok := names[name]
+func hasStaticCaptureObject(objects map[*ast.Object]struct{}, object *ast.Object) bool {
+	if object == nil {
+		return false
+	}
+	_, ok := objects[object]
 	return ok
 }
 
@@ -1661,21 +1673,21 @@ func staticCaptureTestFunction(function *ast.FuncDecl) bool {
 	return false
 }
 
-func staticCaptureLocalExpressions(body ast.Node) map[string]ast.Expr {
-	locals := map[string]ast.Expr{}
+func staticCaptureLocalExpressions(body ast.Node) map[*ast.Object]ast.Expr {
+	locals := map[*ast.Object]ast.Expr{}
 	ast.Inspect(body, func(node ast.Node) bool {
 		switch node := node.(type) {
 		case *ast.AssignStmt:
 			for index, left := range node.Lhs {
 				name, ok := left.(*ast.Ident)
-				if ok && index < len(node.Rhs) {
-					locals[name.Name] = node.Rhs[index]
+				if ok && name.Obj != nil && index < len(node.Rhs) {
+					locals[name.Obj] = node.Rhs[index]
 				}
 			}
 		case *ast.ValueSpec:
 			for index, name := range node.Names {
-				if index < len(node.Values) {
-					locals[name.Name] = node.Values[index]
+				if name.Obj != nil && index < len(node.Values) {
+					locals[name.Obj] = node.Values[index]
 				}
 			}
 		}
@@ -1684,13 +1696,13 @@ func staticCaptureLocalExpressions(body ast.Node) map[string]ast.Expr {
 	return locals
 }
 
-func staticCaptureRows(expression ast.Expr, locals map[string]ast.Expr, constants map[string]string, typeFields map[string][]string, depth int) ([]staticCaptureNameRow, bool) {
+func staticCaptureRows(expression ast.Expr, locals map[*ast.Object]ast.Expr, constants map[string]string, typeFields map[string][]string, depth int) ([]staticCaptureNameRow, bool) {
 	if depth > 8 {
 		return nil, false
 	}
 	switch expression := expression.(type) {
 	case *ast.Ident:
-		initializer, ok := locals[expression.Name]
+		initializer, ok := locals[expression.Obj]
 		if !ok || initializer == expression {
 			return nil, false
 		}
@@ -1812,14 +1824,14 @@ func staticCaptureString(expression ast.Expr, constants map[string]string) (stri
 	return "", false
 }
 
-func staticCaptureNameValues(expression ast.Expr, environment map[string][]staticCaptureNameRow, constants map[string]string) ([]string, bool) {
+func staticCaptureNameValues(expression ast.Expr, environment map[*ast.Object][]staticCaptureNameRow, constants map[string]string) ([]string, bool) {
 	switch expression := expression.(type) {
 	case *ast.BasicLit, *ast.Ident, *ast.ParenExpr:
 		if value, ok := staticCaptureString(expression, constants); ok {
 			return []string{value}, true
 		}
 		if identifier, ok := expression.(*ast.Ident); ok {
-			rows, ok := environment[identifier.Name]
+			rows, ok := environment[identifier.Obj]
 			if !ok {
 				return nil, false
 			}
@@ -1839,7 +1851,7 @@ func staticCaptureNameValues(expression ast.Expr, environment map[string][]stati
 		if !ok {
 			return nil, false
 		}
-		rows, ok := environment[variable.Name]
+		rows, ok := environment[variable.Obj]
 		if !ok {
 			return nil, false
 		}
@@ -1907,6 +1919,31 @@ func TestNativeCapturePrivateLogCannotReachOutput(t *testing.T) {
 	}
 	if err := checkNativeCapturePrivateLogRoutes(script); err != nil {
 		t.Fatalf("private test log has an unapproved output route: %v", err)
+	}
+	sanitizerScript, err := nativeCaptureSanitizeScript(workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	failureDetailWorkflow := script + "\n" + sanitizerScript
+	if err := checkNativeCaptureFailureDetailRoutes(failureDetailWorkflow); err != nil {
+		t.Fatalf("failure details have an unapproved output route: %v", err)
+	}
+	for _, plantedRoute := range []string{
+		`cat "$CAPTURE_ROOT/failure-details.txt"`,
+		`cat "$CAPTURE_ROOT/failure-details.txt" >&2`,
+		`cp "$CAPTURE_ROOT/failure-details.txt" "$GITHUB_OUTPUT"`,
+		`raw_failure_details="$CAPTURE_ROOT/failure-details.txt"` + "\n" + `cp "$raw_failure_details" "$GITHUB_OUTPUT"`,
+		`tee "$GITHUB_OUTPUT" < "$CAPTURE_ROOT/failure-details.txt"`,
+		`raw_failure_details="$CAPTURE_ROOT/failure-details.txt"` + "\n" + `cat "$raw_failure_details"`,
+		`cat "$CAPTURE_ROOT"/*`,
+	} {
+		plant := strings.Replace(sanitizerScript, `cat "$safe_failure_details"`+"\n", `cat "$safe_failure_details"`+"\n"+plantedRoute+"\n", 1)
+		if plant == sanitizerScript {
+			t.Fatal("failure-detail/output-control-plant-point-missing")
+		}
+		if err := checkNativeCaptureFailureDetailRoutes(script + "\n" + plant); err == nil {
+			t.Fatalf("failure-detail/output-control-plant-accepted route=%q", plantedRoute)
+		}
 	}
 
 	const assignment = `private_test_log="$CAPTURE_ROOT/test-output.private.raw.txt"`
@@ -2006,6 +2043,100 @@ func checkNativeCapturePrivateLogRoutes(script string) error {
 	return nil
 }
 
+func checkNativeCaptureFailureDetailRoutes(script string) error {
+	allowedContentOutputRoutes := map[string]struct{}{
+		`cat "$CAPTURE_ROOT/audit-metrics.raw.txt" > "$CAPTURE_ROOT/audit-output.raw.txt"`: {},
+		`cat "$safe_failure_names"`:   {},
+		`cat "$safe_failure_details"`: {},
+	}
+	allowedRawReferenceLines := map[string]struct{}{
+		`failure_details_file="$CAPTURE_ROOT/failure-details.txt"`: {},
+		`"$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" "$failure_details_file" \`: {},
+		`if [[ -s "$CAPTURE_ROOT/failure-details.txt" && -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \`: {},
+		`"$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details" \`: {},
+	}
+	seenRawReferences := map[string]int{}
+	inGoHereDoc := false
+	for _, line := range strings.Split(script, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if inGoHereDoc {
+			if trimmed == "GO" {
+				inGoHereDoc = false
+			}
+			continue
+		}
+		if strings.Contains(line, "<<'GO'") {
+			inGoHereDoc = true
+			continue
+		}
+		if strings.Contains(trimmed, "cat ") {
+			if _, ok := allowedContentOutputRoutes[trimmed]; !ok {
+				return fmt.Errorf("content output has an unapproved workflow route")
+			}
+		}
+		for _, command := range []string{"cp ", "tee ", "mv ", "install "} {
+			if strings.Contains(trimmed, command) {
+				return fmt.Errorf("file copy has an unapproved workflow route")
+			}
+		}
+		if strings.Contains(trimmed, `"$CAPTURE_ROOT"`) && strings.ContainsAny(trimmed, "*?") {
+			return fmt.Errorf("capture-root glob has an unapproved failure-detail route")
+		}
+		if strings.Contains(trimmed, `find "$CAPTURE_ROOT"`) && strings.Contains(trimmed, "-exec") {
+			return fmt.Errorf("capture-root enumeration has an unapproved output route")
+		}
+		if !strings.Contains(line, "failure-details.txt") && !strings.Contains(line, "$failure_details_file") {
+			continue
+		}
+		if _, ok := allowedRawReferenceLines[trimmed]; !ok {
+			return fmt.Errorf("raw failure details have an unapproved workflow reference")
+		}
+		seenRawReferences[trimmed]++
+	}
+	for line := range allowedRawReferenceLines {
+		if seenRawReferences[line] != 1 {
+			return fmt.Errorf("expected one approved raw failure-detail workflow reference")
+		}
+	}
+
+	const startMarker = `safe_failure_details="$CAPTURE_ROOT/failure-details.log-safe.txt"`
+	if strings.Count(script, startMarker) != 1 {
+		return fmt.Errorf("expected one safe failure-detail output section")
+	}
+	start := strings.Index(script, startMarker)
+	const endMarker = `exit "$sanitize_exit"`
+	endRelative := strings.Index(script[start:], endMarker)
+	if endRelative < 0 {
+		return fmt.Errorf("safe failure-detail output section is unterminated")
+	}
+	section := script[start : start+endRelative+len(endMarker)]
+	var lines []string
+	for _, line := range strings.Split(section, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	const approved = `safe_failure_details="$CAPTURE_ROOT/failure-details.log-safe.txt"
+if [[ -s "$CAPTURE_ROOT/failure-details.txt" && -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+"$sanitizer_binary" --failure-diagnostics "$CAPTURE_ROOT/raw-output" \
+"$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details" \
+> "$CAPTURE_ROOT/failure-details.stdout" 2> "$CAPTURE_ROOT/failure-details.stderr"; then
+if [[ -f "$safe_failure_details" ]]; then
+cat "$safe_failure_details"
+else
+printf '%s\n' 'CAPTURE_DETAIL Failure details withheld; sanitizer produced no safe diagnostic.'
+fi
+else
+printf '%s\n' 'CAPTURE_DETAIL Failure details withheld; sanitizer did not produce a safe diagnostic.'
+fi
+fi
+exit "$sanitize_exit"`
+	if strings.Join(lines, "\n") != approved {
+		return fmt.Errorf("failure-detail section differs from the sanitizer-only output contract")
+	}
+	return nil
+}
+
 func withEnvironment(environment []string, values map[string]string) []string {
 	result := make([]string, 0, len(environment)+len(values))
 	for _, entry := range environment {
@@ -2034,23 +2165,31 @@ func TestNativeCaptureRunScriptRequiresRunWithinNamedStep(t *testing.T) {
 }
 
 func nativeCaptureRunScript(workflow []byte) (string, error) {
+	return nativeCaptureStepScript(workflow, "Run the complete capture suite")
+}
+
+func nativeCaptureSanitizeScript(workflow []byte) (string, error) {
+	return nativeCaptureStepScript(workflow, "Sanitize and verify artifact contents")
+}
+
+func nativeCaptureStepScript(workflow []byte, stepName string) (string, error) {
 	text := strings.ReplaceAll(string(workflow), "\r\n", "\n")
-	const stepHeader = "      - name: Run the complete capture suite\n"
+	stepHeader := "      - name: " + stepName + "\n"
 	if strings.Count(text, stepHeader) != 1 {
-		return "", errors.New("native capture run step is missing or duplicated")
+		return "", fmt.Errorf("native capture step %q is missing or duplicated", stepName)
 	}
 	stepStart := strings.Index(text, stepHeader)
 	stepBodyStart := stepStart + len(stepHeader)
 	nextStep := strings.Index(text[stepBodyStart:], "\n      - name: ")
 	if nextStep < 0 {
-		return "", errors.New("native capture run step is unterminated")
+		return "", fmt.Errorf("native capture step %q is unterminated", stepName)
 	}
 	stepEnd := stepBodyStart + nextStep
 	step := text[stepStart:stepEnd]
 	const runHeader = "        run: |\n"
 	runOffset := strings.Index(step, runHeader)
 	if runOffset < 0 {
-		return "", errors.New("native capture run script block is missing")
+		return "", fmt.Errorf("native capture step %q script block is missing", stepName)
 	}
 	bodyStart := stepStart + runOffset + len(runHeader)
 	body := text[bodyStart:stepEnd]
@@ -2061,7 +2200,7 @@ func nativeCaptureRunScript(workflow []byte) (string, error) {
 			continue
 		}
 		if !strings.HasPrefix(line, "          ") {
-			return "", errors.New("native capture run script has unexpected YAML indentation")
+			return "", fmt.Errorf("native capture step %q script has unexpected YAML indentation", stepName)
 		}
 		lines[i] = line[len("          "):]
 	}
