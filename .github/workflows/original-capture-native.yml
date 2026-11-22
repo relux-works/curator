@@ -98,7 +98,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          dcc4a0462c824b980f1d2bf88c3488a07f85b77e08d0d70debca2e122b480725 ancestor_projection_test.go
+          03e153275c7ca9a7a83ade0705ae9d4aac8e4ee3d30a36e381b8f97dbaf1851f ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -303,6 +303,7 @@ jobs:
             "TestNativeCapturePrivateLogCannotReachOutput": {},
             "TestNativeCaptureRunScriptRequiresRunWithinNamedStep": {},
             "TestNativeCaptureUploadConditionAcceptsLFAndCRLF": {},
+            "TestNativeCaptureWorkflowGoProgramAcceptsCRLF": {},
             "TestNativeCaptureWorkflowPathNormalizesMixedSeparators": {},
             "TestNativeCaptureUploadMissingWorkflowBindingFailsClosed": {},
             "TestFixtureAncestorPreRunCaseTable": {},
@@ -1587,7 +1588,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "dcc4a0462c824b980f1d2bf88c3488a07f85b77e08d0d70debca2e122b480725"},
+            {"ancestor_projection_test.go", "03e153275c7ca9a7a83ade0705ae9d4aac8e4ee3d30a36e381b8f97dbaf1851f"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -2465,7 +2466,9 @@ jobs:
           // failure output and source paths remain withheld.
           var failureDiagnosticReasonCodes = map[string]struct{}{
               "capture-driver/native-parent-environment-not-isolated": {},
+              "capture/native-capture-workflow-contract-assertion-failed": {},
               "capture/native-parent-row-failed": {},
+              "capture/failure-diagnostics-contract-assertion-failed": {},
               "capture/audit-child-output-read": {},
               "capture/audit-command-failed": {},
               "capture/audit-failure-detail-bound": {},
@@ -2545,6 +2548,7 @@ jobs:
               "TestNativeCapturePrivateLogCannotReachOutput": {},
               "TestNativeCaptureRunScriptRequiresRunWithinNamedStep": {},
               "TestNativeCaptureUploadConditionAcceptsLFAndCRLF": {},
+              "TestNativeCaptureWorkflowGoProgramAcceptsCRLF": {},
               "TestNativeCaptureWorkflowPathNormalizesMixedSeparators": {},
               "TestNativeCaptureUploadMissingWorkflowBindingFailsClosed": {},
               "TestFixtureAncestorPreRunCaseTable": {},
@@ -2698,6 +2702,27 @@ jobs:
               return name == "" || publicFailureTestName(name) == name
           }
 
+          var publicFailureAssertionReasons = map[string]string{
+              "TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer": "capture/native-capture-workflow-contract-assertion-failed",
+              "TestNativeCaptureFailureNamesPassThroughSanitizer":          "capture/failure-diagnostics-contract-assertion-failed",
+          }
+
+          func failureDiagnosticAssertionReason(line string) string {
+              const prefix = "CAPTURE_FAIL Package=" + publicCapturePackage + " Test="
+              if !strings.HasPrefix(line, prefix) {
+                  return ""
+              }
+              name := strings.TrimPrefix(line, prefix)
+              if publicFailureTestName(name) != name {
+                  return ""
+              }
+              reason, ok := publicFailureAssertionReasons[name]
+              if !ok {
+                  return ""
+              }
+              return reason
+          }
+
           func allowFailureDiagnosticLine(line string) string {
               line = strings.TrimSpace(escapeFailureDiagnosticControls(line))
               reason := strings.TrimPrefix(line, "CAPTURE_REASON=")
@@ -2725,12 +2750,16 @@ jobs:
                       report.WriteString("CAPTURE_DETAIL [remaining failure output withheld at the 200-line limit]\n")
                       break
                   }
+                  safeLine := allowFailureDiagnosticLine(line)
                   report.WriteString("CAPTURE_DETAIL ")
-                  report.WriteString(allowFailureDiagnosticLine(line))
+                  report.WriteString(safeLine)
                   report.WriteByte('\n')
-                  if allowFailureDiagnosticLine(line) == "CAPTURE_FAIL Package="+publicCapturePackage+
+                  if safeLine == "CAPTURE_FAIL Package="+publicCapturePackage+
                       " Test=TestFreezeOriginalBaseline/codex_cli-native-parent" {
                       report.WriteString("CAPTURE_DETAIL CAPTURE_REASON=capture/native-parent-row-failed\n")
+                  }
+                  if reason := failureDiagnosticAssertionReason(safeLine); reason != "" {
+                      fmt.Fprintf(&report, "CAPTURE_DETAIL CAPTURE_REASON=%s\n", reason)
                   }
               }
               return []byte(report.String())
@@ -2779,6 +2808,8 @@ jobs:
               }
               safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\n")
               safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestFreezeOriginalBaseline/codex_cli-native-parent\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestNativeCaptureFailureNamesPassThroughSanitizer\n")...)
               for _, staticSlashName := range staticSlashNames {
                   safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test="+staticSlashName+"\n")...)
               }
@@ -2799,6 +2830,8 @@ jobs:
                   "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=TestFixtureAncestorProjectionRefusals/expected-entry-duplicated",
                   "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=TestOriginalComparatorControls/claude_code-mcp",
                   "CAPTURE_DETAIL CAPTURE_REASON=capture/native-parent-row-failed",
+                  "CAPTURE_DETAIL CAPTURE_REASON=capture/native-capture-workflow-contract-assertion-failed",
+                  "CAPTURE_DETAIL CAPTURE_REASON=capture/failure-diagnostics-contract-assertion-failed",
                   "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=",
               } {
                   if !strings.Contains(rendered, visible) {
@@ -2810,7 +2843,9 @@ jobs:
                   return operational("selfcheck-failure-diagnostic-allowlist")
               }
               unrelatedRow := string(failureDiagnosticLog(caseDir, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestFreezeOriginalBaseline/codex_cli-current\n")))
-              if strings.Contains(unrelatedRow, "capture/native-parent-row-failed") {
+              if strings.Contains(unrelatedRow, "capture/native-parent-row-failed") ||
+                  strings.Contains(unrelatedRow, "capture/native-capture-workflow-contract-assertion-failed") ||
+                  strings.Contains(unrelatedRow, "capture/failure-diagnostics-contract-assertion-failed") {
                   return operational("selfcheck-failure-diagnostic-allowlist")
               }
               for publicName := range publicTestRoots {

@@ -1154,6 +1154,22 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 					t.Errorf("sanitizer positive control does not exercise verdict name %q", name)
 				}
 			}
+			wantReasons := map[string]string{
+				"TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer": "capture/native-capture-workflow-contract-assertion-failed",
+				"TestNativeCaptureFailureNamesPassThroughSanitizer":            "capture/failure-diagnostics-contract-assertion-failed",
+			}
+			gotReasons, err := staticCaptureWorkflowStringMap(parsed, "publicFailureAssertionReasons")
+			if err != nil {
+				t.Fatalf("read sanitizer assertion-cause allowlist: %v", err)
+			}
+			if len(gotReasons) != len(wantReasons) {
+				t.Errorf("sanitizer assertion-cause allowlist has %d entries, want %d", len(gotReasons), len(wantReasons))
+			}
+			for name, reason := range wantReasons {
+				if got := gotReasons[name]; got != reason {
+					t.Errorf("sanitizer assertion cause for %s = %q, want %q", name, got, reason)
+				}
+			}
 		}
 	}
 	required := []struct {
@@ -1178,6 +1194,15 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 		{"sanitizer receives private detail file", `"$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details"`},
 		{"only sanitized detail file is printed", `cat "$safe_failure_details"`},
 		{"native-parent failure has a fixed safe reason", `CAPTURE_REASON=capture/native-parent-row-failed`},
+		{"workflow assertion reason is in the fixed reason allowlist", `"capture/native-capture-workflow-contract-assertion-failed": {}`},
+		{"diagnostic assertion reason is in the fixed reason allowlist", `"capture/failure-diagnostics-contract-assertion-failed": {}`},
+		{"fixed safe assertion causes are allowlisted by test name", `var publicFailureAssertionReasons = map[string]string{`},
+		{"safe assertion cause is derived from allowlisted failure name", `reason, ok := publicFailureAssertionReasons[name]`},
+		{"safe assertion cause is emitted in the summary", `failureDiagnosticAssertionReason(safeLine)`},
+		{"safe assertion cause self-check is positive", `CAPTURE_DETAIL CAPTURE_REASON=capture/native-capture-workflow-contract-assertion-failed`},
+		{"second safe assertion cause self-check is positive", `CAPTURE_DETAIL CAPTURE_REASON=capture/failure-diagnostics-contract-assertion-failed`},
+		{"unrelated failure name does not receive the workflow assertion cause", `strings.Contains(unrelatedRow, "capture/native-capture-workflow-contract-assertion-failed")`},
+		{"unrelated failure name does not receive an assertion cause", `strings.Contains(unrelatedRow, "capture/failure-diagnostics-contract-assertion-failed")`},
 		{"existing reason allowlist remains", `if _, ok := failureDiagnosticReasonCodes[reason]; ok {`},
 		{"existing refusal fallback remains", `return "Failure detail withheld by the sanitizer."`},
 	}
@@ -1226,6 +1251,7 @@ func staticCaptureNameSet(names []string) map[string]struct{} {
 }
 
 func staticCaptureWorkflowGoProgram(workflow, marker string) ([]byte, error) {
+	workflow = strings.ReplaceAll(workflow, "\r\n", "\n")
 	if strings.Count(workflow, marker) != 1 {
 		return nil, fmt.Errorf("heredoc marker %q is not unique", marker)
 	}
@@ -1372,6 +1398,76 @@ func staticCaptureStringStructMap(expression ast.Expr) bool {
 	}
 	value, ok := mapping.Value.(*ast.StructType)
 	return ok && len(value.Fields.List) == 0
+}
+
+func staticCaptureWorkflowStringMap(file *ast.File, name string) (map[string]string, error) {
+	var initializer ast.Expr
+	for _, declaration := range file.Decls {
+		group, ok := declaration.(*ast.GenDecl)
+		if !ok || group.Tok != token.VAR {
+			continue
+		}
+		for _, spec := range group.Specs {
+			value, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for index, identifier := range value.Names {
+				if identifier.Name != name {
+					continue
+				}
+				if initializer != nil || index >= len(value.Values) {
+					return nil, fmt.Errorf("string map %s has ambiguous initializer", name)
+				}
+				initializer = value.Values[index]
+			}
+		}
+	}
+	literal, ok := initializer.(*ast.CompositeLit)
+	if !ok {
+		return nil, fmt.Errorf("string map %s is missing or not a literal", name)
+	}
+	mapping, ok := literal.Type.(*ast.MapType)
+	if !ok || !staticCaptureStringType(mapping.Key) || !staticCaptureStringType(mapping.Value) {
+		return nil, fmt.Errorf("string map %s is not map[string]string", name)
+	}
+	result := make(map[string]string, len(literal.Elts))
+	for _, element := range literal.Elts {
+		entry, ok := element.(*ast.KeyValueExpr)
+		if !ok {
+			return nil, fmt.Errorf("string map %s has a non-keyed entry", name)
+		}
+		key, err := staticCaptureStringLiteral(entry.Key)
+		if err != nil {
+			return nil, fmt.Errorf("string map %s has an invalid key", name)
+		}
+		value, err := staticCaptureStringLiteral(entry.Value)
+		if err != nil {
+			return nil, fmt.Errorf("string map %s has an invalid value", name)
+		}
+		if _, exists := result[key]; exists {
+			return nil, fmt.Errorf("string map %s duplicates key %q", name, key)
+		}
+		result[key] = value
+	}
+	return result, nil
+}
+
+func staticCaptureStringType(expression ast.Expr) bool {
+	identifier, ok := expression.(*ast.Ident)
+	return ok && identifier.Name == "string"
+}
+
+func staticCaptureStringLiteral(expression ast.Expr) (string, error) {
+	literal, ok := expression.(*ast.BasicLit)
+	if !ok || literal.Kind != token.STRING {
+		return "", fmt.Errorf("value is not a string literal")
+	}
+	value, err := strconv.Unquote(literal.Value)
+	if err != nil {
+		return "", fmt.Errorf("string literal cannot be unquoted")
+	}
+	return value, nil
 }
 
 func staticCaptureWorkflowStringConstant(file *ast.File, name string) (string, error) {
@@ -2262,6 +2358,32 @@ func TestNativeCaptureUploadConditionAcceptsLFAndCRLF(t *testing.T) {
 			if !strings.Contains(condition, required) {
 				t.Errorf("condition %q does not require %s", condition, required)
 			}
+		}
+	}
+}
+
+func TestNativeCaptureWorkflowGoProgramAcceptsCRLF(t *testing.T) {
+	workflow, err := readBoundNativeCaptureWorkflow()
+	if err != nil {
+		t.Fatalf("read native capture workflow: %v", err)
+	}
+	text := strings.ReplaceAll(strings.ReplaceAll(string(workflow), "\r\n", "\n"), "\n", "\r\n")
+	programs := []struct {
+		name   string
+		marker string
+	}{
+		{"native-parent", `cat > "$CAPTURE_ROOT/native-parent-env.go" <<'GO'`},
+		{"auditor", `cat > "$CAPTURE_ROOT/audit.go" <<'GO'`},
+		{"sanitizer", `cat > "$sanitizer_source_dir/main.go" <<'GO'`},
+	}
+	for _, program := range programs {
+		source, err := staticCaptureWorkflowGoProgram(text, program.marker)
+		if err != nil {
+			t.Errorf("extract CRLF %s program: %v", program.name, err)
+			continue
+		}
+		if _, err := parser.ParseFile(token.NewFileSet(), program.name+".go", source, parser.SkipObjectResolution); err != nil {
+			t.Errorf("parse extracted CRLF %s program: %v", program.name, err)
 		}
 	}
 }
