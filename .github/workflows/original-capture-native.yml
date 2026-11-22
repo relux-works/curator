@@ -98,7 +98,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          02620608e3b4144aad57c6f53d31dd64687053b4624cd9502bd754c3d2cd6ca7 ancestor_projection_test.go
+          dcc4a0462c824b980f1d2bf88c3488a07f85b77e08d0d70debca2e122b480725 ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -953,18 +953,32 @@ jobs:
           package main
 
           import (
+            "bytes"
             "fmt"
             "io"
             "os"
             "os/exec"
             "path/filepath"
             "strings"
+            "time"
           )
 
           const maxChildStderrBytes = 512
           const maxChildStdoutBytes = 512
           const childStderrTruncation = "\n[child stderr truncated at 512 bytes]\n"
           const childStdoutTruncation = "\n[child stdout truncated at 512 bytes]\n"
+          const nativeParentEnvControlFlag = "--native-parent-env-control"
+          const nativeParentEnvProbeFlag = "--native-parent-env-probe"
+          const nativeParentEnvTimeoutProbeFlag = "--native-parent-env-timeout-probe"
+          const nativeParentEnvUnrelatedControl = "CAPTURE_NATIVE_PARENT_UNRELATED_CONTROL"
+          const nativeParentEnvUnrelatedValue = "native-parent-control"
+          const nativeParentChildTimeout = 5 * time.Minute
+          const nativeParentEnvControlTimeout = 10 * time.Second
+          const nativeParentTimeoutControlLimit = time.Second
+          const nativeParentTimeoutProbeDelay = 3 * time.Second
+          const nativeParentEnvControlStdoutMarker = "NATIVE_PARENT_STDOUT_CONTROL"
+          const nativeParentEnvControlStderrMarker = "NATIVE_PARENT_STDERR_CONTROL"
+          const nativeParentTimeoutProbeMarker = "NATIVE_PARENT_TIMEOUT_CONTROL"
 
           type cappedWriter struct {
             writer    io.Writer
@@ -993,6 +1007,215 @@ jobs:
               return written, io.ErrShortWrite
             }
             return originalLength, nil
+          }
+
+          func nativeParentEnvironmentIsHomeAndPathOnly() bool {
+            entries := os.Environ()
+            if len(entries) != 2 {
+              return false
+            }
+            names := map[string]bool{}
+            for _, entry := range entries {
+              name, _, _ := strings.Cut(entry, "=")
+              names[name] = true
+            }
+            return len(names) == 2 && names["HOME"] && names["PATH"]
+          }
+
+          type processWaitResult struct {
+            state *os.ProcessState
+            err   error
+          }
+
+          func copyChildStream(source *os.File, destination io.Writer) error {
+            _, copyErr := io.Copy(destination, source)
+            if copyErr != nil {
+              _, _ = io.Copy(io.Discard, source)
+            }
+            closeErr := source.Close()
+            if copyErr != nil {
+              return copyErr
+            }
+            return closeErr
+          }
+
+          func startChildProcess(path string, arguments, environment []string, stdin *os.File, stdout, stderr io.Writer, timeout time.Duration) (int, bool, error) {
+            stdoutRead, stdoutWrite, err := os.Pipe()
+            if err != nil {
+              return 127, false, err
+            }
+            stderrRead, stderrWrite, err := os.Pipe()
+            if err != nil {
+              _ = stdoutRead.Close()
+              _ = stdoutWrite.Close()
+              return 127, false, err
+            }
+            process, err := os.StartProcess(path, arguments, &os.ProcAttr{
+              Env:   environment,
+              Files: []*os.File{stdin, stdoutWrite, stderrWrite},
+            })
+            if err != nil {
+              _ = stdoutRead.Close()
+              _ = stdoutWrite.Close()
+              _ = stderrRead.Close()
+              _ = stderrWrite.Close()
+              return 127, false, err
+            }
+
+            stdoutDone := make(chan error, 1)
+            stderrDone := make(chan error, 1)
+            go func() { stdoutDone <- copyChildStream(stdoutRead, stdout) }()
+            go func() { stderrDone <- copyChildStream(stderrRead, stderr) }()
+            stdoutCloseErr := stdoutWrite.Close()
+            stderrCloseErr := stderrWrite.Close()
+            if stdoutCloseErr != nil || stderrCloseErr != nil {
+              _ = process.Kill()
+            }
+
+            waitDone := make(chan processWaitResult, 1)
+            go func() {
+              state, waitErr := process.Wait()
+              waitDone <- processWaitResult{state: state, err: waitErr}
+            }()
+            timer := time.NewTimer(timeout)
+            defer timer.Stop()
+            var wait processWaitResult
+            timedOut := false
+            select {
+            case wait = <-waitDone:
+            case <-timer.C:
+              select {
+              case wait = <-waitDone:
+              default:
+                timedOut = true
+                _ = process.Kill()
+                wait = <-waitDone
+              }
+            }
+
+            stdoutErr := <-stdoutDone
+            stderrErr := <-stderrDone
+            if timedOut {
+              return 124, true, nil
+            }
+            if stdoutCloseErr != nil {
+              return 127, false, stdoutCloseErr
+            }
+            if stderrCloseErr != nil {
+              return 127, false, stderrCloseErr
+            }
+            if wait.err != nil {
+              return 127, false, wait.err
+            }
+            if stdoutErr != nil {
+              return 127, false, stdoutErr
+            }
+            if stderrErr != nil {
+              return 127, false, stderrErr
+            }
+            if wait.state == nil {
+              return 127, false, fmt.Errorf("child process returned no wait state")
+            }
+            return wait.state.ExitCode(), false, nil
+          }
+
+          func nativeParentEnvironmentProbe() int {
+            if !nativeParentEnvironmentIsHomeAndPathOnly() || os.Getenv(nativeParentEnvUnrelatedControl) != "" {
+              return 91
+            }
+            fmt.Fprintln(os.Stdout, nativeParentEnvControlStdoutMarker)
+            fmt.Fprint(os.Stdout, strings.Repeat("o", maxChildStdoutBytes))
+            fmt.Fprintln(os.Stderr, nativeParentEnvControlStderrMarker)
+            fmt.Fprint(os.Stderr, strings.Repeat("e", maxChildStderrBytes))
+            return 7
+          }
+
+          func nativeParentTimeoutProbe() int {
+            fmt.Fprintln(os.Stdout, nativeParentTimeoutProbeMarker)
+            fmt.Fprintln(os.Stderr, nativeParentTimeoutProbeMarker)
+            time.Sleep(nativeParentTimeoutProbeDelay)
+            return 0
+          }
+
+          func runNativeParentEnvironmentControl() int {
+            home := os.Getenv("HOME")
+            trustedPath := os.Getenv("PATH")
+            if home == "" || trustedPath == "" || os.Getenv(nativeParentEnvUnrelatedControl) != nativeParentEnvUnrelatedValue {
+              return 1
+            }
+            executable, err := os.Executable()
+            if err != nil {
+              return 1
+            }
+            environment := []string{"HOME=" + home, "PATH=" + trustedPath}
+            var stdout, stderr bytes.Buffer
+            childStdout := &cappedWriter{writer: &stdout, remaining: maxChildStdoutBytes - len(childStdoutTruncation)}
+            childStderr := &cappedWriter{writer: &stderr, remaining: maxChildStderrBytes - len(childStderrTruncation)}
+            exitCode, timedOut, err := startChildProcess(
+              executable,
+              []string{executable, nativeParentEnvProbeFlag},
+              environment,
+              os.Stdin,
+              childStdout,
+              childStderr,
+              nativeParentEnvControlTimeout,
+            )
+            if err != nil || timedOut || exitCode != 7 {
+              return 1
+            }
+            if childStdout.truncated {
+              if _, err := io.WriteString(&stdout, childStdoutTruncation); err != nil {
+                return 1
+              }
+            }
+            if childStderr.truncated {
+              if _, err := io.WriteString(&stderr, childStderrTruncation); err != nil {
+                return 1
+              }
+            }
+            if !childStdout.truncated || !childStderr.truncated || stdout.Len() > maxChildStdoutBytes || stderr.Len() > maxChildStderrBytes {
+              return 1
+            }
+            if !strings.HasPrefix(stdout.String(), nativeParentEnvControlStdoutMarker+"\n") ||
+              !strings.HasSuffix(stdout.String(), childStdoutTruncation) ||
+              !strings.HasPrefix(stderr.String(), nativeParentEnvControlStderrMarker+"\n") ||
+              !strings.HasSuffix(stderr.String(), childStderrTruncation) {
+              return 1
+            }
+
+            var timeoutStdout, timeoutStderr bytes.Buffer
+            timeoutExit, timeoutObserved, timeoutErr := startChildProcess(
+              executable,
+              []string{executable, nativeParentEnvTimeoutProbeFlag},
+              environment,
+              os.Stdin,
+              &timeoutStdout,
+              &timeoutStderr,
+              nativeParentTimeoutControlLimit,
+            )
+            if timeoutErr != nil || !timeoutObserved || timeoutExit != 124 ||
+              !strings.Contains(timeoutStdout.String(), nativeParentTimeoutProbeMarker) ||
+              !strings.Contains(timeoutStderr.String(), nativeParentTimeoutProbeMarker) {
+              return 1
+            }
+
+            missingProgram := executable + ".missing-control"
+            if _, err := os.Stat(missingProgram); !os.IsNotExist(err) {
+              return 1
+            }
+            failedExit, failedTimeout, failedStart := startChildProcess(
+              missingProgram,
+              []string{missingProgram},
+              environment,
+              os.Stdin,
+              io.Discard,
+              io.Discard,
+              nativeParentEnvControlTimeout,
+            )
+            if failedStart == nil || failedTimeout || failedExit != 127 {
+              return 1
+            }
+            return 0
           }
 
           func childEnvironment(arguments []string) ([]string, string, []string, bool) {
@@ -1095,12 +1318,21 @@ jobs:
               fmt.Fprintln(os.Stderr, "native-parent output capture setup failed")
               return 125
             }
-            command := exec.Command(program, programArgs...)
-            command.Env = environment
-            command.Stdin = os.Stdin
-            command.Stdout = childStdout
-            command.Stderr = childStderr
-            runErr := command.Run()
+            programPath, runErr := exec.LookPath(program)
+            exitCode := 127
+            timedOut := false
+            if runErr == nil {
+              arguments := append([]string{program}, programArgs...)
+              exitCode, timedOut, runErr = startChildProcess(
+                programPath,
+                arguments,
+                environment,
+                os.Stdin,
+                childStdout,
+                childStderr,
+                nativeParentChildTimeout,
+              )
+            }
             if childStdout.truncated {
               if _, err := io.WriteString(stdoutFile, childStdoutTruncation); err != nil && runErr == nil {
                 runErr = err
@@ -1119,17 +1351,30 @@ jobs:
             if stderrCloseErr != nil && runErr == nil {
               runErr = stderrCloseErr
             }
-            if runErr == nil {
-              return 0
+            if timedOut {
+              fmt.Fprintln(os.Stderr, "native-parent child process timed out")
+              return 124
             }
-            if exit, ok := runErr.(*exec.ExitError); ok {
-              return exit.ExitCode()
+            if runErr != nil {
+              fmt.Fprintln(os.Stderr, "native-parent child command could not start")
+              return 127
             }
-            fmt.Fprintln(os.Stderr, "native-parent child command could not start")
-            return 127
+            return exitCode
           }
 
-          func main() { os.Exit(runChild(os.Args[1:])) }
+          func main() {
+            if len(os.Args) == 2 {
+              switch os.Args[1] {
+              case nativeParentEnvControlFlag:
+                os.Exit(runNativeParentEnvironmentControl())
+              case nativeParentEnvProbeFlag:
+                os.Exit(nativeParentEnvironmentProbe())
+              case nativeParentEnvTimeoutProbeFlag:
+                os.Exit(nativeParentTimeoutProbe())
+              }
+            }
+            os.Exit(runChild(os.Args[1:]))
+          }
           GO
           native_path() {
             if [[ "$RUNNER_OS" == "Windows" ]]; then
@@ -1198,6 +1443,14 @@ jobs:
             go build -o "$native_parent_env_binary" "$CAPTURE_ROOT/native-parent-env.go" \
             > "$wrapper_build_stdout" 2> "$wrapper_build_stderr"; then
             printf 'CAPTURE_REASON=capture/native-parent-env-wrapper-build-failed\n' >&2
+            exit 1
+          fi
+          if ! env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+            CAPTURE_NATIVE_PARENT_UNRELATED_CONTROL=native-parent-control \
+            "$native_parent_env_binary" --native-parent-env-control \
+            > "$CAPTURE_ROOT/native-parent-env-control.stdout" \
+            2> "$CAPTURE_ROOT/native-parent-env-control.stderr"; then
+            printf 'CAPTURE_REASON=capture/native-parent-exact-environment-control-failed\n' >&2
             exit 1
           fi
           if ! find "$CAPTURE_ROOT/raw-output" -mindepth 1 -print -quit > "$CAPTURE_ROOT/output-entry-check.raw.txt"; then
@@ -1334,7 +1587,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "02620608e3b4144aad57c6f53d31dd64687053b4624cd9502bd754c3d2cd6ca7"},
+            {"ancestor_projection_test.go", "dcc4a0462c824b980f1d2bf88c3488a07f85b77e08d0d70debca2e122b480725"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},

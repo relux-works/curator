@@ -1031,6 +1031,46 @@ func TestNativeCaptureUploadRequiresSuccessfulCaptureAndSanitizer(t *testing.T) 
 			t.Errorf("artifact upload condition %q does not require %s", condition, required)
 		}
 	}
+	text := string(workflow)
+	controlInvocation := strings.Index(text, `"$native_parent_env_binary" --native-parent-env-control`)
+	captureInvocation := strings.Index(text, `go test -p 1 -count=1 -v -json ./.temp/original-capture/harnessparity`)
+	if controlInvocation < 0 || captureInvocation < 0 || controlInvocation > captureInvocation {
+		t.Fatal("native-parent exact-environment control is missing or runs after the capture suite")
+	}
+	if !strings.Contains(text, `CAPTURE_REASON=capture/native-parent-exact-environment-control-failed`) {
+		t.Fatal("native-parent exact-environment control failure does not use its fixed safe reason")
+	}
+	if !strings.Contains(text, `CAPTURE_NATIVE_PARENT_UNRELATED_CONTROL=native-parent-control`) {
+		t.Fatal("native-parent exact-environment control does not plant an unrelated parent variable")
+	}
+	program, err := staticCaptureWorkflowGoProgram(text, `cat > "$CAPTURE_ROOT/native-parent-env.go" <<'GO'`)
+	if err != nil {
+		t.Fatalf("extract native-parent environment program: %v", err)
+	}
+	programText := string(program)
+	for _, required := range []string{
+		`os.StartProcess(path, arguments, &os.ProcAttr{`,
+		`Env:   environment,`,
+		`Files: []*os.File{stdin, stdoutWrite, stderrWrite},`,
+		`func runNativeParentEnvironmentControl() int`,
+		`func nativeParentEnvironmentProbe() int`,
+		`environment := []string{"HOME=" + home, "PATH=" + trustedPath}`,
+		`nativeParentEnvUnrelatedControl`,
+		`nativeParentEnvControlStdoutMarker`,
+		`nativeParentEnvControlStderrMarker`,
+		`nativeParentTimeoutControlLimit`,
+		`missingProgram := executable + ".missing-control"`,
+		`nativeParentChildTimeout = 5 * time.Minute`,
+		`childStdout.truncated`,
+		`childStderr.truncated`,
+	} {
+		if !strings.Contains(programText, required) {
+			t.Errorf("native-parent exact-environment control is missing %q", required)
+		}
+	}
+	if strings.Contains(programText, `command := exec.Command(program, programArgs...)`) {
+		t.Fatal("native-parent exact-environment child still uses os/exec")
+	}
 }
 
 func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
@@ -1562,7 +1602,7 @@ func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
 					}
 					rows, ok := staticCaptureRows(loop.X, locals, constants, typeFields, 0)
 					if ok {
-					environment[variable.Obj] = rows
+						environment[variable.Obj] = rows
 					}
 				}
 				names, ok := staticCaptureNameValues(run.Args[0], environment, constants)
@@ -2050,10 +2090,10 @@ func checkNativeCaptureFailureDetailRoutes(script string) error {
 		`cat "$safe_failure_details"`: {},
 	}
 	allowedRawReferenceLines := map[string]struct{}{
-		`failure_details_file="$CAPTURE_ROOT/failure-details.txt"`: {},
-		`"$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" "$failure_details_file" \`: {},
+		`failure_details_file="$CAPTURE_ROOT/failure-details.txt"`:                                                                        {},
+		`"$CAPTURE_ROOT/raw-output" "$test_exit" "$failed_names_file" "$failure_details_file" \`:                                          {},
 		`if [[ -s "$CAPTURE_ROOT/failure-details.txt" && -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \`: {},
-		`"$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details" \`: {},
+		`"$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details" \`:                                                                   {},
 	}
 	seenRawReferences := map[string]int{}
 	inGoHereDoc := false
