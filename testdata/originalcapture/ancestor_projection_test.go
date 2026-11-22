@@ -6,12 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1027,6 +1031,82 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 		t.Fatalf("read native capture workflow: %v", err)
 	}
 	text := string(workflow)
+	roots, subtests, err := staticCaptureSuiteIdentifiers()
+	if err != nil {
+		t.Fatalf("derive static capture test identifiers: %v", err)
+	}
+	programs := []struct {
+		name   string
+		marker string
+	}{
+		{"auditor", `cat > "$CAPTURE_ROOT/audit.go" <<'GO'`},
+		{"sanitizer", `cat > "$sanitizer_source_dir/main.go" <<'GO'`},
+	}
+	wantRoots := staticCaptureNameSet(roots)
+	wantSubtests := staticCaptureNameSet(subtests)
+	verdictPositiveNames := []string{
+		"TestFixtureAncestorProjectionControls/macos-var-private-var-aliases",
+		"TestFixtureAncestorProjectionRefusals/expected-entry-duplicated",
+	}
+	for _, program := range programs {
+		source, err := staticCaptureWorkflowGoProgram(text, program.marker)
+		if err != nil {
+			t.Fatalf("extract %s failure-name program: %v", program.name, err)
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), program.name+".go", source, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatalf("parse %s failure-name program: %v", program.name, err)
+		}
+		gotRoots, err := staticCaptureWorkflowAllowlist(parsed, "publicTestRoots")
+		if err != nil {
+			t.Fatalf("read %s root allowlist: %v", program.name, err)
+		}
+		gotSubtests, err := staticCaptureWorkflowAllowlist(parsed, "publicFailureSubtests")
+		if err != nil {
+			t.Fatalf("read %s subtest allowlist: %v", program.name, err)
+		}
+		assertSet := func(label string, got, want map[string]struct{}) {
+			for name := range want {
+				if _, ok := got[name]; !ok {
+					t.Errorf("static %s identifier %q is missing from the %s allowlist", label, name, program.name)
+				}
+			}
+			for name := range got {
+				if _, ok := want[name]; !ok {
+					t.Errorf("%s allowlist accepts non-emitted static %s identifier %q", program.name, label, name)
+				}
+			}
+		}
+		assertSet("root", gotRoots, wantRoots)
+		assertSet("subtest", gotSubtests, wantSubtests)
+		for _, name := range verdictPositiveNames {
+			if _, ok := gotSubtests[name]; !ok {
+				t.Errorf("verdict-positive static name %q is missing from the %s allowlist", name, program.name)
+			}
+		}
+		if program.name == "auditor" {
+			for constantName, want := range map[string]string{
+				"staticFailureTest":        verdictPositiveNames[0],
+				"staticRefusalFailureTest": verdictPositiveNames[1],
+			} {
+				got, err := staticCaptureWorkflowStringConstant(parsed, constantName)
+				if err != nil || got != want {
+					t.Errorf("auditor positive control %s = %q (%v), want %q", constantName, got, err, want)
+				}
+			}
+		} else {
+			positiveNames, err := staticCaptureWorkflowStringSlice(parsed, "checkFailureDiagnosticControls", "staticSlashNames")
+			if err != nil {
+				t.Fatalf("read sanitizer verdict-positive control: %v", err)
+			}
+			positiveSet := staticCaptureNameSet(positiveNames)
+			for _, name := range verdictPositiveNames {
+				if _, ok := positiveSet[name]; !ok {
+					t.Errorf("sanitizer positive control does not exercise verdict name %q", name)
+				}
+			}
+		}
+	}
 	required := []struct {
 		name, fragment string
 	}{
@@ -1035,17 +1115,20 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 		{"failing event carries withheld output control", "CAPTURE_PRIVATE_OUTPUT_CONTROL"},
 		{"static package allowlist in both programs", `const publicCapturePackage = "github.com/relux-works/curator/.temp/original-capture/harnessparity"`},
 		{"static test root allowlist in both programs", `var publicTestRoots = map[string]struct{}{`},
-		{"static slash-name allowlist in both programs", `"TestOriginalComparatorControls/claude_code-mcp": {}`},
 		{"unknown subtests reduce to an allowed root", `if _, ok := publicTestRoots[root]; ok {`},
 		{"auditor accepts every mapped root and subtest", `for publicName := range publicFailureSubtests {`},
 		{"sanitizer accepts every mapped name", `if allowFailureDiagnosticLine(line) != line {`},
-		{"auditor positive control is a static slash test", `const staticFailureTest = "TestOriginalComparatorControls/claude_code-mcp"`},
-		{"sanitizer positive control is a static slash test", `staticSlashName := "TestOriginalComparatorControls/claude_code-mcp"`},
+		{"auditor positive control is the verdict alias identifier", `const staticFailureTest = "TestFixtureAncestorProjectionControls/macos-var-private-var-aliases"`},
+		{"auditor positive control is the verdict refusal identifier", `const staticRefusalFailureTest = "TestFixtureAncestorProjectionRefusals/expected-entry-duplicated"`},
+		{"sanitizer positive controls are static slash tests", `staticSlashNames := []string{`},
 		{"failure name controls reject a host-shaped value", `"TestOriginalComparatorControls/example-host.local"`},
 		{"failure name controls reject an account-shaped value", `"TestOriginalComparatorControls/example-user"`},
-		{"malformed name with output is refused", `" Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"`},
+		{"malformed name with output is refused", `TestOriginalComparatorControls/claude_code-mcp Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"`},
 		{"sanitizer receives names file", `"$CAPTURE_ROOT/test-failures.names.txt" "$safe_failure_names"`},
 		{"only sanitized file is printed", `cat "$safe_failure_names"`},
+		{"sanitizer receives private detail file", `"$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details"`},
+		{"only sanitized detail file is printed", `cat "$safe_failure_details"`},
+		{"native-parent failure has a fixed safe reason", `CAPTURE_REASON=capture/native-parent-row-failed`},
 		{"existing reason allowlist remains", `if _, ok := failureDiagnosticReasonCodes[reason]; ok {`},
 		{"existing refusal fallback remains", `return "Failure detail withheld by the sanitizer."`},
 	}
@@ -1083,6 +1166,719 @@ func TestNativeCaptureFailureNamesPassThroughSanitizer(t *testing.T) {
 			t.Errorf("native capture workflow bypasses the failure-name sanitizer with %q", forbidden)
 		}
 	}
+}
+
+func staticCaptureNameSet(names []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		set[name] = struct{}{}
+	}
+	return set
+}
+
+func staticCaptureWorkflowGoProgram(workflow, marker string) ([]byte, error) {
+	if strings.Count(workflow, marker) != 1 {
+		return nil, fmt.Errorf("heredoc marker %q is not unique", marker)
+	}
+	markerStart := strings.Index(workflow, marker)
+	lineEnd := strings.IndexByte(workflow[markerStart:], '\n')
+	if lineEnd < 0 {
+		return nil, fmt.Errorf("heredoc marker %q has no body", marker)
+	}
+	lineStart := markerStart + lineEnd + 1
+	var lines []string
+	for lineStart < len(workflow) {
+		next := strings.IndexByte(workflow[lineStart:], '\n')
+		lineEnd := len(workflow)
+		if next >= 0 {
+			lineEnd = lineStart + next
+		}
+		line := workflow[lineStart:lineEnd]
+		if line == "          GO" {
+			return []byte(strings.Join(lines, "\n")), nil
+		}
+		if line == "" {
+			lines = append(lines, "")
+			if next < 0 {
+				break
+			}
+			lineStart = lineEnd + 1
+			continue
+		}
+		if !strings.HasPrefix(line, "          ") {
+			return nil, fmt.Errorf("heredoc line lacks workflow indentation")
+		}
+		lines = append(lines, strings.TrimPrefix(line, "          "))
+		if next < 0 {
+			break
+		}
+		lineStart = lineEnd + 1
+	}
+	return nil, fmt.Errorf("heredoc marker %q has no terminator", marker)
+}
+
+func staticCaptureWorkflowAllowlist(file *ast.File, name string) (map[string]struct{}, error) {
+	var initializer ast.Expr
+	for _, declaration := range file.Decls {
+		group, ok := declaration.(*ast.GenDecl)
+		if !ok || group.Tok != token.VAR {
+			continue
+		}
+		for _, spec := range group.Specs {
+			value, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for index, identifier := range value.Names {
+				if identifier.Name != name {
+					continue
+				}
+				if initializer != nil || index >= len(value.Values) {
+					return nil, fmt.Errorf("allowlist %s has ambiguous initializer", name)
+				}
+				initializer = value.Values[index]
+			}
+		}
+	}
+	if initializer == nil {
+		return nil, fmt.Errorf("allowlist %s is missing", name)
+	}
+	var literal *ast.CompositeLit
+	switch name {
+	case "publicTestRoots":
+		var ok bool
+		literal, ok = initializer.(*ast.CompositeLit)
+		if !ok {
+			return nil, fmt.Errorf("allowlist %s is not a direct map literal", name)
+		}
+	case "publicFailureSubtests":
+		call, ok := initializer.(*ast.CallExpr)
+		if !ok || len(call.Args) != 0 {
+			return nil, fmt.Errorf("allowlist %s is not a zero-argument map factory", name)
+		}
+		function, ok := call.Fun.(*ast.FuncLit)
+		if !ok || function.Body == nil || len(function.Body.List) != 2 {
+			return nil, fmt.Errorf("allowlist %s has an unsupported map factory", name)
+		}
+		assignment, ok := function.Body.List[0].(*ast.AssignStmt)
+		if !ok || assignment.Tok != token.DEFINE || len(assignment.Lhs) != 1 || len(assignment.Rhs) != 1 {
+			return nil, fmt.Errorf("allowlist %s does not initialize its returned map directly", name)
+		}
+		mapName, ok := assignment.Lhs[0].(*ast.Ident)
+		if !ok || mapName.Name != "names" {
+			return nil, fmt.Errorf("allowlist %s uses an unexpected map variable", name)
+		}
+		literal, ok = assignment.Rhs[0].(*ast.CompositeLit)
+		if !ok {
+			return nil, fmt.Errorf("allowlist %s does not initialize a literal map", name)
+		}
+		returned, ok := function.Body.List[1].(*ast.ReturnStmt)
+		if !ok || len(returned.Results) != 1 {
+			return nil, fmt.Errorf("allowlist %s does not return its literal map", name)
+		}
+		returnedName, ok := returned.Results[0].(*ast.Ident)
+		if !ok || returnedName.Name != mapName.Name {
+			return nil, fmt.Errorf("allowlist %s returns a value other than its literal map", name)
+		}
+	default:
+		return nil, fmt.Errorf("allowlist %s is unsupported", name)
+	}
+	if !staticCaptureStringStructMap(literal.Type) {
+		return nil, fmt.Errorf("allowlist %s is not map[string]struct{}", name)
+	}
+	entries := make(map[string]struct{}, len(literal.Elts))
+	for _, element := range literal.Elts {
+		entry, ok := element.(*ast.KeyValueExpr)
+		if !ok {
+			return nil, fmt.Errorf("allowlist %s has a non-keyed entry", name)
+		}
+		key, ok := entry.Key.(*ast.BasicLit)
+		if !ok || key.Kind != token.STRING {
+			return nil, fmt.Errorf("allowlist %s has a nonliteral key", name)
+		}
+		value, err := strconv.Unquote(key.Value)
+		if err != nil {
+			return nil, fmt.Errorf("allowlist %s has an invalid string key", name)
+		}
+		if _, exists := entries[value]; exists {
+			return nil, fmt.Errorf("allowlist %s duplicates key %q", name, value)
+		}
+		emptyValue, ok := entry.Value.(*ast.CompositeLit)
+		if !ok || emptyValue.Type != nil || len(emptyValue.Elts) != 0 {
+			return nil, fmt.Errorf("allowlist %s key %q has a nonempty value", name, value)
+		}
+		entries[value] = struct{}{}
+	}
+	return entries, nil
+}
+
+func staticCaptureStringStructMap(expression ast.Expr) bool {
+	mapping, ok := expression.(*ast.MapType)
+	if !ok {
+		return false
+	}
+	key, ok := mapping.Key.(*ast.Ident)
+	if !ok || key.Name != "string" {
+		return false
+	}
+	value, ok := mapping.Value.(*ast.StructType)
+	return ok && len(value.Fields.List) == 0
+}
+
+func staticCaptureWorkflowStringConstant(file *ast.File, name string) (string, error) {
+	var result string
+	found := 0
+	var lookupErr error
+	ast.Inspect(file, func(node ast.Node) bool {
+		value, ok := node.(*ast.ValueSpec)
+		if !ok || len(value.Names) != len(value.Values) {
+			return true
+		}
+		for index, identifier := range value.Names {
+			if identifier.Name != name {
+				continue
+			}
+			found++
+			literal, ok := value.Values[index].(*ast.BasicLit)
+			if !ok || literal.Kind != token.STRING {
+				lookupErr = fmt.Errorf("constant %s is not a string literal", name)
+				return false
+			}
+			parsed, err := strconv.Unquote(literal.Value)
+			if err != nil {
+				lookupErr = fmt.Errorf("constant %s is invalid", name)
+				return false
+			}
+			result = parsed
+		}
+		return true
+	})
+	if lookupErr != nil {
+		return "", lookupErr
+	}
+	if found != 1 {
+		return "", fmt.Errorf("constant %s is missing", name)
+	}
+	return result, nil
+}
+
+func staticCaptureWorkflowStringSlice(file *ast.File, functionName, variableName string) ([]string, error) {
+	for _, declaration := range file.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok || function.Name.Name != functionName || function.Body == nil {
+			continue
+		}
+		var result []string
+		found := false
+		var lookupErr error
+		ast.Inspect(function.Body, func(node ast.Node) bool {
+			assignment, ok := node.(*ast.AssignStmt)
+			if !ok || len(assignment.Lhs) != 1 {
+				return true
+			}
+			identifier, ok := assignment.Lhs[0].(*ast.Ident)
+			if !ok || identifier.Name != variableName {
+				return true
+			}
+			if found {
+				lookupErr = fmt.Errorf("slice %s is assigned more than once", variableName)
+				return false
+			}
+			if assignment.Tok != token.DEFINE || len(assignment.Rhs) != 1 {
+				lookupErr = fmt.Errorf("slice %s is not initialized directly", variableName)
+				return true
+			}
+			literal, ok := assignment.Rhs[0].(*ast.CompositeLit)
+			if !ok {
+				lookupErr = fmt.Errorf("slice %s is not a literal", variableName)
+				return true
+			}
+			slice, ok := literal.Type.(*ast.ArrayType)
+			if !ok {
+				lookupErr = fmt.Errorf("slice %s has an unexpected type", variableName)
+				return true
+			}
+			element, elementOK := slice.Elt.(*ast.Ident)
+			if !elementOK || element.Name != "string" {
+				lookupErr = fmt.Errorf("slice %s is not []string", variableName)
+				return true
+			}
+			for _, item := range literal.Elts {
+				value, ok := item.(*ast.BasicLit)
+				if !ok || value.Kind != token.STRING {
+					lookupErr = fmt.Errorf("slice %s has a nonliteral entry", variableName)
+					return true
+				}
+				parsed, err := strconv.Unquote(value.Value)
+				if err != nil {
+					lookupErr = fmt.Errorf("slice %s has an invalid string entry", variableName)
+					return true
+				}
+				result = append(result, parsed)
+			}
+			found = true
+			return true
+		})
+		if !found {
+			return nil, fmt.Errorf("slice %s is missing or dynamic", variableName)
+		}
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		return result, nil
+	}
+	return nil, fmt.Errorf("function %s is missing", functionName)
+}
+
+type staticCaptureNameRow map[string]string
+
+func staticCaptureSuiteIdentifiers() ([]string, []string, error) {
+	workflowPath := normalizeNativeCaptureWorkflowPath(os.Getenv("CAPTURE_WORKFLOW_PATH"))
+	if workflowPath == "" {
+		return nil, nil, errors.New("CAPTURE_WORKFLOW_PATH is required")
+	}
+	repositoryRoot := filepath.Dir(filepath.Dir(filepath.Dir(workflowPath)))
+	sourceDir := filepath.Join(repositoryRoot, "testdata", "originalcapture")
+	entries, err := os.ReadDir(sourceDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read capture test sources: %w", err)
+	}
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".go" {
+			continue
+		}
+		path := filepath.Join(sourceDir, entry.Name())
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parse capture test source: %w", err)
+		}
+		files = append(files, file)
+	}
+	typeFields := map[string][]string{}
+	constants := map[string]string{}
+	for _, file := range files {
+		for _, declaration := range file.Decls {
+			group, ok := declaration.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range group.Specs {
+				switch spec := spec.(type) {
+				case *ast.TypeSpec:
+					if fields, ok := staticCaptureStructFields(spec.Type, typeFields); ok {
+						typeFields[spec.Name.Name] = fields
+					}
+				case *ast.ValueSpec:
+					if group.Tok != token.CONST || len(spec.Values) != len(spec.Names) {
+						continue
+					}
+					for index, name := range spec.Names {
+						if value, ok := staticCaptureString(spec.Values[index], constants); ok {
+							constants[name.Name] = value
+						}
+					}
+				}
+			}
+		}
+	}
+	var roots, subtests []string
+	for _, file := range files {
+		for _, declaration := range file.Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if !ok || function.Body == nil {
+				continue
+			}
+			testReceivers := staticCaptureTestingTNames(function)
+			if !staticCaptureTestFunction(function) {
+				if staticCaptureHasTestRun(function.Body, testReceivers) {
+					return nil, nil, fmt.Errorf("%s: t.Run outside a Test function needs explicit source inventory", fset.Position(function.Pos()))
+				}
+				continue
+			}
+			root := function.Name.Name
+			roots = append(roots, root)
+			locals := staticCaptureLocalExpressions(function.Body)
+			var ranges []*ast.RangeStmt
+			var runs []*ast.CallExpr
+			runSelectors := map[*ast.SelectorExpr]struct{}{}
+			ast.Inspect(function.Body, func(node ast.Node) bool {
+				switch node := node.(type) {
+				case *ast.RangeStmt:
+					ranges = append(ranges, node)
+				case *ast.CallExpr:
+					selector, ok := node.Fun.(*ast.SelectorExpr)
+					if !ok || selector.Sel.Name != "Run" {
+						break
+					}
+					receiver, ok := selector.X.(*ast.Ident)
+					if ok && hasStaticCaptureName(testReceivers, receiver.Name) {
+						runSelectors[selector] = struct{}{}
+					}
+					if ok && hasStaticCaptureName(testReceivers, receiver.Name) && len(node.Args) >= 1 {
+						runs = append(runs, node)
+					}
+				}
+				return true
+			})
+			unhandledRun := false
+			ast.Inspect(function.Body, func(node ast.Node) bool {
+				selector, ok := node.(*ast.SelectorExpr)
+				if !ok || selector.Sel.Name != "Run" {
+					return true
+				}
+				receiver, ok := selector.X.(*ast.Ident)
+				if !ok || !hasStaticCaptureName(testReceivers, receiver.Name) {
+					return true
+				}
+				if _, called := runSelectors[selector]; !called {
+					unhandledRun = true
+					return false
+				}
+				return true
+			})
+			if unhandledRun {
+				return nil, nil, fmt.Errorf("%s: t.Run is not a direct call with an inventoried static name", fset.Position(function.Pos()))
+			}
+			for _, run := range runs {
+				environment := map[string][]staticCaptureNameRow{}
+				for _, loop := range ranges {
+					if loop.Body.Pos() > run.Pos() || run.End() > loop.Body.End() {
+						continue
+					}
+					variable, ok := loop.Value.(*ast.Ident)
+					if !ok {
+						continue
+					}
+					rows, ok := staticCaptureRows(loop.X, locals, constants, typeFields, 0)
+					if ok {
+						environment[variable.Name] = rows
+					}
+				}
+				names, ok := staticCaptureNameValues(run.Args[0], environment, constants)
+				if !ok || len(names) == 0 {
+					return nil, nil, fmt.Errorf("%s: cannot derive static t.Run name", fset.Position(run.Pos()))
+				}
+				for _, name := range names {
+					if name == "" || strings.ContainsRune(name, '\x00') {
+						return nil, nil, fmt.Errorf("%s: invalid static t.Run name", fset.Position(run.Pos()))
+					}
+					subtests = append(subtests, root+"/"+name)
+				}
+			}
+		}
+	}
+	return staticCaptureUnique(roots), staticCaptureUnique(subtests), nil
+}
+
+func staticCaptureTestingTNames(function *ast.FuncDecl) map[string]struct{} {
+	names := map[string]struct{}{}
+	addParameters := func(fields *ast.FieldList) {
+		if fields == nil {
+			return
+		}
+		for _, field := range fields.List {
+			star, ok := field.Type.(*ast.StarExpr)
+			if !ok {
+				continue
+			}
+			selector, ok := star.X.(*ast.SelectorExpr)
+			if !ok || selector.Sel.Name != "T" {
+				continue
+			}
+			packageName, ok := selector.X.(*ast.Ident)
+			if !ok || packageName.Name != "testing" {
+				continue
+			}
+			for _, parameter := range field.Names {
+				if parameter.Name != "_" {
+					names[parameter.Name] = struct{}{}
+				}
+			}
+		}
+	}
+	addParameters(function.Type.Params)
+	ast.Inspect(function.Body, func(node ast.Node) bool {
+		if literal, ok := node.(*ast.FuncLit); ok {
+			addParameters(literal.Type.Params)
+		}
+		return true
+	})
+	locals := staticCaptureLocalExpressions(function.Body)
+	for changed := true; changed; {
+		changed = false
+		for name, expression := range locals {
+			identifier, ok := expression.(*ast.Ident)
+			if !ok || !hasStaticCaptureName(names, identifier.Name) || hasStaticCaptureName(names, name) {
+				continue
+			}
+			names[name] = struct{}{}
+			changed = true
+		}
+	}
+	return names
+}
+
+func staticCaptureHasTestRun(body ast.Node, receivers map[string]struct{}) bool {
+	found := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		selector, ok := node.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "Run" {
+			return true
+		}
+		receiver, ok := selector.X.(*ast.Ident)
+		if ok && hasStaticCaptureName(receivers, receiver.Name) {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func hasStaticCaptureName(names map[string]struct{}, name string) bool {
+	_, ok := names[name]
+	return ok
+}
+
+func staticCaptureTestFunction(function *ast.FuncDecl) bool {
+	if !strings.HasPrefix(function.Name.Name, "Test") || function.Name.Name == "TestMain" || function.Type.Params == nil {
+		return false
+	}
+	for _, field := range function.Type.Params.List {
+		pointer, ok := field.Type.(*ast.StarExpr)
+		if !ok {
+			continue
+		}
+		selector, ok := pointer.X.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "T" {
+			continue
+		}
+		packageName, ok := selector.X.(*ast.Ident)
+		return ok && packageName.Name == "testing"
+	}
+	return false
+}
+
+func staticCaptureLocalExpressions(body ast.Node) map[string]ast.Expr {
+	locals := map[string]ast.Expr{}
+	ast.Inspect(body, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			for index, left := range node.Lhs {
+				name, ok := left.(*ast.Ident)
+				if ok && index < len(node.Rhs) {
+					locals[name.Name] = node.Rhs[index]
+				}
+			}
+		case *ast.ValueSpec:
+			for index, name := range node.Names {
+				if index < len(node.Values) {
+					locals[name.Name] = node.Values[index]
+				}
+			}
+		}
+		return true
+	})
+	return locals
+}
+
+func staticCaptureRows(expression ast.Expr, locals map[string]ast.Expr, constants map[string]string, typeFields map[string][]string, depth int) ([]staticCaptureNameRow, bool) {
+	if depth > 8 {
+		return nil, false
+	}
+	switch expression := expression.(type) {
+	case *ast.Ident:
+		initializer, ok := locals[expression.Name]
+		if !ok || initializer == expression {
+			return nil, false
+		}
+		return staticCaptureRows(initializer, locals, constants, typeFields, depth+1)
+	case *ast.CallExpr:
+		function, ok := expression.Fun.(*ast.Ident)
+		if !ok {
+			return nil, false
+		}
+		var cases []fixtureCase
+		switch function.Name {
+		case "fixtureCases":
+			cases = fixtureCases()
+		case "launcherCases":
+			cases = launcherCases()
+		case "allCases":
+			cases = allCases()
+		default:
+			return nil, false
+		}
+		rows := make([]staticCaptureNameRow, 0, len(cases))
+		for _, testCase := range cases {
+			rows = append(rows, staticCaptureNameRow{"Name": testCase.Name})
+		}
+		return rows, true
+	case *ast.CompositeLit:
+		slice, ok := expression.Type.(*ast.ArrayType)
+		if !ok {
+			return nil, false
+		}
+		if element, ok := slice.Elt.(*ast.Ident); ok && element.Name == "string" {
+			rows := make([]staticCaptureNameRow, 0, len(expression.Elts))
+			for _, item := range expression.Elts {
+				value, ok := staticCaptureString(item, constants)
+				if !ok {
+					return nil, false
+				}
+				rows = append(rows, staticCaptureNameRow{"": value})
+			}
+			return rows, true
+		}
+		fields, ok := staticCaptureStructFields(slice.Elt, typeFields)
+		if !ok {
+			return nil, false
+		}
+		rows := make([]staticCaptureNameRow, 0, len(expression.Elts))
+		for _, item := range expression.Elts {
+			literal, ok := item.(*ast.CompositeLit)
+			if !ok {
+				return nil, false
+			}
+			row := staticCaptureNameRow{}
+			for index, item := range literal.Elts {
+				fieldName := ""
+				value := item
+				if keyed, ok := item.(*ast.KeyValueExpr); ok {
+					key, ok := keyed.Key.(*ast.Ident)
+					if !ok {
+						continue
+					}
+					fieldName, value = key.Name, keyed.Value
+				} else if index < len(fields) {
+					fieldName = fields[index]
+				}
+				if fieldName == "" {
+					continue
+				}
+				if text, ok := staticCaptureString(value, constants); ok {
+					row[fieldName] = text
+				}
+			}
+			rows = append(rows, row)
+		}
+		return rows, true
+	}
+	return nil, false
+}
+
+func staticCaptureStructFields(expression ast.Expr, typeFields map[string][]string) ([]string, bool) {
+	switch expression := expression.(type) {
+	case *ast.Ident:
+		fields, ok := typeFields[expression.Name]
+		return fields, ok
+	case *ast.StructType:
+		var fields []string
+		for _, field := range expression.Fields.List {
+			for _, name := range field.Names {
+				fields = append(fields, name.Name)
+			}
+		}
+		return fields, len(fields) > 0
+	case *ast.StarExpr:
+		return staticCaptureStructFields(expression.X, typeFields)
+	}
+	return nil, false
+}
+
+func staticCaptureString(expression ast.Expr, constants map[string]string) (string, bool) {
+	switch expression := expression.(type) {
+	case *ast.BasicLit:
+		if expression.Kind != token.STRING {
+			return "", false
+		}
+		value, err := strconv.Unquote(expression.Value)
+		return value, err == nil
+	case *ast.Ident:
+		value, ok := constants[expression.Name]
+		return value, ok
+	case *ast.ParenExpr:
+		return staticCaptureString(expression.X, constants)
+	case *ast.BinaryExpr:
+		if expression.Op != token.ADD {
+			return "", false
+		}
+		left, leftOK := staticCaptureString(expression.X, constants)
+		right, rightOK := staticCaptureString(expression.Y, constants)
+		return left + right, leftOK && rightOK
+	}
+	return "", false
+}
+
+func staticCaptureNameValues(expression ast.Expr, environment map[string][]staticCaptureNameRow, constants map[string]string) ([]string, bool) {
+	switch expression := expression.(type) {
+	case *ast.BasicLit, *ast.Ident, *ast.ParenExpr:
+		if value, ok := staticCaptureString(expression, constants); ok {
+			return []string{value}, true
+		}
+		if identifier, ok := expression.(*ast.Ident); ok {
+			rows, ok := environment[identifier.Name]
+			if !ok {
+				return nil, false
+			}
+			var values []string
+			for _, row := range rows {
+				if value, ok := row[""]; ok {
+					values = append(values, value)
+				}
+			}
+			return values, len(values) > 0
+		}
+		if parenthesized, ok := expression.(*ast.ParenExpr); ok {
+			return staticCaptureNameValues(parenthesized.X, environment, constants)
+		}
+	case *ast.SelectorExpr:
+		variable, ok := expression.X.(*ast.Ident)
+		if !ok {
+			return nil, false
+		}
+		rows, ok := environment[variable.Name]
+		if !ok {
+			return nil, false
+		}
+		var values []string
+		for _, row := range rows {
+			if value, ok := row[expression.Sel.Name]; ok {
+				values = append(values, value)
+			}
+		}
+		return values, len(values) > 0
+	case *ast.BinaryExpr:
+		if expression.Op != token.ADD {
+			return nil, false
+		}
+		left, leftOK := staticCaptureNameValues(expression.X, environment, constants)
+		right, rightOK := staticCaptureNameValues(expression.Y, environment, constants)
+		if !leftOK || !rightOK {
+			return nil, false
+		}
+		var values []string
+		for _, prefix := range left {
+			for _, suffix := range right {
+				values = append(values, prefix+suffix)
+			}
+		}
+		return values, true
+	}
+	return nil, false
+}
+
+func staticCaptureUnique(values []string) []string {
+	sort.Strings(values)
+	unique := values[:0]
+	for _, value := range values {
+		if len(unique) == 0 || unique[len(unique)-1] != value {
+			unique = append(unique, value)
+		}
+	}
+	return unique
 }
 
 func TestNativeCapturePrivateLogCannotReachOutput(t *testing.T) {
@@ -1595,15 +2391,15 @@ func TestFixtureAncestorCanonicalTargetOutsideChainRefusesWithoutExport(t *testi
 }
 
 type fixtureGitTestOutcome struct {
-	lookupError          error
-	queryStdout          string
-	queryStderr          string
-	queryError           error
-	queryTimeout         bool
+	lookupError              error
+	queryStdout              string
+	queryStderr              string
+	queryError               error
+	queryTimeout             bool
 	queryReturnsAfterTimeout bool
-	scanFound            bool
-	scanError            error
-	positiveControlFails bool
+	scanFound                bool
+	scanError                error
+	positiveControlFails     bool
 }
 
 func fixtureGitControlledOps(outcome fixtureGitTestOutcome, observedEnvironments *[]string) fixtureGitOps {

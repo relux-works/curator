@@ -98,7 +98,7 @@ jobs:
               [[ -n "$expected" ]] || continue
               verify_file "$expected" "$prefix/$file"
             done <<'PINS'
-          797b1849687ccc53dd23d85c6f773d7821113734e1ee01a7c440d138f938bb55 ancestor_projection_test.go
+          f1269bafd126b7d3c57cb4a2007ff407d912288b4c049ec83908244cca749341 ancestor_projection_test.go
           35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b capture_homes_test.go
           e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518 capture_launchers_test.go
           2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4 controls_test.go
@@ -319,23 +319,112 @@ jobs:
               "TestFreezeOriginalBaseline/repeat-determinism": {},
               "TestOriginalComparatorControls/claude_code-mcp": {},
               "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
-            }
-            for _, name := range []string{
-              "claude_code-empty", "codex_cli-empty", "opencode-empty", "muse-empty", "pi-empty",
-              "cursor-project-mirror", "gemini-project-mirror", "windsurf-native-discovery", "opencode-native-discovery",
-              "codex_cli-user-settings", "codex_cli-current", "codex_cli-modified", "codex_cli-missing-state",
-              "codex_cli-unreadable-state", "codex_cli-malformed-state", "codex_cli-native-parent", "claude_code-mcp",
-            } {
-              names["TestFreezeOriginalBaseline/"+name] = struct{}{}
-            }
-            for _, name := range []string{
-              "normal-edit", "typed-projection", "valid-00", "valid-01", "valid-02", "valid-03", "valid-04",
-              "invalid-00", "invalid-01", "invalid-02", "invalid-03", "invalid-04", "invalid-05", "invalid-06",
-              "invalid-07", "invalid-08", "invalid-09", "invalid-10", "invalid-11", "invalid-12", "invalid-13",
-              "old-version-1", "old-version-2", "old-version-3", "old-version-5", "old-version-6",
-              "system-authority", "cli-edits", "cli-refusal", "cli-arguments",
-            } {
-              names["TestFreezeOriginalLaunchers/claude-launcher-"+name] = struct{}{}
+              "TestFreezeOriginalBaseline/claude_code-empty": {},
+              "TestFreezeOriginalBaseline/codex_cli-empty": {},
+              "TestFreezeOriginalBaseline/opencode-empty": {},
+              "TestFreezeOriginalBaseline/muse-empty": {},
+              "TestFreezeOriginalBaseline/pi-empty": {},
+              "TestFreezeOriginalBaseline/cursor-project-mirror": {},
+              "TestFreezeOriginalBaseline/gemini-project-mirror": {},
+              "TestFreezeOriginalBaseline/windsurf-native-discovery": {},
+              "TestFreezeOriginalBaseline/opencode-native-discovery": {},
+              "TestFreezeOriginalBaseline/codex_cli-user-settings": {},
+              "TestFreezeOriginalBaseline/codex_cli-current": {},
+              "TestFreezeOriginalBaseline/codex_cli-modified": {},
+              "TestFreezeOriginalBaseline/codex_cli-missing-state": {},
+              "TestFreezeOriginalBaseline/codex_cli-unreadable-state": {},
+              "TestFreezeOriginalBaseline/codex_cli-malformed-state": {},
+              "TestFreezeOriginalBaseline/codex_cli-native-parent": {},
+              "TestFreezeOriginalBaseline/claude_code-mcp": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-normal-edit": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-typed-projection": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-00": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-01": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-02": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-03": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-04": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-00": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-01": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-02": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-03": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-04": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-05": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-06": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-07": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-08": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-09": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-10": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-11": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-12": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-13": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-1": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-2": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-3": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-5": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-6": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-system-authority": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-cli-edits": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-cli-refusal": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-cli-arguments": {},
+              "TestCaptureDriverRejectsCallerSelectors/CODEX_HOME": {},
+              "TestCaptureDriverRejectsCallerSelectors/CLAUDE_CONFIG_DIR": {},
+              "TestCaptureDriverRejectsCallerSelectors/A2A_CAPTURE_CONTROL": {},
+              "TestCaptureDriverRejectsCallerSelectors/A2A_UNLISTED_SELECTOR": {},
+              "TestFixtureAncestorProjectionControls/macos-var-private-var-aliases": {},
+              "TestFixtureAncestorProjectionControls/linux-temp-root": {},
+              "TestFixtureAncestorProjectionControls/windows-drive-slash-normalized-json": {},
+              "TestFixtureAncestorProjectionControls/adjacent-unrelated-private-home-stays-unprojected": {},
+              "TestFixtureAncestorProjectionControls/reordering-is-the-only-normalized-sequence-property": {},
+              "TestFixtureAncestorProjectionRefusals/one-expected-entry-missing": {},
+              "TestFixtureAncestorProjectionRefusals/expected-entry-duplicated": {},
+              "TestFixtureAncestorProjectionRefusals/unexpected-parent-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/near-prefix-sibling-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/traversal-spelling-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/fourth-filename-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/matched-entries-under-another-key": {},
+              "TestFixtureAncestorProjectionRefusals/matched-entries-in-another-file": {},
+              "TestFixtureAncestorProjectionRefusals/permitted-order-string-escaping-and-separator-variants": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/outside-worktree": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/inside-worktree-refused": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/uncertain-git-metadata-refused": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/bare-repository-markers-refused": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/linux-temp-root/claude_code-empty": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/linux-temp-root/claude_code-mcp": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/macos-var-and-private-var/claude_code-empty": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/macos-var-and-private-var/claude_code-mcp": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/windows-drive-slash-normalized/claude_code-empty": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/windows-drive-slash-normalized/claude_code-mcp": {},
+              "TestWindowsRootParameter/windows-slash-order": {},
+              "TestWindowsRootParameter/windows-native": {},
+              "TestWindowsRootParameter/windows-json-escaped": {},
+              "TestWindowsRootParameter/linux-darwin": {},
+              "TestWindowsRootParameter/near-prefix-sibling": {},
+              "TestWindowsRootParameter/near-prefix-posix": {},
+              "TestWindowsRootParameter/unrelated-path": {},
+              "TestWindowsRootParameter/canonical-unchanged": {},
+              "TestWindowsRootParameter/changed-suffix": {},
+              "TestWindowsRootParameter/changed-nonroot": {},
+              "TestWindowsRootParameter/windows-equivalent-root": {},
+              "TestWindowsRootParameter/changed-exclusion-entry": {},
+              "TestWindowsRootParameter/quoted-root-value": {},
+              "TestWindowsRootParameter/colon-path-boundary": {},
+              "TestWindowsRootParameter/missing-binding": {},
+              "TestWindowsRootParameter/ambiguous-binding": {},
+              "TestWindowsRootParameter/environment-binding": {},
+              "TestWindowsRootParameter/output-binding": {},
+              "TestWindowsRootParameter/late-binding": {},
+              "TestWindowsRootParameter/non-absolute-binding": {},
+              "TestWindowsRootParameter/trailing-separator-binding": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/work-tree-result": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/missing-git": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/query-timeout": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/timed-out-command-with-apparent-result": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/command-error": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/ambiguous-result": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/query-stderr-with-false": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/positive-control-fails": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/metadata-scan-fails": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/metadata-found": {},
             }
             return names
           }()
@@ -479,7 +568,8 @@ jobs:
             parsed.allSkips--
             parsed.outputFiles = 46
             if parsed.valid(0) { return auditFailure("CAPTURE_REASON=capture/audit-self-check-count") }
-            const staticFailureTest = "TestOriginalComparatorControls/claude_code-mcp"
+            const staticFailureTest = "TestFixtureAncestorProjectionControls/macos-var-private-var-aliases"
+            const staticRefusalFailureTest = "TestFixtureAncestorProjectionRefusals/expected-entry-duplicated"
             for publicName := range publicTestRoots {
               if publicFailureTestName(publicName) != publicName {
                 return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
@@ -494,6 +584,12 @@ jobs:
             _, failures, err := parseLog(strings.NewReader(failing + "\n"))
             if err != nil || len(failures) != 1 || failures[0].Package != samplePackage ||
                 failures[0].Test != staticFailureTest || strings.Contains(fmt.Sprint(failures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
+              return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
+            }
+            refusalFailing := fmt.Sprintf(`{"Action":"fail","Package":%q,"Test":%q,"Output":"CAPTURE_PRIVATE_OUTPUT_CONTROL"}`, samplePackage, staticRefusalFailureTest)
+            _, refusalFailures, err := parseLog(strings.NewReader(refusalFailing + "\n"))
+            if err != nil || len(refusalFailures) != 1 || refusalFailures[0].Package != samplePackage ||
+                refusalFailures[0].Test != staticRefusalFailureTest || strings.Contains(fmt.Sprint(refusalFailures), "CAPTURE_PRIVATE_OUTPUT_CONTROL") {
               return auditFailure("CAPTURE_REASON=capture/audit-self-check-failure-names")
             }
             for _, dynamicName := range []string{
@@ -1237,7 +1333,7 @@ jobs:
           }
 
           var driverPins = []sourcePin{
-            {"ancestor_projection_test.go", "797b1849687ccc53dd23d85c6f773d7821113734e1ee01a7c440d138f938bb55"},
+            {"ancestor_projection_test.go", "f1269bafd126b7d3c57cb4a2007ff407d912288b4c049ec83908244cca749341"},
             {"capture_homes_test.go", "35457d6728df2436292d85702621318d33b420b7d8aafd891cc96421be8d293b"},
             {"capture_launchers_test.go", "e202ab658c45b6ebaba731c2a72eda82de4cb94583b251d0f73054361e124518"},
             {"controls_test.go", "2928b6a0001dccfd39f430caa93ced8528b23653f4b3542103639eef09b908e4"},
@@ -2115,6 +2211,7 @@ jobs:
           // failure output and source paths remain withheld.
           var failureDiagnosticReasonCodes = map[string]struct{}{
               "capture-driver/native-parent-environment-not-isolated": {},
+              "capture/native-parent-row-failed": {},
               "capture/audit-child-output-read": {},
               "capture/audit-command-failed": {},
               "capture/audit-failure-detail-bound": {},
@@ -2206,29 +2303,118 @@ jobs:
           }
 
           var publicFailureSubtests = func() map[string]struct{} {
-              names := map[string]struct{}{
-                  "TestFreezeOriginalBaseline/repeat-determinism": {},
-                  "TestOriginalComparatorControls/claude_code-mcp": {},
-                  "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
-              }
-              for _, name := range []string{
-                  "claude_code-empty", "codex_cli-empty", "opencode-empty", "muse-empty", "pi-empty",
-                  "cursor-project-mirror", "gemini-project-mirror", "windsurf-native-discovery", "opencode-native-discovery",
-                  "codex_cli-user-settings", "codex_cli-current", "codex_cli-modified", "codex_cli-missing-state",
-                  "codex_cli-unreadable-state", "codex_cli-malformed-state", "codex_cli-native-parent", "claude_code-mcp",
-              } {
-                  names["TestFreezeOriginalBaseline/"+name] = struct{}{}
-              }
-              for _, name := range []string{
-                  "normal-edit", "typed-projection", "valid-00", "valid-01", "valid-02", "valid-03", "valid-04",
-                  "invalid-00", "invalid-01", "invalid-02", "invalid-03", "invalid-04", "invalid-05", "invalid-06",
-                  "invalid-07", "invalid-08", "invalid-09", "invalid-10", "invalid-11", "invalid-12", "invalid-13",
-                  "old-version-1", "old-version-2", "old-version-3", "old-version-5", "old-version-6",
-                  "system-authority", "cli-edits", "cli-refusal", "cli-arguments",
-              } {
-                  names["TestFreezeOriginalLaunchers/claude-launcher-"+name] = struct{}{}
-              }
-              return names
+            names := map[string]struct{}{
+              "TestFreezeOriginalBaseline/repeat-determinism": {},
+              "TestOriginalComparatorControls/claude_code-mcp": {},
+              "TestOriginalComparatorControls/claude-launcher-typed-projection": {},
+              "TestFreezeOriginalBaseline/claude_code-empty": {},
+              "TestFreezeOriginalBaseline/codex_cli-empty": {},
+              "TestFreezeOriginalBaseline/opencode-empty": {},
+              "TestFreezeOriginalBaseline/muse-empty": {},
+              "TestFreezeOriginalBaseline/pi-empty": {},
+              "TestFreezeOriginalBaseline/cursor-project-mirror": {},
+              "TestFreezeOriginalBaseline/gemini-project-mirror": {},
+              "TestFreezeOriginalBaseline/windsurf-native-discovery": {},
+              "TestFreezeOriginalBaseline/opencode-native-discovery": {},
+              "TestFreezeOriginalBaseline/codex_cli-user-settings": {},
+              "TestFreezeOriginalBaseline/codex_cli-current": {},
+              "TestFreezeOriginalBaseline/codex_cli-modified": {},
+              "TestFreezeOriginalBaseline/codex_cli-missing-state": {},
+              "TestFreezeOriginalBaseline/codex_cli-unreadable-state": {},
+              "TestFreezeOriginalBaseline/codex_cli-malformed-state": {},
+              "TestFreezeOriginalBaseline/codex_cli-native-parent": {},
+              "TestFreezeOriginalBaseline/claude_code-mcp": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-normal-edit": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-typed-projection": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-00": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-01": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-02": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-03": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-valid-04": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-00": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-01": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-02": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-03": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-04": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-05": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-06": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-07": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-08": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-09": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-10": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-11": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-12": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-invalid-13": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-1": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-2": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-3": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-5": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-old-version-6": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-system-authority": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-cli-edits": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-cli-refusal": {},
+              "TestFreezeOriginalLaunchers/claude-launcher-cli-arguments": {},
+              "TestCaptureDriverRejectsCallerSelectors/CODEX_HOME": {},
+              "TestCaptureDriverRejectsCallerSelectors/CLAUDE_CONFIG_DIR": {},
+              "TestCaptureDriverRejectsCallerSelectors/A2A_CAPTURE_CONTROL": {},
+              "TestCaptureDriverRejectsCallerSelectors/A2A_UNLISTED_SELECTOR": {},
+              "TestFixtureAncestorProjectionControls/macos-var-private-var-aliases": {},
+              "TestFixtureAncestorProjectionControls/linux-temp-root": {},
+              "TestFixtureAncestorProjectionControls/windows-drive-slash-normalized-json": {},
+              "TestFixtureAncestorProjectionControls/adjacent-unrelated-private-home-stays-unprojected": {},
+              "TestFixtureAncestorProjectionControls/reordering-is-the-only-normalized-sequence-property": {},
+              "TestFixtureAncestorProjectionRefusals/one-expected-entry-missing": {},
+              "TestFixtureAncestorProjectionRefusals/expected-entry-duplicated": {},
+              "TestFixtureAncestorProjectionRefusals/unexpected-parent-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/near-prefix-sibling-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/traversal-spelling-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/fourth-filename-breaks-span": {},
+              "TestFixtureAncestorProjectionRefusals/matched-entries-under-another-key": {},
+              "TestFixtureAncestorProjectionRefusals/matched-entries-in-another-file": {},
+              "TestFixtureAncestorProjectionRefusals/permitted-order-string-escaping-and-separator-variants": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/outside-worktree": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/inside-worktree-refused": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/uncertain-git-metadata-refused": {},
+              "TestFixturePlacementMustBeOutsideGitWorktree/bare-repository-markers-refused": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/linux-temp-root/claude_code-empty": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/linux-temp-root/claude_code-mcp": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/macos-var-and-private-var/claude_code-empty": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/macos-var-and-private-var/claude_code-mcp": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/windows-drive-slash-normalized/claude_code-empty": {},
+              "TestFixtureAncestorContractAuthoredPositiveJSON/windows-drive-slash-normalized/claude_code-mcp": {},
+              "TestWindowsRootParameter/windows-slash-order": {},
+              "TestWindowsRootParameter/windows-native": {},
+              "TestWindowsRootParameter/windows-json-escaped": {},
+              "TestWindowsRootParameter/linux-darwin": {},
+              "TestWindowsRootParameter/near-prefix-sibling": {},
+              "TestWindowsRootParameter/near-prefix-posix": {},
+              "TestWindowsRootParameter/unrelated-path": {},
+              "TestWindowsRootParameter/canonical-unchanged": {},
+              "TestWindowsRootParameter/changed-suffix": {},
+              "TestWindowsRootParameter/changed-nonroot": {},
+              "TestWindowsRootParameter/windows-equivalent-root": {},
+              "TestWindowsRootParameter/changed-exclusion-entry": {},
+              "TestWindowsRootParameter/quoted-root-value": {},
+              "TestWindowsRootParameter/colon-path-boundary": {},
+              "TestWindowsRootParameter/missing-binding": {},
+              "TestWindowsRootParameter/ambiguous-binding": {},
+              "TestWindowsRootParameter/environment-binding": {},
+              "TestWindowsRootParameter/output-binding": {},
+              "TestWindowsRootParameter/late-binding": {},
+              "TestWindowsRootParameter/non-absolute-binding": {},
+              "TestWindowsRootParameter/trailing-separator-binding": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/work-tree-result": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/missing-git": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/query-timeout": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/timed-out-command-with-apparent-result": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/command-error": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/ambiguous-result": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/query-stderr-with-false": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/positive-control-fails": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/metadata-scan-fails": {},
+              "TestFixtureGitQueryUncertaintyRefusesWithoutExport/metadata-found": {},
+            }
+            return names
           }()
 
           func publicFailureTestName(name string) string {
@@ -2287,6 +2473,10 @@ jobs:
                   report.WriteString("CAPTURE_DETAIL ")
                   report.WriteString(allowFailureDiagnosticLine(line))
                   report.WriteByte('\n')
+                  if allowFailureDiagnosticLine(line) == "CAPTURE_FAIL Package="+publicCapturePackage+
+                      " Test=TestFreezeOriginalBaseline/codex_cli-native-parent" {
+                      report.WriteString("CAPTURE_DETAIL CAPTURE_REASON=capture/native-parent-row-failed\n")
+                  }
               }
               return []byte(report.String())
           }
@@ -2326,15 +2516,22 @@ jobs:
           }
 
           func checkFailureDiagnosticControls(caseDir string) error {
-              staticSlashName := "TestOriginalComparatorControls/claude_code-mcp"
+              staticSlashNames := []string{
+                  "TestFixtureAncestorProjectionControls/macos-var-private-var-aliases",
+                  "TestFixtureAncestorProjectionRefusals/expected-entry-duplicated",
+                  "TestOriginalComparatorControls/claude_code-mcp",
+              }
               safe := []byte("CAPTURE_REASON=capture/go-test-failed\ncapture-driver/native-parent-environment-not-isolated\nsanitize/input-repeat-set-invalid\nPASS\nFAIL\n")
-              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test="+staticSlashName+"\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestFreezeOriginalBaseline/codex_cli-native-parent\n")...)
+              for _, staticSlashName := range staticSlashNames {
+                  safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test="+staticSlashName+"\n")...)
+              }
               safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=\n")...)
               safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestOriginalComparatorControls/example-host.local\n")...)
               safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestOriginalComparatorControls/example-user\n")...)
               longTestName := strings.Repeat("T", 300)
               safe = append(safe, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test="+longTestName+"\n")...)
-              safe = append(safe, []byte("CAPTURE_FAIL Package=example/package Test="+staticSlashName+"\n")...)
+              safe = append(safe, []byte("CAPTURE_FAIL Package=example/package Test="+staticSlashNames[1]+"\n")...)
               rendered := string(failureDiagnosticLog(caseDir, safe))
               for _, visible := range []string{
                   "CAPTURE_DETAIL CAPTURE_REASON=capture/go-test-failed",
@@ -2342,7 +2539,10 @@ jobs:
                   "CAPTURE_DETAIL sanitize/input-repeat-set-invalid",
                   "CAPTURE_DETAIL PASS",
                   "CAPTURE_DETAIL FAIL",
-                  "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=" + staticSlashName,
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=TestFixtureAncestorProjectionControls/macos-var-private-var-aliases",
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=TestFixtureAncestorProjectionRefusals/expected-entry-duplicated",
+                  "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=TestOriginalComparatorControls/claude_code-mcp",
+                  "CAPTURE_DETAIL CAPTURE_REASON=capture/native-parent-row-failed",
                   "CAPTURE_DETAIL CAPTURE_FAIL Package=" + publicCapturePackage + " Test=",
               } {
                   if !strings.Contains(rendered, visible) {
@@ -2351,6 +2551,10 @@ jobs:
               }
               if strings.Contains(rendered, "example-host.local") || strings.Contains(rendered, "example-user") ||
                   strings.Contains(rendered, longTestName) {
+                  return operational("selfcheck-failure-diagnostic-allowlist")
+              }
+              unrelatedRow := string(failureDiagnosticLog(caseDir, []byte("CAPTURE_FAIL Package="+publicCapturePackage+" Test=TestFreezeOriginalBaseline/codex_cli-current\n")))
+              if strings.Contains(unrelatedRow, "capture/native-parent-row-failed") {
                   return operational("selfcheck-failure-diagnostic-allowlist")
               }
               for publicName := range publicTestRoots {
@@ -2381,7 +2585,7 @@ jobs:
               for _, control := range []struct{ line, value string }{
                   {"CAPTURE_REASON=capture/theme-dark", "theme-dark"},
                   {"CAPTURE_DETAIL Package=example/pkg Test=TestSettings/theme-dark", "theme-dark"},
-                  {"CAPTURE_FAIL Package=" + publicCapturePackage + " Test=" + staticSlashName + " Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"},
+                  {"CAPTURE_FAIL Package=" + publicCapturePackage + " Test=TestOriginalComparatorControls/claude_code-mcp Output=UNAPPROVED_OUTPUT_CONTROL", "UNAPPROVED_OUTPUT_CONTROL"},
                   {"=== RUN TestSettings/theme-dark", "theme-dark"},
                   {"--- FAIL: TestSettings/theme-dark (0.00s)", "theme-dark"},
                   {"theme-dark.go:17: setting=theme-dark", "theme-dark"},
@@ -4291,6 +4495,19 @@ jobs:
               fi
             else
               printf '%s\n' 'CAPTURE_DETAIL Failure names withheld; sanitizer did not produce a safe diagnostic.'
+            fi
+            safe_failure_details="$CAPTURE_ROOT/failure-details.log-safe.txt"
+            if [[ -s "$CAPTURE_ROOT/failure-details.txt" && -f "$sanitizer_binary" ]] && env -i "${clean_env[@]}" GOPROXY=off GOSUMDB=off \
+              "$sanitizer_binary" --failure-diagnostics "$CAPTURE_ROOT/raw-output" \
+              "$CAPTURE_ROOT/failure-details.txt" "$safe_failure_details" \
+              > "$CAPTURE_ROOT/failure-details.stdout" 2> "$CAPTURE_ROOT/failure-details.stderr"; then
+              if [[ -f "$safe_failure_details" ]]; then
+                cat "$safe_failure_details"
+              else
+                printf '%s\n' 'CAPTURE_DETAIL Failure details withheld; sanitizer produced no safe diagnostic.'
+              fi
+            else
+              printf '%s\n' 'CAPTURE_DETAIL Failure details withheld; sanitizer did not produce a safe diagnostic.'
             fi
           fi
           exit "$sanitize_exit"
