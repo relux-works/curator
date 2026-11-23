@@ -16,6 +16,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -36,6 +37,10 @@ const (
 // StartupVerificationSchemaVersion extends manifest2 with a startup minimum.
 const StartupVerificationSchemaVersion = 3
 
+// SkillCapabilitiesSchemaVersion adds profile declarations for manifestless
+// skills without requiring packages that do not use the field to migrate.
+const SkillCapabilitiesSchemaVersion = 4
+
 // Diagnostic codes (environments §2.1, §3.1).
 const (
 	DiagManifestInvalid            = "context_manifest_invalid"
@@ -43,6 +48,7 @@ const (
 	DiagModuleMissing              = "profile_module_missing"
 	DiagModuleBytesInvalid         = "profile_module_bytes_invalid"
 	DiagSelectorUnknownEnvironment = "profile_selector_unknown_environment"
+	DiagSkillCapabilityInvalid     = "profile_skill_capability_invalid"
 )
 
 // Diagnostic is one protocol-named failure or warning.
@@ -69,8 +75,10 @@ type Requirement struct {
 	// Weight is the edge weight of a context requirement; nil when absent.
 	Weight *int64
 	// Mode and Commands keep their core §4.4 meaning on a skill requirement.
-	Mode     string
-	Commands []string
+	Mode                string
+	Commands            []string
+	Capabilities        capabilities.Manifest
+	CapabilitiesPresent bool
 }
 
 // Form names the requirement's declaration form: "range", "tag", or "revision".
@@ -178,7 +186,7 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 		return nil, err
 	}
 	schema, ok := object["schema_version"].(json.Number)
-	if !ok || (schema.String() != "1" && schema.String() != "2" && schema.String() != strconv.Itoa(StartupVerificationSchemaVersion)) {
+	if !ok || (schema.String() != "1" && schema.String() != "2" && schema.String() != strconv.Itoa(StartupVerificationSchemaVersion) && schema.String() != strconv.Itoa(SkillCapabilitiesSchemaVersion)) {
 		return nil, invalid(DiagManifestInvalid, "unsupported schema_version")
 	}
 	version, _ := strconv.Atoi(schema.String())
@@ -186,7 +194,7 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 	if version >= 2 {
 		allowed = append(allowed, "codex_settings")
 	}
-	if version == StartupVerificationSchemaVersion {
+	if version >= StartupVerificationSchemaVersion {
 		allowed = append(allowed, "startup_verification")
 	}
 	if err := requireKeys(object, DiagManifestInvalid, "", allowed...); err != nil {
@@ -341,6 +349,9 @@ func parseRequirements(raw any, family string, schemaVersion int) (map[string]Re
 			if schemaVersion >= 2 {
 				allowed = append(allowed, "directory")
 			}
+			if schemaVersion >= SkillCapabilitiesSchemaVersion {
+				allowed = append(allowed, "capabilities")
+			}
 		case "mcp":
 			allowed = append(allowed, "directory")
 		}
@@ -414,6 +425,19 @@ func parseRequirements(raw any, family string, schemaVersion int) (map[string]Re
 				return nil, invalid(DiagManifestInvalid, "%scommands requires mode runtime", prefix)
 			}
 			requirement.Commands = commands
+		}
+		if family == "skills" {
+			if raw, present := entry["capabilities"]; present {
+				if _, ok := raw.(map[string]any); !ok {
+					return nil, invalid(DiagSkillCapabilityInvalid, "%scapabilities must be an object", prefix)
+				}
+				parsed, err := capabilities.Parse(raw)
+				if err != nil {
+					return nil, invalid(DiagSkillCapabilityInvalid, "%scapabilities %v", prefix, err)
+				}
+				requirement.Capabilities = parsed
+				requirement.CapabilitiesPresent = true
+			}
 		}
 		out[name] = requirement
 	}

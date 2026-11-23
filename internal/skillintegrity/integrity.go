@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/manifest"
@@ -191,10 +192,17 @@ func (c *capture) reader(root string) skillspec.Reader {
 // Build uses one bounded capture for both hashing and native metadata parsing.
 // The caller supplies a shared budget for a closure, or nil for one skill.
 func Build(ctx context.Context, root string, identity Identity, budget *Budget) (Entry, error) {
-	return build(ctx, root, identity, budget, nil)
+	return build(ctx, root, identity, budget, nil, nil)
 }
 
-func build(ctx context.Context, root string, identity Identity, budget *Budget, expected *Manifest) (Entry, error) {
+// BuildWithProfileCapabilities synthesizes the same bounded evidence as Build
+// while recording validated capabilities supplied by the containing profile.
+// A nil declaration retains the existing all-none synthetic bytes.
+func BuildWithProfileCapabilities(ctx context.Context, root string, identity Identity, declared *capabilities.Manifest, budget *Budget) (Entry, error) {
+	return build(ctx, root, identity, budget, nil, declared)
+}
+
+func build(ctx context.Context, root string, identity Identity, budget *Budget, expected *Manifest, profileCapabilities *capabilities.Manifest) (Entry, error) {
 	if budget == nil {
 		budget = NewBudget()
 	}
@@ -234,7 +242,22 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 	if err != nil {
 		return Entry{}, failure("skill_integrity_manifest_invalid", "content hash could not be computed")
 	}
-	m := Manifest{Schema: Schema, Identity: identity, HashVersion: 2, ContentSHA256: content, Files: c.files, ManifestKind: "synthesized", Declaration: json.RawMessage(syntheticDeclaration)}
+	declaration := []byte(syntheticDeclaration)
+	if expected != nil && expected.ManifestKind == "synthesized" {
+		// Verify validates this frozen declaration before capture. Startup
+		// compares it directly and never reloads the current profile.
+		declaration = bytes.Clone(expected.Declaration)
+	} else if profileCapabilities != nil {
+		if source := reader.ManifestSourcePath(root); source != "" {
+			return Entry{}, failure("profile_skill_capability_native_manifest", "profile capabilities cannot replace a native skill declaration")
+		}
+		var err error
+		declaration, err = synthesizedDeclarationFor(*profileCapabilities)
+		if err != nil {
+			return Entry{}, failure("profile_skill_capability_invalid", "profile capabilities are invalid")
+		}
+	}
+	m := Manifest{Schema: Schema, Identity: identity, HashVersion: 2, ContentSHA256: content, Files: c.files, ManifestKind: "synthesized", Declaration: json.RawMessage(declaration)}
 	if source := reader.ManifestSourcePath(root); source != "" {
 		m.ManifestKind = "native"
 		m.DeclarationPath = source
@@ -253,6 +276,113 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 		return Entry{}, err
 	}
 	return entry, nil
+}
+
+func synthesizedDeclarationFor(value capabilities.Manifest) ([]byte, error) {
+	declared, err := capabilityObject(value)
+	if err != nil {
+		return nil, err
+	}
+	parsed, err := capabilities.Parse(declared)
+	if err != nil {
+		return nil, err
+	}
+	value = normalizeCapabilities(parsed)
+	if allNoneCapabilities(value) {
+		return []byte(syntheticDeclaration), nil
+	}
+	declared, err = capabilityObject(value)
+	if err != nil {
+		return nil, err
+	}
+	return protocoljson.MarshalCanonical(map[string]any{
+		"schema_version": json.Number("3"),
+		"runtime_roots":  []any{},
+		"commands":       map[string]any{},
+		"capabilities":   declared,
+	})
+}
+
+func capabilityObject(value capabilities.Manifest) (map[string]any, error) {
+	if value.Filesystem.Keyword != "" && len(value.Filesystem.Paths) != 0 {
+		return nil, fmt.Errorf("filesystem cannot contain a keyword and path list")
+	}
+	declared := map[string]any{
+		"network":    listOrNone(value.Network),
+		"filesystem": filesystemValue(value.Filesystem),
+		"exec":       listOrNone(value.Exec),
+		"secrets":    listOrNone(value.Secrets),
+		"env_read":   listOrNone(value.EnvRead),
+	}
+	if value.PromptScope != "" {
+		declared["prompt_scope"] = value.PromptScope
+	}
+	return declared, nil
+}
+
+func normalizeCapabilities(value capabilities.Manifest) capabilities.Manifest {
+	value.Network = sortedNetworkStrings(value.Network)
+	value.Filesystem.Paths = sortedStrings(value.Filesystem.Paths)
+	value.Exec = sortedStrings(value.Exec)
+	value.Secrets = sortedStrings(value.Secrets)
+	value.EnvRead = sortedStrings(value.EnvRead)
+	return value
+}
+
+func sortedNetworkStrings(values []string) []string {
+	values = sortedStrings(values)
+	for index := range values {
+		values[index] = strings.ToLower(values[index])
+	}
+	sort.Strings(values)
+	return compactStrings(values)
+}
+
+func compactStrings(values []string) []string {
+	if len(values) < 2 {
+		return values
+	}
+	write := 1
+	for read := 1; read < len(values); read++ {
+		if values[read] == values[write-1] {
+			continue
+		}
+		values[write] = values[read]
+		write++
+	}
+	return values[:write]
+}
+
+func sortedStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := append([]string(nil), values...)
+	sort.Strings(result)
+	return result
+}
+
+func allNoneCapabilities(value capabilities.Manifest) bool {
+	return len(value.Network) == 0 && value.Filesystem.Keyword == "" && len(value.Filesystem.Paths) == 0 &&
+		len(value.Exec) == 0 && len(value.Secrets) == 0 && len(value.EnvRead) == 0 && value.PromptScope == ""
+}
+
+func listOrNone(values []string) any {
+	if len(values) == 0 {
+		return "none"
+	}
+	result := make([]any, len(values))
+	for index, value := range values {
+		result[index] = value
+	}
+	return result
+}
+
+func filesystemValue(value capabilities.Filesystem) any {
+	if value.Keyword != "" {
+		return value.Keyword
+	}
+	return listOrNone(value.Paths)
 }
 
 func captureTree(ctx context.Context, root string, budget *Budget) (*capture, error) {
@@ -501,26 +631,7 @@ func (e Entry) Validate(expected Identity) error {
 		if m.DeclarationPath != "" || m.DeclarationSHA256 != "" {
 			return invalid()
 		}
-		var declaration any
-		decoder := json.NewDecoder(bytes.NewReader(m.Declaration))
-		decoder.UseNumber()
-		if protocoljson.Validate(m.Declaration) != nil || decoder.Decode(&declaration) != nil {
-			return invalid()
-		}
-		var declarationFields map[string]json.RawMessage
-		if json.Unmarshal(m.Declaration, &declarationFields) != nil || !bytes.Equal(bytes.TrimSpace(declarationFields["schema_version"]), []byte("3")) {
-			return invalid()
-		}
-		got, err := protocoljson.MarshalCanonical(declaration)
-		if err != nil {
-			return invalid()
-		}
-		var synthetic any
-		decoder = json.NewDecoder(strings.NewReader(syntheticDeclaration))
-		decoder.UseNumber()
-		_ = decoder.Decode(&synthetic)
-		want, _ := protocoljson.MarshalCanonical(synthetic)
-		if !bytes.Equal(got, want) {
+		if !validSyntheticDeclaration(m.Declaration) {
 			return invalid()
 		}
 		for _, path := range []string{skillspec.CanonicalManifestName, skillspec.LegacyManifestName, skillspec.RuntimeFallbackName} {
@@ -538,13 +649,49 @@ func (e Entry) Validate(expected Identity) error {
 	return nil
 }
 
+func validSyntheticDeclaration(raw json.RawMessage) bool {
+	if protocoljson.Validate(raw) != nil {
+		return false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var declaration any
+	if decoder.Decode(&declaration) != nil {
+		return false
+	}
+	fields, ok := declaration.(map[string]any)
+	if !ok || len(fields) != 4 {
+		return false
+	}
+	schema, ok := fields["schema_version"].(json.Number)
+	if !ok || schema.String() != "3" {
+		return false
+	}
+	roots, ok := fields["runtime_roots"].([]any)
+	if !ok || len(roots) != 0 {
+		return false
+	}
+	commands, ok := fields["commands"].(map[string]any)
+	if !ok || len(commands) != 0 {
+		return false
+	}
+	declared, ok := fields["capabilities"].(map[string]any)
+	if !ok {
+		return false
+	}
+	if _, err := capabilities.Parse(declared); err != nil {
+		return false
+	}
+	return true
+}
+
 // Verify never creates evidence. Missing evidence is handled by the caller's
 // typed unavailable observation; malformed supplied evidence is always fatal.
 func Verify(ctx context.Context, root string, expected Identity, e Entry, budget *Budget) error {
 	if err := e.Validate(expected); err != nil {
 		return err
 	}
-	actual, err := build(ctx, root, expected, budget, &e.Manifest)
+	actual, err := build(ctx, root, expected, budget, &e.Manifest, nil)
 	if err != nil {
 		return err
 	}

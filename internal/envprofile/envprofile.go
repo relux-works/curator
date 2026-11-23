@@ -1879,6 +1879,12 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 		// §9.4 requires network-undeclared with a remedy, not require_pin.
 		// Modern manifests retain their exact schema and audit semantics.
 		declared = spec.Capabilities
+		if resolved.ProfileCapabilitiesPresent {
+			if skillspec.ManifestSourcePath(snapshot) != "" {
+				return nil, fmt.Errorf("profile_skill_capability_native_manifest: skill %s already has a native capability declaration", resolved.Name)
+			}
+			declared = resolved.ProfileCapabilities
+		}
 		if spec.SchemaVersion >= 3 {
 			schema = spec.SchemaVersion
 		}

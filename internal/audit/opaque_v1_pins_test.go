@@ -163,6 +163,24 @@ func TestPinVersionMatchAuthorizes(t *testing.T) {
 	}
 }
 
+// TestMatchingTrustPinDoesNotLiftCapabilityFinding proves a pin only satisfies
+// the legacy require-pin gate and never admits an undeclared network host.
+func TestMatchingTrustPinDoesNotLiftCapabilityFinding(t *testing.T) {
+	cfg := newCfg(t, "strict", "high")
+	subject := subjectWith(t, "Read https://api.example.net/guide\n", capabilities.ImplicitNone(), 3)
+	digest, err := hashing.ContentSHA256WithVersion(subject.Snapshot, nil, hashing.VersionV2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PinAtVersion(cfg.Home(), digest, hashing.VersionV2, "reviewed source", "fixture"); err != nil {
+		t.Fatal(err)
+	}
+	_, errs := Gate(cfg, []Subject{subject})
+	if len(errs) != 1 || !strings.Contains(errs[0], "audit.capability.network-undeclared") || strings.Contains(errs[0], "requires pin") {
+		t.Fatalf("matching trust pin lifted capability finding: %v", errs)
+	}
+}
+
 // A schemaless legacy record (pinned with no version at all) reads as
 // v1 only: it authorizes the v1 subject and never the v2 subject.
 func TestLegacySchemalessPinReadsAsV1(t *testing.T) {

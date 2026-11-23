@@ -1,10 +1,14 @@
 package contextpkg
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/capabilities"
 )
 
 // Production entry points under test: ParseManifest, ParseMCP, LoadManifest,
@@ -80,6 +84,73 @@ func TestRequirementNeedsExactlyOneForm(t *testing.T) {
 		_, err := ParseManifest([]byte(`{"schema_version": 1, "name": "a", "version": "1.0.0", "requires": ` + requires + `}`))
 		if err == nil {
 			t.Fatalf("requires %s must not parse", requires)
+		}
+	}
+}
+
+// TestProfileSkillCapabilitiesUseNativeGrammar proves schema 4 forwards every
+// accepted capability form through the same parser as native skill manifests.
+func TestProfileSkillCapabilitiesUseNativeGrammar(t *testing.T) {
+	for _, raw := range []string{
+		`{}`,
+		`{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}`,
+		`{"network":["api.example.net","*.example.org"],"filesystem":"home-config","exec":["python3"],"secrets":["tracker-cli"],"env_read":["HOME","MY_VAR1"],"prompt_scope":"fetch docs"}`,
+		`{"filesystem":"repo"}`,
+		`{"filesystem":["~/notes","/var/data","relative/ok"]}`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			payload := []byte(`{"schema_version":4,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*","capabilities":` + raw + `}}}}`)
+			manifest, err := ParseManifest(payload)
+			if err != nil {
+				t.Fatalf("schema-4 declaration refused: %v", err)
+			}
+			requirement := manifest.Skills["guide"]
+			var capabilityObject any
+			if err := json.Unmarshal([]byte(raw), &capabilityObject); err != nil {
+				t.Fatal(err)
+			}
+			want, err := capabilities.Parse(capabilityObject)
+			if err != nil {
+				t.Fatalf("native grammar fixture invalid: %v", err)
+			}
+			if !requirement.CapabilitiesPresent || !reflect.DeepEqual(requirement.Capabilities, want) {
+				t.Fatalf("profile capabilities = %+v, want %+v (present=%v)", requirement.Capabilities, want, requirement.CapabilitiesPresent)
+			}
+		})
+	}
+}
+
+// TestProfileSkillCapabilitiesSchemaScope proves old packages keep their
+// current schema and root settings behavior when they do not use capabilities.
+func TestProfileSkillCapabilitiesSchemaScope(t *testing.T) {
+	for _, version := range []string{"1", "3", "4"} {
+		payload := `{"schema_version":` + version + `,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*"}}}}`
+		manifest, err := ParseManifest([]byte(payload))
+		if err != nil {
+			t.Fatalf("schema %s without capabilities: %v", version, err)
+		}
+		if manifest.Skills["guide"].CapabilitiesPresent {
+			t.Fatalf("schema %s acquired an absent capability declaration", version)
+		}
+	}
+
+	legacy := `{"schema_version":3,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*","capabilities":{}}}}}`
+	if _, err := ParseManifest([]byte(legacy)); err == nil || !strings.Contains(err.Error(), DiagManifestInvalid) {
+		t.Fatalf("schema 3 capability field must remain closed, got %v", err)
+	}
+	v4 := `{"schema_version":4,"name":"profile","version":"1.0.0","codex_settings":{},"startup_verification":{"level":3},"requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*","capabilities":{}}}}}`
+	if manifest, err := ParseManifest([]byte(v4)); err != nil || manifest.StartupVerificationLevel == nil || *manifest.StartupVerificationLevel != 3 {
+		t.Fatalf("schema 4 did not retain earlier root fields: manifest=%+v error=%v", manifest, err)
+	}
+}
+
+// TestProfileSkillCapabilitiesMalformedHaveSpecificCode proves invalid v4
+// capability objects fail closed before resolution or publication.
+func TestProfileSkillCapabilitiesMalformedHaveSpecificCode(t *testing.T) {
+	for _, raw := range []string{`null`, `[]`, `{"unknown":[]}`, `{"network":"all"}`, `{"network":["api.example.net","api.example.net"]}`, `{"prompt_scope":null}`} {
+		payload := []byte(`{"schema_version":4,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*","capabilities":` + raw + `}}}}`)
+		if _, err := ParseManifest(payload); err == nil || !strings.Contains(err.Error(), DiagSkillCapabilityInvalid) {
+			t.Errorf("invalid capability %s: got %v", raw, err)
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/skillspec"
@@ -84,6 +85,141 @@ func TestBuildAndVerifyEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func parseTestCapabilities(t *testing.T, raw string) capabilities.Manifest {
+	t.Helper()
+	var object map[string]any
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&object); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := capabilities.Parse(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
+}
+
+// TestProfileCapabilitiesSynthesizeStableEvidence proves explicit all-none
+// capabilities keep today's bytes and key/list order cannot change lock evidence.
+func TestProfileCapabilitiesSynthesizeStableEvidence(t *testing.T) {
+	root, identity := fixture(t)
+	without, err := Build(context.Background(), root, identity, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	allNone := parseTestCapabilities(t, `{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}`)
+	withAllNone, err := BuildWithProfileCapabilities(context.Background(), root, identity, &allNone, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(withAllNone.Manifest.Declaration, []byte(syntheticDeclaration)) || withAllNone.ManifestSHA256 != without.ManifestSHA256 {
+		t.Fatal("explicit all-none declaration changed legacy synthetic evidence")
+	}
+	emptyObject := parseTestCapabilities(t, `{}`)
+	withDefaultFilesystem, err := BuildWithProfileCapabilities(context.Background(), root, identity, &emptyObject, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(withDefaultFilesystem.Manifest.Declaration, []byte(syntheticDeclaration)) {
+		t.Fatal("empty capability object lost its default repository filesystem scope")
+	}
+	var defaultDeclaration map[string]any
+	if err := json.Unmarshal(withDefaultFilesystem.Manifest.Declaration, &defaultDeclaration); err != nil {
+		t.Fatal(err)
+	}
+	defaultCaps, ok := defaultDeclaration["capabilities"].(map[string]any)
+	if !ok || defaultCaps["filesystem"] != "repo" {
+		t.Fatalf("empty object did not preserve the parser's repo default: %#v", defaultDeclaration)
+	}
+
+	firstCaps := parseTestCapabilities(t, `{"network":["api.example.net","docs.example.net"],"filesystem":"repo"}`)
+	secondCaps := parseTestCapabilities(t, `{"filesystem":"repo","network":["docs.example.net","api.example.net"]}`)
+	first, err := BuildWithProfileCapabilities(context.Background(), root, identity, &firstCaps, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := BuildWithProfileCapabilities(context.Background(), root, identity, &secondCaps, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstLock, err := protocoljson.MarshalCanonical(first.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondLock, err := protocoljson.MarshalCanonical(second.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(firstLock, secondLock) || !bytes.Equal(first.Manifest.Declaration, second.Manifest.Declaration) {
+		t.Fatal("semantic capability order changed canonical lock evidence")
+	}
+	upperHost := parseTestCapabilities(t, `{"network":["API.EXAMPLE.NET"]}`)
+	lowerHost := parseTestCapabilities(t, `{"network":["api.example.net"]}`)
+	upperEntry, err := BuildWithProfileCapabilities(context.Background(), root, identity, &upperHost, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lowerEntry, err := BuildWithProfileCapabilities(context.Background(), root, identity, &lowerHost, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(upperEntry.Manifest.Declaration, lowerEntry.Manifest.Declaration) {
+		t.Fatal("case-equivalent audit host patterns changed canonical evidence")
+	}
+	if err := Verify(context.Background(), root, identity, first, nil); err != nil {
+		t.Fatalf("dynamic synthesized evidence did not verify: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, skillspec.CanonicalManifestName)); !os.IsNotExist(err) {
+		t.Fatal("profile capabilities were written into the skill source")
+	}
+}
+
+// TestSynthesizedEvidenceShapeStaysClosed proves recomputing a forged entry
+// digest cannot authorize commands, runtime roots, extra fields or bad caps.
+func TestSynthesizedEvidenceShapeStaysClosed(t *testing.T) {
+	root, identity := fixture(t)
+	caps := parseTestCapabilities(t, `{"network":["api.example.net"]}`)
+	base, err := BuildWithProfileCapabilities(context.Background(), root, identity, &caps, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, declaration := range []string{
+		`{"schema_version":3,"runtime_roots":["runtime"],"commands":{},"capabilities":{"network":["api.example.net"]}}`,
+		`{"schema_version":3,"runtime_roots":[],"commands":{"run":"tool"},"capabilities":{"network":["api.example.net"]}}`,
+		`{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":["api.example.net"]},"extra":true}`,
+		`{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":null}`,
+	} {
+		t.Run(declaration, func(t *testing.T) {
+			forged := base
+			forged.Manifest.Declaration = json.RawMessage(declaration)
+			raw, err := protocoljson.MarshalCanonical(forged.Manifest.Object())
+			if err != nil {
+				t.Fatal(err)
+			}
+			forged.ManifestSHA256 = digest(raw)
+			if err := forged.Validate(identity); !IsCode(err, "skill_integrity_manifest_invalid") {
+				t.Fatalf("forged declaration with recomputed digest was accepted: %v", err)
+			}
+		})
+	}
+}
+
+// TestProfileCapabilitiesCannotReplaceNativeEvidence proves the synthesis
+// helper refuses a valid native declaration instead of overwriting it.
+func TestProfileCapabilitiesCannotReplaceNativeEvidence(t *testing.T) {
+	root, identity := fixture(t)
+	writeFixture(t, root, skillspec.CanonicalManifestName, []byte(`{"schema_version":3,"capabilities":{"network":["api.example.net"]}}`), 0o644)
+	caps := parseTestCapabilities(t, `{"network":["api.example.net"]}`)
+	if _, err := BuildWithProfileCapabilities(context.Background(), root, identity, &caps, nil); !IsCode(err, "profile_skill_capability_native_manifest") {
+		t.Fatalf("profile declaration replaced native evidence: %v", err)
+	}
+	after, err := os.ReadFile(filepath.Join(root, skillspec.CanonicalManifestName))
+	if err != nil || string(after) != `{"schema_version":3,"capabilities":{"network":["api.example.net"]}}` {
+		t.Fatalf("native declaration changed: %s, %v", after, err)
 	}
 }
 func btoi(value bool) int {

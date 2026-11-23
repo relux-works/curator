@@ -2,6 +2,8 @@ package envprofile
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/skillintegrity"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/startupverification"
@@ -71,6 +74,35 @@ func TestPrepareStartupEvidence(t *testing.T) {
 			}
 			if _, err := os.Lstat(filepath.Join(entry, "agent-skill.json")); !os.IsNotExist(err) {
 				t.Fatal("source declaration was written")
+			}
+		})
+	}
+}
+
+// TestStartupRejectsResealedForgedSyntheticDeclaration proves shape checks run
+// at startup even when an attacker recomputes the nested manifest digest.
+func TestStartupRejectsResealedForgedSyntheticDeclaration(t *testing.T) {
+	for _, declaration := range []string{
+		`{"schema_version":3,"runtime_roots":["runtime"],"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}}`,
+		`{"schema_version":3,"runtime_roots":[],"commands":{"run":"tool"},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"}}`,
+		`{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":{"network":"none","filesystem":"none","exec":"none","secrets":"none","env_read":"none"},"extra":true}`,
+		`{"schema_version":3,"runtime_roots":[],"commands":{},"capabilities":null}`,
+	} {
+		t.Run(declaration, func(t *testing.T) {
+			home, result := verificationCandidate(t)
+			if err := prepareStartupEvidence(home, newGitManager(home), result, Policy{}); err != nil {
+				t.Fatal(err)
+			}
+			entry := &result.Lock.SkillIntegrity[0]
+			entry.Manifest.Declaration = []byte(declaration)
+			raw, err := protocoljson.MarshalCanonical(entry.Manifest.Object())
+			if err != nil {
+				t.Fatal(err)
+			}
+			digest := sha256.Sum256(raw)
+			entry.ManifestSHA256 = "sha256:" + hex.EncodeToString(digest[:])
+			if _, err := startupChecks(home, result.Lock); !skillintegrity.IsCode(err, "skill_integrity_manifest_invalid") {
+				t.Fatalf("startup accepted forged declaration with matching manifest digest: %v", err)
 			}
 		})
 	}
