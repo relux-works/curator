@@ -1119,7 +1119,7 @@ var prNodeInterpreterVersion = regexp.MustCompile(`(?i)^(?:node|nodejs)\d+(?:\.\
 var prPerlInterpreterVersion = regexp.MustCompile(`(?i)^perl\d+(?:\.\d+)*$`)
 var prPHPInterpreterVersion = regexp.MustCompile(`(?i)^php\d+(?:\.\d+)*$`)
 var prVersionedShellInterpreter = regexp.MustCompile(`(?i)^(?:bash|sh|dash|ash|zsh|ksh|mksh|yash|fish|csh|tcsh)\d+(?:\.\d+)*$`)
-var prEnvSplitString = regexp.MustCompile(`(?i)(?:^|[\s;&|])env\s+(?:-S|--split-string)(?:\s|$)`)
+var prEnvSplitString = regexp.MustCompile(`(?i)(?:^|[\s;&|])(?:[^\s;&|]*/)?env\s+(?:-S\S*|--split-string(?:=\S*)?)(?:\s|$)`)
 var prShellFunctionDefinition = regexp.MustCompile(`(?im)(?:^|[;&|]\s*)(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{`)
 var localWorkflowScriptInvocation = regexp.MustCompile(`(?i)\b(?:bash|sh|python3?|node|pwsh|powershell)\s+["']?((?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+|[A-Za-z0-9_][A-Za-z0-9_.-]*)`)
 var localWorkflowScriptToken = regexp.MustCompile(`(?:^|[\s;&|])((?:(?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+|[A-Za-z0-9_.-]+)\.(?:sh|bash|zsh|py|js|ps1|cmd|bat|rb|pl))(?:$|[\s;&|])`)
@@ -1131,6 +1131,29 @@ var inlineWorkflowHeredoc = regexp.MustCompile(`(?im)^\s*(?:python3?|bash|sh|zsh
 var testGateSkipOverride = regexp.MustCompile(`(?i)(?:^|[\s;&|])CI_SKIP_POST_LANDING_TESTS=([^\s;&|]+)`)
 var testGateSkipUnset = regexp.MustCompile(`(?i)(?:^|[\s;&|])(?:-u\s+|unset\s+)CI_SKIP_POST_LANDING_TESTS(?:[\s;&|]|$)`)
 var isolatedWorkflowEnvironment = regexp.MustCompile(`(?i)\benv\s+-i(?:\s|$)`)
+var prWorkflowGoTestCommandText = regexp.MustCompile(`(?i)(?:^|[^[:alnum:]_])(?:[[:alnum:]_.-]+/)*go(?:\.exe)?(?:[ \t]+-C(?:[ \t]+|=)[^ \t]+)?[ \t]+test(?:[ \t]|$)`)
+
+// Only env without directory-changing or split-string options is admitted as
+// a wrapper around Go in the current workflows.
+var allowedPRGoCommandWrappers = map[string]struct{}{"env": {}}
+
+// These commands may carry Go command text as inert data. Other commands must
+// be classified by an allowed dispatcher form or refuse that text.
+var allowedPRGoTestTextDataCommands = map[string]struct{}{
+	"echo": {}, "printf": {},
+}
+
+// Dispatchers are checked against explicit non-executing forms. No other form
+// is admitted by the current workflow contract.
+var prWorkflowDelegatedExecutionCommands = map[string]struct{}{
+	"coproc": {}, "find": {}, "gmake": {}, "make": {}, "ninja": {},
+	"parallel": {}, "sed": {}, "sem": {}, "xargs": {},
+}
+
+var allowedPRDelegatedExecutionForms = map[string]func([]workflowShellWord) bool{
+	"find": prWorkflowFindInvocationIsNonExecuting,
+	"sed":  prWorkflowSedInvocationIsNonExecuting,
+}
 
 // Local scripts are admitted by exact path. The test gate is special: its
 // workflow step must also set CI_SKIP_POST_LANDING_TESTS=1.
@@ -1333,6 +1356,11 @@ func prWorkflowGoWorkingDirectories(jobID string, words []workflowShellWord, bas
 			if commandIndex < 0 {
 				commandStart = false
 				continue
+			}
+			if isWorkflowGoCommand(words[commandIndex].value) {
+				if err := checkPRWorkflowGoCommandWrappers(jobID, words, i, commandIndex); err != nil {
+					return nil, err
+				}
 			}
 			command := words[commandIndex].value
 			if command == "export" || command == "declare" || command == "typeset" {
@@ -2176,9 +2204,9 @@ func checkPRWorkflowInterpreters(jobID string, step pullRequestStep, stepDirecto
 	return nil
 }
 
-// Shell substitutions are inspected recursively. Process substitutions,
-// execution dispatchers and find execution actions are refused because their
-// payloads are outside the direct command model.
+// Shell substitutions are inspected recursively. Dispatcher forms are
+// admitted only when listed above; unknown commands carrying Go-test text are
+// refused unless they are known to treat that text as data.
 func checkPRWorkflowNestedExecution(jobID string, step pullRequestStep, stepDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node, run string, depth int) error {
 	if depth > 12 {
 		return fmt.Errorf("pull-request job %q has shell command substitutions nested too deeply", jobID)
@@ -2186,16 +2214,13 @@ func checkPRWorkflowNestedExecution(jobID string, step pullRequestStep, stepDire
 	words := workflowShellWords(run)
 	for _, index := range prWorkflowCommandIndices(words) {
 		command := strings.ToLower(path.Base(strings.ReplaceAll(words[index].value, "\\", "/")))
-		switch command {
-		case "find":
-			for i := index + 1; i < len(words) && !words[i].operator; i++ {
-				switch words[i].value {
-				case "-exec", "-execdir", "-ok", "-okdir":
-					return fmt.Errorf("pull-request job %q uses an unmodeled find execution action", jobID)
-				}
-			}
-		case "parallel", "sem", "make", "gmake", "ninja", "coproc":
-			return fmt.Errorf("pull-request job %q uses an unmodeled execution dispatcher %q", jobID, command)
+		end := index + 1
+		for end < len(words) && !words[end].operator {
+			end++
+		}
+		arguments := words[index+1 : end]
+		if err := checkPRWorkflowExecutionCommand(jobID, command, arguments); err != nil {
+			return err
 		}
 	}
 
@@ -2235,6 +2260,200 @@ func checkPRWorkflowNestedExecution(jobID string, step pullRequestStep, stepDire
 		}
 	}
 	return nil
+}
+
+func checkPRWorkflowExecutionCommand(jobID, command string, arguments []workflowShellWord) error {
+	if _, dispatcher := prWorkflowDelegatedExecutionCommands[command]; dispatcher {
+		allowedForm, listed := allowedPRDelegatedExecutionForms[command]
+		if !listed || !allowedForm(arguments) {
+			if command == "find" {
+				return fmt.Errorf("pull-request job %q uses an unmodeled find execution action", jobID)
+			}
+			return fmt.Errorf("pull-request job %q uses an unmodeled execution dispatcher %q", jobID, command)
+		}
+	}
+	if prWorkflowArgumentsContainGoTestText(arguments) && !prWorkflowCommandMayCarryGoTestText(command, arguments) {
+		return fmt.Errorf("pull-request job %q passes Go-test command text to an unmodeled dispatcher %q", jobID, command)
+	}
+	return nil
+}
+
+func checkPRWorkflowGoCommandWrappers(jobID string, words []workflowShellWord, start, commandIndex int) error {
+	for i := start; i < commandIndex; {
+		if workflowShellAssignment.MatchString(words[i].value) {
+			i++
+			continue
+		}
+		command := strings.ToLower(path.Base(strings.ReplaceAll(words[i].value, "\\", "/")))
+		if command == "env" {
+			if _, ok := allowedPRGoCommandWrappers[command]; !ok {
+				return fmt.Errorf("pull-request job %q uses an unmodeled Go command wrapper %q", jobID, command)
+			}
+			for option := i + 1; option < commandIndex; option++ {
+				value := words[option].value
+				if value == "-C" || value == "--chdir" || strings.HasPrefix(value, "-C") && len(value) > 2 || strings.HasPrefix(value, "--chdir=") {
+					return fmt.Errorf("pull-request job %q changes the Go working directory through env", jobID)
+				}
+				if value == "-S" || value == "--split-string" || strings.HasPrefix(value, "--split-string=") {
+					return fmt.Errorf("pull-request job %q uses an unmodeled env command form before Go", jobID)
+				}
+				if value == "-u" || value == "--unset" {
+					option++
+				}
+				if value == "--" {
+					return nil
+				}
+			}
+			return nil
+		}
+		if command == "sudo" {
+			for option := i + 1; option < commandIndex; option++ {
+				value := words[option].value
+				if value == "-D" || value == "--chdir" || strings.HasPrefix(value, "-D") && len(value) > 2 || strings.HasPrefix(value, "--chdir=") {
+					return fmt.Errorf("pull-request job %q changes the Go working directory through sudo", jobID)
+				}
+			}
+		}
+		return fmt.Errorf("pull-request job %q uses an unmodeled Go command wrapper %q", jobID, command)
+	}
+	return nil
+}
+
+func prWorkflowArgumentsContainGoTestText(arguments []workflowShellWord) bool {
+	values := make([]string, len(arguments))
+	for i, argument := range arguments {
+		values[i] = argument.value
+	}
+	return prWorkflowGoTestCommandText.MatchString(strings.Join(values, " "))
+}
+
+func prWorkflowCommandMayCarryGoTestText(command string, arguments []workflowShellWord) bool {
+	if _, ok := allowedPRGoTestTextDataCommands[command]; ok {
+		return true
+	}
+	if allowedForm, ok := allowedPRDelegatedExecutionForms[command]; ok {
+		return allowedForm(arguments)
+	}
+	if (command == "bash" || command == "python3") && len(arguments) != 0 {
+		_, ok := allowedPRLocalScripts[arguments[0].value]
+		return ok
+	}
+	return false
+}
+
+func prWorkflowFindInvocationIsNonExecuting(arguments []workflowShellWord) bool {
+	for _, argument := range arguments {
+		switch argument.value {
+		case "-exec", "-execdir", "-ok", "-okdir":
+			return false
+		}
+	}
+	return true
+}
+
+func prWorkflowSedInvocationIsNonExecuting(arguments []workflowShellWord) bool {
+	var scripts []string
+	for i := 0; i < len(arguments); i++ {
+		value := arguments[i].value
+		switch {
+		case value == "-e" || value == "--expression":
+			if i+1 >= len(arguments) {
+				return false
+			}
+			i++
+			scripts = append(scripts, arguments[i].value)
+		case strings.HasPrefix(value, "--expression="):
+			scripts = append(scripts, strings.TrimPrefix(value, "--expression="))
+		case strings.HasPrefix(value, "-e") && len(value) > 2:
+			scripts = append(scripts, value[2:])
+		case value == "-f" || value == "--file" || strings.HasPrefix(value, "--file="):
+			return false
+		case value == "--":
+			if i+1 >= len(arguments) {
+				return false
+			}
+			scripts = append(scripts, arguments[i+1].value)
+			return prWorkflowSedScriptsAreNonExecuting(scripts)
+		case value == "-n" || value == "--quiet" || value == "--silent" || value == "-E" || value == "-r" || value == "--regexp-extended" || value == "-s" || value == "--separate" || value == "-u" || value == "--unbuffered" || value == "--sandbox" || value == "-i" || strings.HasPrefix(value, "-i") || value == "--in-place" || strings.HasPrefix(value, "--in-place="):
+			continue
+		case strings.HasPrefix(value, "-"):
+			return false
+		default:
+			if len(scripts) == 0 {
+				scripts = append(scripts, value)
+			}
+			return prWorkflowSedScriptsAreNonExecuting(scripts)
+		}
+	}
+	return prWorkflowSedScriptsAreNonExecuting(scripts)
+}
+
+func prWorkflowSedScriptsAreNonExecuting(scripts []string) bool {
+	if len(scripts) == 0 {
+		return false
+	}
+	for _, script := range scripts {
+		if !prWorkflowSedScriptIsNonExecuting(script) {
+			return false
+		}
+	}
+	return true
+}
+
+func prWorkflowSedScriptIsNonExecuting(script string) bool {
+	position := 0
+	sawSubstitution := false
+	for position < len(script) {
+		for position < len(script) && (script[position] == ' ' || script[position] == '\t' || script[position] == '\r' || script[position] == '\n' || script[position] == ';') {
+			position++
+		}
+		if position == len(script) {
+			break
+		}
+		if script[position] != 's' || position+1 >= len(script) {
+			return false
+		}
+		delimiter := script[position+1]
+		if delimiter == '\\' || delimiter == ' ' || delimiter == '\t' || delimiter == '\r' || delimiter == '\n' {
+			return false
+		}
+		position += 2
+		var ok bool
+		position, ok = prWorkflowSedConsumeDelimited(script, position, delimiter)
+		if !ok {
+			return false
+		}
+		position, ok = prWorkflowSedConsumeDelimited(script, position, delimiter)
+		if !ok {
+			return false
+		}
+		for position < len(script) && script[position] != ';' && script[position] != '\n' {
+			switch value := script[position]; {
+			case value == 'e':
+				return false
+			case value == ' ' || value == '\t' || value == '\r' || value == 'g' || value == 'p' || value == 'i' || value == 'I' || value == 'm' || value == 'M' || value >= '0' && value <= '9':
+				position++
+			default:
+				return false
+			}
+		}
+		sawSubstitution = true
+	}
+	return sawSubstitution
+}
+
+func prWorkflowSedConsumeDelimited(script string, position int, delimiter byte) (int, bool) {
+	for position < len(script) {
+		if script[position] == '\\' {
+			position += 2
+			continue
+		}
+		if script[position] == delimiter {
+			return position + 1, true
+		}
+		position++
+	}
+	return 0, false
 }
 
 func prWorkflowCommandSubstitutionBodies(run string) ([]string, bool) {
@@ -2511,7 +2730,7 @@ func prWorkflowCommandTarget(words []workflowShellWord, start int) int {
 			index++
 			for index < len(words) && !words[index].operator {
 				value := words[index].value
-				if value == "-u" || value == "-g" || value == "-h" || value == "-p" || value == "-C" || value == "-D" {
+				if value == "-u" || value == "-g" || value == "-h" || value == "-p" || value == "-C" || value == "-D" || value == "--chdir" {
 					index += 2
 					continue
 				}
@@ -3826,6 +4045,16 @@ func TestPullRequestGuardTracksShellDirectoryChanges(t *testing.T) {
 		{name: "cd_to_deferred_package_refuses", run: "cd cmd/curator && go test .", wantError: true},
 		{name: "command_cd_to_deferred_package_refuses", run: "command cd cmd/curator && go test .", wantError: true},
 		{name: "pushd_to_deferred_package_refuses", run: "pushd cmd/curator; go test .", wantError: true},
+		{name: "env_short_chdir_to_deferred_package_refuses", run: "env -C cmd/curator go test .", wantError: true},
+		{name: "env_short_attached_chdir_to_deferred_package_refuses", run: "env -Ccmd/curator go test .", wantError: true},
+		{name: "env_long_chdir_to_deferred_package_refuses", run: "env --chdir cmd/curator go test .", wantError: true},
+		{name: "env_long_attached_chdir_to_deferred_package_refuses", run: "env --chdir=cmd/curator go test .", wantError: true},
+		{name: "sudo_short_directory_to_deferred_package_refuses", run: "sudo -D cmd/curator go test .", wantError: true},
+		{name: "sudo_short_attached_directory_to_deferred_package_refuses", run: "sudo -Dcmd/curator go test .", wantError: true},
+		{name: "sudo_long_directory_to_deferred_package_refuses", run: "sudo --chdir cmd/curator go test .", wantError: true},
+		{name: "sudo_long_attached_directory_to_deferred_package_refuses", run: "sudo --chdir=cmd/curator go test .", wantError: true},
+		{name: "unmodeled_go_wrapper_refuses", run: "unmodeled-wrapper --directory cmd/curator go test .", wantError: true},
+		{name: "env_unset_without_directory_change_admits", run: "env -u GIT_DIR go test ./tools/ciworkflow -run '^TestPullRequestGuardTracksShellDirectoryChanges$'"},
 		{name: "pushd_and_popd_to_safe_tree_admits", run: "pushd tools && go test ./... && popd"},
 		{name: "popd_to_deferred_tree_refuses", run: "pushd tools && popd && go test ./...", wantError: true},
 		{name: "dynamic_cd_target_refuses", run: `cd "$X" && go test ./...`, wantError: true},
@@ -3996,6 +4225,16 @@ func TestPullRequestGuardChecksLocalActionsAndScripts(t *testing.T) {
 		{name: "make_execution_dispatcher", run: "make test", wantError: true},
 		{name: "coproc_execution_dispatcher", run: `coproc ruby -e 'puts 1'`, wantError: true},
 		{name: "find_print_neighbor", run: "find . -type f -print"},
+		{name: "sed_execution_flag_go_test_refuses", run: `printf x | sed 's|x|go test ./...|e'`, wantError: true},
+		{name: "sed_execution_flag_expanded_go_test_refuses", run: `printf x | sed 's|x|go${IFS}test ./...|e'`, wantError: true},
+		{name: "sed_execution_command_go_test_refuses", run: `printf x | sed 'e go test ./...'`, wantError: true},
+		{name: "sed_nonexecuting_replacement_neighbor", run: `printf x | sed 's|x|go test ./...|'`},
+		{name: "env_split_string_go_test_refuses", run: `env -S 'go test ./...'`, wantError: true},
+		{name: "env_attached_split_string_go_test_refuses", run: `env -Sgo test ./...`, wantError: true},
+		{name: "env_long_split_string_go_test_refuses", run: `env --split-string 'go test ./...'`, wantError: true},
+		{name: "env_long_attached_split_string_go_test_refuses", run: `env --split-string=go test ./...`, wantError: true},
+		{name: "unmodeled_dispatcher_go_test_refuses", run: `unmodeled-runner --script 'go test ./...'`, wantError: true},
+		{name: "printf_go_test_text_neighbor", run: `printf '%s' 'go test ./tools/ciworkflow'`},
 		{name: "perl_inline_eval", run: `perl -e 'system("go", "test", "./...")'`, wantError: true},
 		{name: "node_inline_eval", run: `node -e 'require("child_process").spawnSync("go", ["test", "./..."])'`, wantError: true},
 		{name: "node_inline_print", run: `node -p 'require("child_process").spawnSync("go", ["test", "./..."])'`, wantError: true},
