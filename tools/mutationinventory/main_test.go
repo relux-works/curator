@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -793,10 +795,13 @@ func TestMacOSRaceJobLogsRunnerCapacity(t *testing.T) {
 }
 
 type pullRequestStep struct {
-	Name string    `yaml:"name"`
-	If   string    `yaml:"if"`
-	Run  string    `yaml:"run"`
-	Env  yaml.Node `yaml:"env"`
+	Name             string    `yaml:"name"`
+	If               string    `yaml:"if"`
+	Run              string    `yaml:"run"`
+	Uses             string    `yaml:"uses"`
+	WorkingDirectory string    `yaml:"working-directory"`
+	With             yaml.Node `yaml:"with"`
+	Env              yaml.Node `yaml:"env"`
 }
 
 type pullRequestJob struct {
@@ -884,6 +889,12 @@ func checkPRDefersPostLandingTests(data []byte) error {
 			if _, ok := allowedPRReusableWorkflowTargets[uses]; !ok {
 				return fmt.Errorf("pull-request job %q calls an unapproved reusable workflow %q", id, uses)
 			}
+		}
+		if err := checkPRDeferredTestCommands(id, job, &workflow.Env); err != nil {
+			return err
+		}
+		if err := checkPRLocalTargets(id, job, &workflow.Env); err != nil {
+			return err
 		}
 		if err := checkPRDynamicInputs(id, job, &workflow.Env); err != nil {
 			return err
@@ -1093,6 +1104,1774 @@ func checkPRDynamicInputs(jobID string, job pullRequestJob, workflowEnv *yaml.No
 		}
 	}
 	return nil
+}
+
+type workflowShellWord struct {
+	value    string
+	quote    byte
+	operator bool
+}
+
+var workflowShellVariable = regexp.MustCompile(`^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$`)
+var prPythonInterpreterVersion = regexp.MustCompile(`(?i)^python(?:2|3)(?:\.\d+)*$`)
+var prRubyInterpreterVersion = regexp.MustCompile(`(?i)^ruby(?:\d+)(?:\.\d+)*$`)
+var prNodeInterpreterVersion = regexp.MustCompile(`(?i)^(?:node|nodejs)\d+(?:\.\d+)*$`)
+var prPerlInterpreterVersion = regexp.MustCompile(`(?i)^perl\d+(?:\.\d+)*$`)
+var prPHPInterpreterVersion = regexp.MustCompile(`(?i)^php\d+(?:\.\d+)*$`)
+var prVersionedShellInterpreter = regexp.MustCompile(`(?i)^(?:bash|sh|dash|ash|zsh|ksh|mksh|yash|fish|csh|tcsh)\d+(?:\.\d+)*$`)
+var prEnvSplitString = regexp.MustCompile(`(?i)(?:^|[\s;&|])(?:[^\s;&|]*/)?env\s+(?:-S\S*|--split-string(?:=\S*)?)(?:\s|$)`)
+var prShellFunctionDefinition = regexp.MustCompile(`(?im)(?:^|[;&|]\s*)(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{`)
+var localWorkflowScriptInvocation = regexp.MustCompile(`(?i)\b(?:bash|sh|python3?|node|pwsh|powershell)\s+["']?((?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+|[A-Za-z0-9_][A-Za-z0-9_.-]*)`)
+var localWorkflowScriptToken = regexp.MustCompile(`(?:^|[\s;&|])((?:(?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+|[A-Za-z0-9_.-]+)\.(?:sh|bash|zsh|py|js|ps1|cmd|bat|rb|pl))(?:$|[\s;&|])`)
+var localWorkflowExecutable = regexp.MustCompile(`(?m)(?:^|[;&|]\s*)((?:\./|\.\./|[A-Za-z0-9_.-]+/)[^\s;&|]+)(?:$|[\s;&|])`)
+var dynamicWorkflowScriptInvocation = regexp.MustCompile(`(?i)\b(?:bash|sh|python3?|node|pwsh|powershell)\s+["']?\$(?:\{|[A-Za-z_(])`)
+var dynamicWorkflowSourceInvocation = regexp.MustCompile(`(?im)(?:^|[;&|]\s*)(?:source|\.)\s+["']?\$(?:\{|[A-Za-z_(])`)
+var inlineWorkflowScriptBody = regexp.MustCompile(`(?i)\b(?:bash|sh|zsh)\s+-[A-Za-z]*c(?:\s|$)|\bpython3?\s+-c(?:\s|$)|\bnode\s+-e(?:\s|$)|\beval(?:\s|$)`)
+var inlineWorkflowHeredoc = regexp.MustCompile(`(?im)^\s*(?:python3?|bash|sh|zsh|node|pwsh|powershell)\s+[^\n]*<<-?\s*["']?[A-Za-z_][A-Za-z0-9_]*["']?\s*$`)
+var testGateSkipOverride = regexp.MustCompile(`(?i)(?:^|[\s;&|])CI_SKIP_POST_LANDING_TESTS=([^\s;&|]+)`)
+var testGateSkipUnset = regexp.MustCompile(`(?i)(?:^|[\s;&|])(?:-u\s+|unset\s+)CI_SKIP_POST_LANDING_TESTS(?:[\s;&|]|$)`)
+var isolatedWorkflowEnvironment = regexp.MustCompile(`(?i)\benv\s+-i(?:\s|$)`)
+var prWorkflowGoTestCommandText = regexp.MustCompile(`(?i)(?:^|[^[:alnum:]_])(?:[[:alnum:]_.-]+/)*go(?:\.exe)?(?:[ \t]+-C(?:[ \t]+|=)[^ \t]+)?[ \t]+test(?:[ \t]|$)`)
+
+// Only env without directory-changing or split-string options is admitted as
+// a wrapper around Go in the current workflows.
+var allowedPRGoCommandWrappers = map[string]struct{}{"env": {}}
+
+// These commands may carry Go command text as inert data. Other commands must
+// be classified by an allowed dispatcher form or refuse that text.
+var allowedPRGoTestTextDataCommands = map[string]struct{}{
+	"echo": {}, "printf": {},
+}
+
+// Dispatchers are checked against explicit non-executing forms. No other form
+// is admitted by the current workflow contract.
+var prWorkflowDelegatedExecutionCommands = map[string]struct{}{
+	"coproc": {}, "find": {}, "gmake": {}, "make": {}, "ninja": {},
+	"parallel": {}, "sed": {}, "sem": {}, "xargs": {},
+}
+
+var allowedPRDelegatedExecutionForms = map[string]func([]workflowShellWord) bool{
+	"find": prWorkflowFindInvocationIsNonExecuting,
+	"sed":  prWorkflowSedInvocationIsNonExecuting,
+}
+
+// Local scripts are admitted by exact path. The test gate is special: its
+// workflow step must also set CI_SKIP_POST_LANDING_TESTS=1.
+var allowedPRLocalScripts = map[string]struct{}{
+	".github/ci/candidate-suite.sh":                 {},
+	".github/ci/default-build-transport-control.py": {},
+	".github/ci/gate-selftest.sh":                   {},
+	".github/ci/install-rust-toolchain.sh":          {},
+	".github/ci/isolate-go-state.sh":                {},
+	".github/ci/isolated-test.sh":                   {},
+	".github/ci/ledger-consistency.sh":              {},
+	".github/ci/naming-gate.sh":                     {},
+	".github/ci/no-broad-suppression.sh":            {},
+	".github/ci/pnpm-pin-guard.sh":                  {},
+	".github/ci/release-source-gate.sh":             {},
+	".github/ci/rust-pin-guard.sh":                  {},
+	".github/ci/test-gate.sh":                       {},
+	".github/ci/toolchain-identity.sh":              {},
+	"scripts/restore-runner-tmp.sh":                 {},
+}
+
+// These existing workflow bodies use shell function or trap forms outside the
+// static shell model. An edit changes the digest and must satisfy the model.
+var allowedPRUnmodeledShellRuns = map[string]struct{}{
+	"race\x00Record macOS race capacity\x006132d13dc9aea819d1cd3aac9107a2742c6e83ea9e87807709fe545d91ab8780":                                                          {},
+	"project-bin-windows-read-controls\x00Prove native read denial and legacy ownership controls\x001aee247d6840a83336f962d8e1f70aa48e5261993e7a2bf49fe036babf9029f1": {},
+	"credential-windows-controls\x00Portable selection and native descriptor-policy controls\x005e49c924dc7d98df0d7b92056a339b89397962e0f2a55c8afce0ee6c13853370":     {},
+	"default-build-transport\x00Default-lane credential isolation and refusal controls\x00ca1a083d029d462f33d93a16ab9f7efa121f1ee9d919c3df7000229d99b6915b":           {},
+	"default-build-transport\x00Detect a dropped default-lane SSH policy\x0083bf56421a73f944f9ebcf8e3df6c56448975f7de2b98a0140eb1d48d07879f9":                         {},
+	"openssh89-fetch\x00Real product fetch with key and policy refusals\x00fa25f69e82fd616751be0bdd623c5c8cb7387a301448f41773b92dc85dc6f9c9":                          {},
+	"test\x00Windows fixture compatibility preflight\x003df993df26fed5d667e9099e1c5cd28936509a95e226558e865c8f31b7331207":                                             {},
+	"linux-unprivileged-sweep\x00Real non-root process and unreadable-image controls\x006715c9b09642a4e2462ad36048c2353bfd7f010a49c0684f9f389118e1cb14ed":             {},
+}
+
+// No workflow directly executes a repository-local file. Keep this explicit
+// allowlist empty until a reviewed invocation form is added.
+var allowedPRLocalExecutables = map[string]struct{}{}
+
+// Absolute host tools are admitted only within their exact current workflow
+// step body, so new arguments cannot inherit a path-only exception.
+var allowedPRAbsoluteCommandRuns = map[string]struct{}{
+	"openssh89-fetch\x00Install trusted Git and image OpenSSH\x00/usr/bin/ssh\x001cefb3f7f37cd15379a368f7bc90f93f2828f40dca97f10949f2a3e041ec5903":                  {},
+	"openssh89-fetch\x00Real product fetch with key and policy refusals\x00/usr/bin/ssh-keygen\x00fa25f69e82fd616751be0bdd623c5c8cb7387a301448f41773b92dc85dc6f9c9": {},
+	"openssh89-fetch\x00Real product fetch with key and policy refusals\x00/usr/sbin/sshd\x00fa25f69e82fd616751be0bdd623c5c8cb7387a301448f41773b92dc85dc6f9c9":      {},
+}
+
+var allowedPRAbsoluteGoCommands = map[string]struct{}{
+	"/opt/go/bin/go": {},
+}
+
+// No local action is currently admitted in PR workflows. A future local action
+// must add an exact path and exact input map here after its target is reviewed.
+var allowedPRLocalActions = map[string]map[string]string{}
+
+var allowedPRLocalGoTools = map[string]struct{}{
+	"./tools/check-store-compatibility": {},
+	"./tools/envprofilerace":            {},
+	"./tools/sanitize-ci-evidence":      {},
+}
+
+func checkPRDeferredTestCommands(jobID string, job pullRequestJob, workflowEnv *yaml.Node) error {
+	for _, step := range job.Steps {
+		stepDirectory, err := prStepWorkingDirectory(jobID, step, workflowEnv, &job.Env, &step.Env)
+		if err != nil {
+			return err
+		}
+		words := workflowShellWords(step.Run)
+		workingDirectories, err := prWorkflowGoWorkingDirectories(jobID, words, stepDirectory, workflowEnv, &job.Env, &step.Env)
+		if err != nil {
+			return err
+		}
+		var goFlags []workflowShellWord
+		goFlagsLoaded := false
+		for i := 0; i < len(words); i++ {
+			if words[i].operator || !isWorkflowGoCommand(words[i].value) {
+				continue
+			}
+			directories := workingDirectories[i]
+			if len(directories) == 0 {
+				directories = []string{stepDirectory}
+			}
+			for _, baseDirectory := range directories {
+				command, commandIndex, workingDirectory, err := parsePRGoCommand(jobID, words, i, baseDirectory, workflowEnv, &job.Env, &step.Env)
+				if err != nil {
+					return err
+				}
+				if command != "test" {
+					continue
+				}
+				if !goFlagsLoaded {
+					value, present, readable := workflowEnvironmentLookup("GOFLAGS", workflowEnv, &job.Env, &step.Env)
+					if !readable {
+						return fmt.Errorf("pull-request job %q has unclassifiable GOFLAGS", jobID)
+					}
+					if present {
+						goFlags = workflowShellWords(value)
+					}
+					goFlagsLoaded = true
+				}
+				end := commandIndex + 1
+				for end < len(words) && !words[end].operator {
+					end++
+				}
+				if err := checkPRGoTestArguments(jobID, words[commandIndex+1:end], goFlags, workingDirectory, workflowEnv, &job.Env, &step.Env); err != nil {
+					return err
+				}
+			}
+			end := i + 1
+			for end < len(words) && !words[end].operator {
+				end++
+			}
+			i = end - 1
+		}
+	}
+	return nil
+}
+
+type prShellDirectoryState struct {
+	directory string
+	stack     []string
+}
+
+type prShellDirectoryEffect struct {
+	success []prShellDirectoryState
+	failure []prShellDirectoryState
+}
+
+type prShellDirectoryFrame struct {
+	states []prShellDirectoryState
+}
+
+var workflowShellAssignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=.*$`)
+
+func prWorkflowGoWorkingDirectories(jobID string, words []workflowShellWord, baseDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) (map[int][]string, error) {
+	states := []prShellDirectoryState{{directory: baseDirectory}}
+	frames := []prShellDirectoryFrame{}
+	workingDirectories := make(map[int][]string)
+	var pending *prShellDirectoryEffect
+	commandStart := true
+	for i := 0; i < len(words); i++ {
+		word := words[i]
+		if word.operator {
+			switch word.value {
+			case "(":
+				states = clonePRShellDirectoryStates(states)
+				frames = append(frames, prShellDirectoryFrame{states: states})
+				pending = nil
+				commandStart = true
+			case ")":
+				if len(frames) > 0 {
+					states = frames[len(frames)-1].states
+					frames = frames[:len(frames)-1]
+				}
+				pending = nil
+				commandStart = true
+			case "&&":
+				if pending != nil {
+					states = clonePRShellDirectoryStates(pending.success)
+				}
+				pending = nil
+				commandStart = true
+			case "||":
+				if pending != nil {
+					states = clonePRShellDirectoryStates(pending.failure)
+				}
+				pending = nil
+				commandStart = true
+			case "|":
+				if pending != nil {
+					states = clonePRShellDirectoryStates(pending.failure)
+				}
+				pending = nil
+				commandStart = true
+			default:
+				if pending != nil {
+					states = unionPRShellDirectoryStates(pending.success, pending.failure)
+					pending = nil
+				}
+				commandStart = true
+			}
+			continue
+		}
+		if word.quote == 0 && isPRShellControlKeyword(word.value) {
+			commandStart = true
+			continue
+		}
+		if commandStart && word.quote == 0 && strings.HasPrefix(word.value, "#") {
+			for i+1 < len(words) && (!words[i+1].operator || words[i+1].value != ";") {
+				i++
+			}
+			continue
+		}
+		if commandStart {
+			if word.quote == 0 {
+				if name, value, ok := strings.Cut(word.value, "="); ok && name == "CDPATH" && value != "" {
+					return nil, fmt.Errorf("pull-request job %q sets an unmodeled CDPATH value", jobID)
+				}
+			}
+			commandIndex := prWorkflowCommandTarget(words, i)
+			if commandIndex < 0 {
+				commandStart = false
+				continue
+			}
+			if isWorkflowGoCommand(words[commandIndex].value) {
+				if err := checkPRWorkflowGoCommandWrappers(jobID, words, i, commandIndex); err != nil {
+					return nil, err
+				}
+			}
+			command := words[commandIndex].value
+			if command == "export" || command == "declare" || command == "typeset" {
+				end := commandIndex + 1
+				for end < len(words) && !words[end].operator {
+					name, value, ok := strings.Cut(words[end].value, "=")
+					if name == "CDPATH" && (!ok || value != "") {
+						return nil, fmt.Errorf("pull-request job %q sets an unmodeled CDPATH value", jobID)
+					}
+					end++
+				}
+			}
+			if command == "cd" || command == "pushd" || command == "popd" {
+				end := commandIndex + 1
+				for end < len(words) && !words[end].operator {
+					end++
+				}
+				args := words[commandIndex+1 : end]
+				success := make([]prShellDirectoryState, 0, len(states))
+				failure := clonePRShellDirectoryStates(states)
+				switch command {
+				case "cd", "pushd":
+					if len(args) != 1 || !isLiteralPRDirectory(args[0]) {
+						return nil, fmt.Errorf("pull-request job %q has an unclassifiable shell %s directory", jobID, command)
+					}
+					cdPath, present, readable := workflowEnvironmentLookup("CDPATH", workflowEnv, jobEnv, stepEnv)
+					if !readable || (present && cdPath != "") {
+						return nil, fmt.Errorf("pull-request job %q has an unclassifiable shell CDPATH", jobID)
+					}
+					for _, prefix := range words[i:commandIndex] {
+						if name, value, ok := strings.Cut(prefix.value, "="); ok && name == "CDPATH" && value != "" {
+							return nil, fmt.Errorf("pull-request job %q sets an unmodeled CDPATH value", jobID)
+						}
+					}
+					for _, state := range states {
+						directory, err := resolvePRRepoDirectory(jobID, args[0], state.directory, workflowEnv, jobEnv, stepEnv)
+						if err != nil {
+							return nil, err
+						}
+						changed := clonePRShellDirectoryState(state)
+						if command == "pushd" {
+							changed.stack = append(changed.stack, state.directory)
+						}
+						changed.directory = directory
+						success = append(success, changed)
+					}
+				case "popd":
+					if len(args) != 0 {
+						return nil, fmt.Errorf("pull-request job %q has an unclassifiable shell popd command", jobID)
+					}
+					for _, state := range states {
+						if len(state.stack) == 0 {
+							return nil, fmt.Errorf("pull-request job %q has a popd without a known directory stack", jobID)
+						}
+						changed := clonePRShellDirectoryState(state)
+						changed.directory = changed.stack[len(changed.stack)-1]
+						changed.stack = changed.stack[:len(changed.stack)-1]
+						success = append(success, changed)
+					}
+				}
+				pending = &prShellDirectoryEffect{success: success, failure: failure}
+				states = unionPRShellDirectoryStates(success, failure)
+				i = end - 1
+				commandStart = false
+				continue
+			}
+			commandStart = false
+		}
+		if isWorkflowGoCommand(word.value) {
+			for _, state := range states {
+				workingDirectories[i] = appendUniquePRString(workingDirectories[i], state.directory)
+			}
+		}
+	}
+	if len(frames) != 0 {
+		return nil, fmt.Errorf("pull-request job %q has an unclosed shell subshell", jobID)
+	}
+	return workingDirectories, nil
+}
+
+func isLiteralPRDirectory(word workflowShellWord) bool {
+	value := word.value
+	return value != "" && !strings.HasPrefix(value, "-") && !strings.HasPrefix(value, "+") && !path.IsAbs(value) && !strings.HasPrefix(value, "~") &&
+		!strings.ContainsAny(value, "$`*?[]{}") && !strings.Contains(value, "${{")
+}
+
+func clonePRShellDirectoryState(state prShellDirectoryState) prShellDirectoryState {
+	state.stack = append([]string(nil), state.stack...)
+	return state
+}
+
+func clonePRShellDirectoryStates(states []prShellDirectoryState) []prShellDirectoryState {
+	cloned := make([]prShellDirectoryState, len(states))
+	for i, state := range states {
+		cloned[i] = clonePRShellDirectoryState(state)
+	}
+	return cloned
+}
+
+func unionPRShellDirectoryStates(groups ...[]prShellDirectoryState) []prShellDirectoryState {
+	seen := make(map[string]struct{})
+	var states []prShellDirectoryState
+	for _, group := range groups {
+		for _, state := range group {
+			key := state.directory + "\x00" + strings.Join(state.stack, "\x00")
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			states = append(states, clonePRShellDirectoryState(state))
+		}
+	}
+	return states
+}
+
+func appendUniquePRString(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
+}
+
+func isPRShellControlKeyword(value string) bool {
+	switch value {
+	case "if", "then", "elif", "else", "fi", "while", "until", "for", "select", "do", "done", "case", "esac", "{", "}", "!":
+		return true
+	default:
+		return false
+	}
+}
+
+func prStepWorkingDirectory(jobID string, step pullRequestStep, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	value := strings.TrimSpace(step.WorkingDirectory)
+	if value == "" {
+		return ".", nil
+	}
+	if workspaceEnvironmentPath.MatchString(value) {
+		end := strings.Index(value, "}}")
+		if end < 0 {
+			return ".", nil
+		}
+		value = strings.TrimSpace(value[end+2:])
+		value = strings.TrimPrefix(value, "/")
+		if value == "" {
+			return ".", nil
+		}
+	}
+	return resolvePRRepoDirectory(jobID, workflowShellWord{value: value}, ".", workflowEnv, jobEnv, stepEnv)
+}
+
+func resolvePRRepoDirectory(jobID string, word workflowShellWord, baseDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	resolved, err := resolvePRRepoPath(jobID, word, baseDirectory, "Go working directory", workflowEnv, jobEnv, stepEnv)
+	if err != nil {
+		return "", err
+	}
+	root, err := prRepositoryRoot()
+	if err != nil {
+		return "", fmt.Errorf("pull-request job %q cannot establish the checkout root: %w", jobID, err)
+	}
+	target, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(resolved)))
+	if err != nil {
+		return "", fmt.Errorf("pull-request job %q has an unclassifiable Go working directory %q", jobID, resolved)
+	}
+	info, err := os.Stat(target)
+	if err != nil || !info.IsDir() {
+		return "", fmt.Errorf("pull-request job %q has an unclassifiable Go working directory %q", jobID, resolved)
+	}
+	relative, err := filepath.Rel(root, target)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("pull-request job %q uses a Go working directory outside the checkout", jobID)
+	}
+	return filepath.ToSlash(relative), nil
+}
+
+func prRepositoryRoot() (string, error) {
+	current, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(current, "go.mod")); err == nil {
+			return filepath.EvalSymlinks(current)
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", fmt.Errorf("go.mod was not found in the working directory ancestry")
+		}
+		current = parent
+	}
+}
+
+func resolvePRRepoPath(jobID string, word workflowShellWord, baseDirectory string, targetKind string, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	resolved, err := resolvePRTestSelector(word, workflowEnv, jobEnv, stepEnv)
+	if err != nil {
+		return "", fmt.Errorf("pull-request job %q has an unclassifiable %s: %w", jobID, targetKind, err)
+	}
+	if resolved == "" || path.IsAbs(resolved) || strings.ContainsAny(resolved, `\\:`) ||
+		(word.quote == 0 && strings.ContainsAny(resolved, " \t\r\n")) {
+		return "", fmt.Errorf("pull-request job %q has an unclassifiable %s %q", jobID, targetKind, resolved)
+	}
+	cleaned := path.Clean(path.Join(baseDirectory, resolved))
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("pull-request job %q uses a %s outside the checkout", jobID, targetKind)
+	}
+	return cleaned, nil
+}
+
+func parsePRGoCommand(jobID string, words []workflowShellWord, goIndex int, baseDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, int, string, error) {
+	workingDirectory := baseDirectory
+	seenChangeDirectory := false
+	for i := goIndex + 1; i < len(words); {
+		word := words[i]
+		if word.operator {
+			return "", -1, workingDirectory, nil
+		}
+		value := word.value
+		switch {
+		case value == "-C":
+			if seenChangeDirectory || i+1 >= len(words) || words[i+1].operator {
+				return "", -1, workingDirectory, fmt.Errorf("pull-request job %q has an unreadable Go -C directory", jobID)
+			}
+			directory, err := resolvePRRepoDirectory(jobID, words[i+1], workingDirectory, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return "", -1, workingDirectory, err
+			}
+			workingDirectory = directory
+			seenChangeDirectory = true
+			i += 2
+		case strings.HasPrefix(value, "-C="):
+			if seenChangeDirectory {
+				return "", -1, workingDirectory, fmt.Errorf("pull-request job %q repeats Go -C", jobID)
+			}
+			pathValue := value[strings.IndexByte(value, '=')+1:]
+			directory, err := resolvePRRepoDirectory(jobID, workflowShellWord{value: pathValue, quote: word.quote}, workingDirectory, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return "", -1, workingDirectory, err
+			}
+			workingDirectory = directory
+			seenChangeDirectory = true
+			i++
+		case strings.HasPrefix(value, "-"):
+			return "", -1, workingDirectory, fmt.Errorf("pull-request job %q uses an unmodeled Go global flag %q", jobID, value)
+		default:
+			return value, i, workingDirectory, nil
+		}
+	}
+	return "", -1, workingDirectory, nil
+}
+
+func workflowShellWords(text string) []workflowShellWord {
+	text = strings.ReplaceAll(text, "\\\r\n", " ")
+	text = strings.ReplaceAll(text, "\\\n", " ")
+	var words []workflowShellWord
+	var current strings.Builder
+	var quote byte
+	var wordQuote byte
+	started := false
+	flush := func() {
+		if started {
+			words = append(words, workflowShellWord{value: current.String(), quote: wordQuote})
+			current.Reset()
+			wordQuote = 0
+			started = false
+		}
+	}
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+		if quote == '\'' {
+			if ch == '\'' {
+				quote = 0
+			} else {
+				current.WriteByte(ch)
+			}
+			continue
+		}
+		if ch == '\\' && i+1 < len(text) {
+			if text[i+1] == '\n' {
+				i++
+				continue
+			}
+			if isWindowsDrivePathPrefix(current.String()) {
+				current.WriteByte('/')
+				started = true
+				continue
+			}
+			current.WriteByte(text[i+1])
+			started = true
+			i++
+			continue
+		}
+		if quote == '"' {
+			if ch == '"' {
+				quote = 0
+			} else {
+				current.WriteByte(ch)
+			}
+			continue
+		}
+		if ch == '\'' || ch == '"' {
+			if started {
+				wordQuote = 0
+			} else {
+				wordQuote = ch
+			}
+			started = true
+			quote = ch
+			continue
+		}
+		if ch == '\n' {
+			flush()
+			words = append(words, workflowShellWord{value: ";", operator: true})
+			continue
+		}
+		if ch == ' ' || ch == '\t' || ch == '\r' {
+			flush()
+			continue
+		}
+		if strings.ContainsRune(";|&()<> ", rune(ch)) {
+			flush()
+			operator := string(ch)
+			if i+1 < len(text) && ((ch == '&' && text[i+1] == '&') || (ch == '|' && text[i+1] == '|')) {
+				operator += string(text[i+1])
+				i++
+			}
+			words = append(words, workflowShellWord{value: operator, operator: true})
+			continue
+		}
+		current.WriteByte(ch)
+		started = true
+	}
+	flush()
+	return words
+}
+
+func isWindowsDrivePathPrefix(value string) bool {
+	return len(value) >= 2 && ((value[0] >= 'a' && value[0] <= 'z') || (value[0] >= 'A' && value[0] <= 'Z')) && value[1] == ':'
+}
+
+func isWorkflowGoCommand(value string) bool {
+	if value == "go" || value == "$GO" || value == "${GO}" || strings.EqualFold(value, "go.exe") {
+		return true
+	}
+	path := strings.ToLower(strings.ReplaceAll(value, "\\", "/"))
+	return strings.HasSuffix(path, "/go") || strings.HasSuffix(path, "/go.exe")
+}
+
+func checkPRGoTestArguments(jobID string, args, goFlags []workflowShellWord, workingDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) error {
+	var runSelector, skipSelector string
+	hasRun, hasSkip := false, false
+	deferredPackage := false
+	goTestArguments := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		value := arg.value
+		if value == "-args" {
+			goTestArguments = true
+			continue
+		}
+		switch {
+		case value == "-run" || value == "--run" || value == "-test.run" || value == "--test.run":
+			if hasRun || i+1 >= len(args) {
+				return fmt.Errorf("pull-request job %q has an unreadable go test -run selector", jobID)
+			}
+			i++
+			resolved, err := resolvePRTestSelector(args[i], workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return fmt.Errorf("pull-request job %q has an unclassifiable go test -run selector: %w", jobID, err)
+			}
+			runSelector, hasRun = resolved, true
+		case strings.HasPrefix(value, "-run=") || strings.HasPrefix(value, "--run=") || strings.HasPrefix(value, "-test.run=") || strings.HasPrefix(value, "--test.run="):
+			if hasRun {
+				return fmt.Errorf("pull-request job %q repeats go test -run", jobID)
+			}
+			resolved, err := resolvePRTestSelector(workflowShellWord{value: value[strings.IndexByte(value, '=')+1:], quote: arg.quote}, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return fmt.Errorf("pull-request job %q has an unclassifiable go test -run selector: %w", jobID, err)
+			}
+			runSelector, hasRun = resolved, true
+		case value == "-skip" || value == "--skip" || value == "-test.skip" || value == "--test.skip":
+			if hasSkip || i+1 >= len(args) {
+				return fmt.Errorf("pull-request job %q has an unreadable go test -skip selector", jobID)
+			}
+			i++
+			resolved, err := resolvePRTestSelector(args[i], workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return fmt.Errorf("pull-request job %q has an unclassifiable go test -skip selector: %w", jobID, err)
+			}
+			skipSelector, hasSkip = resolved, true
+		case strings.HasPrefix(value, "-skip=") || strings.HasPrefix(value, "--skip=") || strings.HasPrefix(value, "-test.skip=") || strings.HasPrefix(value, "--test.skip="):
+			if hasSkip {
+				return fmt.Errorf("pull-request job %q repeats go test -skip", jobID)
+			}
+			resolved, err := resolvePRTestSelector(workflowShellWord{value: value[strings.IndexByte(value, '=')+1:], quote: arg.quote}, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return fmt.Errorf("pull-request job %q has an unclassifiable go test -skip selector: %w", jobID, err)
+			}
+			skipSelector, hasSkip = resolved, true
+		case value == "-exec" || value == "--exec" || strings.HasPrefix(value, "-exec=") || strings.HasPrefix(value, "--exec="):
+			return fmt.Errorf("pull-request job %q uses a custom go test executor", jobID)
+		default:
+			if goTestArguments || strings.HasPrefix(value, "-") {
+				continue
+			}
+			packagePath := value
+			if hasDynamicShellReference(value) {
+				resolved, err := resolvePRTestSelector(arg, workflowEnv, jobEnv, stepEnv)
+				if err != nil {
+					return fmt.Errorf("pull-request job %q has an unclassifiable go test package target: %w", jobID, err)
+				}
+				packagePath = resolved
+			}
+			if packageReachesPRDeferredRootFromDirectory(packagePath, workingDirectory) {
+				deferredPackage = true
+			}
+		}
+	}
+	goRun, goSkip, hasGoRun, hasGoSkip, err := parsePRGoFlags(jobID, goFlags)
+	if err != nil {
+		return err
+	}
+	if !hasRun && hasGoRun {
+		runSelector, hasRun = goRun, true
+	}
+	if !hasSkip && hasGoSkip {
+		skipSelector, hasSkip = goSkip, true
+	}
+	if hasRun && prSelectorMatchesDeferredTests(runSelector) && (!hasSkip || !prSelectorSkipsAllDeferredTests(skipSelector)) {
+		return fmt.Errorf("pull-request job %q selects deferred tests with go test -run", jobID)
+	}
+	if deferredPackage && (!hasRun || prSelectorMatchesDeferredTests(runSelector)) && (!hasSkip || !prSelectorSkipsAllDeferredTests(skipSelector)) {
+		return fmt.Errorf("pull-request job %q runs an unfiltered deferred test root", jobID)
+	}
+	return nil
+}
+
+func parsePRGoFlags(jobID string, words []workflowShellWord) (string, string, bool, bool, error) {
+	var runSelector, skipSelector string
+	hasRun, hasSkip := false, false
+	for _, word := range words {
+		if word.operator {
+			return "", "", false, false, fmt.Errorf("pull-request job %q has unclassifiable GOFLAGS syntax", jobID)
+		}
+		value := word.value
+		switch {
+		case value == "-run" || value == "--run" || value == "-test.run" || value == "--test.run":
+			return "", "", false, false, fmt.Errorf("pull-request job %q has a GOFLAGS selector without a static value", jobID)
+		case strings.HasPrefix(value, "-run=") || strings.HasPrefix(value, "--run=") || strings.HasPrefix(value, "-test.run=") || strings.HasPrefix(value, "--test.run="):
+			if hasRun {
+				return "", "", false, false, fmt.Errorf("pull-request job %q repeats GOFLAGS -run", jobID)
+			}
+			runSelector = value[strings.IndexByte(value, '=')+1:]
+			if runSelector == "" || strings.Contains(runSelector, "${{") {
+				return "", "", false, false, fmt.Errorf("pull-request job %q has an unclassifiable GOFLAGS -run selector", jobID)
+			}
+			hasRun = true
+		case value == "-skip" || value == "--skip" || value == "-test.skip" || value == "--test.skip":
+			return "", "", false, false, fmt.Errorf("pull-request job %q has a GOFLAGS skip selector without a static value", jobID)
+		case strings.HasPrefix(value, "-skip=") || strings.HasPrefix(value, "--skip=") || strings.HasPrefix(value, "-test.skip=") || strings.HasPrefix(value, "--test.skip="):
+			if hasSkip {
+				return "", "", false, false, fmt.Errorf("pull-request job %q repeats GOFLAGS -skip", jobID)
+			}
+			skipSelector = value[strings.IndexByte(value, '=')+1:]
+			if skipSelector == "" || strings.Contains(skipSelector, "${{") {
+				return "", "", false, false, fmt.Errorf("pull-request job %q has an unclassifiable GOFLAGS -skip selector", jobID)
+			}
+			hasSkip = true
+		case value == "-exec" || value == "--exec" || strings.HasPrefix(value, "-exec=") || strings.HasPrefix(value, "--exec="):
+			return "", "", false, false, fmt.Errorf("pull-request job %q uses a custom GOFLAGS test executor", jobID)
+		default:
+			if !strings.HasPrefix(value, "-") {
+				return "", "", false, false, fmt.Errorf("pull-request job %q has an unclassifiable GOFLAGS entry", jobID)
+			}
+		}
+	}
+	return runSelector, skipSelector, hasRun, hasSkip, nil
+}
+
+func resolvePRTestSelector(word workflowShellWord, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	selector := strings.TrimSpace(word.value)
+	if word.quote == '\'' {
+		return selector, nil
+	}
+	if selector == "" || strings.Contains(selector, "${{") || strings.ContainsRune(selector, '`') {
+		return "", fmt.Errorf("selector is empty or dynamic")
+	}
+	if match := workflowShellVariable.FindStringSubmatch(selector); len(match) == 3 {
+		name := match[1]
+		if name == "" {
+			name = match[2]
+		}
+		value, ok := workflowEnvironmentValue(name, workflowEnv, jobEnv, stepEnv)
+		if !ok {
+			return "", fmt.Errorf("shell variable %q is not statically defined", name)
+		}
+		return value, nil
+	}
+	if hasDynamicShellReference(selector) {
+		return "", fmt.Errorf("selector contains an unresolved shell expansion")
+	}
+	return selector, nil
+}
+
+func hasDynamicShellReference(value string) bool {
+	if value == "$" {
+		return true
+	}
+	for i := 0; i < len(value); i++ {
+		if value[i] != '$' || i+1 >= len(value) {
+			continue
+		}
+		next := value[i+1]
+		if next == '{' || next == '(' || next == '?' || next == '!' || next == '$' || next == '-' || next >= '0' && next <= '9' || next == '_' || next >= 'A' && next <= 'Z' || next >= 'a' && next <= 'z' {
+			return true
+		}
+		if next != '|' && next != ')' && next != '/' && next != ']' {
+			return true
+		}
+	}
+	return false
+}
+
+func workflowEnvironmentValue(name string, levels ...*yaml.Node) (string, bool) {
+	value, present, readable := workflowEnvironmentLookup(name, levels...)
+	return value, present && readable
+}
+
+func workflowEnvironmentLookup(name string, levels ...*yaml.Node) (string, bool, bool) {
+	var value *yaml.Node
+	for _, level := range levels {
+		level = resolveWorkflowAlias(level)
+		if current := workflowMappingValue(level, name); current != nil {
+			value = current
+		}
+	}
+	if value == nil {
+		return "", false, true
+	}
+	value = resolveWorkflowAlias(value)
+	if value == nil || value.Kind != yaml.ScalarNode || value.Tag != "!!str" || strings.Contains(value.Value, "${{") {
+		return "", true, false
+	}
+	return value.Value, true, true
+}
+
+func packageReachesPRDeferredRootFromDirectory(value, workingDirectory string) bool {
+	if value == "..." || value == "./..." {
+		return prPackageTreeContainsDeferredRoot(workingDirectory)
+	}
+	if strings.HasSuffix(value, "/...") {
+		if !strings.HasPrefix(value, "./") && !strings.HasPrefix(value, "../") {
+			return packageReachesPRDeferredImport(value)
+		}
+		base := strings.TrimPrefix(strings.TrimSuffix(value, "/..."), "./")
+		return prPackageTreeContainsDeferredRoot(path.Clean(path.Join(workingDirectory, base)))
+	}
+	if value == "." || value == ".." || strings.HasPrefix(value, "./") || strings.HasPrefix(value, "../") {
+		target := path.Clean(path.Join(workingDirectory, value))
+		return target == "cmd/curator" || strings.HasPrefix(target, "cmd/curator/")
+	}
+	return packageReachesPRDeferredImport(value)
+}
+
+func prPackageTreeContainsDeferredRoot(directory string) bool {
+	return directory == "." || directory == "cmd/curator" ||
+		strings.HasPrefix("cmd/curator", directory+"/") || strings.HasPrefix(directory, "cmd/curator/")
+}
+
+func packageReachesPRDeferredImport(value string) bool {
+	return value == "cmd/curator" || value == "./cmd/curator" ||
+		value == "github.com/relux-works/curator/cmd/curator" || strings.HasSuffix(value, "/cmd/curator") ||
+		strings.HasPrefix(value, "./cmd/curator/") || strings.HasPrefix(value, "cmd/curator/") ||
+		strings.HasSuffix(value, "/cmd/curator/...")
+}
+
+func prSelectorMatchesDeferredTests(selector string) bool {
+	patterns, ok := prCompileTestNamePattern(selector)
+	if !ok {
+		return true
+	}
+	for _, name := range curatormutations.PostLandingNames() {
+		matched, _ := prTestNamePatternMatches(patterns, name)
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func prSelectorSkipsAllDeferredTests(selector string) bool {
+	patterns, ok := prCompileTestNamePattern(selector)
+	if !ok {
+		return false
+	}
+	for _, name := range curatormutations.PostLandingNames() {
+		matched, partial := prTestNamePatternMatches(patterns, name)
+		if !matched || partial {
+			return false
+		}
+	}
+	return true
+}
+
+func prCompileTestNamePattern(selector string) ([][]*regexp.Regexp, bool) {
+	parts := prSplitTestNamePattern(selector)
+	compiled := make([][]*regexp.Regexp, len(parts))
+	for i, alternative := range parts {
+		compiled[i] = make([]*regexp.Regexp, len(alternative))
+		for j, component := range alternative {
+			pattern, err := regexp.Compile(component)
+			if err != nil {
+				return nil, false
+			}
+			compiled[i][j] = pattern
+		}
+	}
+	return compiled, len(compiled) != 0
+}
+
+func prSplitTestNamePattern(selector string) [][]string {
+	var alternatives [][]string
+	var components []string
+	start := 0
+	parenDepth := 0
+	charClassDepth := 0
+	for i := 0; i < len(selector); i++ {
+		switch selector[i] {
+		case '[':
+			charClassDepth++
+		case ']':
+			charClassDepth--
+			if charClassDepth < 0 {
+				charClassDepth = 0
+			}
+		case '(':
+			if charClassDepth == 0 {
+				parenDepth++
+			}
+		case ')':
+			if charClassDepth == 0 {
+				parenDepth--
+			}
+		case '\\':
+			i++
+		case '/':
+			if charClassDepth == 0 && parenDepth == 0 {
+				components = append(components, selector[start:i])
+				start = i + 1
+			}
+		case '|':
+			if charClassDepth == 0 && parenDepth == 0 {
+				components = append(components, selector[start:i])
+				alternatives = append(alternatives, components)
+				components = nil
+				start = i + 1
+			}
+		}
+	}
+	components = append(components, selector[start:])
+	return append(alternatives, components)
+}
+
+func prTestNamePatternMatches(patterns [][]*regexp.Regexp, name string) (bool, bool) {
+	nameParts := strings.Split(name, "/")
+	for _, alternative := range patterns {
+		matched := true
+		for i, namePart := range nameParts {
+			if i >= len(alternative) {
+				break
+			}
+			if !alternative[i].MatchString(namePart) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true, len(nameParts) < len(alternative)
+		}
+	}
+	return false, false
+}
+
+func checkPRLocalTargets(jobID string, job pullRequestJob, workflowEnv *yaml.Node) error {
+	for _, step := range job.Steps {
+		stepDirectory, err := prStepWorkingDirectory(jobID, step, workflowEnv, &job.Env, &step.Env)
+		if err != nil {
+			return err
+		}
+		if err := checkPRLocalExecutableCommands(jobID, step, stepDirectory, workflowEnv, &job.Env, &step.Env); err != nil {
+			return err
+		}
+		if err := checkPRWorkflowInterpreters(jobID, step, stepDirectory, workflowEnv, &job.Env, &step.Env); err != nil {
+			return err
+		}
+		words := workflowShellWords(step.Run)
+		for i := 0; i < len(words); i++ {
+			if words[i].operator || !isWorkflowGoCommand(words[i].value) {
+				continue
+			}
+			command, commandIndex, workingDirectory, err := parsePRGoCommand(jobID, words, i, stepDirectory, workflowEnv, &job.Env, &step.Env)
+			if err != nil {
+				return err
+			}
+			if command != "run" {
+				continue
+			}
+			for j := commandIndex + 1; j < len(words) && !words[j].operator; j++ {
+				candidate := words[j].value
+				if strings.HasPrefix(candidate, "-") {
+					continue
+				}
+				if strings.HasPrefix(candidate, "$") {
+					if !isAllowedPRDynamicGoRun(step) {
+						return fmt.Errorf("pull-request job %q uses a dynamic local go run target", jobID)
+					}
+					break
+				}
+				if candidate == "." || strings.HasPrefix(candidate, "./") || strings.HasPrefix(candidate, "../") || strings.HasSuffix(candidate, ".go") {
+					target, err := resolvePRRepoPath(jobID, workflowShellWord{value: candidate}, workingDirectory, "local Go tool target", workflowEnv, &job.Env, &step.Env)
+					if err != nil {
+						return err
+					}
+					allowlistPath := "./" + strings.TrimPrefix(target, "./")
+					if _, ok := allowedPRLocalGoTools[allowlistPath]; !ok {
+						return fmt.Errorf("pull-request job %q calls an unapproved local Go tool %q", jobID, allowlistPath)
+					}
+					break
+				}
+			}
+		}
+		uses := strings.TrimSpace(step.Uses)
+		if isPRLocalPath(uses) {
+			allowedInputs, ok := allowedPRLocalActions[uses]
+			actualInputs, readable := workflowStringMap(&step.With)
+			if !ok || !readable || !reflect.DeepEqual(actualInputs, allowedInputs) {
+				return fmt.Errorf("pull-request job %q calls an unapproved local action %q or changes its inputs", jobID, uses)
+			}
+		}
+		if dynamicWorkflowScriptInvocation.MatchString(step.Run) {
+			return fmt.Errorf("pull-request job %q calls a local script through a dynamic path", jobID)
+		}
+		if dynamicWorkflowSourceInvocation.MatchString(step.Run) {
+			return fmt.Errorf("pull-request job %q sources a local script through a dynamic path", jobID)
+		}
+		if inlineWorkflowScriptBody.MatchString(step.Run) {
+			return fmt.Errorf("pull-request job %q embeds an unclassifiable shell script body", jobID)
+		}
+		if inlineWorkflowHeredoc.MatchString(step.Run) && !isAllowedPRInlineHeredoc(step) {
+			return fmt.Errorf("pull-request job %q embeds an unapproved interpreter heredoc", jobID)
+		}
+		for _, script := range prLocalScripts(step.Run) {
+			target, err := resolvePRRepoPath(jobID, workflowShellWord{value: script}, stepDirectory, "local script target", workflowEnv, &job.Env, &step.Env)
+			if err != nil {
+				return err
+			}
+			if _, ok := allowedPRLocalScripts[target]; !ok {
+				return fmt.Errorf("pull-request job %q calls an unapproved local script %q", jobID, target)
+			}
+			if target == ".github/ci/test-gate.sh" {
+				value, ok := workflowEnvironmentValue("CI_SKIP_POST_LANDING_TESTS", workflowEnv, &job.Env, &step.Env)
+				if !ok || value != "1" {
+					return fmt.Errorf("pull-request job %q calls test-gate.sh without the deferred-suite skip", jobID)
+				}
+				if testGateSkipUnset.MatchString(step.Run) || isolatedWorkflowEnvironment.MatchString(step.Run) {
+					return fmt.Errorf("pull-request job %q removes the test-gate deferred-suite skip", jobID)
+				}
+				for _, match := range testGateSkipOverride.FindAllStringSubmatch(step.Run, -1) {
+					if strings.Trim(match[1], "\"'") != "1" {
+						return fmt.Errorf("pull-request job %q overrides the test-gate deferred-suite skip", jobID)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func checkPRLocalExecutableCommands(jobID string, step pullRequestStep, stepDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) error {
+	words := workflowShellWords(step.Run)
+	for _, index := range prWorkflowCommandIndices(words) {
+		candidate := words[index]
+		if path.IsAbs(candidate.value) {
+			if _, ok := allowedPRAbsoluteGoCommands[candidate.value]; ok {
+				continue
+			}
+			if isAllowedPRAbsoluteCommandRun(jobID, step, candidate.value) {
+				continue
+			}
+		}
+		if !path.IsAbs(candidate.value) && !strings.Contains(candidate.value, "/") {
+			continue
+		}
+		target, err := resolvePRRepoPath(jobID, candidate, stepDirectory, "local executable target", workflowEnv, jobEnv, stepEnv)
+		if err != nil {
+			return err
+		}
+		if _, ok := allowedPRLocalExecutables[target]; !ok {
+			return fmt.Errorf("pull-request job %q directly executes an unapproved local file %q", jobID, target)
+		}
+	}
+	return nil
+}
+
+func isAllowedPRAbsoluteCommandRun(jobID string, step pullRequestStep, command string) bool {
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(step.Run)))
+	_, ok := allowedPRAbsoluteCommandRuns[jobID+"\x00"+step.Name+"\x00"+command+"\x00"+digest]
+	return ok
+}
+
+func checkPRWorkflowInterpreters(jobID string, step pullRequestStep, stepDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) error {
+	if inlineWorkflowHeredoc.MatchString(step.Run) {
+		if !isAllowedPRInlineHeredoc(step) {
+			return fmt.Errorf("pull-request job %q embeds an unapproved interpreter heredoc", jobID)
+		}
+		return nil
+	}
+	if err := checkPRWorkflowNestedExecution(jobID, step, stepDirectory, workflowEnv, jobEnv, stepEnv, step.Run, 0); err != nil {
+		return err
+	}
+	unmodeledShell := prEnvSplitString.MatchString(step.Run) || prShellFunctionDefinition.MatchString(step.Run)
+	words := workflowShellWords(step.Run)
+	for _, index := range prWorkflowCommandIndices(words) {
+		command := strings.ToLower(path.Base(strings.ReplaceAll(words[index].value, "\\", "/")))
+		if command == "." || command == "source" {
+			return fmt.Errorf("pull-request job %q uses an unapproved source invocation", jobID)
+		}
+		switch command {
+		case "alias", "eval", "function", "shopt", "trap":
+			unmodeledShell = true
+		}
+	}
+	if unmodeledShell && !isAllowedPRUnmodeledShellRun(jobID, step) {
+		return fmt.Errorf("pull-request job %q uses an unmodeled shell command form", jobID)
+	}
+	for _, index := range prWorkflowInterpreterCommandIndices(words) {
+		if err := checkPRInterpreterInvocation(jobID, words, index, stepDirectory, workflowEnv, jobEnv, stepEnv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Shell substitutions are inspected recursively. Dispatcher forms are
+// admitted only when listed above; unknown commands carrying Go-test text are
+// refused unless they are known to treat that text as data.
+func checkPRWorkflowNestedExecution(jobID string, step pullRequestStep, stepDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node, run string, depth int) error {
+	if depth > 12 {
+		return fmt.Errorf("pull-request job %q has shell command substitutions nested too deeply", jobID)
+	}
+	words := workflowShellWords(run)
+	for _, index := range prWorkflowCommandIndices(words) {
+		command := strings.ToLower(path.Base(strings.ReplaceAll(words[index].value, "\\", "/")))
+		end := index + 1
+		for end < len(words) && !words[end].operator {
+			end++
+		}
+		arguments := words[index+1 : end]
+		if err := checkPRWorkflowExecutionCommand(jobID, command, arguments); err != nil {
+			return err
+		}
+	}
+
+	bodies, complete := prWorkflowCommandSubstitutionBodies(run)
+	if !complete {
+		return fmt.Errorf("pull-request job %q has an unclassifiable shell command substitution", jobID)
+	}
+	for _, body := range bodies {
+		nestedStep := step
+		nestedStep.Run = body
+		nestedWords := workflowShellWords(body)
+		if err := checkPRLocalExecutableCommands(jobID, nestedStep, stepDirectory, workflowEnv, jobEnv, stepEnv); err != nil {
+			return err
+		}
+		for _, index := range prWorkflowCommandIndices(nestedWords) {
+			command := strings.ToLower(path.Base(strings.ReplaceAll(nestedWords[index].value, "\\", "/")))
+			switch command {
+			case ".", "source", "alias", "eval", "function", "shopt", "trap":
+				return fmt.Errorf("pull-request job %q uses an unmodeled command inside a shell substitution", jobID)
+			}
+			if prWorkflowInterpreter(nestedWords[index].value) != "" {
+				return fmt.Errorf("pull-request job %q invokes an interpreter inside a shell substitution", jobID)
+			}
+			if !isWorkflowGoCommand(nestedWords[index].value) {
+				continue
+			}
+			goCommand, _, _, err := parsePRGoCommand(jobID, nestedWords, index, stepDirectory, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return err
+			}
+			if goCommand == "test" || goCommand == "run" {
+				return fmt.Errorf("pull-request job %q runs an unmodeled Go test or tool inside a shell substitution", jobID)
+			}
+		}
+		if err := checkPRWorkflowNestedExecution(jobID, nestedStep, stepDirectory, workflowEnv, jobEnv, stepEnv, body, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkPRWorkflowExecutionCommand(jobID, command string, arguments []workflowShellWord) error {
+	if _, dispatcher := prWorkflowDelegatedExecutionCommands[command]; dispatcher {
+		allowedForm, listed := allowedPRDelegatedExecutionForms[command]
+		if !listed || !allowedForm(arguments) {
+			if command == "find" {
+				return fmt.Errorf("pull-request job %q uses an unmodeled find execution action", jobID)
+			}
+			return fmt.Errorf("pull-request job %q uses an unmodeled execution dispatcher %q", jobID, command)
+		}
+	}
+	if prWorkflowArgumentsContainGoTestText(arguments) && !prWorkflowCommandMayCarryGoTestText(command, arguments) {
+		return fmt.Errorf("pull-request job %q passes Go-test command text to an unmodeled dispatcher %q", jobID, command)
+	}
+	return nil
+}
+
+func checkPRWorkflowGoCommandWrappers(jobID string, words []workflowShellWord, start, commandIndex int) error {
+	for i := start; i < commandIndex; {
+		if workflowShellAssignment.MatchString(words[i].value) {
+			i++
+			continue
+		}
+		command := strings.ToLower(path.Base(strings.ReplaceAll(words[i].value, "\\", "/")))
+		if command == "env" {
+			if _, ok := allowedPRGoCommandWrappers[command]; !ok {
+				return fmt.Errorf("pull-request job %q uses an unmodeled Go command wrapper %q", jobID, command)
+			}
+			for option := i + 1; option < commandIndex; option++ {
+				value := words[option].value
+				if value == "-C" || value == "--chdir" || strings.HasPrefix(value, "-C") && len(value) > 2 || strings.HasPrefix(value, "--chdir=") {
+					return fmt.Errorf("pull-request job %q changes the Go working directory through env", jobID)
+				}
+				if value == "-S" || value == "--split-string" || strings.HasPrefix(value, "--split-string=") {
+					return fmt.Errorf("pull-request job %q uses an unmodeled env command form before Go", jobID)
+				}
+				if value == "-u" || value == "--unset" {
+					option++
+				}
+				if value == "--" {
+					return nil
+				}
+			}
+			return nil
+		}
+		if command == "sudo" {
+			for option := i + 1; option < commandIndex; option++ {
+				value := words[option].value
+				if value == "-D" || value == "--chdir" || strings.HasPrefix(value, "-D") && len(value) > 2 || strings.HasPrefix(value, "--chdir=") {
+					return fmt.Errorf("pull-request job %q changes the Go working directory through sudo", jobID)
+				}
+			}
+		}
+		return fmt.Errorf("pull-request job %q uses an unmodeled Go command wrapper %q", jobID, command)
+	}
+	return nil
+}
+
+func prWorkflowArgumentsContainGoTestText(arguments []workflowShellWord) bool {
+	values := make([]string, len(arguments))
+	for i, argument := range arguments {
+		values[i] = argument.value
+	}
+	return prWorkflowGoTestCommandText.MatchString(strings.Join(values, " "))
+}
+
+func prWorkflowCommandMayCarryGoTestText(command string, arguments []workflowShellWord) bool {
+	if _, ok := allowedPRGoTestTextDataCommands[command]; ok {
+		return true
+	}
+	if allowedForm, ok := allowedPRDelegatedExecutionForms[command]; ok {
+		return allowedForm(arguments)
+	}
+	if (command == "bash" || command == "python3") && len(arguments) != 0 {
+		_, ok := allowedPRLocalScripts[arguments[0].value]
+		return ok
+	}
+	return false
+}
+
+func prWorkflowFindInvocationIsNonExecuting(arguments []workflowShellWord) bool {
+	for _, argument := range arguments {
+		switch argument.value {
+		case "-exec", "-execdir", "-ok", "-okdir":
+			return false
+		}
+	}
+	return true
+}
+
+func prWorkflowSedInvocationIsNonExecuting(arguments []workflowShellWord) bool {
+	var scripts []string
+	for i := 0; i < len(arguments); i++ {
+		value := arguments[i].value
+		switch {
+		case value == "-e" || value == "--expression":
+			if i+1 >= len(arguments) {
+				return false
+			}
+			i++
+			scripts = append(scripts, arguments[i].value)
+		case strings.HasPrefix(value, "--expression="):
+			scripts = append(scripts, strings.TrimPrefix(value, "--expression="))
+		case strings.HasPrefix(value, "-e") && len(value) > 2:
+			scripts = append(scripts, value[2:])
+		case value == "-f" || value == "--file" || strings.HasPrefix(value, "--file="):
+			return false
+		case value == "--":
+			if i+1 >= len(arguments) {
+				return false
+			}
+			scripts = append(scripts, arguments[i+1].value)
+			return prWorkflowSedScriptsAreNonExecuting(scripts)
+		case value == "-n" || value == "--quiet" || value == "--silent" || value == "-E" || value == "-r" || value == "--regexp-extended" || value == "-s" || value == "--separate" || value == "-u" || value == "--unbuffered" || value == "--sandbox" || value == "-i" || strings.HasPrefix(value, "-i") || value == "--in-place" || strings.HasPrefix(value, "--in-place="):
+			continue
+		case strings.HasPrefix(value, "-"):
+			return false
+		default:
+			if len(scripts) == 0 {
+				scripts = append(scripts, value)
+			}
+			return prWorkflowSedScriptsAreNonExecuting(scripts)
+		}
+	}
+	return prWorkflowSedScriptsAreNonExecuting(scripts)
+}
+
+func prWorkflowSedScriptsAreNonExecuting(scripts []string) bool {
+	if len(scripts) == 0 {
+		return false
+	}
+	for _, script := range scripts {
+		if !prWorkflowSedScriptIsNonExecuting(script) {
+			return false
+		}
+	}
+	return true
+}
+
+func prWorkflowSedScriptIsNonExecuting(script string) bool {
+	position := 0
+	sawSubstitution := false
+	for position < len(script) {
+		for position < len(script) && (script[position] == ' ' || script[position] == '\t' || script[position] == '\r' || script[position] == '\n' || script[position] == ';') {
+			position++
+		}
+		if position == len(script) {
+			break
+		}
+		if script[position] != 's' || position+1 >= len(script) {
+			return false
+		}
+		delimiter := script[position+1]
+		if delimiter == '\\' || delimiter == ' ' || delimiter == '\t' || delimiter == '\r' || delimiter == '\n' {
+			return false
+		}
+		position += 2
+		var ok bool
+		position, ok = prWorkflowSedConsumeDelimited(script, position, delimiter)
+		if !ok {
+			return false
+		}
+		position, ok = prWorkflowSedConsumeDelimited(script, position, delimiter)
+		if !ok {
+			return false
+		}
+		for position < len(script) && script[position] != ';' && script[position] != '\n' {
+			switch value := script[position]; {
+			case value == 'e':
+				return false
+			case value == ' ' || value == '\t' || value == '\r' || value == 'g' || value == 'p' || value == 'i' || value == 'I' || value == 'm' || value == 'M' || value >= '0' && value <= '9':
+				position++
+			default:
+				return false
+			}
+		}
+		sawSubstitution = true
+	}
+	return sawSubstitution
+}
+
+func prWorkflowSedConsumeDelimited(script string, position int, delimiter byte) (int, bool) {
+	for position < len(script) {
+		if script[position] == '\\' {
+			position += 2
+			continue
+		}
+		if script[position] == delimiter {
+			return position + 1, true
+		}
+		position++
+	}
+	return 0, false
+}
+
+func prWorkflowCommandSubstitutionBodies(run string) ([]string, bool) {
+	var bodies []string
+	var quote byte
+	for i := 0; i < len(run); i++ {
+		ch := run[i]
+		if quote == '\'' {
+			if ch == '\'' {
+				quote = 0
+			}
+			continue
+		}
+		if ch == '\\' && quote != '\'' {
+			i++
+			continue
+		}
+		if quote == '"' {
+			if ch == '"' {
+				quote = 0
+				continue
+			}
+		} else {
+			if ch == '\'' || ch == '"' {
+				quote = ch
+				continue
+			}
+			if ch == '#' && (i == 0 || strings.ContainsRune(" \t\r\n;&|()", rune(run[i-1]))) {
+				for i < len(run) && run[i] != '\n' {
+					i++
+				}
+				continue
+			}
+		}
+		if ch == '$' && i+1 < len(run) && run[i+1] == '(' {
+			end, ok := prWorkflowCommandSubstitutionEnd(run, i+1)
+			if !ok {
+				return nil, false
+			}
+			bodies = append(bodies, run[i+2:end])
+			i = end
+			continue
+		}
+		if quote == 0 && (ch == '<' || ch == '>') && i+1 < len(run) && run[i+1] == '(' {
+			return nil, false
+		}
+		if ch == '`' {
+			end := i + 1
+			for end < len(run) {
+				if run[end] == '\\' {
+					end += 2
+					continue
+				}
+				if run[end] == '`' {
+					break
+				}
+				end++
+			}
+			if end >= len(run) {
+				return nil, false
+			}
+			bodies = append(bodies, run[i+1:end])
+			i = end
+		}
+	}
+	return bodies, true
+}
+
+func prWorkflowCommandSubstitutionEnd(run string, open int) (int, bool) {
+	depth := 1
+	var quote byte
+	for i := open + 1; i < len(run); i++ {
+		ch := run[i]
+		if quote == '\'' {
+			if ch == '\'' {
+				quote = 0
+			}
+			continue
+		}
+		if ch == '\\' && quote != '\'' {
+			i++
+			continue
+		}
+		if quote == '"' {
+			if ch == '"' {
+				quote = 0
+			}
+			if ch == '$' && i+1 < len(run) && run[i+1] == '(' {
+				end, ok := prWorkflowCommandSubstitutionEnd(run, i+1)
+				if !ok {
+					return 0, false
+				}
+				i = end
+			}
+			continue
+		}
+		if ch == '$' && i+1 < len(run) && run[i+1] == '(' {
+			end, ok := prWorkflowCommandSubstitutionEnd(run, i+1)
+			if !ok {
+				return 0, false
+			}
+			i = end
+			continue
+		}
+		if (ch == '<' || ch == '>') && i+1 < len(run) && run[i+1] == '(' {
+			return 0, false
+		}
+		if ch == '`' {
+			for i++; i < len(run); i++ {
+				if run[i] == '\\' {
+					i++
+					continue
+				}
+				if run[i] == '`' {
+					break
+				}
+			}
+			if i >= len(run) {
+				return 0, false
+			}
+			continue
+		}
+		switch ch {
+		case '\'', '"':
+			quote = ch
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func isAllowedPRUnmodeledShellRun(jobID string, step pullRequestStep) bool {
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(step.Run)))
+	_, ok := allowedPRUnmodeledShellRuns[jobID+"\x00"+step.Name+"\x00"+digest]
+	return ok
+}
+
+func checkPRInterpreterInvocation(jobID string, words []workflowShellWord, index int, stepDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) error {
+	interpreter := prWorkflowInterpreter(words[index].value)
+	end := index + 1
+	for end < len(words) && !words[end].operator {
+		end++
+	}
+	args := words[index+1 : end]
+	switch interpreter {
+	case "bash":
+		if len(args) == 0 || strings.HasPrefix(args[0].value, "-") || strings.Contains(args[0].value, "$") {
+			return fmt.Errorf("pull-request job %q uses an unapproved bash invocation form", jobID)
+		}
+		target, err := resolvePRRepoPath(jobID, args[0], stepDirectory, "local script target", workflowEnv, jobEnv, stepEnv)
+		if err != nil {
+			return err
+		}
+		if _, ok := allowedPRLocalScripts[target]; !ok || !strings.HasSuffix(target, ".sh") {
+			return fmt.Errorf("pull-request job %q calls an unapproved bash script %q", jobID, target)
+		}
+		if args[0].value != target {
+			return fmt.Errorf("pull-request job %q uses an unapproved bash script path form %q", jobID, args[0].value)
+		}
+		if target == ".github/ci/isolated-test.sh" {
+			nested := prWorkflowInterpreterCommandIndices(args[1:])
+			for _, nestedIndex := range nested {
+				if err := checkPRInterpreterInvocation(jobID, args[1:], nestedIndex, stepDirectory, workflowEnv, jobEnv, stepEnv); err != nil {
+					return err
+				}
+			}
+		}
+	case "python3":
+		if len(args) == 0 || strings.HasPrefix(args[0].value, "-") || strings.Contains(args[0].value, "$") {
+			return fmt.Errorf("pull-request job %q uses an unapproved python3 invocation form", jobID)
+		}
+		target, err := resolvePRRepoPath(jobID, args[0], stepDirectory, "local script target", workflowEnv, jobEnv, stepEnv)
+		if err != nil {
+			return err
+		}
+		if _, ok := allowedPRLocalScripts[target]; !ok || !strings.HasSuffix(target, ".py") {
+			return fmt.Errorf("pull-request job %q calls an unapproved python3 script %q", jobID, target)
+		}
+		if args[0].value != target {
+			return fmt.Errorf("pull-request job %q uses an unapproved python3 script path form %q", jobID, args[0].value)
+		}
+	default:
+		return fmt.Errorf("pull-request job %q uses an unapproved interpreter %q", jobID, words[index].value)
+	}
+	return nil
+}
+
+func prWorkflowCommandIndices(words []workflowShellWord) []int {
+	var indices []int
+	commandStart := true
+	for i := 0; i < len(words); i++ {
+		word := words[i]
+		if word.operator {
+			if word.value == ">" || word.value == "<" {
+				if i+1 < len(words) && !words[i+1].operator {
+					i++
+				}
+				continue
+			}
+			commandStart = true
+			continue
+		}
+		if word.quote == 0 && strings.HasPrefix(word.value, "#") {
+			for i+1 < len(words) && (!words[i+1].operator || words[i+1].value != ";") {
+				i++
+			}
+			commandStart = true
+			continue
+		}
+		if word.quote == 0 && isPRShellControlKeyword(word.value) {
+			commandStart = true
+			continue
+		}
+		if !commandStart {
+			continue
+		}
+		commandIndex := prWorkflowCommandTarget(words, i)
+		if commandIndex >= 0 {
+			indices = append(indices, commandIndex)
+		}
+		commandStart = false
+	}
+	return indices
+}
+
+func prWorkflowInterpreterCommandIndices(words []workflowShellWord) []int {
+	var indices []int
+	for _, index := range prWorkflowCommandIndices(words) {
+		if prWorkflowInterpreter(words[index].value) != "" {
+			indices = append(indices, index)
+		}
+	}
+	return indices
+}
+
+func prWorkflowCommandTarget(words []workflowShellWord, start int) int {
+	index := start
+	for index < len(words) && !words[index].operator && workflowShellAssignment.MatchString(words[index].value) {
+		index++
+	}
+	for index < len(words) && !words[index].operator {
+		command := strings.ToLower(path.Base(strings.ReplaceAll(words[index].value, "\\", "/")))
+		switch command {
+		case "env":
+			index++
+			for index < len(words) && !words[index].operator {
+				value := words[index].value
+				if value == "--" {
+					index++
+					break
+				}
+				if value == "-u" || value == "--unset" || value == "-C" || value == "--chdir" {
+					index += 2
+					continue
+				}
+				if strings.HasPrefix(value, "-") || workflowShellAssignment.MatchString(value) {
+					index++
+					continue
+				}
+				break
+			}
+		case "command", "builtin", "exec", "nohup", "nice", "time":
+			index++
+			for index < len(words) && !words[index].operator && strings.HasPrefix(words[index].value, "-") {
+				index++
+			}
+		case "sudo":
+			index++
+			for index < len(words) && !words[index].operator {
+				value := words[index].value
+				if value == "-u" || value == "-g" || value == "-h" || value == "-p" || value == "-C" || value == "-D" || value == "--chdir" {
+					index += 2
+					continue
+				}
+				if strings.HasPrefix(value, "-") || workflowShellAssignment.MatchString(value) {
+					index++
+					continue
+				}
+				break
+			}
+		case "timeout":
+			index++
+			for index < len(words) && !words[index].operator && strings.HasPrefix(words[index].value, "-") {
+				value := words[index].value
+				index++
+				if value == "-k" || value == "--kill-after" {
+					index++
+				}
+			}
+			if index < len(words) && !words[index].operator {
+				index++
+			}
+		case "xargs":
+			index++
+			for index < len(words) && !words[index].operator && strings.HasPrefix(words[index].value, "-") {
+				value := words[index].value
+				index++
+				if value == "-a" || value == "-d" || value == "-E" || value == "-I" || value == "-L" || value == "-n" || value == "-P" || value == "-s" {
+					index++
+				}
+			}
+		default:
+			if index < len(words) && !words[index].operator && prWorkflowInterpreter(words[index].value) == "" && workflowShellAssignment.MatchString(words[index].value) {
+				index++
+				continue
+			}
+			if index >= len(words) || words[index].operator {
+				return -1
+			}
+			return index
+		}
+	}
+	return -1
+}
+
+func prWorkflowInterpreter(command string) string {
+	base := strings.ToLower(path.Base(strings.ReplaceAll(command, "\\", "/")))
+	if base == "python" || base == "py" {
+		return base
+	}
+	if strings.HasSuffix(base, ".exe") {
+		if prWorkflowInterpreter(strings.TrimSuffix(base, ".exe")) != "" {
+			return base
+		}
+		return ""
+	}
+	if base == "python3" {
+		return "python3"
+	}
+	if base == "bash" {
+		return "bash"
+	}
+	if prPythonInterpreterVersion.MatchString(base) || prNodeInterpreterVersion.MatchString(base) || prPerlInterpreterVersion.MatchString(base) || prPHPInterpreterVersion.MatchString(base) || prVersionedShellInterpreter.MatchString(base) {
+		return base
+	}
+	if prRubyInterpreterVersion.MatchString(base) || base == "ruby" || base == "jruby" || base == "truffleruby" {
+		return "ruby"
+	}
+	switch base {
+	case "sh", "dash", "ash", "zsh", "ksh", "mksh", "yash", "fish", "csh", "tcsh",
+		"pypy", "pypy3", "perl", "perl5", "node", "nodejs", "deno", "bun", "bunx", "tsx", "ts-node", "npx",
+		"js", "jsc", "qjs", "quickjs", "pwsh", "powershell", "php", "lua", "luajit", "r", "rscript", "julia",
+		"awk", "gawk", "mawk", "nawk", "tclsh", "wish", "java", "jshell", "groovy", "scala", "swift", "csi",
+		"dotnet-script", "scriptcs", "cmd", "cmd.exe", "command.com", "cscript", "wscript", "ipython", "ipython3",
+		"busybox", "toybox", "pythonw", "pythonw3",
+		"irb", "pry", "elixir", "iex", "erl", "escript", "ghci", "runghc", "ocaml", "ocamlrun", "osascript":
+		return base
+	default:
+		return ""
+	}
+}
+
+func isAllowedPRDynamicGoRun(step pullRequestStep) bool {
+	return step.Name == "Record macOS race capacity" && step.If == "runner.os == 'macOS'" &&
+		fmt.Sprintf("%x", sha256.Sum256([]byte(step.Run))) == "6132d13dc9aea819d1cd3aac9107a2742c6e83ea9e87807709fe545d91ab8780"
+}
+
+func isAllowedPRInlineHeredoc(step pullRequestStep) bool {
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(step.Run)))
+	switch step.Name {
+	case "Driver qualification and reproducibility":
+		return digest == "34dd145d07394a40b8159c102e5665a1363050b74e6623a802a8a57eb92ff0d8" ||
+			digest == "dfeb880111ffb7b4a3b48aa2adb757ae2d344042a4a0cc13564b5c66522d1502"
+	case "Compare thirty isolated counts at each revision":
+		return digest == "34e2488b9fba5fbb5a0d64c4ca1fac95a431be59499ba12b02271c4ae08d9fd1"
+	default:
+		return false
+	}
+}
+
+func isPRLocalPath(value string) bool {
+	return strings.HasPrefix(value, "./") || strings.HasPrefix(value, "../") || strings.HasPrefix(value, ".github/")
+}
+
+func prLocalScripts(run string) []string {
+	found := make(map[string]struct{})
+	for _, pattern := range []*regexp.Regexp{localWorkflowScriptInvocation, localWorkflowScriptToken, localWorkflowExecutable} {
+		for _, match := range pattern.FindAllStringSubmatch(run, -1) {
+			if len(match) < 2 {
+				continue
+			}
+			value := strings.Trim(match[1], "\"'")
+			value = strings.TrimPrefix(value, "./")
+			found[value] = struct{}{}
+		}
+	}
+	paths := make([]string, 0, len(found))
+	for value := range found {
+		paths = append(paths, value)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func workflowStringMap(node *yaml.Node) (map[string]string, bool) {
+	node = resolveWorkflowAlias(node)
+	if node == nil || node.Kind == 0 || node.Tag == "!!null" {
+		return map[string]string{}, true
+	}
+	if node.Kind != yaml.MappingNode {
+		return nil, false
+	}
+	values := make(map[string]string, len(node.Content)/2)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key := node.Content[i]
+		value := resolveWorkflowAlias(node.Content[i+1])
+		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" || value == nil || value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
+			return nil, false
+		}
+		values[key.Value] = value.Value
+	}
+	return values, true
 }
 
 func pullRequestMatrixValues(strategy *yaml.Node) (map[string][]string, error) {
@@ -1356,9 +3135,12 @@ func workflowScalarValues(node *yaml.Node) []string {
 }
 
 type workflowStepAddition struct {
-	Name string
-	Run  string
-	Env  map[string]string
+	Name             string
+	Run              string
+	Uses             string
+	WorkingDirectory string
+	With             map[string]string
+	Env              map[string]string
 }
 
 func addStepToWorkflowJob(data []byte, jobName string, step workflowStepAddition) ([]byte, error) {
@@ -1546,8 +3328,26 @@ func workflowStepNode(step workflowStepAddition) *yaml.Node {
 	if step.Name != "" {
 		appendWorkflowMappingPair(node, "name", workflowStringNode(step.Name))
 	}
+	if step.WorkingDirectory != "" {
+		appendWorkflowMappingPair(node, "working-directory", workflowStringNode(step.WorkingDirectory))
+	}
 	if step.Run != "" {
 		appendWorkflowMappingPair(node, "run", workflowStringNode(step.Run))
+	}
+	if step.Uses != "" {
+		appendWorkflowMappingPair(node, "uses", workflowStringNode(step.Uses))
+	}
+	if len(step.With) != 0 {
+		with := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		keys := make([]string, 0, len(step.With))
+		for key := range step.With {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			appendWorkflowMappingPair(with, key, workflowStringNode(step.With[key]))
+		}
+		appendWorkflowMappingPair(node, "with", with)
 	}
 	if len(step.Env) != 0 {
 		env := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
@@ -1964,5 +3764,524 @@ func TestOtherWorkflowCmdCuratorInvocationsAreNarrow(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no direct cmd/curator workflow invocations were checked")
+	}
+}
+
+// Claim: the PR guard rejects deferred test selectors resolved from workflow,
+// job, step, package, and GOFLAGS inputs while admitting safe neighbors.
+// Limit: this is a static workflow check, not hosted-runner evidence.
+func TestPullRequestGuardResolvesDeferredSelectorsFromEnvironment(t *testing.T) {
+	good := mutationInventoryWorkflowBytes(t)
+	if err := checkPRDefersPostLandingTests(good); err != nil {
+		t.Fatalf("unmodified workflow is not the passing control: %v", err)
+	}
+	makeWorkflow := func(scope, selector string) ([]byte, error) {
+		data, err := addWorkflowJob(good, "selector-control", "Selector control", `go test ./... -run "$SUITE_SELECTOR"`, "", "")
+		if err != nil {
+			return nil, err
+		}
+		document, root, err := parseWorkflowDocument(data)
+		if err != nil {
+			return nil, err
+		}
+		target := root
+		if scope != "workflow" {
+			target = workflowMappingValue(workflowMappingValue(root, "jobs"), "selector-control")
+			if scope == "step" {
+				steps := workflowMappingValue(target, "steps")
+				if steps == nil || len(steps.Content) != 1 {
+					return nil, fmt.Errorf("selector-control job has no single step")
+				}
+				target = steps.Content[0]
+			}
+		}
+		env := workflowMappingValue(target, "env")
+		if env == nil {
+			env = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+			appendWorkflowMappingPair(target, "env", env)
+		}
+		appendWorkflowMappingPair(env, "SUITE_SELECTOR", workflowStringNode(selector))
+		return yaml.Marshal(document)
+	}
+	for _, scope := range []string{"workflow", "job", "step"} {
+		t.Run(scope+"_environment_refuses_deferred_selector", func(t *testing.T) {
+			workflow, err := makeWorkflow(scope, curatormutations.PostLandingSelector())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := checkPRDefersPostLandingTests(workflow); err == nil {
+				t.Fatalf("deferred selector from %s environment was admitted", scope)
+			}
+			workflow, err = makeWorkflow(scope, "^TestRoutine$")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := checkPRDefersPostLandingTests(workflow); err != nil {
+				t.Fatalf("ordinary selector from %s environment rejected: %v", scope, err)
+			}
+		})
+	}
+	for _, test := range []struct {
+		name      string
+		packageID string
+		wantError bool
+	}{
+		{name: "deferred_package_from_environment_refuses", packageID: "./cmd/curator", wantError: true},
+		{name: "ordinary_package_from_environment_admits", packageID: "./tools/mutationinventory"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := addWorkflowJob(good, "package-control", "Package control", `go test "$TEST_PACKAGE"`, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			document, root, err := parseWorkflowDocument(workflow)
+			if err != nil {
+				t.Fatal(err)
+			}
+			job := workflowMappingValue(workflowMappingValue(root, "jobs"), "package-control")
+			steps := workflowMappingValue(job, "steps")
+			if steps == nil || len(steps.Content) != 1 {
+				t.Fatal("package-control job has no single step")
+			}
+			step := steps.Content[0]
+			env := workflowMappingValue(step, "env")
+			if env == nil {
+				env = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				appendWorkflowMappingPair(step, "env", env)
+			}
+			appendWorkflowMappingPair(env, "TEST_PACKAGE", workflowStringNode(test.packageID))
+			workflow, err = yaml.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("deferred package target from the step environment was admitted")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("ordinary package target from the step environment was rejected: %v", err)
+			}
+		})
+	}
+	workflow, err := addWorkflowJob(good, "unknown-package-control", "Unknown package control", `go test "$MISSING_PACKAGE"`, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPRDefersPostLandingTests(workflow); err == nil {
+		t.Fatal("unresolved dynamic package target was admitted")
+	}
+	for _, test := range []struct {
+		name      string
+		goPath    string
+		selector  string
+		wantError bool
+	}{
+		{name: "absolute_go_path_refuses_deferred_selector", goPath: "/opt/go/bin/go", selector: curatormutations.PostLandingSelector(), wantError: true},
+		{name: "absolute_go_exe_path_refuses_deferred_selector", goPath: "C:/Go/bin/go.exe", selector: curatormutations.PostLandingSelector(), wantError: true},
+		{name: "absolute_windows_backslash_go_path_refuses_deferred_selector", goPath: `C:\Go\bin\go.exe`, selector: curatormutations.PostLandingSelector(), wantError: true},
+		{name: "absolute_go_path_admits_ordinary_selector", goPath: "/opt/go/bin/go", selector: "^TestRoutine$"},
+		{name: "unapproved_absolute_go_path_refuses", goPath: "/tmp/go", selector: "^TestRoutine$", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			run := test.goPath + " test ./... -run '" + test.selector + "'"
+			workflow, err := addWorkflowJob(good, "absolute-go-control", "Absolute Go control", run, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("absolute Go invocation admitted a deferred selector")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("absolute Go invocation rejected a safe selector: %v", err)
+			}
+		})
+	}
+	makeGOFlagsWorkflow := func(scope, goFlags, run string) ([]byte, error) {
+		data, err := addWorkflowJob(good, "goflags-control", "GOFLAGS control", run, "", "")
+		if err != nil {
+			return nil, err
+		}
+		document, root, err := parseWorkflowDocument(data)
+		if err != nil {
+			return nil, err
+		}
+		target := root
+		if scope != "workflow" {
+			target = workflowMappingValue(workflowMappingValue(root, "jobs"), "goflags-control")
+			if scope == "step" {
+				steps := workflowMappingValue(target, "steps")
+				if steps == nil || len(steps.Content) != 1 {
+					return nil, fmt.Errorf("GOFLAGS-control job has no single step")
+				}
+				target = steps.Content[0]
+			}
+		}
+		env := workflowMappingValue(target, "env")
+		if env == nil {
+			env = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+			appendWorkflowMappingPair(target, "env", env)
+		}
+		appendWorkflowMappingPair(env, "GOFLAGS", workflowStringNode(goFlags))
+		return yaml.Marshal(document)
+	}
+	goFlagsCases := []struct {
+		name      string
+		scope     string
+		goFlags   string
+		run       string
+		wantError bool
+	}{
+		{name: "workflow_goflags_deferred_refuses", scope: "workflow", goFlags: `-run="` + curatormutations.PostLandingSelector() + `"`, run: "go test ./tools/ciworkflow", wantError: true},
+		{name: "workflow_goflags_ordinary_admits", scope: "workflow", goFlags: `-run="^TestRoutine$"`, run: "go test ./tools/ciworkflow"},
+		{name: "job_goflags_test_run_alias_refuses", scope: "job", goFlags: `-test.run="` + curatormutations.PostLandingSelector() + `"`, run: "go test ./tools/ciworkflow", wantError: true},
+		{name: "step_goflags_complete_skip_admits", scope: "step", goFlags: `-skip="` + curatormutations.PostLandingSelector() + `"`, run: "go test ./..."},
+		{name: "command_run_overrides_goflags_selector", scope: "step", goFlags: `-run="` + curatormutations.PostLandingSelector() + `"`, run: `go test ./tools/ciworkflow -run '^TestRoutine$'`},
+		{name: "dynamic_goflags_refuses", scope: "step", goFlags: "${{ env.SUITE_SELECTOR }}", run: "go test ./tools/ciworkflow", wantError: true},
+		{name: "step_goflags_custom_executor_refuses", scope: "step", goFlags: "-exec=./tools/deferred-wrapper", run: "go test ./tools/ciworkflow", wantError: true},
+	}
+	for _, test := range goFlagsCases {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := makeGOFlagsWorkflow(test.scope, test.goFlags, test.run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("GOFLAGS-selected deferred tests were admitted")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("safe GOFLAGS selection rejected: %v", err)
+			}
+		})
+	}
+	for _, test := range []struct {
+		name      string
+		run       string
+		wantError bool
+	}{
+		{name: "go_global_c_path_refuses_deferred_package", run: "go -C ./cmd/curator test .", wantError: true},
+		{name: "go_global_c_equals_path_refuses_deferred_package", run: "go -C=./cmd/curator test .", wantError: true},
+		{name: "go_global_c_ancestor_recursive_target_refuses", run: "go -C ./cmd test ./...", wantError: true},
+		{name: "go_global_c_path_admits_ordinary_package", run: `go -C ./tools/ciworkflow test . -run '^TestRoutine$'`},
+		{name: "go_global_c_equals_path_admits_ordinary_package", run: `go -C=./tools/ciworkflow test . -run '^TestRoutine$'`},
+		{name: "go_global_c_unapproved_local_tool_refuses", run: "go -C ./tools run ./deferred-suite", wantError: true},
+		{name: "go_global_c_allowlisted_local_tool_admits", run: "go -C ./tools run ./sanitize-ci-evidence -source input -destination output"},
+		{name: "go_unmodeled_global_flag_refuses", run: "go -x test ./tools/ciworkflow", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := addWorkflowJob(good, "global-go-flag-control", "Global Go flag control", test.run, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("Go global flags admitted a deferred package target")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("safe Go global flag form was rejected: %v", err)
+			}
+		})
+	}
+	if !isWorkflowGoCommand(`C:\Go\bin\go.exe`) {
+		t.Fatal("Windows absolute Go executable path was not recognized")
+	}
+	if isWorkflowGoCommand("gopher") {
+		t.Fatal("non-Go command was recognized as the Go executable")
+	}
+	workflow, err = addWorkflowJob(good, "selector-control", "Selector control", `go test ./... -run "$MISSING_SELECTOR"`, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPRDefersPostLandingTests(workflow); err == nil {
+		t.Fatal("unresolved shell selector was admitted")
+	}
+	workflow, err = addWorkflowJob(good, "literal-selector", "Routine", "go test ./... -run '"+curatormutations.PostLandingSelector()+"'", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPRDefersPostLandingTests(workflow); err == nil {
+		t.Fatal("literal deferred selector was admitted")
+	}
+	for _, test := range []struct {
+		name      string
+		run       string
+		wantError bool
+	}{
+		{name: "unfiltered_recursive_packages", run: "go test ./...", wantError: true},
+		{name: "unfiltered_deferred_root", run: "go test ./cmd/curator", wantError: true},
+		{name: "ordinary_recursive_selector", run: `go test ./... -run '^TestRoutine$'`},
+		{name: "ordinary_deferred_root_selector", run: `go test ./cmd/curator -run '^TestRoutine$'`},
+		{name: "recursive_with_complete_deferred_skip", run: "go test ./... -skip '" + curatormutations.PostLandingSelector() + "'"},
+		{name: "recursive_with_partial_deferred_skip_refuses", run: "go test ./... -skip '" + curatormutations.PostLandingSelector() + "/init-bypasses-help'", wantError: true},
+		{name: "ordinary_run_with_partial_skip_admitted", run: `go test ./... -run '^TestRoutine$' -skip '^TestRoutine$/init-bypasses-help'`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := addWorkflowJob(good, "selector-shape", "Selector shape", test.run, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("deferred test execution was admitted")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("safe test selection rejected: %v", err)
+			}
+		})
+	}
+}
+
+// Claim: local actions and scripts are refused unless their exact target is
+// admitted, while supported remote actions and guarded CI scripts remain valid.
+// Limit: an allowlisted target remains trusted by path; this does not run it.
+func TestPullRequestGuardTracksShellDirectoryChanges(t *testing.T) {
+	good := mutationInventoryWorkflowBytes(t)
+	for _, test := range []struct {
+		name      string
+		run       string
+		wantError bool
+	}{
+		{name: "cd_to_deferred_package_refuses", run: "cd cmd/curator && go test .", wantError: true},
+		{name: "command_cd_to_deferred_package_refuses", run: "command cd cmd/curator && go test .", wantError: true},
+		{name: "pushd_to_deferred_package_refuses", run: "pushd cmd/curator; go test .", wantError: true},
+		{name: "env_short_chdir_to_deferred_package_refuses", run: "env -C cmd/curator go test .", wantError: true},
+		{name: "env_short_attached_chdir_to_deferred_package_refuses", run: "env -Ccmd/curator go test .", wantError: true},
+		{name: "env_long_chdir_to_deferred_package_refuses", run: "env --chdir cmd/curator go test .", wantError: true},
+		{name: "env_long_attached_chdir_to_deferred_package_refuses", run: "env --chdir=cmd/curator go test .", wantError: true},
+		{name: "sudo_short_directory_to_deferred_package_refuses", run: "sudo -D cmd/curator go test .", wantError: true},
+		{name: "sudo_short_attached_directory_to_deferred_package_refuses", run: "sudo -Dcmd/curator go test .", wantError: true},
+		{name: "sudo_long_directory_to_deferred_package_refuses", run: "sudo --chdir cmd/curator go test .", wantError: true},
+		{name: "sudo_long_attached_directory_to_deferred_package_refuses", run: "sudo --chdir=cmd/curator go test .", wantError: true},
+		{name: "unmodeled_go_wrapper_refuses", run: "unmodeled-wrapper --directory cmd/curator go test .", wantError: true},
+		{name: "env_unset_without_directory_change_admits", run: "env -u GIT_DIR go test ./tools/ciworkflow -run '^TestPullRequestGuardTracksShellDirectoryChanges$'"},
+		{name: "pushd_and_popd_to_safe_tree_admits", run: "pushd tools && go test ./... && popd"},
+		{name: "popd_to_deferred_tree_refuses", run: "pushd tools && popd && go test ./...", wantError: true},
+		{name: "dynamic_cd_target_refuses", run: `cd "$X" && go test ./...`, wantError: true},
+		{name: "pushd_stack_option_refuses", run: "pushd -0 && go test .", wantError: true},
+		{name: "pushd_plus_stack_option_refuses", run: "pushd +0 && go test .", wantError: true},
+		{name: "cdpath_prefix_refuses", run: "CDPATH=cmd cd curator && go test .", wantError: true},
+		{name: "cdpath_export_refuses", run: "export CDPATH=cmd; cd curator && go test .", wantError: true},
+		{name: "empty_cdpath_safe_neighbor", run: "CDPATH= cd tools && go test ./..."},
+		{name: "cd_to_safe_package_tree_admits", run: "cd tools && go test ./..."},
+		{name: "subshell_cd_to_safe_package_tree_admits", run: "(cd tools && go test ./...)"},
+		{name: "cd_dash_refuses", run: "cd - && go test ./...", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := addWorkflowJob(good, "directory-control", "Directory control", test.run, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("shell directory change reached a deferred test package")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("safe shell directory change was rejected: %v", err)
+			}
+		})
+	}
+}
+
+func TestPullRequestGuardResolvesShellDirectorySymlinks(t *testing.T) {
+	root, err := prRepositoryRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempRoot := filepath.Join(root, ".temp")
+	if err := os.MkdirAll(tempRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tempDir, err := os.MkdirTemp(tempRoot, "deferred-directory-symlink-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
+	link := filepath.Join(tempDir, "curator")
+	if err := os.Symlink(filepath.Join(root, "cmd", "curator"), link); err != nil {
+		t.Skipf("symlink creation is unavailable: %v", err)
+	}
+	relative, err := filepath.Rel(root, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow, err := addWorkflowJob(mutationInventoryWorkflowBytes(t), "directory-symlink-control", "Directory symlink control", "cd "+filepath.ToSlash(relative)+" && go test .", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPRDefersPostLandingTests(workflow); err == nil {
+		t.Fatal("shell directory symlink reached a deferred test package")
+	}
+}
+
+func TestPullRequestGuardChecksLocalActionsAndScripts(t *testing.T) {
+	good := mutationInventoryWorkflowBytes(t)
+	document, root, err := parseWorkflowDocument(good)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs := workflowMappingValue(root, "jobs")
+	changedHeredoc := false
+	for i := 1; i < len(jobs.Content) && !changedHeredoc; i += 2 {
+		steps := workflowMappingValue(jobs.Content[i], "steps")
+		if steps == nil {
+			continue
+		}
+		for _, step := range steps.Content {
+			name := workflowMappingValue(step, "name")
+			if name == nil || name.Value != "Driver qualification and reproducibility" {
+				continue
+			}
+			run := workflowMappingValue(step, "run")
+			run.Value += "\npython3 - <<'MUTATION'\nimport subprocess\nsubprocess.run(['go', 'test', './...'])\nMUTATION\n"
+			changedHeredoc = true
+			break
+		}
+	}
+	if !changedHeredoc {
+		t.Fatal("did not find the allowlisted Python heredoc to mutate")
+	}
+	mutatedWorkflow, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPRDefersPostLandingTests(mutatedWorkflow); err == nil {
+		t.Fatal("modified allowlisted interpreter heredoc was admitted")
+	}
+	document, root, err = parseWorkflowDocument(good)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs = workflowMappingValue(root, "jobs")
+	changedGeneratedGoRun := false
+	for i := 1; i < len(jobs.Content) && !changedGeneratedGoRun; i += 2 {
+		steps := workflowMappingValue(jobs.Content[i], "steps")
+		if steps == nil {
+			continue
+		}
+		for _, step := range steps.Content {
+			name := workflowMappingValue(step, "name")
+			if name == nil || name.Value != "Record macOS race capacity" {
+				continue
+			}
+			run := workflowMappingValue(step, "run")
+			run.Value += "\necho changed\n"
+			changedGeneratedGoRun = true
+			break
+		}
+	}
+	if !changedGeneratedGoRun {
+		t.Fatal("did not find the allowlisted generated Go command to mutate")
+	}
+	mutatedWorkflow, err = yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkPRDefersPostLandingTests(mutatedWorkflow); err == nil {
+		t.Fatal("modified allowlisted generated Go command was admitted")
+	}
+	addStep := func(uses, run string, with, env map[string]string, workingDirectory ...string) ([]byte, error) {
+		data, err := addWorkflowJob(good, "local-target-control", "Local target control", "", "", "")
+		if err != nil {
+			return nil, err
+		}
+		step := workflowStepAddition{Uses: uses, Run: run, With: with, Env: env}
+		if len(workingDirectory) != 0 {
+			step.WorkingDirectory = workingDirectory[0]
+		}
+		return addStepToWorkflowJob(data, "local-target-control", step)
+	}
+	for _, test := range []struct {
+		name             string
+		uses             string
+		run              string
+		with             map[string]string
+		env              map[string]string
+		workingDirectory string
+		wantError        bool
+	}{
+		{name: "unapproved_local_action_with_selector", uses: "./.github/actions/deferred-suite", with: map[string]string{"selector": curatormutations.PostLandingSelector()}, wantError: true},
+		{name: "remote_action_neighbor", uses: "actions/checkout@v4", with: map[string]string{"fetch-depth": "1"}},
+		{name: "unapproved_local_script", run: "bash .github/ci/deferred-suite.sh", wantError: true},
+		{name: "unapproved_bare_bash_script", run: "bash deferred-suite.sh", wantError: true},
+		{name: "unapproved_bare_sh_script", run: "sh x.sh", wantError: true},
+		{name: "allowlisted_script_basename_from_working_directory_refuses", run: "bash isolate-go-state.sh", workingDirectory: ".github/ci", wantError: true},
+		{name: "unapproved_local_go_tool", run: "go run ./tools/deferred-suite", wantError: true},
+		{name: "allowlisted_local_go_tool_neighbor", run: "go run ./tools/sanitize-ci-evidence -source input -destination output"},
+		{name: "go_test_custom_executor", run: `go test ./tools/ciworkflow -run '^TestRoutine$' -exec ./tools/deferred-wrapper`, wantError: true},
+		{name: "go_test_without_custom_executor", run: `go test ./tools/ciworkflow -run '^TestRoutine$'`},
+		{name: "dynamic_local_go_target", run: `go run "$LOCAL_GO_FILE"`, wantError: true},
+		{name: "dynamic_interpreter_script", run: `bash "$LOCAL_SCRIPT"`, wantError: true},
+		{name: "inline_shell_body", run: `bash -c 'go test ./... -run "${SUITE_SELECTOR}"'`, wantError: true},
+		{name: "bash_inline_command", run: `bash -c 'go test ./...'`, wantError: true},
+		{name: "ruby_inline_eval", run: `ruby -e 'require "open3"; Open3.capture3("go", "test", "./...")'`, wantError: true},
+		{name: "ruby_extensionless_script", run: "ruby deferred-suite", wantError: true},
+		{name: "quoted_command_substitution_interpreter", run: `echo "$(ruby -e 'system("go", "test", "./...")')"`, wantError: true},
+		{name: "command_substitution_go_test", run: `echo "$(go test ./... -run TestCommandHelpNarrowingMutants)"`, wantError: true},
+		{name: "command_substitution_go_env_neighbor", run: `echo "$(go env GOTOOLCHAIN)"`},
+		{name: "process_substitution_refuses", run: "cat <(printf safe)", wantError: true},
+		{name: "find_exec_interpreter", run: `find . -exec ruby -e 'puts 1' \;`, wantError: true},
+		{name: "parallel_execution_dispatcher", run: `parallel ruby -e 'puts 1'`, wantError: true},
+		{name: "make_execution_dispatcher", run: "make test", wantError: true},
+		{name: "coproc_execution_dispatcher", run: `coproc ruby -e 'puts 1'`, wantError: true},
+		{name: "find_print_neighbor", run: "find . -type f -print"},
+		{name: "sed_execution_flag_go_test_refuses", run: `printf x | sed 's|x|go test ./...|e'`, wantError: true},
+		{name: "sed_execution_flag_expanded_go_test_refuses", run: `printf x | sed 's|x|go${IFS}test ./...|e'`, wantError: true},
+		{name: "sed_execution_command_go_test_refuses", run: `printf x | sed 'e go test ./...'`, wantError: true},
+		{name: "sed_nonexecuting_replacement_neighbor", run: `printf x | sed 's|x|go test ./...|'`},
+		{name: "env_split_string_go_test_refuses", run: `env -S 'go test ./...'`, wantError: true},
+		{name: "env_attached_split_string_go_test_refuses", run: `env -Sgo test ./...`, wantError: true},
+		{name: "env_long_split_string_go_test_refuses", run: `env --split-string 'go test ./...'`, wantError: true},
+		{name: "env_long_attached_split_string_go_test_refuses", run: `env --split-string=go test ./...`, wantError: true},
+		{name: "unmodeled_dispatcher_go_test_refuses", run: `unmodeled-runner --script 'go test ./...'`, wantError: true},
+		{name: "printf_go_test_text_neighbor", run: `printf '%s' 'go test ./tools/ciworkflow'`},
+		{name: "perl_inline_eval", run: `perl -e 'system("go", "test", "./...")'`, wantError: true},
+		{name: "node_inline_eval", run: `node -e 'require("child_process").spawnSync("go", ["test", "./..."])'`, wantError: true},
+		{name: "node_inline_print", run: `node -p 'require("child_process").spawnSync("go", ["test", "./..."])'`, wantError: true},
+		{name: "node_long_inline_eval", run: `node --eval 'require("child_process").spawnSync("go", ["test", "./..."])'`, wantError: true},
+		{name: "python_launcher_inline_eval", run: `py -c 'import subprocess; subprocess.run(["go", "test", "./..."])'`, wantError: true},
+		{name: "powershell_inline_command", run: `pwsh -Command 'go test ./...'`, wantError: true},
+		{name: "windows_command_shell", run: `cmd /C "go test ./..."`, wantError: true},
+		{name: "versioned_perl_interpreter", run: `perl5.36 -e 'print 1'`, wantError: true},
+		{name: "versioned_node_interpreter", run: `node20 -p 'console.log("ok")'`, wantError: true},
+		{name: "versioned_php_interpreter", run: `php8.3 -r 'echo "ok";'`, wantError: true},
+		{name: "versioned_shell_interpreter", run: `bash5.2 -c 'printf ok'`, wantError: true},
+		{name: "windows_executable_interpreter", run: `python3.exe -c 'print(1)'`, wantError: true},
+		{name: "busybox_shell_interpreter", run: `busybox ash -c 'echo ok'`, wantError: true},
+		{name: "env_split_string_interpreter", run: `env -S "ruby -e 'puts 1'"`, wantError: true},
+		{name: "extensionless_sourced_script", run: "source ./x", wantError: true},
+		{name: "extensionless_dot_script", run: ". ./x", wantError: true},
+		{name: "unmodeled_shell_function", run: "noop() { echo ok; }", wantError: true},
+		{name: "shell_alias_directory_change", run: "alias cdir='cd cmd/curator'; cdir; go test .", wantError: true},
+		{name: "shell_trap_directory_change", run: "trap 'cd cmd/curator' DEBUG; go test .", wantError: true},
+		{name: "extensionless_local_executable", run: "./x", wantError: true},
+		{name: "absolute_local_executable", run: "/tmp/x", wantError: true},
+		{name: "extensionless_local_executable_through_env", run: "env ./x", wantError: true},
+		{name: "extensionless_local_executable_in_subshell", run: "(./x)", wantError: true},
+		{name: "allowlisted_python_script_neighbor", run: "python3 .github/ci/default-build-transport-control.py"},
+		{name: "unapproved_interpreter_heredoc", run: "python3 - <<'PY'\nimport subprocess\nsubprocess.run(['go', 'test', './...'])\nPY", wantError: true},
+		{name: "dynamic_sourced_script", run: `source "$LOCAL_SCRIPT"`, wantError: true},
+		{name: "allowlisted_helper_script_neighbor", run: "bash .github/ci/isolate-go-state.sh"},
+		{name: "sourcing_allowlisted_script_refuses", run: "source .github/ci/isolate-go-state.sh", wantError: true},
+		{name: "test_gate_without_skip", run: "bash .github/ci/test-gate.sh", wantError: true},
+		{name: "test_gate_with_skip", run: "bash .github/ci/test-gate.sh", env: map[string]string{"CI_SKIP_POST_LANDING_TESTS": "1"}},
+		{name: "test_gate_inline_skip_override", run: "CI_SKIP_POST_LANDING_TESTS=0 bash .github/ci/test-gate.sh", env: map[string]string{"CI_SKIP_POST_LANDING_TESTS": "1"}, wantError: true},
+		{name: "test_gate_case_insensitive_skip_override", run: "ci_skip_post_landing_tests=0 bash .github/ci/test-gate.sh", env: map[string]string{"CI_SKIP_POST_LANDING_TESTS": "1"}, wantError: true},
+		{name: "test_gate_skip_unset", run: "env -u CI_SKIP_POST_LANDING_TESTS bash .github/ci/test-gate.sh", env: map[string]string{"CI_SKIP_POST_LANDING_TESTS": "1"}, wantError: true},
+		{name: "test_gate_shell_unset", run: "unset CI_SKIP_POST_LANDING_TESTS; bash .github/ci/test-gate.sh", env: map[string]string{"CI_SKIP_POST_LANDING_TESTS": "1"}, wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := addStep(test.uses, test.run, test.with, test.env, test.workingDirectory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("unapproved local action or deferred script was admitted")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("supported local or remote action was rejected: %v", err)
+			}
+		})
 	}
 }
