@@ -1455,10 +1455,10 @@ func checkPRGoTestArguments(jobID string, args, goFlags []workflowShellWord, wor
 	if !hasSkip && hasGoSkip {
 		skipSelector, hasSkip = goSkip, true
 	}
-	if hasRun && prSelectorMatchesDeferredTests(runSelector) && !(hasSkip && prSelectorSkipsAllDeferredTests(skipSelector)) {
+	if hasRun && prSelectorMatchesDeferredTests(runSelector) && (!hasSkip || !prSelectorSkipsAllDeferredTests(skipSelector)) {
 		return fmt.Errorf("pull-request job %q selects deferred tests with go test -run", jobID)
 	}
-	if deferredPackage && (!hasRun || prSelectorMatchesDeferredTests(runSelector)) && !(hasSkip && prSelectorSkipsAllDeferredTests(skipSelector)) {
+	if deferredPackage && (!hasRun || prSelectorMatchesDeferredTests(runSelector)) && (!hasSkip || !prSelectorSkipsAllDeferredTests(skipSelector)) {
 		return fmt.Errorf("pull-request job %q runs an unfiltered deferred test root", jobID)
 	}
 	return nil
@@ -1571,10 +1571,6 @@ func workflowEnvironmentLookup(name string, levels ...*yaml.Node) (string, bool,
 		return "", true, false
 	}
 	return value.Value, true, true
-}
-
-func packageReachesPRDeferredRoot(value string) bool {
-	return packageReachesPRDeferredRootFromDirectory(value, ".")
 }
 
 func packageReachesPRDeferredRootFromDirectory(value, workingDirectory string) bool {
@@ -1833,9 +1829,7 @@ func prLocalScripts(run string) []string {
 				continue
 			}
 			value := strings.Trim(match[1], "\"'")
-			if strings.HasPrefix(value, "./") {
-				value = strings.TrimPrefix(value, "./")
-			}
+			value = strings.TrimPrefix(value, "./")
 			found[value] = struct{}{}
 		}
 	}
