@@ -1318,7 +1318,7 @@ func prWorkflowGoWorkingDirectories(jobID string, words []workflowShellWord, bas
 			continue
 		}
 		if commandStart && word.quote == 0 && strings.HasPrefix(word.value, "#") {
-			for i+1 < len(words) && !(words[i+1].operator && words[i+1].value == ";") {
+			for i+1 < len(words) && (!words[i+1].operator || words[i+1].value != ";") {
 				i++
 			}
 			continue
@@ -2444,7 +2444,7 @@ func prWorkflowCommandIndices(words []workflowShellWord) []int {
 			continue
 		}
 		if word.quote == 0 && strings.HasPrefix(word.value, "#") {
-			for i+1 < len(words) && !(words[i+1].operator && words[i+1].value == ";") {
+			for i+1 < len(words) && (!words[i+1].operator || words[i+1].value != ";") {
 				i++
 			}
 			commandStart = true
