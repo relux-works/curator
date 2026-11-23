@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -794,12 +795,13 @@ func TestMacOSRaceJobLogsRunnerCapacity(t *testing.T) {
 }
 
 type pullRequestStep struct {
-	Name string    `yaml:"name"`
-	If   string    `yaml:"if"`
-	Run  string    `yaml:"run"`
-	Uses string    `yaml:"uses"`
-	With yaml.Node `yaml:"with"`
-	Env  yaml.Node `yaml:"env"`
+	Name             string    `yaml:"name"`
+	If               string    `yaml:"if"`
+	Run              string    `yaml:"run"`
+	Uses             string    `yaml:"uses"`
+	WorkingDirectory string    `yaml:"working-directory"`
+	With             yaml.Node `yaml:"with"`
+	Env              yaml.Node `yaml:"env"`
 }
 
 type pullRequestJob struct {
@@ -1111,8 +1113,8 @@ type workflowShellWord struct {
 }
 
 var workflowShellVariable = regexp.MustCompile(`^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$`)
-var localWorkflowScriptInvocation = regexp.MustCompile(`(?i)\b(?:bash|sh|python3?|node|pwsh|powershell)\s+["']?((?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+)`)
-var localWorkflowScriptToken = regexp.MustCompile(`(?:^|[\s;&|])((?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+\.(?:sh|bash|zsh|py|js|ps1|cmd|bat|rb|pl))(?:$|[\s;&|])`)
+var localWorkflowScriptInvocation = regexp.MustCompile(`(?i)\b(?:bash|sh|python3?|node|pwsh|powershell)\s+["']?((?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+|[A-Za-z0-9_][A-Za-z0-9_.-]*)`)
+var localWorkflowScriptToken = regexp.MustCompile(`(?:^|[\s;&|])((?:(?:\./|\.\./|\.github/|[A-Za-z0-9_.-]+/|/)[^"' \t\r\n;&|]+|[A-Za-z0-9_.-]+)\.(?:sh|bash|zsh|py|js|ps1|cmd|bat|rb|pl))(?:$|[\s;&|])`)
 var localWorkflowExecutable = regexp.MustCompile(`(?m)(?:^|[;&|]\s*)((?:\./|\.\./|[A-Za-z0-9_.-]+/)[^\s;&|]+)(?:$|[\s;&|])`)
 var dynamicWorkflowScriptInvocation = regexp.MustCompile(`(?i)\b(?:bash|sh|python3?|node|pwsh|powershell)\s+["']?\$(?:\{|[A-Za-z_(])`)
 var dynamicWorkflowSourceInvocation = regexp.MustCompile(`(?im)(?:^|[;&|]\s*)(?:source|\.)\s+["']?\$(?:\{|[A-Za-z_(])`)
@@ -1154,11 +1156,22 @@ var allowedPRLocalGoTools = map[string]struct{}{
 
 func checkPRDeferredTestCommands(jobID string, job pullRequestJob, workflowEnv *yaml.Node) error {
 	for _, step := range job.Steps {
+		stepDirectory, err := prStepWorkingDirectory(jobID, step, workflowEnv, &job.Env, &step.Env)
+		if err != nil {
+			return err
+		}
 		var goFlags []workflowShellWord
 		goFlagsLoaded := false
 		words := workflowShellWords(step.Run)
-		for i := 0; i+1 < len(words); i++ {
-			if words[i].operator || !isWorkflowGoCommand(words[i].value) || words[i+1].operator || words[i+1].value != "test" {
+		for i := 0; i < len(words); i++ {
+			if words[i].operator || !isWorkflowGoCommand(words[i].value) {
+				continue
+			}
+			command, commandIndex, workingDirectory, err := parsePRGoCommand(jobID, words, i, stepDirectory, workflowEnv, &job.Env, &step.Env)
+			if err != nil {
+				return err
+			}
+			if command != "test" {
 				continue
 			}
 			if !goFlagsLoaded {
@@ -1171,17 +1184,98 @@ func checkPRDeferredTestCommands(jobID string, job pullRequestJob, workflowEnv *
 				}
 				goFlagsLoaded = true
 			}
-			end := i + 2
+			end := commandIndex + 1
 			for end < len(words) && !words[end].operator {
 				end++
 			}
-			if err := checkPRGoTestArguments(jobID, words[i+2:end], goFlags, workflowEnv, &job.Env, &step.Env); err != nil {
+			if err := checkPRGoTestArguments(jobID, words[commandIndex+1:end], goFlags, workingDirectory, workflowEnv, &job.Env, &step.Env); err != nil {
 				return err
 			}
 			i = end - 1
 		}
 	}
 	return nil
+}
+
+func prStepWorkingDirectory(jobID string, step pullRequestStep, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	value := strings.TrimSpace(step.WorkingDirectory)
+	if value == "" {
+		return ".", nil
+	}
+	if workspaceEnvironmentPath.MatchString(value) {
+		end := strings.Index(value, "}}")
+		if end < 0 {
+			return ".", nil
+		}
+		value = strings.TrimSpace(value[end+2:])
+		value = strings.TrimPrefix(value, "/")
+		if value == "" {
+			return ".", nil
+		}
+	}
+	return resolvePRRepoDirectory(jobID, workflowShellWord{value: value}, ".", workflowEnv, jobEnv, stepEnv)
+}
+
+func resolvePRRepoDirectory(jobID string, word workflowShellWord, baseDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	return resolvePRRepoPath(jobID, word, baseDirectory, "Go working directory", workflowEnv, jobEnv, stepEnv)
+}
+
+func resolvePRRepoPath(jobID string, word workflowShellWord, baseDirectory string, targetKind string, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, error) {
+	resolved, err := resolvePRTestSelector(word, workflowEnv, jobEnv, stepEnv)
+	if err != nil {
+		return "", fmt.Errorf("pull-request job %q has an unclassifiable %s: %w", jobID, targetKind, err)
+	}
+	if resolved == "" || path.IsAbs(resolved) || strings.ContainsAny(resolved, `\\:`) ||
+		(word.quote == 0 && strings.ContainsAny(resolved, " \t\r\n")) {
+		return "", fmt.Errorf("pull-request job %q has an unclassifiable %s %q", jobID, targetKind, resolved)
+	}
+	cleaned := path.Clean(path.Join(baseDirectory, resolved))
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("pull-request job %q uses a %s outside the checkout", jobID, targetKind)
+	}
+	return cleaned, nil
+}
+
+func parsePRGoCommand(jobID string, words []workflowShellWord, goIndex int, baseDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) (string, int, string, error) {
+	workingDirectory := baseDirectory
+	seenChangeDirectory := false
+	for i := goIndex + 1; i < len(words); {
+		word := words[i]
+		if word.operator {
+			return "", -1, workingDirectory, nil
+		}
+		value := word.value
+		switch {
+		case value == "-C":
+			if seenChangeDirectory || i+1 >= len(words) || words[i+1].operator {
+				return "", -1, workingDirectory, fmt.Errorf("pull-request job %q has an unreadable Go -C directory", jobID)
+			}
+			directory, err := resolvePRRepoDirectory(jobID, words[i+1], workingDirectory, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return "", -1, workingDirectory, err
+			}
+			workingDirectory = directory
+			seenChangeDirectory = true
+			i += 2
+		case strings.HasPrefix(value, "-C="):
+			if seenChangeDirectory {
+				return "", -1, workingDirectory, fmt.Errorf("pull-request job %q repeats Go -C", jobID)
+			}
+			pathValue := value[strings.IndexByte(value, '=')+1:]
+			directory, err := resolvePRRepoDirectory(jobID, workflowShellWord{value: pathValue, quote: word.quote}, workingDirectory, workflowEnv, jobEnv, stepEnv)
+			if err != nil {
+				return "", -1, workingDirectory, err
+			}
+			workingDirectory = directory
+			seenChangeDirectory = true
+			i++
+		case strings.HasPrefix(value, "-"):
+			return "", -1, workingDirectory, fmt.Errorf("pull-request job %q uses an unmodeled Go global flag %q", jobID, value)
+		default:
+			return value, i, workingDirectory, nil
+		}
+	}
+	return "", -1, workingDirectory, nil
 }
 
 func workflowShellWords(text string) []workflowShellWord {
@@ -1281,7 +1375,7 @@ func isWorkflowGoCommand(value string) bool {
 	return strings.HasSuffix(path, "/go") || strings.HasSuffix(path, "/go.exe")
 }
 
-func checkPRGoTestArguments(jobID string, args, goFlags []workflowShellWord, workflowEnv, jobEnv, stepEnv *yaml.Node) error {
+func checkPRGoTestArguments(jobID string, args, goFlags []workflowShellWord, workingDirectory string, workflowEnv, jobEnv, stepEnv *yaml.Node) error {
 	var runSelector, skipSelector string
 	hasRun, hasSkip := false, false
 	deferredPackage := false
@@ -1346,7 +1440,7 @@ func checkPRGoTestArguments(jobID string, args, goFlags []workflowShellWord, wor
 				}
 				packagePath = resolved
 			}
-			if packageReachesPRDeferredRoot(packagePath) {
+			if packageReachesPRDeferredRootFromDirectory(packagePath, workingDirectory) {
 				deferredPackage = true
 			}
 		}
@@ -1480,19 +1574,47 @@ func workflowEnvironmentLookup(name string, levels ...*yaml.Node) (string, bool,
 }
 
 func packageReachesPRDeferredRoot(value string) bool {
-	return value == "./..." || value == "..." || value == "./cmd/curator" ||
+	return packageReachesPRDeferredRootFromDirectory(value, ".")
+}
+
+func packageReachesPRDeferredRootFromDirectory(value, workingDirectory string) bool {
+	if value == "..." || value == "./..." {
+		return prPackageTreeContainsDeferredRoot(workingDirectory)
+	}
+	if strings.HasSuffix(value, "/...") {
+		if !strings.HasPrefix(value, "./") && !strings.HasPrefix(value, "../") {
+			return packageReachesPRDeferredImport(value)
+		}
+		base := strings.TrimPrefix(strings.TrimSuffix(value, "/..."), "./")
+		return prPackageTreeContainsDeferredRoot(path.Clean(path.Join(workingDirectory, base)))
+	}
+	if value == "." || value == ".." || strings.HasPrefix(value, "./") || strings.HasPrefix(value, "../") {
+		target := path.Clean(path.Join(workingDirectory, value))
+		return target == "cmd/curator" || strings.HasPrefix(target, "cmd/curator/")
+	}
+	return packageReachesPRDeferredImport(value)
+}
+
+func prPackageTreeContainsDeferredRoot(directory string) bool {
+	return directory == "." || directory == "cmd/curator" ||
+		strings.HasPrefix("cmd/curator", directory+"/") || strings.HasPrefix(directory, "cmd/curator/")
+}
+
+func packageReachesPRDeferredImport(value string) bool {
+	return value == "cmd/curator" || value == "./cmd/curator" ||
 		value == "github.com/relux-works/curator/cmd/curator" || strings.HasSuffix(value, "/cmd/curator") ||
-		strings.HasPrefix(value, "./cmd/curator/") || strings.HasSuffix(value, "/cmd/curator/...")
+		strings.HasPrefix(value, "./cmd/curator/") || strings.HasPrefix(value, "cmd/curator/") ||
+		strings.HasSuffix(value, "/cmd/curator/...")
 }
 
 func prSelectorMatchesDeferredTests(selector string) bool {
-	parts := strings.Split(selector, "/")
-	pattern, err := regexp.Compile(parts[0])
-	if err != nil {
+	patterns, ok := prCompileTestNamePattern(selector)
+	if !ok {
 		return true
 	}
 	for _, name := range curatormutations.PostLandingNames() {
-		if pattern.MatchString(name) {
+		matched, _ := prTestNamePatternMatches(patterns, name)
+		if matched {
 			return true
 		}
 	}
@@ -1500,27 +1622,117 @@ func prSelectorMatchesDeferredTests(selector string) bool {
 }
 
 func prSelectorSkipsAllDeferredTests(selector string) bool {
-	parts := strings.Split(selector, "/")
-	pattern, err := regexp.Compile(parts[0])
-	if err != nil {
+	patterns, ok := prCompileTestNamePattern(selector)
+	if !ok {
 		return false
 	}
 	for _, name := range curatormutations.PostLandingNames() {
-		if !pattern.MatchString(name) {
+		matched, partial := prTestNamePatternMatches(patterns, name)
+		if !matched || partial {
 			return false
 		}
 	}
 	return true
 }
 
+func prCompileTestNamePattern(selector string) ([][]*regexp.Regexp, bool) {
+	parts := prSplitTestNamePattern(selector)
+	compiled := make([][]*regexp.Regexp, len(parts))
+	for i, alternative := range parts {
+		compiled[i] = make([]*regexp.Regexp, len(alternative))
+		for j, component := range alternative {
+			pattern, err := regexp.Compile(component)
+			if err != nil {
+				return nil, false
+			}
+			compiled[i][j] = pattern
+		}
+	}
+	return compiled, len(compiled) != 0
+}
+
+func prSplitTestNamePattern(selector string) [][]string {
+	var alternatives [][]string
+	var components []string
+	start := 0
+	parenDepth := 0
+	charClassDepth := 0
+	for i := 0; i < len(selector); i++ {
+		switch selector[i] {
+		case '[':
+			charClassDepth++
+		case ']':
+			charClassDepth--
+			if charClassDepth < 0 {
+				charClassDepth = 0
+			}
+		case '(':
+			if charClassDepth == 0 {
+				parenDepth++
+			}
+		case ')':
+			if charClassDepth == 0 {
+				parenDepth--
+			}
+		case '\\':
+			i++
+		case '/':
+			if charClassDepth == 0 && parenDepth == 0 {
+				components = append(components, selector[start:i])
+				start = i + 1
+			}
+		case '|':
+			if charClassDepth == 0 && parenDepth == 0 {
+				components = append(components, selector[start:i])
+				alternatives = append(alternatives, components)
+				components = nil
+				start = i + 1
+			}
+		}
+	}
+	components = append(components, selector[start:])
+	return append(alternatives, components)
+}
+
+func prTestNamePatternMatches(patterns [][]*regexp.Regexp, name string) (bool, bool) {
+	nameParts := strings.Split(name, "/")
+	for _, alternative := range patterns {
+		matched := true
+		for i, namePart := range nameParts {
+			if i >= len(alternative) {
+				break
+			}
+			if !alternative[i].MatchString(namePart) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true, len(nameParts) < len(alternative)
+		}
+	}
+	return false, false
+}
+
 func checkPRLocalTargets(jobID string, job pullRequestJob, workflowEnv *yaml.Node) error {
 	for _, step := range job.Steps {
+		stepDirectory, err := prStepWorkingDirectory(jobID, step, workflowEnv, &job.Env, &step.Env)
+		if err != nil {
+			return err
+		}
 		words := workflowShellWords(step.Run)
-		for i := 0; i+1 < len(words); i++ {
-			if words[i].operator || !isWorkflowGoCommand(words[i].value) || words[i+1].operator || words[i+1].value != "run" {
+		for i := 0; i < len(words); i++ {
+			if words[i].operator || !isWorkflowGoCommand(words[i].value) {
 				continue
 			}
-			for j := i + 2; j < len(words) && !words[j].operator; j++ {
+			command, commandIndex, workingDirectory, err := parsePRGoCommand(jobID, words, i, stepDirectory, workflowEnv, &job.Env, &step.Env)
+			if err != nil {
+				return err
+			}
+			if command != "run" {
+				continue
+			}
+			for j := commandIndex + 1; j < len(words) && !words[j].operator; j++ {
 				candidate := words[j].value
 				if strings.HasPrefix(candidate, "-") {
 					continue
@@ -1531,9 +1743,14 @@ func checkPRLocalTargets(jobID string, job pullRequestJob, workflowEnv *yaml.Nod
 					}
 					break
 				}
-				if strings.HasPrefix(candidate, "./") || strings.HasSuffix(candidate, ".go") {
-					if _, ok := allowedPRLocalGoTools[candidate]; !ok {
-						return fmt.Errorf("pull-request job %q calls an unapproved local Go tool %q", jobID, candidate)
+				if candidate == "." || strings.HasPrefix(candidate, "./") || strings.HasPrefix(candidate, "../") || strings.HasSuffix(candidate, ".go") {
+					target, err := resolvePRRepoPath(jobID, workflowShellWord{value: candidate}, workingDirectory, "local Go tool target", workflowEnv, &job.Env, &step.Env)
+					if err != nil {
+						return err
+					}
+					allowlistPath := "./" + strings.TrimPrefix(target, "./")
+					if _, ok := allowedPRLocalGoTools[allowlistPath]; !ok {
+						return fmt.Errorf("pull-request job %q calls an unapproved local Go tool %q", jobID, allowlistPath)
 					}
 					break
 				}
@@ -1560,10 +1777,14 @@ func checkPRLocalTargets(jobID string, job pullRequestJob, workflowEnv *yaml.Nod
 			return fmt.Errorf("pull-request job %q embeds an unapproved interpreter heredoc", jobID)
 		}
 		for _, script := range prLocalScripts(step.Run) {
-			if _, ok := allowedPRLocalScripts[script]; !ok {
-				return fmt.Errorf("pull-request job %q calls an unapproved local script %q", jobID, script)
+			target, err := resolvePRRepoPath(jobID, workflowShellWord{value: script}, stepDirectory, "local script target", workflowEnv, &job.Env, &step.Env)
+			if err != nil {
+				return err
 			}
-			if script == ".github/ci/test-gate.sh" {
+			if _, ok := allowedPRLocalScripts[target]; !ok {
+				return fmt.Errorf("pull-request job %q calls an unapproved local script %q", jobID, target)
+			}
+			if target == ".github/ci/test-gate.sh" {
 				value, ok := workflowEnvironmentValue("CI_SKIP_POST_LANDING_TESTS", workflowEnv, &job.Env, &step.Env)
 				if !ok || value != "1" {
 					return fmt.Errorf("pull-request job %q calls test-gate.sh without the deferred-suite skip", jobID)
@@ -1907,11 +2128,12 @@ func workflowScalarValues(node *yaml.Node) []string {
 }
 
 type workflowStepAddition struct {
-	Name string
-	Run  string
-	Uses string
-	With map[string]string
-	Env  map[string]string
+	Name             string
+	Run              string
+	Uses             string
+	WorkingDirectory string
+	With             map[string]string
+	Env              map[string]string
 }
 
 func addStepToWorkflowJob(data []byte, jobName string, step workflowStepAddition) ([]byte, error) {
@@ -2098,6 +2320,9 @@ func workflowStepNode(step workflowStepAddition) *yaml.Node {
 	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 	if step.Name != "" {
 		appendWorkflowMappingPair(node, "name", workflowStringNode(step.Name))
+	}
+	if step.WorkingDirectory != "" {
+		appendWorkflowMappingPair(node, "working-directory", workflowStringNode(step.WorkingDirectory))
 	}
 	if step.Run != "" {
 		appendWorkflowMappingPair(node, "run", workflowStringNode(step.Run))
@@ -2722,6 +2947,34 @@ func TestPullRequestGuardResolvesDeferredSelectorsFromEnvironment(t *testing.T) 
 			}
 		})
 	}
+	for _, test := range []struct {
+		name      string
+		run       string
+		wantError bool
+	}{
+		{name: "go_global_c_path_refuses_deferred_package", run: "go -C ./cmd/curator test .", wantError: true},
+		{name: "go_global_c_equals_path_refuses_deferred_package", run: "go -C=./cmd/curator test .", wantError: true},
+		{name: "go_global_c_ancestor_recursive_target_refuses", run: "go -C ./cmd test ./...", wantError: true},
+		{name: "go_global_c_path_admits_ordinary_package", run: `go -C ./tools/ciworkflow test . -run '^TestRoutine$'`},
+		{name: "go_global_c_equals_path_admits_ordinary_package", run: `go -C=./tools/ciworkflow test . -run '^TestRoutine$'`},
+		{name: "go_global_c_unapproved_local_tool_refuses", run: "go -C ./tools run ./deferred-suite", wantError: true},
+		{name: "go_global_c_allowlisted_local_tool_admits", run: "go -C ./tools run ./sanitize-ci-evidence -source input -destination output"},
+		{name: "go_unmodeled_global_flag_refuses", run: "go -x test ./tools/ciworkflow", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflow, err := addWorkflowJob(good, "global-go-flag-control", "Global Go flag control", test.run, "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = checkPRDefersPostLandingTests(workflow)
+			if test.wantError && err == nil {
+				t.Fatal("Go global flags admitted a deferred package target")
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("safe Go global flag form was rejected: %v", err)
+			}
+		})
+	}
 	if !isWorkflowGoCommand(`C:\Go\bin\go.exe`) {
 		t.Fatal("Windows absolute Go executable path was not recognized")
 	}
@@ -2752,6 +3005,8 @@ func TestPullRequestGuardResolvesDeferredSelectorsFromEnvironment(t *testing.T) 
 		{name: "ordinary_recursive_selector", run: `go test ./... -run '^TestRoutine$'`},
 		{name: "ordinary_deferred_root_selector", run: `go test ./cmd/curator -run '^TestRoutine$'`},
 		{name: "recursive_with_complete_deferred_skip", run: "go test ./... -skip '" + curatormutations.PostLandingSelector() + "'"},
+		{name: "recursive_with_partial_deferred_skip_refuses", run: "go test ./... -skip '" + curatormutations.PostLandingSelector() + "/init-bypasses-help'", wantError: true},
+		{name: "ordinary_run_with_partial_skip_admitted", run: `go test ./... -run '^TestRoutine$' -skip '^TestRoutine$/init-bypasses-help'`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			workflow, err := addWorkflowJob(good, "selector-shape", "Selector shape", test.run, "", "")
@@ -2838,24 +3093,32 @@ func TestPullRequestGuardChecksLocalActionsAndScripts(t *testing.T) {
 	if err := checkPRDefersPostLandingTests(mutatedWorkflow); err == nil {
 		t.Fatal("modified allowlisted generated Go command was admitted")
 	}
-	addStep := func(uses, run string, with, env map[string]string) ([]byte, error) {
+	addStep := func(uses, run string, with, env map[string]string, workingDirectory ...string) ([]byte, error) {
 		data, err := addWorkflowJob(good, "local-target-control", "Local target control", "", "", "")
 		if err != nil {
 			return nil, err
 		}
-		return addStepToWorkflowJob(data, "local-target-control", workflowStepAddition{Uses: uses, Run: run, With: with, Env: env})
+		step := workflowStepAddition{Uses: uses, Run: run, With: with, Env: env}
+		if len(workingDirectory) != 0 {
+			step.WorkingDirectory = workingDirectory[0]
+		}
+		return addStepToWorkflowJob(data, "local-target-control", step)
 	}
 	for _, test := range []struct {
-		name      string
-		uses      string
-		run       string
-		with      map[string]string
-		env       map[string]string
-		wantError bool
+		name             string
+		uses             string
+		run              string
+		with             map[string]string
+		env              map[string]string
+		workingDirectory string
+		wantError        bool
 	}{
 		{name: "unapproved_local_action_with_selector", uses: "./.github/actions/deferred-suite", with: map[string]string{"selector": curatormutations.PostLandingSelector()}, wantError: true},
 		{name: "remote_action_neighbor", uses: "actions/checkout@v4", with: map[string]string{"fetch-depth": "1"}},
 		{name: "unapproved_local_script", run: "bash .github/ci/deferred-suite.sh", wantError: true},
+		{name: "unapproved_bare_bash_script", run: "bash deferred-suite.sh", wantError: true},
+		{name: "unapproved_bare_sh_script", run: "sh x.sh", wantError: true},
+		{name: "allowlisted_bare_script_in_working_directory", run: "bash isolate-go-state.sh", workingDirectory: ".github/ci"},
 		{name: "unapproved_local_go_tool", run: "go run ./tools/deferred-suite", wantError: true},
 		{name: "allowlisted_local_go_tool_neighbor", run: "go run ./tools/sanitize-ci-evidence -source input -destination output"},
 		{name: "go_test_custom_executor", run: `go test ./tools/ciworkflow -run '^TestRoutine$' -exec ./tools/deferred-wrapper`, wantError: true},
@@ -2875,7 +3138,7 @@ func TestPullRequestGuardChecksLocalActionsAndScripts(t *testing.T) {
 		{name: "test_gate_shell_unset", run: "unset CI_SKIP_POST_LANDING_TESTS; bash .github/ci/test-gate.sh", env: map[string]string{"CI_SKIP_POST_LANDING_TESTS": "1"}, wantError: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			workflow, err := addStep(test.uses, test.run, test.with, test.env)
+			workflow, err := addStep(test.uses, test.run, test.with, test.env, test.workingDirectory)
 			if err != nil {
 				t.Fatal(err)
 			}
