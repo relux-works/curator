@@ -21,6 +21,7 @@ import (
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/pkgversion"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/stateread"
@@ -159,10 +160,26 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 			return "", err
 		}
 		if metadata.Kind == stateread.KindPresent {
-			return m.checkedRepo(canonical)
+			checked, err := m.checkedRepo(canonical)
+			if err != nil {
+				return "", err
+			}
+			return checked, nil
 		}
-	} else if info, err := os.Stat(dir); err == nil && info.IsDir() {
-		return dir, nil
+	} else {
+		metadata, err := stateread.Lstat(dir)
+		if err != nil {
+			return "", err
+		}
+		if metadata.Kind == stateread.KindPresent {
+			if metadata.Info == nil || !metadata.Info.IsDir() || metadata.Info.Mode()&os.ModeSymlink != 0 {
+				return "", stateread.UnusableError(dir, fmt.Errorf("profile source cache is not a regular directory"))
+			}
+			if err := m.compactRepo(canonical, dir); err != nil {
+				return "", err
+			}
+			return dir, nil
+		}
 	}
 	if err := gitops.CheckCloneDestination(dir); err != nil {
 		return "", fmt.Errorf("%s: clone %s: %w", DiagSourceInvalid, canonical, err)
@@ -176,13 +193,178 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 	} else if identity.ValidCanonical(canonical) {
 		cloneURL = "https://" + canonical
 	}
-	if err := gitops.Clone(cloneURL, dir); err != nil {
+	clone := gitops.CloneProfileSource
+	if m.sourceCacheRoot != "" {
+		clone = gitops.Clone
+	}
+	if err := clone(cloneURL, dir); err != nil {
 		return "", fmt.Errorf("%s: clone %s: %w", DiagSourceInvalid, canonical, err)
+	}
+	if m.sourceCacheRoot == "" {
+		compact, err := gitops.IsProfileSourceClone(dir)
+		if err != nil || !compact {
+			_ = os.RemoveAll(dir)
+			if err != nil {
+				return "", fmt.Errorf("%s: inspect shallow source %s: %w", DiagSourceInvalid, canonical, err)
+			}
+			return "", fmt.Errorf("%s: git server did not provide a shallow source for %s", DiagSourceInvalid, canonical)
+		}
 	}
 	if m.sourceCacheRoot != "" {
 		return m.checkedRepo(canonical)
 	}
 	return dir, nil
+}
+
+// compactRepo replaces an existing full-history source cache with a shallow
+// clone. A staged replacement is validated before the old cache is moved, and
+// every commit in an installed profile lock is fetched into the replacement
+// before it becomes authoritative.
+func (m *gitManager) compactRepo(canonical, dir string) error {
+	compact, err := gitops.IsProfileSourceClone(dir)
+	if err != nil || compact {
+		return err
+	}
+	storedOrigin, err := cacheOriginURL(dir, canonical)
+	if err != nil {
+		return err
+	}
+	cloneURL := storedOrigin
+	if raw, ok := m.fetchRaw[canonical]; ok {
+		cloneURL = raw
+	}
+	pins, err := m.profilePins(canonical)
+	if err != nil {
+		return err
+	}
+	stageRoot, err := os.MkdirTemp(filepath.Dir(dir), ".curator-source-compact-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(stageRoot) }()
+	staged := filepath.Join(stageRoot, "repo")
+	if err := gitops.CloneProfileSource(cloneURL, staged); err != nil {
+		return fmt.Errorf("compact profile source %s: %w", canonical, err)
+	}
+	if err := gitops.FetchProfileSourceURL(staged, cloneURL); err != nil {
+		return fmt.Errorf("refresh compact profile source %s: %w", canonical, err)
+	}
+	compact, err = gitops.IsProfileSourceClone(staged)
+	if err != nil || !compact {
+		if err != nil {
+			return fmt.Errorf("inspect compact profile source %s: %w", canonical, err)
+		}
+		return fmt.Errorf("git server did not provide a shallow source for %s", canonical)
+	}
+	for _, pin := range pins {
+		fetcher := *m
+		fetcher.missingPins = map[string]bool{}
+		if err := fetcher.acquireMissingPin(staged, canonical, pin); err != nil {
+			return fmt.Errorf("preserve installed profile pin %s for %s: %w", pin, canonical, err)
+		}
+	}
+	// Retain the original authenticated transport spelling in the replacement.
+	setOrigin := exec.Command("git", "-C", staged, "remote", "set-url", "origin", storedOrigin) // #nosec G204 -- stored origin was validated against canonical source identity
+	if output, err := setOrigin.CombinedOutput(); err != nil {
+		return fmt.Errorf("preserve profile source origin: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	backup := filepath.Join(stageRoot, "old")
+	if err := os.Rename(dir, backup); err != nil {
+		return fmt.Errorf("stage full profile source %s: %w", canonical, err)
+	}
+	if err := os.Rename(staged, dir); err != nil {
+		if restoreErr := os.Rename(backup, dir); restoreErr != nil {
+			return fmt.Errorf("install compact profile source failed: %v (restore failed: %w)", err, restoreErr)
+		}
+		return fmt.Errorf("install compact profile source: %w", err)
+	}
+	if err := os.RemoveAll(backup); err != nil {
+		return fmt.Errorf("remove replaced full profile source %s: %w", canonical, err)
+	}
+	return nil
+}
+
+// profilePins retains every commit named by a current or rollback profile lock
+// while a repository is compacted. An unreadable lock prevents replacement.
+func (m *gitManager) profilePins(canonical string) ([]string, error) {
+	root := ProfilesDir(m.home)
+	listing, err := stateread.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	pins := map[string]bool{}
+	for _, entry := range listing.Entries {
+		profileDir := filepath.Join(root, entry.Name())
+		state, stateErr := stateread.Lstat(profileDir)
+		if stateErr != nil {
+			return nil, stateErr
+		}
+		if state.Kind != stateread.KindPresent {
+			continue
+		}
+		if state.Info == nil || state.Info.Mode()&os.ModeSymlink != 0 {
+			return nil, stateread.UnusableError(profileDir, fmt.Errorf("profile directory is not a plain directory"))
+		}
+		if !state.Info.IsDir() {
+			continue
+		}
+		for _, lockName := range []string{"lock.json", "lock.prev.json"} {
+			lock, _, readErr := contextlock.ReadWith(filepath.Join(profileDir, lockName), stateread.ReadRegularFile)
+			if isStateAbsent(readErr) {
+				continue
+			}
+			if readErr != nil {
+				return nil, fmt.Errorf("profile lock %s cannot be trusted: %w", filepath.Join(profileDir, lockName), readErr)
+			}
+			for _, member := range lock.Members {
+				if member.Source == canonical && member.Commit != "" {
+					pins[member.Commit] = true
+				}
+			}
+		}
+	}
+	for _, scope := range []string{"global", "hybrid"} {
+		root := filepath.Join(m.home, scope, "skills")
+		skills, readErr := stateread.ReadDir(root)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if skills.Kind == stateread.KindAbsent {
+			continue
+		}
+		for _, skill := range skills.Entries {
+			skillPath := filepath.Join(root, skill.Name())
+			state, stateErr := stateread.Lstat(skillPath)
+			if stateErr != nil {
+				return nil, stateErr
+			}
+			if state.Kind != stateread.KindPresent {
+				continue
+			}
+			if state.Info == nil || state.Info.Mode()&os.ModeSymlink != 0 {
+				return nil, stateread.UnusableError(skillPath, fmt.Errorf("installed skill path is not a plain directory"))
+			}
+			if !state.Info.IsDir() {
+				continue
+			}
+			installed, markerState, readErr := marker.ReadState(skillPath)
+			if readErr != nil {
+				return nil, readErr
+			}
+			if markerState == stateread.KindPresent && installed.Source == canonical && installed.Commit != "" {
+				pins[installed.Commit] = true
+			}
+		}
+	}
+	result := make([]string, 0, len(pins))
+	for pin := range pins {
+		result = append(result, pin)
+	}
+	sort.Strings(result)
+	return result, nil
 }
 
 // checkedRepo is local-only: stored origin, not a rewritten transport URL,
@@ -292,12 +474,20 @@ func (m *gitManager) fetch(canonical string) error {
 		if err := cacheOriginBound(dir, canonical); err != nil {
 			return err
 		}
-		if err := gitops.FetchURL(dir, raw); err != nil {
+		fetchURL := gitops.FetchProfileSourceURL
+		if m.sourceCacheRoot != "" {
+			fetchURL = gitops.FetchURL
+		}
+		if err := fetchURL(dir, raw); err != nil {
 			return fmt.Errorf("fetch %s: %v", canonical, err)
 		}
 		return nil
 	}
-	if err := gitops.Fetch(dir); err != nil {
+	fetch := gitops.FetchProfileSource
+	if m.sourceCacheRoot != "" {
+		fetch = gitops.Fetch
+	}
+	if err := fetch(dir); err != nil {
 		return fmt.Errorf("fetch %s: %v", canonical, err)
 	}
 	return nil
@@ -311,16 +501,21 @@ func (m *gitManager) fetch(canonical string) error {
 // insteadOf rewrite, so a missing, repeated (including an empty, blank or
 // included extra value) or foreign origin refuses; nothing is rewritten.
 func cacheOriginBound(dir, canonical string) error {
+	_, err := cacheOriginURL(dir, canonical)
+	return err
+}
+
+func cacheOriginURL(dir, canonical string) (string, error) {
 	output, err := exec.Command("git", "-C", dir, "config", "--local", "--includes", "--null", "--get-all", "remote.origin.url").Output() // #nosec G204 -- fixed Git argv reads local metadata from the manager cache without a shell.
 	urls := strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00")
 	if err != nil || len(urls) != 1 || strings.TrimSpace(urls[0]) == "" {
-		return fmt.Errorf("%s: profile source cache %s has no single stored origin", DiagSourceInvalid, canonical)
+		return "", fmt.Errorf("%s: profile source cache %s has no single stored origin", DiagSourceInvalid, canonical)
 	}
 	origin, err := identity.Parse(urls[0])
 	if err != nil || origin != canonical {
-		return fmt.Errorf("%s: profile source cache origin differs from the requested source %s", DiagSourceInvalid, canonical)
+		return "", fmt.Errorf("%s: profile source cache origin differs from the requested source %s", DiagSourceInvalid, canonical)
 	}
-	return nil
+	return urls[0], nil
 }
 
 // Identity returns the core §6.1 canonical source identity for a declared
@@ -488,7 +683,7 @@ func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
 		return fmt.Errorf("pinned object remains unavailable after acquisition")
 	}
 	m.missingPins[key] = true
-	cmd := exec.Command("git", "-C", dir, "fetch", "--no-tags", "--no-write-fetch-head",
+	cmd := exec.Command("git", "-C", dir, "fetch", "--depth=1", "--no-tags", "--no-write-fetch-head",
 		"--no-auto-maintenance", "--recurse-submodules=no", "--refmap=", "origin", commit) // #nosec G204 -- validated exact commit, fixed remote
 	// Preserve operator transport configuration, but apply the same protocol
 	// boundary as every gitops network operation, including after rewrites.

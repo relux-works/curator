@@ -507,6 +507,36 @@ func TestCollectSweepsTheReceipt3Namespace(t *testing.T) {
 	}
 }
 
+func TestPreviewListsUnreferencedReceipt3WithoutMutation(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "cache")
+	events := []string{}
+	keepRequest, _ := sourceAwareRequest(t, root, &events, nil)
+	kept, err := RunPipeline(context.Background(), keepRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dropRequest := keepRequest
+	dropRequest.Package = &buildmeta.Package{Kind: buildmeta.PackageKindLocalSnapshot, Snapshot: "sha256:" + strings.Repeat("cd", 32)}
+	dropped, err := RunPipeline(context.Background(), dropRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wouldRemove, err := PreviewChecked(root, []string{kept.CacheKey}, time.Now().Add(48*time.Hour), time.Hour, func() error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(wouldRemove, "\n")
+	if !strings.Contains(joined, "external:sha256:"+strings.TrimPrefix(dropped.CacheKey, "sha256:")) || strings.Contains(joined, "external:sha256:"+strings.TrimPrefix(kept.CacheKey, "sha256:")) {
+		t.Fatalf("preview candidates = %v", wouldRemove)
+	}
+	for _, entry := range []string{kept.CacheKey, dropped.CacheKey} {
+		path := filepath.Join(root, ArtifactsDir(SourceAwareReceiptSchemaVersion), strings.TrimPrefix(entry, "sha256:"))
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("preview changed artifact %s: %v", entry, err)
+		}
+	}
+}
+
 // TestPrepareNamespacesCreatesEveryProtectedParentPrivately: the store creates
 // its root, the snapshot namespace and one artifact namespace per requested
 // receipt schema version through its own private creation, idempotently, so a

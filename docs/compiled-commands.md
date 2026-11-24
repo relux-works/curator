@@ -89,6 +89,8 @@ Curator selects trusted Go installations exclusively via `CURATOR_GO` (an absolu
 
 Marking reads live project, global, and hybrid scopes once. Runtime store entries are marked from all supported install marker schemas; compiled build cache entries are marked from marker v2 build state and transaction journals.
 
+The pass also marks profile locks (including the previous lock retained for rollback), project source locks, and global/hybrid install markers before sweeping legacy whole-skill and Git source snapshots. Those snapshots have no grace period: an entry is removed when no installed lock or live marker references its name/source and commit. An unreadable or invalid reference blocks the corresponding snapshot sweep. `curator gc --dry-run` lists runtime, build, and snapshot candidates without recovery or registry pruning; it uses only an already existing home lock so preview does not create manager state.
+
 Anything the pass cannot prove keeps its artifacts across passes. A consumer registry that exists but does not match the exact shape Curator writes is reported and left untouched rather than rewritten; a registered checkout is unregistered only once its scope is proven absent or proven valid and empty. Ambiguous registries (documents stating `schema_version` or `consumers` more than once) are refused by every reader and writer. Skill directories or installed skills that are symbolic links or reparse points are refused instead of followed. Unreadable or invalid markers block the build sweep.
 
 The sweep removes a protected build cache entry only when all of the following conditions hold:

@@ -5,15 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/projectlease"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/sourcelock"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -63,13 +71,21 @@ type MaintenanceRequest struct {
 	// values mean "now" and buildcache.DefaultGrace.
 	Now   time.Time
 	Grace time.Duration
+	// DryRun reports all removal candidates without changing the manager home.
+	DryRun bool
 }
 
 // MaintenanceResult reports what one pass removed and what it could not prove.
 type MaintenanceResult struct {
-	RemovedRuntime []string
-	RemovedBuilds  []string
-	Warnings       []string
+	RemovedRuntime             []string
+	RemovedBuilds              []string
+	RemovedSkillSnapshots      []string
+	RemovedSourceSnapshots     []string
+	WouldRemoveRuntime         []string
+	WouldRemoveBuilds          []string
+	WouldRemoveSkillSnapshots  []string
+	WouldRemoveSourceSnapshots []string
+	Warnings                   []string
 }
 
 // Collect runs one serialized maintenance pass: it marks every live reference
@@ -116,8 +132,10 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err := check(); err != nil {
 		return result, err
 	}
-	if err := pruneConsumersChecked(request.Home, marked, check); err != nil {
-		return result, err
+	if !request.DryRun {
+		if err := pruneConsumersChecked(request.Home, marked, check); err != nil {
+			return result, err
+		}
 	}
 	if len(marked.uncertain) > 0 {
 		result.Warnings = append(result.Warnings,
@@ -125,8 +143,11 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 			"build cache sweep skipped: the live reference set could not be proven complete")
 		return result, nil
 	}
-	removedRuntime, err := sweepRuntimeChecked(request.Home, marked.runtime, check)
-	result.RemovedRuntime = removedRuntime
+	if request.DryRun {
+		result.WouldRemoveRuntime, err = previewRuntimeChecked(request.Home, marked.runtime, check)
+	} else {
+		result.RemovedRuntime, err = sweepRuntimeChecked(request.Home, marked.runtime, check)
+	}
 	if err != nil {
 		return result, err
 	}
@@ -148,8 +169,10 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 		Referenced: referenced,
 		Now:        request.Now,
 		Grace:      request.Grace,
+		DryRun:     request.DryRun,
 	}, maintenanceLock{check: check})
 	result.RemovedBuilds = sweep.Removed
+	result.WouldRemoveBuilds = append(result.WouldRemoveBuilds, sweep.WouldRemove...)
 	result.Warnings = append(result.Warnings, sweep.Warnings...)
 	if err != nil {
 		return result, fmt.Errorf("sweep the protected build cache: %w", err)
@@ -157,10 +180,31 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err := check(); err != nil {
 		return result, err
 	}
-	externalRemoved, externalErr := buildrepo.CollectChecked(filepath.Join(request.Home, "external-build-cache"), referenced, request.Now, request.Grace, check)
-	result.RemovedBuilds = append(result.RemovedBuilds, externalRemoved...)
+	var externalRemoved []string
+	var externalErr error
+	if request.DryRun {
+		externalRemoved, externalErr = buildrepo.PreviewChecked(filepath.Join(request.Home, "external-build-cache"), referenced, request.Now, request.Grace, check)
+		result.WouldRemoveBuilds = append(result.WouldRemoveBuilds, externalRemoved...)
+	} else {
+		externalRemoved, externalErr = buildrepo.CollectChecked(filepath.Join(request.Home, "external-build-cache"), referenced, request.Now, request.Grace, check)
+		result.RemovedBuilds = append(result.RemovedBuilds, externalRemoved...)
+	}
 	if externalErr != nil {
 		return result, fmt.Errorf("sweep the external build cache: %w", externalErr)
+	}
+	if len(marked.snapshotUncertain) > 0 {
+		result.Warnings = append(result.Warnings, "skill snapshot sweep skipped: installed lock references could not be proven complete")
+		return result, nil
+	}
+	result.RemovedSkillSnapshots, result.WouldRemoveSkillSnapshots, err = sweepLegacySkillSnapshots(
+		request.Home, marked.skillSnapshots, maintenanceLock{check: check}, request.DryRun)
+	if err != nil {
+		return result, fmt.Errorf("sweep legacy skill snapshots: %w", err)
+	}
+	result.RemovedSourceSnapshots, result.WouldRemoveSourceSnapshots, err = sweepSourceSnapshots(
+		request.Home, marked.sourceSnapshots, marked.skillSnapshots, maintenanceLock{check: check}, request.DryRun)
+	if err != nil {
+		return result, fmt.Errorf("sweep source snapshots: %w", err)
 	}
 	return result, nil
 }
@@ -195,13 +239,18 @@ func requireHomeLock(lock HomeLock) error {
 
 // marks is one complete traversal of every live install scope.
 type marks struct {
-	consumers []string
-	runtime   map[string]bool
-	builds    []string
+	consumers       []string
+	runtime         map[string]bool
+	builds          []string
+	skillSnapshots  map[string]bool
+	sourceSnapshots map[string]bool
 	// uncertain describes state that exists but could not be trusted, so the
 	// reference set derived from it is incomplete. Any entry here blocks the
 	// runtime and build sweeps and protects every consumer it came from.
 	uncertain []string
+	// snapshotUncertain blocks only snapshot cleanup. The existing runtime and
+	// build sweeps have independent reference formats and can remain useful.
+	snapshotUncertain []string
 	// notes describe state that was ignored but cannot hide a reference, so
 	// they are reported without blocking maintenance.
 	notes []string
@@ -212,11 +261,12 @@ type marks struct {
 
 func (marked marks) warnings() []string {
 	warnings := append([]string(nil), marked.uncertain...)
+	warnings = append(warnings, marked.snapshotUncertain...)
 	return append(warnings, marked.notes...)
 }
 
 func markScopes(home string) marks {
-	marked := marks{runtime: map[string]bool{}}
+	marked := marks{runtime: map[string]bool{}, skillSnapshots: map[string]bool{}, sourceSnapshots: map[string]bool{}}
 	consumers, err := readConsumers(home)
 	if err != nil {
 		marked.registryUnknown = true
@@ -225,6 +275,7 @@ func markScopes(home string) marks {
 			filepath.Join(home, ConsumersName), err))
 	}
 	for _, projectRoot := range consumers {
+		markSourceLock(projectRoot, &marked)
 		scope := readScope(filepath.Join(projectRoot, ".agents", "skills"))
 		marked.uncertain = append(marked.uncertain, scope.uncertain...)
 		marked.notes = append(marked.notes, scope.notes...)
@@ -246,11 +297,27 @@ func markScopes(home string) marks {
 		marked.notes = append(marked.notes, scope.notes...)
 		marked.absorb(scope)
 	}
+	for _, root := range []string{filepath.Join(home, "global"), filepath.Join(home, "hybrid")} {
+		markSourceLock(root, &marked)
+	}
+	markProfileSkillLocks(home, &marked)
 	return marked
 }
 
 func (marked *marks) absorb(scope scopeMarks) {
+	if marked.skillSnapshots == nil {
+		marked.skillSnapshots = map[string]bool{}
+	}
+	if marked.sourceSnapshots == nil {
+		marked.sourceSnapshots = map[string]bool{}
+	}
 	for _, installed := range scope.markers {
+		if identifiers.Valid(installed.Name) && contextpkg.ValidCommit(installed.Commit) {
+			marked.skillSnapshots[installed.Name+"/"+installed.Commit] = true
+		}
+		if installed.Source != "" && contextpkg.ValidCommit(installed.Commit) {
+			marked.sourceSnapshots[sourceSnapshotKey(installed.Source, installed.Commit)] = true
+		}
 		if installed.Package != nil {
 			// A draft marker keys its runtime tree by the frozen package
 			// identity in the source-v1 namespace, never by a commit: mark
@@ -280,6 +347,283 @@ func (marked *marks) absorb(scope scopeMarks) {
 			marked.builds = append(marked.builds, string(build.CacheKey))
 		}
 	}
+}
+
+func markProfileSkillLocks(home string, marked *marks) {
+	root := filepath.Join(home, "profiles")
+	profiles, err := stateread.ReadDir(root)
+	if err != nil {
+		marked.snapshotUncertain = append(marked.snapshotUncertain, fmt.Sprintf("profile locks %s cannot be listed: %v", root, err))
+		return
+	}
+	if profiles.Kind == stateread.KindAbsent {
+		return
+	}
+	for _, entry := range profiles.Entries {
+		profileDir := filepath.Join(root, entry.Name())
+		state, err := stateread.Lstat(profileDir)
+		if err != nil {
+			marked.snapshotUncertain = append(marked.snapshotUncertain, fmt.Sprintf("profile lock directory %s cannot be inspected: %v", profileDir, err))
+			continue
+		}
+		if state.Kind != stateread.KindPresent {
+			continue
+		}
+		if state.Info == nil || state.Info.Mode()&os.ModeSymlink != 0 {
+			marked.snapshotUncertain = append(marked.snapshotUncertain, fmt.Sprintf("profile lock directory %s is not a plain directory", profileDir))
+			continue
+		}
+		if !state.Info.IsDir() {
+			continue
+		}
+		for _, name := range []string{"lock.json", "lock.prev.json"} {
+			path := filepath.Join(profileDir, name)
+			lock, _, readErr := contextlock.ReadWith(path, stateread.ReadRegularFile)
+			if errors.Is(readErr, os.ErrNotExist) {
+				continue
+			}
+			if readErr != nil {
+				marked.snapshotUncertain = append(marked.snapshotUncertain, fmt.Sprintf("profile lock %s cannot be trusted: %v", path, readErr))
+				continue
+			}
+			for _, member := range lock.Members {
+				if member.Kind != contextlock.KindSkill || !contextpkg.ValidCommit(member.Commit) {
+					continue
+				}
+				marked.skillSnapshots[member.Name+"/"+member.Commit] = true
+				if member.Source != "" {
+					marked.sourceSnapshots[sourceSnapshotKey(member.Source, member.Commit)] = true
+				}
+			}
+		}
+	}
+}
+
+func markSourceLock(root string, marked *marks) {
+	path := sourcelock.PathIn(root)
+	file, err := stateread.ReadRegularFile(path)
+	if err != nil {
+		marked.snapshotUncertain = append(marked.snapshotUncertain, fmt.Sprintf("source lock %s cannot be read: %v", path, err))
+		return
+	}
+	if file.Kind == stateread.KindAbsent {
+		return
+	}
+	lock, err := sourcelock.Parse(file.Bytes)
+	if err != nil {
+		marked.snapshotUncertain = append(marked.snapshotUncertain, fmt.Sprintf("source lock %s cannot be trusted: %v", path, err))
+		return
+	}
+	for _, member := range lock.Members {
+		pkg := member.Package
+		source := ""
+		switch pkg.Kind {
+		case sourcelock.KindNetworkGit:
+			source = pkg.Repository
+		case sourcelock.KindConfiguredGit:
+			source = pkg.Source
+		}
+		if source != "" && contextpkg.ValidCommit(pkg.Commit.Hex) {
+			marked.sourceSnapshots[sourceSnapshotKey(source, pkg.Commit.Hex)] = true
+		}
+	}
+}
+
+func sourceSnapshotKey(source, commit string) string { return source + "\x00" + commit }
+
+type snapshotCandidate struct {
+	label string
+	path  string
+}
+
+func sweepLegacySkillSnapshots(home string, referenced map[string]bool, lock HomeLock, dryRun bool) (removed, wouldRemove []string, err error) {
+	root := filepath.Join(contextstore.Root(home), "skill")
+	listing, err := stateread.ReadDir(root)
+	if err != nil {
+		return nil, nil, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil, nil
+	}
+	var candidates []snapshotCandidate
+	for _, skill := range listing.Entries {
+		if !identifiers.Valid(skill.Name()) {
+			continue
+		}
+		skillDir := filepath.Join(root, skill.Name())
+		skillState, stateErr := stateread.Lstat(skillDir)
+		if stateErr != nil {
+			return nil, nil, stateErr
+		}
+		if skillState.Kind != stateread.KindPresent || skillState.Info == nil || skillState.Info.Mode()&os.ModeSymlink != 0 || !skillState.Info.IsDir() {
+			continue
+		}
+		commits, readErr := stateread.ReadDir(skillDir)
+		if readErr != nil {
+			return nil, nil, readErr
+		}
+		for _, commit := range commits.Entries {
+			if !contextpkg.ValidCommit(commit.Name()) || referenced[skill.Name()+"/"+commit.Name()] {
+				continue
+			}
+			entry := filepath.Join(skillDir, commit.Name())
+			entryState, stateErr := stateread.Lstat(entry)
+			if stateErr != nil {
+				return nil, nil, stateErr
+			}
+			if entryState.Kind != stateread.KindPresent || entryState.Info == nil || entryState.Info.Mode()&os.ModeSymlink != 0 || !entryState.Info.IsDir() {
+				continue
+			}
+			if boundaryErr := pathboundary.ValidateWithin(root, entry); boundaryErr != nil {
+				return nil, nil, fmt.Errorf("refuse snapshot outside the skill store: %w", boundaryErr)
+			}
+			candidates = append(candidates, snapshotCandidate{label: skill.Name() + "/" + commit.Name(), path: entry})
+		}
+	}
+	for _, candidate := range candidates {
+		if dryRun {
+			wouldRemove = append(wouldRemove, candidate.label)
+			continue
+		}
+		if err := lock.AssertHeld(); err != nil {
+			return removed, wouldRemove, err
+		}
+		if err := pathboundary.ValidateWithin(root, candidate.path); err != nil {
+			return removed, wouldRemove, fmt.Errorf("refuse snapshot outside the skill store: %w", err)
+		}
+		if err := os.RemoveAll(candidate.path); err != nil {
+			return removed, wouldRemove, err
+		}
+		removed = append(removed, candidate.label)
+	}
+	sort.Strings(removed)
+	sort.Strings(wouldRemove)
+	return removed, wouldRemove, nil
+}
+
+func sweepSourceSnapshots(home string, sourceRefs, skillRefs map[string]bool, lock HomeLock, dryRun bool) (removed, wouldRemove []string, err error) {
+	root := filepath.Join(home, "cache")
+	listing, err := stateread.ReadDir(root)
+	if err != nil {
+		return nil, nil, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil, nil
+	}
+	var candidates []snapshotCandidate
+	var walk func(path, source string, depth int) error
+	walk = func(path, source string, depth int) error {
+		if depth > 32 {
+			return fmt.Errorf("source cache nesting exceeds the supported bound")
+		}
+		entries, readErr := stateread.ReadDir(path)
+		if readErr != nil {
+			return readErr
+		}
+		if entries.Kind == stateread.KindAbsent {
+			return nil
+		}
+		for _, entry := range entries.Entries {
+			if depth == 0 && (entry.Name() == "build" || entry.Name() == "registry" || entry.Name() == "local-store") {
+				continue
+			}
+			child := filepath.Join(path, entry.Name())
+			state, stateErr := stateread.Lstat(child)
+			if stateErr != nil {
+				return stateErr
+			}
+			if state.Kind != stateread.KindPresent || state.Info == nil || state.Info.Mode()&os.ModeSymlink != 0 || !state.Info.IsDir() {
+				continue
+			}
+			childSource := entry.Name()
+			if source != "" {
+				childSource = filepath.ToSlash(filepath.Join(source, entry.Name()))
+			}
+			if contextpkg.ValidCommit(entry.Name()) && (identity.ValidCanonical(source) || (strings.Count(source, "/") == 0 && identifiers.Valid(source))) {
+				snapshotPath := filepath.Join(child, "snapshot")
+				snapshotState, snapshotErr := stateread.Lstat(snapshotPath)
+				if snapshotErr != nil {
+					return snapshotErr
+				}
+				if snapshotState.Kind == stateread.KindAbsent {
+					continue
+				}
+				if snapshotState.Info == nil || snapshotState.Info.Mode()&os.ModeSymlink != 0 || !snapshotState.Info.IsDir() {
+					return fmt.Errorf("refuse non-directory source snapshot %s", snapshotPath)
+				}
+				if boundaryErr := pathboundary.ValidateWithin(root, snapshotPath); boundaryErr != nil {
+					return fmt.Errorf("refuse source snapshot outside the cache store: %w", boundaryErr)
+				}
+				key := sourceSnapshotKey(source, entry.Name())
+				if sourceRefs[key] || skillRefs[source+"/"+entry.Name()] {
+					continue
+				}
+				candidates = append(candidates, snapshotCandidate{label: source + "/" + entry.Name(), path: snapshotPath})
+				continue
+			}
+			if err := walk(child, childSource, depth+1); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := walk(root, "", 0); err != nil {
+		return nil, nil, err
+	}
+	for _, candidate := range candidates {
+		if dryRun {
+			wouldRemove = append(wouldRemove, candidate.label)
+			continue
+		}
+		if err := lock.AssertHeld(); err != nil {
+			return removed, wouldRemove, err
+		}
+		if err := pathboundary.ValidateWithin(root, candidate.path); err != nil {
+			return removed, wouldRemove, fmt.Errorf("refuse source snapshot outside the cache store: %w", err)
+		}
+		if err := os.RemoveAll(candidate.path); err != nil {
+			return removed, wouldRemove, err
+		}
+		removed = append(removed, candidate.label)
+	}
+	sort.Strings(removed)
+	sort.Strings(wouldRemove)
+	return removed, wouldRemove, nil
+}
+
+func previewRuntimeChecked(home string, referenced map[string]bool, check func() error) ([]string, error) {
+	if err := check(); err != nil {
+		return nil, err
+	}
+	root := filepath.Join(home, "runtime")
+	listing, err := stateread.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	if listing.Kind == stateread.KindAbsent {
+		return nil, nil
+	}
+	var candidates []string
+	for _, skill := range listing.Entries {
+		if !skill.IsDir() {
+			continue
+		}
+		commitListing, err := stateread.ReadDir(filepath.Join(root, skill.Name()))
+		if err != nil {
+			return candidates, err
+		}
+		for _, commit := range commitListing.Entries {
+			key := skill.Name() + "/" + commit.Name()
+			if commit.IsDir() && !referenced[key] {
+				if err := check(); err != nil {
+					return candidates, err
+				}
+				candidates = append(candidates, key)
+			}
+		}
+	}
+	sort.Strings(candidates)
+	return candidates, nil
 }
 
 // scopeMarks is one skills directory: its valid markers, everything it holds

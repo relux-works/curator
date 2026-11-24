@@ -99,7 +99,7 @@ var commandRegistry = []commandSpec{
 	{"hybrid list", "", "List hybrid skill declarations.", "", nil},
 	{"hybrid status", "", "Report hybrid installed state.", "", nil},
 	{"audit", "[target] [--all] [--global] [--json] [--allow <hash> --reason <reason>] [--publish <file> --registry <url> --token <token>]", "Audit skills, pin trust, or publish a signed record.", "", cli.cmdAudit},
-	{"gc", "", "Remove unreferenced runtime entries.", "", func(c cli, _ []string) int { return c.cmdGC() }},
+	{"gc", "[--dry-run]", "Remove unreferenced runtime, build, and source cache entries.", "--dry-run lists removal candidates without changing the manager home.\n", func(c cli, args []string) int { return c.cmdGC(args) }},
 	{"shell-init", "[auto|zsh|bash|powershell] [--install] [--no-global]", "Print or cache an optional shell hook.", "", cli.cmdShellInit},
 	{"hook", "<approve|approvals|revoke> [arguments]", "Manage trust approvals for project environment files.", "", cli.cmdHook},
 	{"hook approve", "<path>", "Approve a project environment file.", "", nil},

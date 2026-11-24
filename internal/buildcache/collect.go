@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -55,17 +56,20 @@ type SweepRequest struct {
 	// Grace retains an unreferenced entry published less than this long ago.
 	// The zero value means DefaultGrace.
 	Grace time.Duration
+	// DryRun classifies removable entries without retiring them.
+	DryRun bool
 }
 
 // SweepResult reports the removed logical keys and every uncertainty an
 // operator has to resolve. A warning always means something was retained.
 type SweepResult struct {
-	Removed  []string
-	Warnings []string
+	Removed     []string
+	WouldRemove []string
+	Warnings    []string
 }
 
 // Sweep removes unreferenced protected cache entries older than the grace
-// period while the caller holds the manager-home mutation lock.
+// period, or classifies them without mutation when DryRun is set.
 //
 // Every decision fails safe. The cache root is revalidated as protected state
 // before traversal; an entry is removed only when it is itself protected,
@@ -147,7 +151,7 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 		if err != nil {
 			return result, err
 		}
-		proceed, err := store.sweepNamespace(base, referenced, snapshot, now, grace, &result, lock)
+		proceed, err := store.sweepNamespace(base, referenced, snapshot, now, grace, request.DryRun, &result, lock)
 		if err != nil {
 			return result, err
 		}
@@ -157,13 +161,15 @@ func (store *Store) Sweep(request SweepRequest, lock HomeLock) (SweepResult, err
 			return result, nil
 		}
 	}
+	sort.Strings(result.Removed)
+	sort.Strings(result.WouldRemove)
 	return result, nil
 }
 
 // sweepNamespace sweeps one protected cache root. It reports false only when
 // the root's boundary was refused (an absent root is simply empty); every
 // refusal is recorded as a warning on the result.
-func (store *Store) sweepNamespace(base string, referenced map[string]bool, snapshot executableSnapshot, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) (bool, error) {
+func (store *Store) sweepNamespace(base string, referenced map[string]bool, snapshot executableSnapshot, now time.Time, grace time.Duration, dryRun bool, result *SweepResult, lock HomeLock) (bool, error) {
 	root, err := openSweepRoot(store.home, base)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -195,7 +201,7 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, snap
 			if referenced[name] || !snapshot.linuxProbe && buildInUse(filepath.Join(base, name), filepath.Join(canonicalBase, name), snapshot.paths) {
 				continue
 			}
-			if err := store.sweepUnreferenced(root, name, snapshot, now, grace, result, lock); err != nil {
+			if err := store.sweepUnreferenced(root, name, snapshot, now, grace, dryRun, result, lock); err != nil {
 				return false, err
 			}
 		case strings.HasPrefix(name, sweepPrefix):
@@ -211,6 +217,10 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, snap
 				if inUse {
 					continue
 				}
+			}
+			if dryRun {
+				result.WouldRemove = append(result.WouldRemove, "retired:"+name)
+				continue
 			}
 			// Manager-private wreckage of an interrupted removal: the entry is
 			// already unreachable by key, so finishing the deletion is safe.
@@ -231,7 +241,7 @@ func (store *Store) sweepNamespace(base string, referenced map[string]bool, snap
 
 // sweepUnreferenced classifies one unreferenced candidate and removes it only
 // when every safety property holds.
-func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot executableSnapshot, now time.Time, grace time.Duration, result *SweepResult, lock HomeLock) error {
+func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot executableSnapshot, now time.Time, grace time.Duration, dryRun bool, result *SweepResult, lock HomeLock) error {
 	key := buildmeta.CacheKey("sha256:" + name)
 	published, inspected, err := store.inspectUnexpected(root, name, key)
 	if err != nil {
@@ -256,6 +266,10 @@ func (store *Store) sweepUnreferenced(root *sweepRoot, name string, snapshot exe
 		return nil
 	}
 	if now.Sub(published) <= grace {
+		return nil
+	}
+	if dryRun {
+		result.WouldRemove = append(result.WouldRemove, string(key))
 		return nil
 	}
 	if hook := beforeRetireForTests; hook != nil {

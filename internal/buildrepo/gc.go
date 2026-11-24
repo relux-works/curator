@@ -23,18 +23,30 @@ func Collect(root string, referenced []string, now time.Time, grace time.Duratio
 // CollectChecked revalidates the acquisition that produced referenced after
 // potentially blocking reads and immediately before each artifact/snapshot removal.
 func CollectChecked(root string, referenced []string, now time.Time, grace time.Duration, check func() error) (removed []string, err error) {
+	removed, _, err = collectChecked(root, referenced, now, grace, check, false)
+	return removed, err
+}
+
+// PreviewChecked classifies external artifacts and snapshots that collection
+// would remove without changing the cache root.
+func PreviewChecked(root string, referenced []string, now time.Time, grace time.Duration, check func() error) (wouldRemove []string, err error) {
+	_, wouldRemove, err = collectChecked(root, referenced, now, grace, check, true)
+	return wouldRemove, err
+}
+
+func collectChecked(root string, referenced []string, now time.Time, grace time.Duration, check func() error, dryRun bool) (removed, wouldRemove []string, err error) {
 	if check == nil {
-		return nil, fmt.Errorf("external sweep ownership check is required")
+		return nil, nil, fmt.Errorf("external sweep ownership check is required")
 	}
 	if err := check(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	store := &DiskProtectedStore{Root: root}
 	if _, statErr := os.Lstat(root); os.IsNotExist(statErr) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err := store.prepareFor(false); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	keep := map[string]bool{}
 	for _, key := range referenced {
@@ -42,37 +54,42 @@ func CollectChecked(root string, referenced []string, now time.Time, grace time.
 	}
 	reachableSnapshots := map[string]bool{}
 	for _, version := range []int{LegacyReceiptSchemaVersion, SourceAwareReceiptSchemaVersion} {
-		removed, err = collectArtifacts(store, filepath.Join(root, ArtifactsDir(version)), keep, reachableSnapshots, now, grace, removed, check)
+		removed, wouldRemove, err = collectArtifacts(store, filepath.Join(root, ArtifactsDir(version)), keep, reachableSnapshots, now, grace, dryRun, removed, wouldRemove, check)
 		if err != nil {
-			return removed, err
+			return removed, wouldRemove, err
 		}
 	}
 	snapshotsRoot := filepath.Join(root, "snapshots")
 	snapshots, readErr := os.ReadDir(snapshotsRoot)
 	if readErr != nil && !os.IsNotExist(readErr) {
-		return removed, readErr
+		return removed, wouldRemove, readErr
 	}
 	for _, entry := range snapshots {
 		if entry.IsDir() && !reachableSnapshots[entry.Name()] {
 			if err := check(); err != nil {
-				return removed, err
+				return removed, wouldRemove, err
+			}
+			if dryRun {
+				wouldRemove = append(wouldRemove, "external-snapshot:sha256:"+entry.Name())
+				continue
 			}
 			if err := os.RemoveAll(filepath.Join(snapshotsRoot, entry.Name())); err != nil {
-				return removed, err
+				return removed, wouldRemove, err
 			}
 			removed = append(removed, "external-snapshot:sha256:"+entry.Name())
 		}
 	}
 	sort.Strings(removed)
-	return removed, nil
+	sort.Strings(wouldRemove)
+	return removed, wouldRemove, nil
 }
 
 // collectArtifacts sweeps one artifact namespace and records the snapshot
 // roots its retained receipts still reach.
-func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, reachableSnapshots map[string]bool, now time.Time, grace time.Duration, removed []string, check func() error) ([]string, error) {
+func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, reachableSnapshots map[string]bool, now time.Time, grace time.Duration, dryRun bool, removed, wouldRemove []string, check func() error) ([]string, []string, error) {
 	entries, readErr := os.ReadDir(artifactsRoot)
 	if readErr != nil && !os.IsNotExist(readErr) {
-		return removed, readErr
+		return removed, wouldRemove, readErr
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -81,33 +98,37 @@ func collectArtifacts(store *DiskProtectedStore, artifactsRoot string, keep, rea
 		path := filepath.Join(artifactsRoot, entry.Name())
 		info, infoErr := entry.Info()
 		if infoErr != nil {
-			return removed, infoErr
+			return removed, wouldRemove, infoErr
 		}
 		if !keep[entry.Name()] && (grace <= 0 || !info.ModTime().Add(grace).After(now)) {
 			if err := check(); err != nil {
-				return removed, err
+				return removed, wouldRemove, err
+			}
+			if dryRun {
+				wouldRemove = append(wouldRemove, "external:sha256:"+entry.Name())
+				continue
 			}
 			if err := os.RemoveAll(path); err != nil {
-				return removed, err
+				return removed, wouldRemove, err
 			}
 			removed = append(removed, "external:sha256:"+entry.Name())
 			continue
 		}
 		receipt, err := store.readProtectedFile(filepath.Join(path, "receipt.json"), 4<<20)
 		if err != nil || protocoljson.Validate(receipt) != nil {
-			return removed, fmt.Errorf("retained external receipt %s is unreadable", entry.Name())
+			return removed, wouldRemove, fmt.Errorf("retained external receipt %s is unreadable", entry.Name())
 		}
 		var object map[string]any
 		decoder := json.NewDecoder(strings.NewReader(string(receipt)))
 		decoder.UseNumber()
 		if decoder.Decode(&object) != nil {
-			return removed, fmt.Errorf("retained external receipt %s is invalid", entry.Name())
+			return removed, wouldRemove, fmt.Errorf("retained external receipt %s is invalid", entry.Name())
 		}
 		if key, ok := snapshotKeyFromReceipt(object); ok {
 			reachableSnapshots[strings.TrimPrefix(key, "sha256:")] = true
 		}
 	}
-	return removed, nil
+	return removed, wouldRemove, nil
 }
 
 func snapshotKeyFromReceipt(receipt map[string]any) (string, bool) {

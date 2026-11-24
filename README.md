@@ -154,7 +154,7 @@ Run `curator install` or `curator upgrade` to reconcile drifted or missing build
 
 ## Maintenance and the build-cache grace period
 
-`curator gc` executes maintenance to sweep unreferenced runtime store entries and compiled build cache artifacts. Garbage collection acquires an exclusive lock on the manager home directory and enforces a 24-hour grace period for unreferenced cache items. See [docs/compiled-commands.md](docs/compiled-commands.md) for maintenance locking and garbage collection criteria.
+`curator gc --dry-run` lists removal candidates without changing the manager home. `curator gc` also removes unreferenced legacy skill and Git source snapshots; installed locks and live markers retain their snapshots. The compiled build cache keeps its 24-hour grace period. See [docs/compiled-commands.md](docs/compiled-commands.md) for maintenance locking and garbage collection criteria.
 
 ## Commands
 
