@@ -3,6 +3,7 @@ package envprofile
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envregistry"
@@ -57,10 +58,29 @@ func TestUseWithPolicyReturnsProjectionFailureInsteadOfFallbackTarget(t *testing
 	}
 
 	failing := writeManagedFixture(t, "pi-use-error")
+	profileBefore := snapshotPlanState(t, failing.home)
+	nativeBefore := snapshotActivationTree(t, failing.native[envregistry.Pi])
+	currentBefore, err := Current(failing.home)
+	if err != nil {
+		t.Fatal(err)
+	}
 	failPiSkillProjection(t)
 	results, err = UseWithPolicy(failing.home, failing.profile, envregistry.Pi, "", false, Policy{})
 	if !errors.Is(err, errPiSkillProjection) {
 		t.Fatalf("Pi profile-use error = %v, results=%+v; want projection failure before fallback targeting", err, results)
+	}
+	if got := snapshotPlanState(t, failing.home); got != profileBefore {
+		t.Fatal("profile-use projection failure changed the profile or store publication state")
+	}
+	if got := snapshotActivationTree(t, failing.native[envregistry.Pi]); !reflect.DeepEqual(got, nativeBefore) {
+		t.Fatal("profile-use projection failure wrote through a fallback native target")
+	}
+	currentAfter, err := Current(failing.home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentAfter != currentBefore {
+		t.Fatalf("profile-use projection failure changed current profile from %q to %q", currentBefore, currentAfter)
 	}
 }
 
