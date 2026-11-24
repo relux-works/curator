@@ -14,13 +14,17 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
+// envAdapterByID is the staged projection lookup used by native skill
+// consumers. Tests replace it with a failing declaration to pin propagation.
+var envAdapterByID = envregistry.ByID
+
 // inPlaceSkillsDir preserves opencode staging; only the single-home native
 // adapters participate in the native skills ownership contract.
 func inPlaceSkillsDir(id string) string {
 	if _, ok := adapterByID(id); !ok {
 		return profileSkillsSurfaceDir
 	}
-	adapter, err := envregistry.ByID(id)
+	adapter, err := envAdapterByID(id)
 	if err != nil || adapter.SkillsDir == "" {
 		return profileSkillsSurfaceDir
 	}

@@ -1178,7 +1178,7 @@ func readLockError(err error) string {
 func adapterStates(req StatusRequest) []AdapterState {
 	var out []AdapterState
 	for _, adapter := range envregistry.Registry {
-		projected, _ := envregistry.ByID(adapter.ID)
+		projected, _ := envAdapterByID(adapter.ID)
 		var detected string
 		if req.Detect != nil {
 			detected = req.Detect(projected)

@@ -93,3 +93,18 @@ func TestProjectSkillResolverKeepsDeclaredMirrorPath(t *testing.T) {
 		t.Fatalf("project skill path = %q, want fixture/skills", path)
 	}
 }
+
+func TestUserSkillResolverAcceptsPiNativeDiscovery(t *testing.T) {
+	pi, err := harnessregistry.Lookup("pi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovery, ok := registeredSkillProjection("pi", harnessapi.UserScope, pi)
+	if !ok || discovery.Scope() != harnessapi.UserScope || !discovery.NativeDiscovery() || discovery.Mirror() {
+		t.Fatalf("Pi user-scope declaration = %#v, supported=%v; want native discovery without a mirror", discovery, ok)
+	}
+	paths := discovery.Paths().Paths()
+	if len(paths) != 1 || paths[0].String() != "skills" {
+		t.Fatalf("Pi user-scope paths = %v, want [skills]", paths)
+	}
+}
