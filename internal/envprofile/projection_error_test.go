@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envregistry"
@@ -66,8 +67,12 @@ func TestUseWithPolicyReturnsProjectionFailureInsteadOfFallbackTarget(t *testing
 	}
 	failPiSkillProjection(t)
 	results, err = UseWithPolicy(failing.home, failing.profile, envregistry.Pi, "", false, Policy{})
-	if !errors.Is(err, errPiSkillProjection) {
-		t.Fatalf("Pi profile-use error = %v, results=%+v; want projection failure before fallback targeting", err, results)
+	if err == nil || !strings.Contains(err.Error(), DiagUsePartial) {
+		t.Fatalf("Pi profile-use error = %v, results=%+v; want the normal partial-use error", err, results)
+	}
+	if len(results) != 1 || results[0].Adapter != envregistry.Pi || results[0].OK ||
+		!strings.Contains(results[0].Detail, errPiSkillProjection.Error()) {
+		t.Fatalf("Pi projection failure result = %+v; want preserved projection detail without fallback success", results)
 	}
 	if got := snapshotPlanState(t, failing.home); got != profileBefore {
 		t.Fatal("profile-use projection failure changed the profile or store publication state")
