@@ -131,11 +131,19 @@ func TestPiInspectionHasNoSources(t *testing.T) {
 	write(t, env.ProjectRoot, ".pi/mcp.json", `{"mcpServers":{"project-only":{"command":"fixture"}}}`)
 	write(t, env.UserHome, ".pi/agent/mcp.json", `{"mcpServers":{"home-only":{"command":"fixture"}}}`)
 
-	if got := ConfiguredServers(env, "pi"); len(got) != 0 {
+	got, err := ConfiguredServers(env, "pi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
 		t.Fatalf("Pi inspection found unsupported MCP sources: %v", got)
 	}
-	if got := ProjectOnlyServers(env, "pi"); len(got) != 0 {
-		t.Fatalf("Pi project-only inspection found unsupported MCP sources: %v", got)
+	projectOnly, err := ProjectOnlyServers(env, "pi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projectOnly) != 0 {
+		t.Fatalf("Pi project-only inspection found unsupported MCP sources: %v", projectOnly)
 	}
 }
 
