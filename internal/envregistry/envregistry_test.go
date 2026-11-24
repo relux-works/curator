@@ -1,8 +1,14 @@
 package envregistry
 
 import (
+	"errors"
+	"fmt"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 )
 
 func mustAdapter(t *testing.T, id string) Adapter {
@@ -71,6 +77,35 @@ func TestByIDProjectsStagedPiFacts(t *testing.T) {
 	}
 	if len(projected.Probe) != 2 || projected.Probe[0] != "pi" || projected.Probe[1] != "--version" {
 		t.Fatalf("Pi's staged probe = %v, want [pi --version]", projected.Probe)
+	}
+}
+
+func TestStagedSkillsDirectoryUsesTypedUnsupportedAllowlist(t *testing.T) {
+	staged, err := harnessregistry.Lookup(harnessapi.ID(Pi))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovery, err := staged.Skills(ctx, harnessapi.UserScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := stagedSkillsDirectory(discovery, nil); err != nil || got != "skills" {
+		t.Fatalf("valid native user-skill path = %q, %v; want skills", got, err)
+	}
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, harnessapi.NewRefusal(harnessapi.CapabilityUnsupported)); err != nil || got != "" {
+		t.Fatalf("typed unsupported user-skill path = %q, %v; want empty path without error", got, err)
+	}
+	other := errors.New("unexpected user-skill projection failure")
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, fmt.Errorf("wrapped: %w", other)); !errors.Is(err, other) || got != "" {
+		t.Fatalf("unexpected user-skill failure = %q, %v; want preserved error", got, err)
+	}
+	ported := harnessapi.NewRefusal(harnessapi.OperationNotPorted)
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, ported); err == nil || got != "" {
+		t.Fatalf("operation-not-ported skill failure = %q, %v; want error", got, err)
 	}
 }
 

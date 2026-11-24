@@ -68,7 +68,18 @@ func registeredSkillProjection(agent string, scope harnessapi.Scope, adapter har
 		}
 		panic(fmt.Errorf("read skill projection for %q: %w", agent, err))
 	}
-	if discovery.Scope() != scope || discovery.NativeDiscovery() || !discovery.Mirror() {
+	valid := discovery.Scope() == scope
+	switch scope {
+	case harnessapi.ProjectScope:
+		valid = valid && !discovery.NativeDiscovery() && discovery.Mirror()
+	case harnessapi.UserScope:
+		// User-scope adapters may either request a mirror (Cursor) or declare
+		// a native-discovery path without a mirror (Pi).
+		valid = valid && discovery.NativeDiscovery() != discovery.Mirror()
+	default:
+		valid = false
+	}
+	if !valid {
 		panic(fmt.Errorf("invalid skill projection declaration for %q", agent))
 	}
 	return discovery, true

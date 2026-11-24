@@ -411,7 +411,10 @@ func StatusOf(req StatusRequest) (*Status, error) {
 			status.NonCurrent = true
 		}
 	}
-	status.Adapters = adapterStates(req)
+	status.Adapters, err = adapterStates(req)
+	if err != nil {
+		return nil, err
+	}
 	status.Targets = targetStates(req)
 	var profileDiagnostics []StateDiagnostic
 	status.Profiles, profileDiagnostics, err = profileStates(req, infos)
@@ -1175,10 +1178,13 @@ func readLockError(err error) string {
 // adapterStates reports the recorded and detected tool release per
 // adapter (§7.9). Status does not execute a vendor: unavailable metadata
 // reports unknown, never matching. Detect may supply an existing observation.
-func adapterStates(req StatusRequest) []AdapterState {
+func adapterStates(req StatusRequest) ([]AdapterState, error) {
 	var out []AdapterState
 	for _, adapter := range envregistry.Registry {
-		projected, _ := envAdapterByID(adapter.ID)
+		projected, err := projectedSkillsAdapterByID(adapter.ID)
+		if err != nil {
+			return nil, fmt.Errorf("%s: project adapter status for %q: %w", DiagUnknown, adapter.ID, err)
+		}
 		var detected string
 		if req.Detect != nil {
 			detected = req.Detect(projected)
@@ -1195,7 +1201,7 @@ func adapterStates(req StatusRequest) []AdapterState {
 			Supported: append([]string{}, projected.Forms...),
 		})
 	}
-	return out
+	return out, nil
 }
 
 // targetStates evaluates secondary-target participation with the standing

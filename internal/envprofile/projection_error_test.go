@@ -12,14 +12,14 @@ var errPiSkillProjection = errors.New("injected Pi user-scope skill projection f
 
 func failPiSkillProjection(t *testing.T) {
 	t.Helper()
-	prior := envAdapterByID
-	envAdapterByID = func(id string) (envregistry.Adapter, error) {
+	prior := projectedSkillsAdapterByID
+	projectedSkillsAdapterByID = func(id string) (envregistry.Adapter, error) {
 		if id == envregistry.Pi {
 			return envregistry.Adapter{}, errPiSkillProjection
 		}
 		return prior(id)
 	}
-	t.Cleanup(func() { envAdapterByID = prior })
+	t.Cleanup(func() { projectedSkillsAdapterByID = prior })
 }
 
 func TestNativeSkillsStateReturnsProjectionFailure(t *testing.T) {
@@ -90,8 +90,10 @@ func TestCaptureNativeReturnsProjectionFailure(t *testing.T) {
 }
 
 func TestStatusOfReturnsProjectionFailureInsteadOfUnknownAdapterRow(t *testing.T) {
-	fx := writeManagedFixture(t, "pi-status-error")
-	positive, err := StatusOf(statusRequest(fx))
+	// With no managed profiles, StatusOf reaches adapterStates directly and
+	// cannot fail earlier while constructing native-skill scope rows.
+	req := StatusRequest{Home: t.TempDir(), Machine: envregistry.DefaultMachineConfig()}
+	positive, err := StatusOf(req)
 	if err != nil {
 		t.Fatalf("valid status projection failed: %v", err)
 	}
@@ -107,7 +109,7 @@ func TestStatusOfReturnsProjectionFailureInsteadOfUnknownAdapterRow(t *testing.T
 	}
 
 	failPiSkillProjection(t)
-	status, err := StatusOf(statusRequest(fx))
+	status, err := StatusOf(req)
 	if !errors.Is(err, errPiSkillProjection) {
 		t.Fatalf("status error = %v, status=%+v; want projection failure", err, status)
 	}

@@ -14,48 +14,50 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
-// envAdapterByID is the staged projection lookup used by native skill
+// projectedSkillsAdapterByID is the staged projection lookup used by native skill
 // consumers. Tests replace it with a failing declaration to pin propagation.
-var envAdapterByID = envregistry.ByID
+var projectedSkillsAdapterByID = envregistry.ByID
 
 // inPlaceSkillsDir preserves opencode staging; only the single-home native
 // adapters participate in the native skills ownership contract.
-func inPlaceSkillsDir(id string) string {
+func inPlaceSkillsDir(id string) (string, error) {
 	if _, ok := adapterByID(id); !ok {
-		return profileSkillsSurfaceDir
+		return profileSkillsSurfaceDir, nil
 	}
-	adapter, err := envAdapterByID(id)
-	if err != nil || adapter.SkillsDir == "" {
-		return profileSkillsSurfaceDir
+	adapter, err := projectedSkillsAdapterByID(id)
+	if err != nil {
+		return "", err
 	}
-	return adapter.SkillsDir
+	if adapter.SkillsDir == "" {
+		return profileSkillsSurfaceDir, nil
+	}
+	return adapter.SkillsDir, nil
 }
 
 // inPlaceSkillsLedger checks the parent before reading ownership state. A
 // failed ledger read is never evidence that an entry is unowned.
-func inPlaceSkillsLedger(native string, adapter Adapter, skills []skillOf, recorded map[string]bool) (map[string]bool, error) {
+func inPlaceSkillsLedger(native, skillsDir string, skills []skillOf, recorded map[string]bool) (map[string]bool, error) {
 	needed := len(skills) > 0
 	for path := range recorded {
-		if strings.HasPrefix(path, inPlaceSkillsDir(adapter.ID)+"/") {
+		if strings.HasPrefix(path, skillsDir+"/") {
 			needed = true
 		}
 	}
 	if !needed {
 		return map[string]bool{}, nil
 	}
-	if inPlaceSkillsDir(adapter.ID) == profileSkillsSurfaceDir {
+	if skillsDir == profileSkillsSurfaceDir {
 		return map[string]bool{}, nil
 	}
-	path, err := managedPath(native, filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), ".csk-managed.json")), false)
+	path, err := managedPath(native, filepath.ToSlash(filepath.Join(skillsDir, ".csk-managed.json")), false)
 	if err != nil {
 		return nil, err
 	}
 	return readSkillsLedger(filepath.Dir(path))
 }
 
-func ledgerSkillPath(adapter Adapter, path string, ledger map[string]bool) bool {
-	dir := inPlaceSkillsDir(adapter.ID)
-	return dir != profileSkillsSurfaceDir && ledger[strings.TrimPrefix(path, dir+"/")] && strings.HasPrefix(path, dir+"/")
+func ledgerSkillPath(skillsDir, path string, ledger map[string]bool) bool {
+	return skillsDir != profileSkillsSurfaceDir && ledger[strings.TrimPrefix(path, skillsDir+"/")] && strings.HasPrefix(path, skillsDir+"/")
 }
 
 func inPlaceLinkInStore(full, target, store string) bool {
@@ -68,7 +70,11 @@ func inPlaceLinkInStore(full, target, store string) bool {
 // nativeSkillsState is read-only and checks only the effective current
 // profile. It never inventories or adopts names outside the profile.
 func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (string, error)) (*SurfaceState, error) {
-	if inPlaceSkillsDir(id) == profileSkillsSurfaceDir {
+	skillsDir, err := inPlaceSkillsDir(id)
+	if err != nil {
+		return nil, err
+	}
+	if skillsDir == profileSkillsSurfaceDir {
 		return nil, nil
 	}
 	scoped, err := ScopedCurrents(home)
@@ -118,14 +124,14 @@ func nativeSkillsState(home, profile, id string, nativeHomeOf func(string) (stri
 	if err != nil {
 		return nil, err
 	}
-	ledger, err := inPlaceSkillsLedger(native, adapter, skills, map[string]bool{})
+	ledger, err := inPlaceSkillsLedger(native, skillsDir, skills, map[string]bool{})
 	if err != nil {
 		return nil, err
 	}
 	expected := map[string][]byte{}
 	var reasons []string
 	for _, skill := range skills {
-		path := filepath.ToSlash(filepath.Join(inPlaceSkillsDir(id), skill.name))
+		path := filepath.ToSlash(filepath.Join(skillsDir, skill.name))
 		row.Paths = append(row.Paths, path)
 		if ledger[skill.name] {
 			reasons = append(reasons, path+" belongs to legacy global scope (adapter ledger); left in place")
@@ -216,7 +222,11 @@ func repairNativeSkills(op *operation, req *ResolveRequest) error {
 // repairs participating effective-current homes without re-resolving path bytes.
 func syncCurrentNativeSkills(op *operation, home, profile string, policy Policy) error {
 	for _, adapter := range Adapters {
-		if inPlaceSkillsDir(adapter.ID) == profileSkillsSurfaceDir {
+		skillsDir, err := inPlaceSkillsDir(adapter.ID)
+		if err != nil {
+			return err
+		}
+		if skillsDir == profileSkillsSurfaceDir {
 			continue
 		}
 		req := &ResolveRequest{Home: home, Profile: profile, EnvID: adapter.ID, Policy: policy}

@@ -6,6 +6,7 @@
 package envregistry
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -420,14 +421,10 @@ func ByID(id string) (Adapter, error) {
 			}
 			if capabilities.Has(harnessapi.SkillProjection) || capabilities.Has(harnessapi.NativeSkillDiscovery) {
 				skills, err := staged.Skills(ctx, harnessapi.UserScope)
+				adapter.SkillsDir, err = stagedSkillsDirectory(skills, err)
 				if err != nil {
-					return Adapter{}, fmt.Errorf("%s: staged skill declaration failed: %w", DiagUnknown, err)
+					return Adapter{}, err
 				}
-				paths := skills.Paths().Paths()
-				if len(paths) == 0 {
-					return Adapter{}, fmt.Errorf("%s: staged skill declaration has no paths", DiagUnknown)
-				}
-				adapter.SkillsDir = paths[0].String()
 			}
 			if capabilities.Has(harnessapi.ReleaseProbing) {
 				probe, err := staged.ReleaseProbe(ctx)
@@ -440,6 +437,21 @@ func ByID(id string) (Adapter, error) {
 		}
 	}
 	return Adapter{}, fmt.Errorf("%s: unregistered environment %q", DiagUnknown, id)
+}
+
+func stagedSkillsDirectory(skills harnessapi.SkillDiscovery, err error) (string, error) {
+	if err != nil {
+		var refusal harnessapi.Refusal
+		if errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
+			return "", nil
+		}
+		return "", fmt.Errorf("%s: staged skill declaration failed: %w", DiagUnknown, err)
+	}
+	paths := skills.Paths().Paths()
+	if len(paths) == 0 {
+		return "", fmt.Errorf("%s: staged skill declaration has no paths", DiagUnknown)
+	}
+	return paths[0].String(), nil
 }
 
 // TargetByID resolves a declared secondary target or reports

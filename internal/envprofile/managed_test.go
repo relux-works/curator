@@ -1106,8 +1106,8 @@ func TestPiNativeSurfacesUseStagedAdapterValues(t *testing.T) {
 	if switchAdapter.EnvVar != "PI_CODING_AGENT_DIR" || switchAdapter.DefaultDir != ".pi" || switchAdapter.Target != "AGENTS.md" {
 		t.Fatalf("Pi native home adapter = %+v, want staged home and instruction values", switchAdapter)
 	}
-	if got := inPlaceSkillsDir(envregistry.Pi); got != "skills" {
-		t.Fatalf("Pi native skills directory = %q, want skills from staged discovery", got)
+	if got, err := inPlaceSkillsDir(envregistry.Pi); err != nil || got != "skills" {
+		t.Fatalf("Pi native skills directory = %q, err=%v; want skills from staged discovery", got, err)
 	}
 	projected, err := envregistry.ByID(envregistry.Pi)
 	if err != nil {

@@ -649,10 +649,14 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 		if written {
 			want[adapter.Target] = true
 		}
-		for _, skill := range skills {
-			want[filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))] = true
+		skillsDir, err := inPlaceSkillsDir(adapter.ID)
+		if err != nil {
+			return err
 		}
-		ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
+		for _, skill := range skills {
+			want[filepath.ToSlash(filepath.Join(skillsDir, skill.name))] = true
+		}
+		ledger, err := inPlaceSkillsLedger(native, skillsDir, skills, recorded)
 		if err != nil {
 			return err
 		}
@@ -665,7 +669,7 @@ func preflightInPlaceScope(home, profile, environment string, policy Policy, nat
 			if _, err := managedPath(native, path, false); err != nil {
 				return err
 			}
-			if ledgerSkillPath(adapter, path, ledger) {
+			if ledgerSkillPath(skillsDir, path, ledger) {
 				continue
 			}
 			if recorded[path] {
@@ -797,7 +801,11 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	if written {
 		want[adapter.Target] = true
 	}
-	ledger, err := inPlaceSkillsLedger(native, adapter, skills, recorded)
+	skillsDir, err := inPlaceSkillsDir(adapter.ID)
+	if err != nil {
+		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
+	}
+	ledger, err := inPlaceSkillsLedger(native, skillsDir, skills, recorded)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 	}
@@ -805,7 +813,7 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 		if _, err := managedPath(native, path, false); err != nil {
 			return EntryResult{Adapter: adapter.ID, Home: native, Detail: err.Error()}
 		}
-		if ledgerSkillPath(adapter, path, ledger) {
+		if ledgerSkillPath(skillsDir, path, ledger) {
 			delete(recorded, path)
 		}
 	}
@@ -814,8 +822,8 @@ func materializeOne(op *operation, home string, source Source, profile string, l
 	skillHashes := map[string][]byte{}
 	skillPaths := make([]string, 0, len(skills))
 	for _, skill := range skills {
-		path := filepath.ToSlash(filepath.Join(inPlaceSkillsDir(adapter.ID), skill.name))
-		if ledgerSkillPath(adapter, path, ledger) {
+		path := filepath.ToSlash(filepath.Join(skillsDir, skill.name))
+		if ledgerSkillPath(skillsDir, path, ledger) {
 			ledgerDetails = append(ledgerDetails, path+" belongs to legacy global scope (adapter ledger); left in place")
 			continue
 		}
