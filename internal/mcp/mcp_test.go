@@ -120,7 +120,7 @@ func TestMCPSourceFallbackIsNarrow(t *testing.T) {
 	}
 	if _, err := mcpSources("cursor", "unsupported", fallback); err == nil || err.Error() != "harness_scope_unsupported" {
 		t.Fatalf("registry context refusal was masked by fallback: %v", err)
-}
+	}
 }
 
 // TestPiInspectionHasNoSources is the negative control for unsupported Pi
