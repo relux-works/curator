@@ -1099,6 +1099,54 @@ func TestMigrateOldRootBytesWarnAndProceed(t *testing.T) {
 	}
 }
 
+// TestPiCredentialMigrationPlanDoesNotExposeCredentialBytes characterizes
+// the legacy shared migration owner retained until the contract can describe
+// both roots and a link-replacement plan.
+func TestPiCredentialMigrationPlanDoesNotExposeCredentialBytes(t *testing.T) {
+	requireLinkCapability(t)
+	fx := writeManagedFixture(t, "acme")
+	native := fx.native["pi"]
+	oldAuth := filepath.Join(native, "auth.json")
+	agentAuth := filepath.Join(native, "agent", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(agentAuth), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const credentialPayload = `{"token":"fixture-only-credential-payload"}`
+	if err := os.WriteFile(oldAuth, []byte(credentialPayload), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	provision(t, fx, "pi", envregistry.DefaultMachineConfig())
+	link := filepath.Join(ManagedHomeDir(fx.home, "acme", "pi"), "auth.json")
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(oldAuth, link); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := PlanMigration(fx.migrateRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Ops()) != 1 || len(report.Conflicts()) != 0 {
+		t.Fatalf("old-root link has one planned relink and no conflicts: ops=%+v conflicts=%+v", report.Ops(), report.Conflicts())
+	}
+	op := report.Ops()[0]
+	if op.Path != "auth.json" || op.From != oldAuth || op.To != agentAuth {
+		t.Fatalf("planned relink = %+v", op)
+	}
+	plan := report.Text(MigratePhasePlan)
+	if strings.Contains(plan, credentialPayload) {
+		t.Fatal("migration plan exposed credential bytes")
+	}
+	if target, err := os.Readlink(link); err != nil || target != oldAuth {
+		t.Fatalf("planning leaves the managed link unchanged: target=%q err=%v", target, err)
+	}
+	if payload, err := os.ReadFile(oldAuth); err != nil || string(payload) != credentialPayload {
+		t.Fatalf("planning leaves old-root bytes unchanged: payload=%q err=%v", payload, err)
+	}
+}
+
 // TestMigratePendingNeedsNothing proves dangling-to-declared entries
 // get no operation: the plan is empty, apply succeeds applying nothing,
 // and the pending link is untouched.

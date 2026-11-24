@@ -120,6 +120,22 @@ func TestMCPSourceFallbackIsNarrow(t *testing.T) {
 	}
 	if _, err := mcpSources("cursor", "unsupported", fallback); err == nil || err.Error() != "harness_scope_unsupported" {
 		t.Fatalf("registry context refusal was masked by fallback: %v", err)
+}
+}
+
+// TestPiInspectionHasNoSources is the negative control for unsupported Pi
+// MCP inspection: files at plausible home and project paths are not read as
+// configuration by Curator.
+func TestPiInspectionHasNoSources(t *testing.T) {
+	env := newEnv(t)
+	write(t, env.ProjectRoot, ".pi/mcp.json", `{"mcpServers":{"project-only":{"command":"fixture"}}}`)
+	write(t, env.UserHome, ".pi/agent/mcp.json", `{"mcpServers":{"home-only":{"command":"fixture"}}}`)
+
+	if got := ConfiguredServers(env, "pi"); len(got) != 0 {
+		t.Fatalf("Pi inspection found unsupported MCP sources: %v", got)
+	}
+	if got := ProjectOnlyServers(env, "pi"); len(got) != 0 {
+		t.Fatalf("Pi project-only inspection found unsupported MCP sources: %v", got)
 	}
 }
 

@@ -3,6 +3,7 @@
 package envprofile
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -985,5 +986,94 @@ func TestResolveFormats(t *testing.T) {
 	req.Format = "pwsh"
 	if _, err := Resolve(req); err == nil {
 		t.Fatal("an unknown format must fail")
+	}
+}
+
+// TestPiSystemPromptFileModes pins the native file selection through the
+// shared managed-home renderer. The inert store document is always retained;
+// only the selected Pi launch file is materialized.
+func TestPiSystemPromptFileModes(t *testing.T) {
+	for _, tc := range []struct {
+		mode, active string
+	}{
+		{"off", ""},
+		{"append", "APPEND_SYSTEM.md"},
+		{"replace", "SYSTEM.md"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			fx := writeManagedFixture(t, "acme")
+			seedLiveNativeCredentials(t, fx)
+			req := fx.request("pi")
+			req.Machine.SystemPromptFiles = map[string]string{fx.profile: tc.mode}
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatalf("provision Pi home: %v", err)
+			}
+
+			home := ManagedHomeDir(fx.home, fx.profile, "pi")
+			inert, err := os.ReadFile(filepath.Join(home, ".agent-context", "system-prompt.md"))
+			if err != nil || string(inert) != "Be terse.\n" {
+				t.Fatalf("inert prompt = %q, err=%v", inert, err)
+			}
+			for _, path := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
+				payload, err := os.ReadFile(filepath.Join(home, path))
+				if path == tc.active {
+					if err != nil || !bytes.Equal(payload, inert) {
+						t.Fatalf("active prompt %s = %q, err=%v; want inert bytes", path, payload, err)
+					}
+					continue
+				}
+				if !os.IsNotExist(err) {
+					t.Fatalf("unselected prompt %s exists or failed inspection: payload=%q err=%v", path, payload, err)
+				}
+			}
+		})
+	}
+}
+
+func TestPiSeedCopiesAndFirstResolveNotice(t *testing.T) {
+	fx := writeManagedFixture(t, "acme")
+	seedLiveNativeCredentials(t, fx)
+	seeds := map[string]string{
+		"settings.json": `{"theme":"dark"}`,
+		"models.json":   `{"model":"fixture"}`,
+	}
+	for name, payload := range seeds {
+		if err := os.WriteFile(filepath.Join(fx.native["pi"], name), []byte(payload), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	req := fx.request("pi")
+	req.Repair = true
+	result, err := Resolve(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Provisioned || !strings.Contains(result.Notice, "No trust wall; authentication is shared from the native home.") {
+		t.Fatalf("Pi provisioned=%v notice=%q, want the legacy first-resolve notice", result.Provisioned, result.Notice)
+	}
+
+	managedHome := ManagedHomeDir(fx.home, "acme", "pi")
+	for name, payload := range seeds {
+		got, err := os.ReadFile(filepath.Join(managedHome, name))
+		if err != nil || !bytes.Equal(got, []byte(payload)) {
+			t.Fatalf("managed Pi seed %s = %q, err=%v; want native bytes", name, got, err)
+		}
+	}
+
+	for name := range seeds {
+		if err := os.WriteFile(filepath.Join(fx.native["pi"], name), []byte("changed native seed"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := Resolve(req); err != nil {
+		t.Fatalf("repair after native seed changes: %v", err)
+	}
+	for name, payload := range seeds {
+		got, err := os.ReadFile(filepath.Join(managedHome, name))
+		if err != nil || !bytes.Equal(got, []byte(payload)) {
+			t.Fatalf("repair refreshed Pi seed %s = %q, err=%v; want original managed bytes", name, got, err)
+		}
 	}
 }
