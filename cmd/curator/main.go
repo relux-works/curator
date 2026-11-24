@@ -87,7 +87,7 @@ Commands:
   run <env-id> ...         umbrella dispatch to curator-run (see §11)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
-  gc                       remove unreferenced runtime entries
+  gc [--dry-run]            remove unreferenced runtime, build, and source-cache entries
   shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
   hook <subcommand>        approve | approvals | revoke (project env file trust)
   ui                       terminal view over installed state
@@ -2400,12 +2400,17 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string, 
 	return warnings, errs, audit.ScriptPolicyRecords(subjects)
 }
 
-// cmdGC runs maintenance under the exclusive manager-home mutation lock, so it
-// serializes with every install, rollback, and recovery. Incomplete
-// transactions are recovered first, and their build references are marked, so
-// an installation interrupted by a crash keeps the artifacts it will finish
-// with.
-func (c cli) cmdGC() int {
+// cmdGC runs maintenance or a read-only preview under the manager-home lock.
+// A regular pass recovers incomplete transactions before marking references;
+// a preview reads journal references but skips recovery and registry pruning.
+func (c cli) cmdGC(args []string) int {
+	flags := c.newFlagSet("gc")
+	dryRun := flags.Bool("dry-run", false, "list cache entries that would be removed")
+	positional, parseErr := parseInterspersed(flags, args)
+	if parseErr != nil || len(positional) != 0 {
+		_, _ = fmt.Fprintln(c.stderr, "curator: gc accepts only --dry-run")
+		return exitUsage
+	}
 	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
@@ -2420,35 +2425,71 @@ func (c cli) cmdGC() int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	lock, err := manager.AcquireHomeOnly(context.Background(), false)
+	var lock *managerlock.HomeLock
+	if *dryRun {
+		lock, err = manager.AcquireExistingHomeOnly(context.Background())
+	} else {
+		lock, err = manager.AcquireHomeOnly(context.Background(), false)
+	}
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator: acquire the manager-home lock:", err)
 		return exitFail
 	}
-	result, err := collectUnderLock(home, lock, envprofile.PolicyFromConfig(cfg))
+	result, err := collectUnderLock(home, lock, envprofile.PolicyFromConfig(cfg), *dryRun)
 	if closeErr := lock.Close(); closeErr != nil && err == nil {
 		err = fmt.Errorf("release the manager-home lock: %w", closeErr)
 	}
 	for _, warning := range result.Warnings {
 		_, _ = fmt.Fprintln(c.stderr, "curator: warning:", warning)
 	}
-	for _, entry := range result.RemovedRuntime {
-		_, _ = fmt.Fprintln(c.stdout, "removed runtime", entry)
-	}
-	for _, key := range result.RemovedBuilds {
-		_, _ = fmt.Fprintln(c.stdout, "removed build", key)
+	if *dryRun {
+		for _, entry := range result.WouldRemoveRuntime {
+			_, _ = fmt.Fprintln(c.stdout, "would remove runtime", entry)
+		}
+		for _, key := range result.WouldRemoveBuilds {
+			_, _ = fmt.Fprintln(c.stdout, "would remove build", key)
+		}
+		for _, entry := range result.WouldRemoveSkillSnapshots {
+			_, _ = fmt.Fprintln(c.stdout, "would remove legacy skill snapshot", entry)
+		}
+		for _, entry := range result.WouldRemoveSourceSnapshots {
+			_, _ = fmt.Fprintln(c.stdout, "would remove source snapshot", entry)
+		}
+	} else {
+		for _, entry := range result.RemovedRuntime {
+			_, _ = fmt.Fprintln(c.stdout, "removed runtime", entry)
+		}
+		for _, key := range result.RemovedBuilds {
+			_, _ = fmt.Fprintln(c.stdout, "removed build", key)
+		}
+		for _, entry := range result.RemovedSkillSnapshots {
+			_, _ = fmt.Fprintln(c.stdout, "removed legacy skill snapshot", entry)
+		}
+		for _, entry := range result.RemovedSourceSnapshots {
+			_, _ = fmt.Fprintln(c.stdout, "removed source snapshot", entry)
+		}
 	}
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	_, _ = fmt.Fprintf(c.stdout, "gc: %d runtime entr%s removed, %d build entr%s removed\n",
-		len(result.RemovedRuntime), pluralY(len(result.RemovedRuntime)),
-		len(result.RemovedBuilds), pluralY(len(result.RemovedBuilds)))
+	if *dryRun {
+		_, _ = fmt.Fprintf(c.stdout, "gc: %d runtime entr%s, %d build entr%s, %d legacy skill snapshot%s, %d source snapshot%s would be removed\n",
+			len(result.WouldRemoveRuntime), pluralY(len(result.WouldRemoveRuntime)),
+			len(result.WouldRemoveBuilds), pluralY(len(result.WouldRemoveBuilds)),
+			len(result.WouldRemoveSkillSnapshots), pluralS(len(result.WouldRemoveSkillSnapshots)),
+			len(result.WouldRemoveSourceSnapshots), pluralS(len(result.WouldRemoveSourceSnapshots)))
+	} else {
+		_, _ = fmt.Fprintf(c.stdout, "gc: %d runtime entr%s removed, %d build entr%s removed, %d legacy skill snapshot%s removed, %d source snapshot%s removed\n",
+			len(result.RemovedRuntime), pluralY(len(result.RemovedRuntime)),
+			len(result.RemovedBuilds), pluralY(len(result.RemovedBuilds)),
+			len(result.RemovedSkillSnapshots), pluralS(len(result.RemovedSkillSnapshots)),
+			len(result.RemovedSourceSnapshots), pluralS(len(result.RemovedSourceSnapshots)))
+	}
 	return exitOK
 }
 
-func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile.Policy) (scopes.MaintenanceResult, error) {
+func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile.Policy, dryRun bool) (scopes.MaintenanceResult, error) {
 	if err := envprofile.PreflightCurrentPathSources(home, policy); err != nil {
 		return scopes.MaintenanceResult{}, err
 	}
@@ -2456,14 +2497,16 @@ func collectUnderLock(home string, lock *managerlock.HomeLock, policy envprofile
 	if err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)
 	}
-	if _, err := projectlease.RecoverUnderLock(home, lock, engine); err != nil {
-		return scopes.MaintenanceResult{}, fmt.Errorf("recover incomplete install transactions: %w", err)
+	if !dryRun {
+		if _, err := projectlease.RecoverUnderLock(home, lock, engine); err != nil {
+			return scopes.MaintenanceResult{}, fmt.Errorf("recover incomplete install transactions: %w", err)
+		}
 	}
 	journalKeys, err := engine.ReferencedBuildKeys(lock)
 	if err != nil {
 		return scopes.MaintenanceResult{}, fmt.Errorf("read in-flight build references: %w", err)
 	}
-	return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, JournalKeys: journalKeys})
+	return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, JournalKeys: journalKeys, DryRun: dryRun})
 }
 
 func (c cli) cmdShellInit(args []string) int {
@@ -3083,6 +3126,13 @@ func pluralY(n int) string {
 		return "y"
 	}
 	return "ies"
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func (c cli) cmdUI() int {

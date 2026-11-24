@@ -1053,21 +1053,21 @@ no warning fires. See
 
 ### curator gc
 
-`curator gc` sweeps unreferenced runtime store entries and compiled build cache artifacts.
+`curator gc` sweeps unreferenced runtime, build-cache, and source-snapshot entries.
 
 Synopsis:
 
 ```bash
-curator gc
+curator gc [--dry-run]
 ```
 
-Run garbage collection pass:
+Preview the entries a garbage-collection pass would remove:
 
 ```bash
-curator gc
+curator gc --dry-run
 ```
 
-The command acquires the manager home lock and removes unreferenced artifacts older than 24 hours.
+The preview does not recover transactions or prune consumer records. A regular pass recovers incomplete install transactions before marking references. The 24-hour grace period applies to compiled build-cache entries; unreferenced legacy skill and source snapshots have no grace period.
 
 ### curator shell-init
 

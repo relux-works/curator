@@ -90,6 +90,15 @@ the corresponding Git tree, so added sibling files and selected-byte tampering
 both fail. Existing commit-keyed complete snapshots remain readable and keep
 whole-tree verification. The lock's commit, directory and hash are unchanged.
 
+Profile Git source caches use depth-one clones and fetches; an existing
+full-history cache is replaced only after a staged shallow clone carries
+forward pins from current and previous profile locks and global or hybrid
+install markers. `curator gc --dry-run` lists
+removal candidates. Garbage collection removes unreferenced legacy whole-skill
+snapshots and source snapshot entries while preserving references from
+installed locks and live markers; unreadable reference state prevents snapshot
+cleanup, and paths outside Curator's cache are refused.
+
 Audit content identity, manifest capabilities and findings use the selected
 package tree. For skills, Markdown guidance participates in network-declaration detection only within
 agent-facing context (core section 3), using the shared context roots and

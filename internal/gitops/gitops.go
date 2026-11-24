@@ -279,6 +279,24 @@ func Clone(remoteURL, destination string) error {
 	return cloneWith(remoteURL, destination, run)
 }
 
+// CloneProfileSource creates the shallow repository used by a profile
+// source. Each fetched ref retains its tip without the source's full history.
+func CloneProfileSource(remoteURL, destination string) error {
+	return cloneWithOptions(remoteURL, destination, []string{"--depth=1"}, run)
+}
+
+// IsProfileSourceClone reports whether repo has a shallow history boundary.
+func IsProfileSourceClone(repo string) (bool, error) {
+	if err := EnsureRepo(repo); err != nil {
+		return false, err
+	}
+	shallow, err := run(repo, "rev-parse", "--is-shallow-repository")
+	if err != nil {
+		return false, err
+	}
+	return shallow == "true", nil
+}
+
 // CloneIsolated is the draft literal-URL lane's clone: identical to Clone
 // except the invocation runs on the allow-list environment with pinned
 // transport (no user or system git configuration — no
@@ -298,6 +316,10 @@ func CloneIsolated(remoteURL, destination string) error {
 }
 
 func cloneWith(remoteURL, destination string, runFn func(dir string, args ...string) (string, error)) error {
+	return cloneWithOptions(remoteURL, destination, nil, runFn)
+}
+
+func cloneWithOptions(remoteURL, destination string, options []string, runFn func(dir string, args ...string) (string, error)) error {
 	trimmed := strings.TrimSpace(remoteURL)
 	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
 		return fmt.Errorf("refusing to clone suspicious git URL: %q", remoteURL)
@@ -313,7 +335,10 @@ func cloneWith(remoteURL, destination string, runFn func(dir string, args ...str
 	}
 	// gitCommand supplies the early process option; retain the local setting
 	// for later repository consumers outside this package too.
-	if _, err := runFn("", "clone", "--config", "core.longpaths=true", "--", trimmed, destination); err != nil {
+	args := []string{"clone"}
+	args = append(args, options...)
+	args = append(args, "--config", "core.longpaths=true", "--", trimmed, destination)
+	if _, err := runFn("", args...); err != nil {
 		_ = os.RemoveAll(destination)
 		return fmt.Errorf("git clone failed for %s -> %s: %w", remoteURL, destination, err)
 	}
@@ -443,6 +468,26 @@ func FetchURL(repo, remoteURL string) error {
 	}
 	_, err = run(repo, args...)
 	return err
+}
+
+// FetchProfileSourceURL refreshes heads and tags for the profile source cache
+// without retaining their full history.
+func FetchProfileSourceURL(repo, remoteURL string) error {
+	if err := ValidateFetchEndpoint(remoteURL); err != nil {
+		return err
+	}
+	args, err := fetchURLArgsWithOptions(repo, lowerURLScheme(remoteURL), []string{"--depth=1"})
+	if err != nil {
+		return err
+	}
+	_, err = run(repo, args...)
+	return err
+}
+
+// FetchProfileSource refreshes configured remotes in the profile source cache
+// while keeping only shallow commit tips.
+func FetchProfileSource(repo string) error {
+	return fetchWithOptions(repo, run, []string{"--depth=1"})
 }
 
 // fetchSchemes are the URL schemes of the descriptor contract, matched case
@@ -602,6 +647,10 @@ func lowerURLScheme(endpoint string) string {
 // fetchURLArgs validates an explicit fetch endpoint and maps its heads and
 // tags into the same local refs Resolve reads.
 func fetchURLArgs(repo, remoteURL string) ([]string, error) {
+	return fetchURLArgsWithOptions(repo, remoteURL, nil)
+}
+
+func fetchURLArgsWithOptions(repo, remoteURL string, options []string) ([]string, error) {
 	trimmed := strings.TrimSpace(remoteURL)
 	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
 		return nil, fmt.Errorf("refusing to fetch from suspicious git URL")
@@ -609,11 +658,14 @@ func fetchURLArgs(repo, remoteURL string) ([]string, error) {
 	if err := EnsureRepo(repo); err != nil {
 		return nil, err
 	}
-	return []string{
-		"fetch", "--force", "--prune", "--no-write-fetch-head", "--", trimmed,
+	args := []string{"fetch"}
+	args = append(args, options...)
+	args = append(args,
+		"--force", "--prune", "--no-write-fetch-head", "--", trimmed,
 		"+refs/heads/*:refs/remotes/origin/*",
 		"+refs/tags/*:refs/tags/*",
-	}, nil
+	)
+	return args, nil
 }
 
 // FetchCommitIsolated requests one locked object ID from the repository's
@@ -710,6 +762,10 @@ func validateLockedCommit(commit string) error {
 }
 
 func fetchWith(repo string, runFn func(dir string, args ...string) (string, error)) error {
+	return fetchWithOptions(repo, runFn, nil)
+}
+
+func fetchWithOptions(repo string, runFn func(dir string, args ...string) (string, error), options []string) error {
 	if err := EnsureRepo(repo); err != nil {
 		return err
 	}
@@ -720,7 +776,10 @@ func fetchWith(repo string, runFn func(dir string, args ...string) (string, erro
 	if !has {
 		return nil
 	}
-	_, err = runFn(repo, "fetch", "--all", "--tags", "--prune")
+	args := []string{"fetch"}
+	args = append(args, options...)
+	args = append(args, "--all", "--tags", "--prune")
+	_, err = runFn(repo, args...)
 	return err
 }
 
