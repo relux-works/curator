@@ -279,10 +279,18 @@ func Clone(remoteURL, destination string) error {
 	return cloneWith(remoteURL, destination, run)
 }
 
-// CloneProfileSource creates the shallow repository used by a profile
-// source. Each fetched ref retains its tip without the source's full history.
+// CloneProfileSource creates a shallow profile-source repository with every
+// supported head and tag available locally. The follow-up depth-one fetch
+// maps all heads and tags into the refs used by the profile resolver.
 func CloneProfileSource(remoteURL, destination string) error {
-	return cloneWithOptions(remoteURL, destination, []string{"--depth=1"}, run)
+	if err := cloneWithOptions(remoteURL, destination, []string{"--depth=1", "--no-single-branch"}, run); err != nil {
+		return err
+	}
+	if err := FetchProfileSourceURL(destination, remoteURL); err != nil {
+		_ = os.RemoveAll(destination)
+		return fmt.Errorf("git profile source ref fetch failed: %w", err)
+	}
+	return nil
 }
 
 // IsProfileSourceClone reports whether repo has a shallow history boundary.
