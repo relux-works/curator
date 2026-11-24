@@ -403,7 +403,15 @@ func migrationAdapters(explicit string) ([]envregistry.Adapter, error) {
 		}
 		return []envregistry.Adapter{adapter}, nil
 	}
-	return append([]envregistry.Adapter{}, envregistry.Registry...), nil
+	adapters := make([]envregistry.Adapter, 0, len(envregistry.Registry))
+	for _, declared := range envregistry.Registry {
+		adapter, err := envregistry.ByID(declared.ID)
+		if err != nil {
+			return nil, err
+		}
+		adapters = append(adapters, adapter)
+	}
+	return adapters, nil
 }
 
 // inventoryHome inventories one profile × environment. It never fails:

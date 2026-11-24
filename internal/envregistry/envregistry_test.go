@@ -27,13 +27,17 @@ func TestRegistryClosed(t *testing.T) {
 		t.Fatalf("the revision-1 registry holds %d adapters, want 5", len(Registry))
 	}
 	seen := map[string]bool{}
-	for _, adapter := range Registry {
-		if seen[adapter.ID] {
-			t.Fatalf("duplicate adapter %s", adapter.ID)
+	for _, declared := range Registry {
+		if seen[declared.ID] {
+			t.Fatalf("duplicate adapter %s", declared.ID)
 		}
-		seen[adapter.ID] = true
+		seen[declared.ID] = true
+		adapter, err := ByID(declared.ID)
+		if err != nil {
+			t.Fatalf("adapter %s lookup: %v", declared.ID, err)
+		}
 		if adapter.EnvVar == "" || adapter.RootTarget == "" {
-			t.Fatalf("adapter %s names no home variable or root target", adapter.ID)
+			t.Fatalf("adapter %s names no home variable or root target", declared.ID)
 		}
 	}
 	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi, Muse} {

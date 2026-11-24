@@ -53,6 +53,7 @@ func StageProject(stageRoot, projectRoot string, agents []string, groups []Group
 		}
 		if rel, known := AgentPaths[agent]; known {
 			roots[agent] = filepath.Join(projectRoot, filepath.FromSlash(rel))
+			continue
 		}
 	}
 	return stage(stageRoot, roots, groups, mode)
@@ -102,9 +103,30 @@ func StageGlobalWithOwnership(
 		}
 		if rel, known := AgentPaths[agent]; known {
 			roots[agent] = filepath.Join(userHome, filepath.FromSlash(rel))
+			continue
 		}
 		if NativeDiscoveryAgents[agent] {
-			roots[agent] = filepath.Join(userHome, filepath.FromSlash(NativeDiscoveryHomePath))
+			adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+			if err == nil && adapter.Capabilities().Has(harnessapi.NativeSkillDiscovery) {
+				context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+				if err != nil {
+					return Mirror{}, err
+				}
+				discovery, err := adapter.Skills(context, harnessapi.UserScope)
+				if err != nil {
+					return Mirror{}, err
+				}
+				if !discovery.Mirror() {
+					continue
+				}
+				paths := discovery.Paths().Paths()
+				if len(paths) == 0 {
+					return Mirror{}, fmt.Errorf("adapter %q declares a user mirror without a path", agent)
+				}
+				roots[agent] = filepath.Join(userHome, filepath.FromSlash(paths[0].String()))
+			} else {
+				roots[agent] = filepath.Join(userHome, filepath.FromSlash(NativeDiscoveryHomePath))
+			}
 		}
 	}
 	return stageWithOwnership(stageRoot, roots, []Group{{Root: canonical, Skills: skills, Sources: sources, Admitted: admitted}}, mode, owner)

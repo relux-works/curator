@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envprofile"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 )
 
 // machineFromConfig threads the effective machine knobs used by environment
@@ -45,13 +48,31 @@ func (c cli) profileNativeHomeResolver() func(string) (string, error) {
 		return func(string) (string, error) { return "", err }
 	}
 	return func(id string) (string, error) {
+		registered, lookupErr := harnessregistry.Lookup(harnessapi.ID(id))
+		if lookupErr == nil && registered.Capabilities().Has(harnessapi.ManagedHome) {
+			context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+			if err != nil {
+				return "", err
+			}
+			layout, err := registered.Home(context)
+			if err != nil {
+				return "", err
+			}
+			roots := layout.Roots().Paths()
+			if len(roots) != 1 {
+				return "", fmt.Errorf("harness adapter %q declares an incomplete native home", id)
+			}
+			base := userHome
+			if layout.ParentValued() {
+				base = filepath.Join(base, ".config")
+			}
+			return filepath.Join(base, filepath.FromSlash(roots[0].String())), nil
+		}
 		switch id {
 		case envregistry.ClaudeCode:
 			return filepath.Join(userHome, ".claude"), nil
 		case envregistry.CodexCLI:
 			return filepath.Join(userHome, ".codex"), nil
-		case envregistry.OpenCode:
-			return filepath.Join(userHome, ".config", "opencode"), nil
 		case envregistry.Muse:
 			return filepath.Join(userHome, ".config", "muse"), nil
 		case envregistry.Pi:
