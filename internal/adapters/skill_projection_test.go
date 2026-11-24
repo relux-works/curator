@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/harnessvalue"
 )
 
@@ -23,11 +24,15 @@ func (a skillProjectionTestAdapter) Skills(_ harnessapi.Context, _ harnessapi.Sc
 }
 
 func TestProjectSkillResolverTreatsPiScopeRefusalAsNoMirror(t *testing.T) {
+	pi, err := harnessregistry.Lookup("pi")
+	if err != nil {
+		t.Fatal(err)
+	}
 	paths := projectAgentPaths()
 	if _, ok := paths["pi"]; ok {
 		t.Fatalf("Pi project path = %q, want no project mirror", paths["pi"])
 	}
-	if _, ok := registeredSkillProjection("pi", harnessapi.ProjectScope); ok {
+	if _, ok := registeredSkillProjection("pi", harnessapi.ProjectScope, pi); ok {
 		t.Fatal("Pi project scope unexpectedly produced a mirror")
 	}
 }
@@ -52,7 +57,7 @@ func TestProjectSkillResolverStillFailsForOtherErrors(t *testing.T) {
 					t.Fatal("unexpected Skills error did not fail the resolver")
 				}
 			}()
-			_, _ = skillProjectionFromAdapter("fixture", harnessapi.ProjectScope, adapter)
+			_, _ = registeredSkillProjection("fixture", harnessapi.ProjectScope, adapter)
 		})
 	}
 }
@@ -80,7 +85,7 @@ func TestProjectSkillResolverKeepsDeclaredMirrorPath(t *testing.T) {
 	}
 	adapter := skillProjectionTestAdapter{capabilities: capabilities, discovery: discovery}
 
-	got, ok := skillProjectionFromAdapter("fixture", harnessapi.ProjectScope, adapter)
+	got, ok := registeredSkillProjection("fixture", harnessapi.ProjectScope, adapter)
 	if !ok || !got.Mirror() || got.Scope() != harnessapi.ProjectScope {
 		t.Fatalf("project skill declaration = %#v, supported=%v", got, ok)
 	}

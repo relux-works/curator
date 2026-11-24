@@ -37,7 +37,15 @@ func projectAgentPaths() map[string]string {
 		paths[agent] = path
 	}
 	for _, id := range harnessregistry.IDs() {
-		discovery, supported := registeredSkillProjection(string(id), harnessapi.ProjectScope)
+		adapter, err := harnessregistry.Lookup(id)
+		if err != nil {
+			var refusal harnessapi.Refusal
+			if errors.As(err, &refusal) && refusal.Code() == harnessapi.UnknownID {
+				continue
+			}
+			panic(fmt.Errorf("lookup harness adapter %q: %w", id, err))
+		}
+		discovery, supported := registeredSkillProjection(string(id), harnessapi.ProjectScope, adapter)
 		if !supported || !discovery.Mirror() {
 			continue
 		}
@@ -46,22 +54,10 @@ func projectAgentPaths() map[string]string {
 	return paths
 }
 
-func registeredSkillProjection(agent string, scope harnessapi.Scope) (harnessapi.SkillDiscovery, bool) {
-	adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
-	if err != nil {
-		var refusal harnessapi.Refusal
-		if errors.As(err, &refusal) && refusal.Code() == harnessapi.UnknownID {
-			return harnessapi.SkillDiscovery{}, false
-		}
-		panic(fmt.Errorf("lookup harness adapter %q: %w", agent, err))
-	}
+func registeredSkillProjection(agent string, scope harnessapi.Scope, adapter harnessapi.Adapter) (harnessapi.SkillDiscovery, bool) {
 	if !adapter.Capabilities().Has(harnessapi.SkillProjection) {
 		return harnessapi.SkillDiscovery{}, false
 	}
-	return skillProjectionFromAdapter(agent, scope, adapter)
-}
-
-func skillProjectionFromAdapter(agent string, scope harnessapi.Scope, adapter harnessapi.Adapter) (harnessapi.SkillDiscovery, bool) {
 	discovery, err := adapter.Skills(harnessapi.Context{}, scope)
 	if err != nil {
 		var refusal harnessapi.Refusal
