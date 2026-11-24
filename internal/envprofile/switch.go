@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -49,6 +50,8 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/opaquescan"
@@ -78,13 +81,44 @@ type Adapter struct {
 	Target     string
 }
 
-// Adapters is the closed revision-1 registry.
-var Adapters = []Adapter{
+// Adapters is the closed native-home set. Staged adapters supply their own
+// home and instruction declarations; legacy records cover the remaining set.
+var Adapters = append([]Adapter{
 	{ID: "claude_code", EnvVar: "CLAUDE_CONFIG_DIR", DefaultDir: ".claude", Target: "CLAUDE.md"},
 	{ID: "codex_cli", EnvVar: "CODEX_HOME", DefaultDir: ".codex", Target: "AGENTS.md"},
 	{ID: "opencode", EnvVar: "XDG_CONFIG_HOME", DefaultDir: ".config", Target: "AGENTS.md"},
-	{ID: "pi", EnvVar: "PI_CODING_AGENT_DIR", DefaultDir: ".pi", Target: "AGENTS.md"},
-}
+}, func() []Adapter {
+	var rows []Adapter
+	for _, id := range harnessregistry.IDs() {
+		adapter, err := harnessregistry.Lookup(id)
+		if err != nil {
+			panic(err)
+		}
+		capabilities := adapter.Capabilities()
+		if !capabilities.Has(harnessapi.ManagedHome) || !capabilities.Has(harnessapi.InstructionOutput) {
+			continue
+		}
+		ctx, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if err != nil {
+			panic(err)
+		}
+		home, err := adapter.Home(ctx)
+		if err != nil {
+			panic(err)
+		}
+		roots := home.Roots().Paths()
+		instructions, err := adapter.Instructions(ctx, harnessapi.Monolithic)
+		if err != nil {
+			panic(err)
+		}
+		paths := instructions.Paths().Paths()
+		if len(roots) == 0 || len(paths) == 0 {
+			panic("adapter returned an incomplete home or instruction layout")
+		}
+		rows = append(rows, Adapter{ID: string(adapter.ID()), EnvVar: home.EnvironmentVariable(), DefaultDir: roots[0].String(), Target: paths[0].String()})
+	}
+	return rows
+}()...)
 
 // adapterByID returns the adapter or false for an unregistered identifier.
 func adapterByID(id string) (Adapter, bool) {

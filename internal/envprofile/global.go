@@ -297,7 +297,11 @@ func preflightManagedProfile(home, profile string, policy Policy, machine envreg
 	}
 
 	precedence := policy.Precedence()
-	for _, adapter := range envregistry.Registry {
+	for _, registered := range envregistry.Registry {
+		adapter, err := envregistry.ByID(registered.ID)
+		if err != nil {
+			return err
+		}
 		// Muse is managed-home-only and is provisioned by an explicit resolve.
 		// Global skill changes reconcile an existing Muse home without requiring
 		// every operator to have logged into the newly admitted tool.

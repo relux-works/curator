@@ -377,7 +377,11 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	installed := map[string]bool{}
 	for _, info := range infos {
 		installed[info.Name] = true
-		for _, adapter := range envregistry.Registry {
+		for _, registered := range envregistry.Registry {
+			adapter, err := envregistry.ByID(registered.ID)
+			if err != nil {
+				return nil, err
+			}
 			if adapter.ID == envregistry.CodexCLI {
 				adapter.CodexSeedRevision = shippedCodexSeedRevision
 			}
@@ -1174,9 +1178,10 @@ func readLockError(err error) string {
 func adapterStates(req StatusRequest) []AdapterState {
 	var out []AdapterState
 	for _, adapter := range envregistry.Registry {
+		projected, _ := envregistry.ByID(adapter.ID)
 		var detected string
 		if req.Detect != nil {
-			detected = req.Detect(adapter)
+			detected = req.Detect(projected)
 		}
 		if detected == "" {
 			detected = "unknown"
@@ -1187,7 +1192,7 @@ func adapterStates(req StatusRequest) []AdapterState {
 		}
 		out = append(out, AdapterState{
 			ID: adapter.ID, Recorded: recorded, Detected: detected,
-			Supported: append([]string{}, adapter.Forms...),
+			Supported: append([]string{}, projected.Forms...),
 		})
 	}
 	return out

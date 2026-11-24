@@ -1077,3 +1077,43 @@ func TestPiSeedCopiesAndFirstResolveNotice(t *testing.T) {
 		}
 	}
 }
+
+func TestPiManagedMCPRefusalKeepsLegacyDiagnostic(t *testing.T) {
+	adapter, err := envregistry.ByID(envregistry.Pi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := &homePlan{
+		credentialPolicy: &effectiveCredentialPolicy{},
+		parent:           "/managed",
+		homeDir:          "/managed/pi",
+		marker: &envmarker.Marker{Surfaces: map[string]envmarker.Surface{
+			envmarker.SurfaceMCP: {Paths: []string{"mcp.json"}},
+		}},
+	}
+	_, err = buildFragment(&ResolveRequest{Profile: "acme"}, adapter, &verification{plan: plan})
+	want := "managed home carries an mcp surface the pi adapter declares no channel for"
+	if err == nil || err.Error() != want {
+		t.Fatalf("managed MCP error = %v, want %q", err, want)
+	}
+}
+
+func TestPiNativeSurfacesUseStagedAdapterValues(t *testing.T) {
+	switchAdapter, ok := adapterByID(envregistry.Pi)
+	if !ok {
+		t.Fatal("Pi home is missing from the native adapter set")
+	}
+	if switchAdapter.EnvVar != "PI_CODING_AGENT_DIR" || switchAdapter.DefaultDir != ".pi" || switchAdapter.Target != "AGENTS.md" {
+		t.Fatalf("Pi native home adapter = %+v, want staged home and instruction values", switchAdapter)
+	}
+	if got := inPlaceSkillsDir(envregistry.Pi); got != "skills" {
+		t.Fatalf("Pi native skills directory = %q, want skills from staged discovery", got)
+	}
+	projected, err := envregistry.ByID(envregistry.Pi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projected.EnvVar != switchAdapter.EnvVar || projected.RootTarget != switchAdapter.Target || projected.SkillsDir != "skills" || projected.DefaultForm != envregistry.FormMonolithic {
+		t.Fatalf("shared consumers disagree on Pi's staged facts: envregistry=%+v switch=%+v", projected, switchAdapter)
+	}
+}

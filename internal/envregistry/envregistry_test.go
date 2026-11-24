@@ -32,7 +32,11 @@ func TestRegistryClosed(t *testing.T) {
 			t.Fatalf("duplicate adapter %s", adapter.ID)
 		}
 		seen[adapter.ID] = true
-		if adapter.EnvVar == "" || adapter.RootTarget == "" {
+		projected, err := ByID(adapter.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if projected.EnvVar == "" || projected.RootTarget == "" {
 			t.Fatalf("adapter %s names no home variable or root target", adapter.ID)
 		}
 	}
@@ -40,6 +44,33 @@ func TestRegistryClosed(t *testing.T) {
 		if !seen[id] {
 			t.Fatalf("adapter %s is missing from the registry", id)
 		}
+	}
+}
+
+func TestByIDProjectsStagedPiFacts(t *testing.T) {
+	var raw Adapter
+	for _, adapter := range Registry {
+		if adapter.ID == Pi {
+			raw = adapter
+			break
+		}
+	}
+	if raw.ID == "" {
+		t.Fatal("Pi row is missing")
+	}
+	if raw.EnvVar != "" || raw.RootTarget != "" || raw.SkillsDir != "" || len(raw.Forms) != 0 || raw.DefaultForm != "" || len(raw.Probe) != 0 {
+		t.Fatalf("Pi's staged facts remain duplicated in envregistry.Registry: %+v", raw)
+	}
+
+	projected, err := ByID(Pi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projected.EnvVar != "PI_CODING_AGENT_DIR" || projected.RootTarget != "AGENTS.md" || projected.SkillsDir != "skills" || projected.DefaultForm != FormMonolithic || len(projected.Forms) != 1 || projected.Forms[0] != FormMonolithic {
+		t.Fatalf("Pi's staged home, instruction, or skill facts differ: %+v", projected)
+	}
+	if len(projected.Probe) != 2 || projected.Probe[0] != "pi" || projected.Probe[1] != "--version" {
+		t.Fatalf("Pi's staged probe = %v, want [pi --version]", projected.Probe)
 	}
 }
 

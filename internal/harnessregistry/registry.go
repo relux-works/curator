@@ -51,7 +51,18 @@ var entries = [...]registration{
 	{gemini.ID, 1, harnessapi.CapabilitySet{}, gemini.New, harnessapi.ProbeSpec{}, false},
 	{muse.ID, 1, probing(), muse.New, harnessapi.NewProbeSpec("muse", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{opencode.ID, 1, probing(), opencode.New, harnessapi.NewProbeSpec("opencode", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
-	{pi.ID, 1, probing(), pi.New, harnessapi.NewProbeSpec("pi", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
+	{pi.ID, 1, func() harnessapi.CapabilitySet {
+		set, _ := harnessapi.NewCapabilitySet(
+			harnessapi.ManagedHome,
+			harnessapi.InstructionOutput,
+			harnessapi.SkillProjection,
+			harnessapi.NativeSkillDiscovery,
+			harnessapi.CredentialMetadata,
+			harnessapi.TrustObservation,
+			harnessapi.ReleaseProbing,
+		)
+		return set
+	}(), pi.New, harnessapi.NewProbeSpec("pi", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{windsurf.ID, 1, nativeSkillsAndMCPInspection(), windsurf.New, harnessapi.ProbeSpec{}, false},
 }
 

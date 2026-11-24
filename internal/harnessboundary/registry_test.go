@@ -49,10 +49,8 @@ func notPortedResults(adapter harnessapi.Adapter, effects *effectSpy, capabiliti
 	}
 	vset, err := adapter.Settings(c)
 	errors = append(errors, effects.observe(vset, err))
-	if !capabilities.Has(harnessapi.MCPInspection) && !capabilities.Has(harnessapi.NativeMCPWrite) {
-		vmcp, err := adapter.MCP(c, harnessapi.UserScope)
-		errors = append(errors, effects.observe(vmcp, err))
-	}
+	// MCP is checked separately because one adapter declares an unsupported
+	// channel while the remaining operations stay staged.
 	vc, err := adapter.Credentials(c)
 	errors = append(errors, effects.observe(vc, err))
 	vt, err := adapter.Trust(c)
@@ -74,6 +72,67 @@ func notPortedResults(adapter harnessapi.Adapter, effects *effectSpy, capabiliti
 // support. A false operational declaration fails this same conformance check.
 func stagedCapabilities(adapter harnessapi.Adapter) error {
 	capabilities := adapter.Capabilities()
+	if adapter.ID() == "pi" {
+		want, _ := harnessapi.NewCapabilitySet(
+			harnessapi.ManagedHome,
+			harnessapi.InstructionOutput,
+			harnessapi.SkillProjection,
+			harnessapi.NativeSkillDiscovery,
+			harnessapi.CredentialMetadata,
+			harnessapi.TrustObservation,
+			harnessapi.ReleaseProbing,
+		)
+		if capabilities != want {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		ctx, snapshot, request := harnessapi.Context{}, harnessapi.Snapshot{}, harnessapi.Request{}
+		if _, err := adapter.Home(ctx); err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Instructions(ctx, harnessapi.Monolithic); err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Skills(ctx, harnessapi.UserScope); err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Skills(ctx, harnessapi.ProjectScope); code(err) != harnessapi.CapabilityUnsupported {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Credentials(ctx); err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Trust(ctx); err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.ReleaseProbe(ctx); err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.MCP(ctx, harnessapi.UserScope); code(err) != harnessapi.CapabilityUnsupported {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.ParseReleaseProbe(ctx, harnessapi.ProbeOutput{}); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Settings(ctx); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Preflight(ctx, snapshot, request); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.PlanSeed(ctx, snapshot, request); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.ProjectContext(ctx, snapshot, request); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Status(ctx, snapshot); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		if _, err := adapter.Drift(ctx, snapshot); code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		return nil
+	}
 	for _, capability := range capabilities.Values() {
 		switch capability {
 		case harnessapi.ReleaseProbing:
@@ -106,6 +165,13 @@ func stagedCapabilities(adapter harnessapi.Adapter) error {
 	effects := effectSpy{}
 	for _, err := range notPortedResults(adapter, &effects, capabilities) {
 		if code(err) != harnessapi.OperationNotPorted {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+	}
+	if !capabilities.Has(harnessapi.MCPInspection) && !capabilities.Has(harnessapi.NativeMCPWrite) {
+		mcp, mcpErr := adapter.MCP(harnessapi.Context{}, harnessapi.UserScope)
+		effects.observe(mcp, mcpErr)
+		if code(mcpErr) != harnessapi.OperationNotPorted {
 			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
 		}
 	}

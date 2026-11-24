@@ -19,7 +19,7 @@ func TestNativeSkillsNarrowingMutants(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, m := range []struct{ name, file, before, after, pkg, run, fails, message string }{
-		{"pi-native-only", "native_skills.go", "return adapter.SkillsDir", "if id == envregistry.Pi { return profileSkillsSurfaceDir }; return adapter.SkillsDir", "envprofile", "TestNativeSkillsUseAndSync", "TestNativeSkillsUseAndSync", "native skill link missing"},
+		{"pi-native-only", "native_skills.go", "func inPlaceSkillsDir(id string) string {\n\tif _, ok := adapterByID(id); !ok {", "func inPlaceSkillsDir(id string) string {\n\tif id == envregistry.Pi { return profileSkillsSurfaceDir }; if _, ok := adapterByID(id); !ok {", "envprofile", "TestNativeSkillsUseAndSync", "TestNativeSkillsUseAndSync", "native skill link missing"},
 		{"codex-link-drift", "native_skills.go", "link.Target != skill.root", "(link.Target != skill.root && id != envregistry.CodexCLI)", "envprofile", "TestNativeSkillsRepair", "TestNativeSkillsRepair", "drift status"},
 		{"dangling-foreign-consent", "switch.go", "if !takeover {\n\t\t\t\t\tresult.OK", "if !takeover && !strings.HasPrefix(filepath.ToSlash(link.Target), \"../../retired/\") {\n\t\t\t\t\tresult.OK", "envprofile", "TestNativeSkillsTakeover/foreign", "TestNativeSkillsTakeover/foreign", "environment_foreign_manager_detected"},
 		{"plain-file-consent", "switch.go", "if !takeover {\n\t\t\tresult.OK", "if !takeover && !info.Mode().IsRegular() {\n\t\t\tresult.OK", "envprofile", "TestNativeSkillsTakeover/file", "TestNativeSkillsTakeover/file", "environment_surface_unmanaged_conflict"},
