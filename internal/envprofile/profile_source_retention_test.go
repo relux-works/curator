@@ -196,12 +196,14 @@ func TestProfileSourceCompactsCommitOnlyInOldCacheAndPinsIt(t *testing.T) {
 	gitRun(t, repo, "branch", "-D", defaultBranch)
 	gitRun(t, repo, "branch", "-m", defaultBranch)
 	gitRun(t, repo, "tag", "-d", "v1.0.0")
+	gitRun(t, repo, "reflog", "expire", "--expire=now", "--all")
+	gitRun(t, repo, "gc", "--prune=now")
 	remoteRefs := fixtureGitOutput(t, repo, "ls-remote", operand)
 	if strings.Contains(remoteRefs, oldPin) {
 		t.Fatalf("server still advertises old pin %s:\n%s", oldPin, remoteRefs)
 	}
-	if _, err := gitops.Resolve(repo, "revision", oldPin); err != nil {
-		t.Fatalf("fixture server should retain the unadvertised object for this control: %v", err)
+	if _, err := gitops.Resolve(repo, "revision", oldPin); err == nil {
+		t.Fatalf("fixture server still has local-only pin %s after pruning", oldPin)
 	}
 
 	writeProfileSourcePinLock(t, home, source, oldPin)
