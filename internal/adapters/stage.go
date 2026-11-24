@@ -95,9 +95,7 @@ func StageGlobalWithOwnership(
 			return Mirror{}, err
 		}
 		if ported {
-			if discovery.Mirror() || discovery.NativeDiscovery() {
-				addSkillRoots(roots, agent, userHome, discovery.Paths())
-			}
+			addSkillRoots(roots, agent, userHome, discovery.Paths())
 			continue
 		}
 		if rel, known := AgentPaths[agent]; known {
@@ -118,6 +116,9 @@ func registeredSkills(agent string, scope harnessapi.Scope) (harnessapi.SkillDis
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
 	}
+	if !adapter.Capabilities().Has(harnessapi.SkillProjection) {
+		return harnessapi.SkillDiscovery{}, false, nil
+	}
 	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
@@ -129,6 +130,9 @@ func registeredSkills(agent string, scope harnessapi.Scope) (harnessapi.SkillDis
 	}
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
+	}
+	if !validSkillProjection(scope, discovery) {
+		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("invalid skill projection declaration for %q", agent)
 	}
 	return discovery, true, nil
 }

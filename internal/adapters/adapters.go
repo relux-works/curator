@@ -68,6 +68,13 @@ func registeredSkillProjection(agent string, scope harnessapi.Scope, adapter har
 		}
 		panic(fmt.Errorf("read skill projection for %q: %w", agent, err))
 	}
+	if !validSkillProjection(scope, discovery) {
+		panic(fmt.Errorf("invalid skill projection declaration for %q", agent))
+	}
+	return discovery, true
+}
+
+func validSkillProjection(scope harnessapi.Scope, discovery harnessapi.SkillDiscovery) bool {
 	valid := discovery.Scope() == scope
 	switch scope {
 	case harnessapi.ProjectScope:
@@ -79,10 +86,7 @@ func registeredSkillProjection(agent string, scope harnessapi.Scope, adapter har
 	default:
 		valid = false
 	}
-	if !valid {
-		panic(fmt.Errorf("invalid skill projection declaration for %q", agent))
-	}
-	return discovery, true
+	return valid
 }
 
 func oneSkillPath(agent string, paths harnessapi.NamedPaths) string {
