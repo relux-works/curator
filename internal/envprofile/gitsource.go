@@ -218,8 +218,8 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 
 // compactRepo replaces an existing full-history source cache with a shallow
 // clone. A staged replacement is validated before the old cache is moved, and
-// every commit in an installed profile lock is fetched into the replacement
-// before it becomes authoritative.
+// every commit in an installed profile lock is copied from the old object
+// store or fetched from origin, then anchored by its own local ref.
 func (m *gitManager) compactRepo(canonical, dir string) error {
 	compact, err := gitops.IsProfileSourceClone(dir)
 	if err != nil || compact {
@@ -246,9 +246,6 @@ func (m *gitManager) compactRepo(canonical, dir string) error {
 	if err := gitops.CloneProfileSource(cloneURL, staged); err != nil {
 		return fmt.Errorf("compact profile source %s: %w", canonical, err)
 	}
-	if err := gitops.FetchProfileSourceURL(staged, cloneURL); err != nil {
-		return fmt.Errorf("refresh compact profile source %s: %w", canonical, err)
-	}
 	compact, err = gitops.IsProfileSourceClone(staged)
 	if err != nil || !compact {
 		if err != nil {
@@ -259,7 +256,7 @@ func (m *gitManager) compactRepo(canonical, dir string) error {
 	for _, pin := range pins {
 		fetcher := *m
 		fetcher.missingPins = map[string]bool{}
-		if err := fetcher.acquireMissingPin(staged, canonical, pin); err != nil {
+		if err := fetcher.acquireCompactionPin(staged, dir, canonical, pin); err != nil {
 			return fmt.Errorf("preserve installed profile pin %s for %s: %w", pin, canonical, err)
 		}
 	}
@@ -657,26 +654,12 @@ func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
 	if m.readOnly {
 		return m.readOnlyRefusal("exact pin acquisition")
 	}
-	probe := exec.Command("git", "-C", dir, "cat-file", "--batch-check") // #nosec G204 -- fixed command, manager cache
-	probe.Stdin = strings.NewReader(commit + "\n")
-	var diagnostics strings.Builder
-	probe.Stderr = &diagnostics
-	out, err := probe.Output()
+	present, err := profileCommitObjectPresent(dir, commit)
 	if err != nil {
-		return fmt.Errorf("inspect pinned object: %w", err)
+		return err
 	}
-	// A corrupt loose object can produce both a successful exit and the
-	// exact "missing" stdout response. Only a diagnostic-free probe permits
-	// either local admission or acquisition; corruption is not absence.
-	if diagnostics.Len() != 0 {
-		return fmt.Errorf("inspect pinned object: Git reported object database diagnostics")
-	}
-	fields := strings.Fields(string(out))
-	if len(fields) == 3 && fields[0] == commit && fields[1] == "commit" {
+	if present {
 		return nil
-	}
-	if string(out) != commit+" missing\n" {
-		return fmt.Errorf("pinned object is not an available commit")
 	}
 	key := source + "\x00" + commit
 	if m.missingPins[key] {
@@ -694,6 +677,60 @@ func (m *gitManager) acquireMissingPin(dir, source, commit string) error {
 	// Re-probe, retaining the attempted key: a successful transport that did
 	// not supply the object must refuse, never fetch repeatedly.
 	return m.acquireMissingPin(dir, source, commit)
+}
+
+// acquireCompactionPin prefers a locked commit already in the old cache's
+// object store. Only if it is absent there does it request the exact object
+// from origin. The destination receives a durable ref in either case.
+func (m *gitManager) acquireCompactionPin(dir, oldCache, source, commit string) error {
+	if m.readOnly {
+		return m.readOnlyRefusal("exact pin acquisition")
+	}
+	present, err := profileCommitObjectPresent(dir, commit)
+	if err != nil {
+		return err
+	}
+	if !present {
+		present, err = profileCommitObjectPresent(oldCache, commit)
+		if err != nil {
+			return fmt.Errorf("inspect old source pin: %w", err)
+		}
+		if present {
+			return gitops.CopyCommitFromLocalPath(dir, oldCache, commit)
+		}
+		if err := m.acquireMissingPin(dir, source, commit); err != nil {
+			return err
+		}
+	}
+	return gitops.RetainProfilePin(dir, commit)
+}
+
+// profileCommitObjectPresent distinguishes an absent object from a failed
+// database read. Only Git's explicit missing response permits acquisition;
+// malformed output, corruption and non-commit objects refuse.
+func profileCommitObjectPresent(dir, commit string) (bool, error) {
+	probe := exec.Command("git", "-C", dir, "cat-file", "--batch-check") // #nosec G204 -- fixed command, manager cache
+	probe.Stdin = strings.NewReader(commit + "\n")
+	var diagnostics strings.Builder
+	probe.Stderr = &diagnostics
+	out, err := probe.Output()
+	if err != nil {
+		return false, fmt.Errorf("inspect pinned object: %w", err)
+	}
+	// A corrupt loose object can produce both a successful exit and the
+	// exact "missing" stdout response. Only a diagnostic-free probe permits
+	// either local admission or acquisition; corruption is not absence.
+	if diagnostics.Len() != 0 {
+		return false, fmt.Errorf("inspect pinned object: Git reported object database diagnostics")
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) == 3 && fields[0] == commit && fields[1] == "commit" {
+		return true, nil
+	}
+	if string(out) != commit+" missing\n" {
+		return false, fmt.Errorf("pinned object is not an available commit")
+	}
+	return false, nil
 }
 
 // VerifyCandidate verifies the selected tag signature and peeled commit
