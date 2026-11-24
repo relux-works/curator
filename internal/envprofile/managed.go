@@ -35,6 +35,9 @@ import (
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessprobe"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/mcpnative"
@@ -174,15 +177,39 @@ var versionToken = regexp.MustCompile(`\d+(?:\.\d+)+`)
 
 // detectRelease probes the adapter's tool read-only for its release
 // (environments §7.9). Any failure reports "unknown", never a match.
-func detectRelease(probe []string) string {
-	if len(probe) == 0 {
-		return "unknown"
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, probe[0], probe[1:]...).Output() // #nosec G204 -- probe argv is registry data
-	if err != nil {
-		return "unknown"
+func detectRelease(adapter envregistry.Adapter) string {
+	var out []byte
+	if len(adapter.Probe) > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var err error
+		out, err = exec.CommandContext(ctx, adapter.Probe[0], adapter.Probe[1:]...).Output() // #nosec G204 -- remaining legacy probe tuples are registry data
+		if err != nil {
+			return "unknown"
+		}
+	} else {
+		id := harnessapi.ID(adapter.ID)
+		registered, err := harnessregistry.Lookup(id)
+		if err != nil {
+			return "unknown"
+		}
+		release, err := harnessapi.NewVerifiedRelease(adapter.VerifiedRelease)
+		if err != nil {
+			return "unknown"
+		}
+		probeContext, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, release)
+		if err != nil {
+			return "unknown"
+		}
+		spec, err := registered.ReleaseProbe(probeContext)
+		if err != nil {
+			return "unknown"
+		}
+		output, err := harnessprobe.Run(context.Background(), id, spec)
+		if err != nil {
+			return "unknown"
+		}
+		out = output.Stdout()
 	}
 	if token := versionToken.FindString(string(out)); token != "" {
 		return token
@@ -219,7 +246,7 @@ func (req *ResolveRequest) detected(adapter envregistry.Adapter) string {
 	if req.readOnly {
 		return "unknown"
 	}
-	return detectRelease(adapter.Probe)
+	return detectRelease(adapter)
 }
 
 func applyCodexSeedRevisionTestOverride(adapter envregistry.Adapter, revision string) (envregistry.Adapter, error) {

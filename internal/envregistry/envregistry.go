@@ -242,7 +242,7 @@ var Registry = []Adapter{
 		SkillsDir:       "data/muse/skills",
 		Passthrough:     map[string][]Passthrough{"default": {{Path: "config/muse/auth.json", Strategy: StrategyFileLink, FileLinkTarget: "auth.json"}}},
 		Seeds:           []string{"config/muse/settings.json", "config/muse/trust.json"},
-		VerifiedRelease: "1.4.7", Probe: []string{"muse", "--version"},
+		VerifiedRelease: "1.4.7", Probe: nil,
 		SizeAdvisoryBytes: 32768,
 		CredentialScope:   "xdg-config; refresh unverified", GlobalContextCap: "32768 advisory; no measured cap",
 	},
