@@ -8,6 +8,15 @@ lane is pinned to it, so another self-hosted Apple-silicon runner without
 that label never takes the job. It runs on `main` pushes only, and only while the repository
 variable `ROSE_AIR_RUNNER` is `true`.
 
+## macOS matrix routing
+
+The macOS entries of the CI matrix use `macos-latest` by default. When the
+repository variable `MACOS_SELF_HOSTED` is `true`, pushes, manual dispatches,
+and pull requests from this repository select a self-hosted runner with labels
+`self-hosted, macOS, ARM64, relux-mac`. Pull requests from forks stay on the
+hosted image. Windows jobs remain hosted. This switch is separate from the
+`ROSE_AIR_RUNNER` gate above.
+
 ## One-time prerequisites on the runner
 
 - **rustup.** Install once for the runner user, either with the installer at
@@ -122,10 +131,12 @@ on a successful final step. No shared cache is deleted.
 On self-hosted Linux, `setup-go` cache restore/save is disabled. The lint
 action also skips its cache and uses a private `GOLANGCI_LINT_CACHE`. This
 prevents restored per-user state from reconnecting otherwise isolated jobs.
-Hosted macOS/Windows caching and routing and the fork guard retain their
-existing behavior. `GOTOOLCHAIN=local` and `GOENV=off` remain
-mandatory. Shared Go state was implicated in intermittent cross-toolchain
-link errors involving `golang.org/x/sys/unix.Syscall` and ABI0/ABIInternal.
+The macOS cache behavior is unchanged; `MACOS_SELF_HOSTED` controls which
+runner handles macOS matrix entries, and fork pull requests stay hosted.
+Windows routing and caching remain hosted as before. `GOTOOLCHAIN=local` and
+`GOENV=off` remain mandatory. Shared Go state was implicated in intermittent
+cross-toolchain link errors involving `golang.org/x/sys/unix.Syscall` and
+ABI0/ABIInternal.
 
 Workflow concurrency is keyed by workflow and ref. Pull requests cancel
 superseded runs; pushes (including `main` and `gate/**`) never cancel an active
