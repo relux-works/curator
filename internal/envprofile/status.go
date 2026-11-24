@@ -1183,7 +1183,7 @@ func adapterStates(req StatusRequest) ([]AdapterState, error) {
 	for _, adapter := range envregistry.Registry {
 		projected, err := projectedSkillsAdapterByID(adapter.ID)
 		if err != nil {
-			return nil, fmt.Errorf("%s: project adapter status for %q: %w", DiagUnknown, adapter.ID, err)
+			return nil, fmt.Errorf("%s: project adapter status for %q: %w", envregistry.DiagUnknown, adapter.ID, err)
 		}
 		var detected string
 		if req.Detect != nil {
