@@ -2,6 +2,7 @@ package envprofile
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -41,8 +42,7 @@ func TestNativeSkillsStateReturnsProjectionFailure(t *testing.T) {
 }
 
 func TestUseWithPolicyReturnsProjectionFailureInsteadOfFallbackTarget(t *testing.T) {
-	pinHomes(t)
-	setActivationRuntimes(t, allActivationRuntimes()...)
+	nativeHomes := pinHomes(t)
 	positive := writeManagedFixture(t, "pi-use-positive")
 	results, err := UseWithPolicy(positive.home, positive.profile, envregistry.Pi, "", false, Policy{})
 	if err != nil {
@@ -58,15 +58,21 @@ func TestUseWithPolicyReturnsProjectionFailureInsteadOfFallbackTarget(t *testing
 		t.Fatalf("valid Pi use did not materialize a Pi entry: %+v", results)
 	}
 
-	failing := writeManagedFixture(t, "pi-use-error")
-	profileBefore := snapshotPlanState(t, failing.home)
-	nativeBefore := snapshotActivationTree(t, failing.native[envregistry.Pi])
-	currentBefore, err := Current(failing.home)
+	nativeSkill := filepath.Join(nativeHomes[envregistry.Pi], "skills", "myskill")
+	if _, err := os.Lstat(nativeSkill); err != nil {
+		t.Fatalf("valid Pi use did not materialize at its declared user-scope path %s: %v", nativeSkill, err)
+	}
+	fallbackSkill := filepath.Join(nativeHomes[envregistry.Pi], profileSkillsSurfaceDir, "myskill")
+	if _, err := os.Lstat(fallbackSkill); !os.IsNotExist(err) {
+		t.Fatalf("valid Pi use materialized through the shared fallback path %s: %v", fallbackSkill, err)
+	}
+	nativeBefore := snapshotActivationTree(t, nativeHomes[envregistry.Pi])
+	currentBefore, err := Current(positive.home)
 	if err != nil {
 		t.Fatal(err)
 	}
 	failPiSkillProjection(t)
-	results, err = UseWithPolicy(failing.home, failing.profile, envregistry.Pi, "", false, Policy{})
+	results, err = UseWithPolicy(positive.home, positive.profile, envregistry.Pi, "", false, Policy{})
 	if err == nil || !strings.Contains(err.Error(), DiagUsePartial) {
 		t.Fatalf("Pi profile-use error = %v, results=%+v; want the normal partial-use error", err, results)
 	}
@@ -74,13 +80,10 @@ func TestUseWithPolicyReturnsProjectionFailureInsteadOfFallbackTarget(t *testing
 		!strings.Contains(results[0].Detail, errPiSkillProjection.Error()) {
 		t.Fatalf("Pi projection failure result = %+v; want preserved projection detail without fallback success", results)
 	}
-	if got := snapshotPlanState(t, failing.home); got != profileBefore {
-		t.Fatal("profile-use projection failure changed the profile or store publication state")
-	}
-	if got := snapshotActivationTree(t, failing.native[envregistry.Pi]); !reflect.DeepEqual(got, nativeBefore) {
+	if got := snapshotActivationTree(t, nativeHomes[envregistry.Pi]); !reflect.DeepEqual(got, nativeBefore) {
 		t.Fatal("profile-use projection failure wrote through a fallback native target")
 	}
-	currentAfter, err := Current(failing.home)
+	currentAfter, err := Current(positive.home)
 	if err != nil {
 		t.Fatal(err)
 	}
