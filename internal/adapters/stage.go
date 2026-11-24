@@ -95,7 +95,7 @@ func StageGlobalWithOwnership(
 			return Mirror{}, err
 		}
 		if ported {
-			if discovery.Mirror() {
+			if discovery.Mirror() || discovery.NativeDiscovery() {
 				addSkillRoots(roots, agent, userHome, discovery.Paths())
 			}
 			continue
@@ -123,7 +123,8 @@ func registeredSkills(agent string, scope harnessapi.Scope) (harnessapi.SkillDis
 		return harnessapi.SkillDiscovery{}, false, err
 	}
 	discovery, err := adapter.Skills(context, scope)
-	if refusalIs(err, harnessapi.OperationNotPorted) {
+	if refusalIs(err, harnessapi.OperationNotPorted) ||
+		(scope == harnessapi.ProjectScope && refusalIs(err, harnessapi.CapabilityUnsupported)) {
 		return harnessapi.SkillDiscovery{}, false, nil
 	}
 	if err != nil {
