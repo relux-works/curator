@@ -65,9 +65,9 @@ func skillProjectionFromAdapter(agent string, scope harnessapi.Scope, adapter ha
 	discovery, err := adapter.Skills(harnessapi.Context{}, scope)
 	if err != nil {
 		var refusal harnessapi.Refusal
-		// Pi's v1 contract supports user-scope discovery only. Its exact
-		// project-scope refusal means there is no project mirror.
-		if agent == "pi" && scope == harnessapi.ProjectScope && errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
+		// A typed project-scope capability refusal means this harness has no
+		// project mirror. Every other declaration error remains fatal.
+		if scope == harnessapi.ProjectScope && errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
 			return harnessapi.SkillDiscovery{}, false
 		}
 		panic(fmt.Errorf("read skill projection for %q: %w", agent, err))

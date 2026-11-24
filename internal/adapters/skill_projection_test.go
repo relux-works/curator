@@ -34,13 +34,11 @@ func TestProjectSkillResolverTreatsPiScopeRefusalAsNoMirror(t *testing.T) {
 
 func TestProjectSkillResolverStillFailsForOtherErrors(t *testing.T) {
 	cases := []struct {
-		name  string
-		agent string
-		err   error
+		name string
+		err  error
 	}{
 		{name: "ordinary error", err: errors.New("unexpected skill failure")},
-		{name: "other typed refusal", err: fmt.Errorf("wrapped: %w", harnessapi.NewRefusal(harnessapi.CapabilityUnsupported))},
-		{name: "Pi different refusal", agent: "pi", err: harnessapi.NewRefusal("harness_scope_unsupported")},
+		{name: "other typed refusal", err: fmt.Errorf("wrapped: %w", harnessapi.NewRefusal(harnessapi.OperationNotPorted))},
 	}
 	capabilities, err := harnessapi.NewCapabilitySet(harnessapi.SkillProjection)
 	if err != nil {
@@ -49,16 +47,12 @@ func TestProjectSkillResolverStillFailsForOtherErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			adapter := skillProjectionTestAdapter{capabilities: capabilities, err: tc.err}
-			agent := tc.agent
-			if agent == "" {
-				agent = "fixture"
-			}
 			defer func() {
 				if recover() == nil {
 					t.Fatal("unexpected Skills error did not fail the resolver")
 				}
 			}()
-			_, _ = skillProjectionFromAdapter(agent, harnessapi.ProjectScope, adapter)
+			_, _ = skillProjectionFromAdapter("fixture", harnessapi.ProjectScope, adapter)
 		})
 	}
 }
