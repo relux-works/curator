@@ -87,17 +87,29 @@ func StageGlobalWithOwnership(
 	admitted []string,
 	owner GlobalOwnership,
 ) (Mirror, error) {
+	return stageGlobalWithLookup(stageRoot, home, userHome, agents, skills, mode, sources, admitted, owner, harnessregistry.Lookup)
+}
+
+func stageGlobalWithLookup(
+	stageRoot, home, userHome string,
+	agents, skills []string,
+	mode string,
+	sources map[string]string,
+	admitted []string,
+	owner GlobalOwnership,
+	lookup func(harnessapi.ID) (harnessapi.Adapter, error),
+) (Mirror, error) {
 	canonical := filepath.Join(home, "global", "skills")
 	roots := map[string]string{}
 	for _, agent := range agents {
-		discovery, ported, err := registeredSkills(agent, harnessapi.UserScope)
+		discovery, ported, err := registeredSkillsWithLookup(agent, harnessapi.UserScope, lookup)
 		if err != nil {
 			return Mirror{}, err
 		}
 		if ported {
 			if discovery.Mirror() {
 				base := userHome
-				adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+				adapter, err := lookup(harnessapi.ID(agent))
 				if err != nil {
 					return Mirror{}, err
 				}
@@ -133,7 +145,15 @@ func StageGlobalWithOwnership(
 }
 
 func registeredSkills(agent string, scope harnessapi.Scope) (harnessapi.SkillDiscovery, bool, error) {
-	adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+	return registeredSkillsWithLookup(agent, scope, harnessregistry.Lookup)
+}
+
+func registeredSkillsWithLookup(
+	agent string,
+	scope harnessapi.Scope,
+	lookup func(harnessapi.ID) (harnessapi.Adapter, error),
+) (harnessapi.SkillDiscovery, bool, error) {
+	adapter, err := lookup(harnessapi.ID(agent))
 	if refusalIs(err, harnessapi.UnknownID) {
 		return harnessapi.SkillDiscovery{}, false, nil
 	}

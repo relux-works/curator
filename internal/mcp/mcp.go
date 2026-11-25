@@ -278,7 +278,16 @@ func homeEntries(env Env, agent string) (map[string]any, error) {
 }
 
 func mcpSources(agent string, scope harnessapi.Scope, legacy []string) ([]string, error) {
-	adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+	return mcpSourcesWithLookup(agent, scope, legacy, harnessregistry.Lookup)
+}
+
+func mcpSourcesWithLookup(
+	agent string,
+	scope harnessapi.Scope,
+	legacy []string,
+	lookup func(harnessapi.ID) (harnessapi.Adapter, error),
+) ([]string, error) {
+	adapter, err := lookup(harnessapi.ID(agent))
 	if refusalIs(err, harnessapi.UnknownID) {
 		return legacy, nil
 	}
