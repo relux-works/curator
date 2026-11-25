@@ -2,6 +2,7 @@ package envprofile
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -109,6 +110,14 @@ func activationTreeStateDifferences(before, after map[string]activationTreeEntry
 func setActivationRuntimes(t *testing.T, runtimes ...string) string {
 	t.Helper()
 	return testruntimes.Pin(t, activationRuntimeFallbackPath, runtimes...)
+}
+
+// setActivationRuntimesWithoutFallback isolates runtime-presence tests from
+// adapter binaries installed on the host. Use this when absence is the
+// contract under test; ordinary tools are not needed after fixture setup.
+func setActivationRuntimesWithoutFallback(t *testing.T, runtimes ...string) string {
+	t.Helper()
+	return testruntimes.Pin(t, "", runtimes...)
 }
 
 func allActivationRuntimes() []string { return testruntimes.All() }
@@ -284,7 +293,18 @@ func TestUseRuntimePreflightIsScopedAndReadOnlyOnRefusal(t *testing.T) {
 	}
 	beforeHomes := snapshotActivationHomes(t, homes)
 	beforeManager := snapshotActivationTree(t, home)
-	setActivationRuntimes(t, "claude", "opencode", "pi")
+	runtimeBin := setActivationRuntimesWithoutFallback(t, "claude", "opencode", "pi")
+	if got := os.Getenv("PATH"); got != runtimeBin {
+		t.Fatalf("runtime test PATH = %q, want only the fixture directory %q", got, runtimeBin)
+	}
+	for _, runtime := range []string{"claude", "opencode", "pi"} {
+		if _, err := exec.LookPath(runtime); err != nil {
+			t.Fatalf("positive runtime fixture %q is unavailable: %v", runtime, err)
+		}
+	}
+	if _, err := exec.LookPath("codex"); err == nil {
+		t.Fatal("missing-runtime fixture unexpectedly finds codex on its isolated PATH")
+	}
 	beta := t.TempDir()
 	writePackage(t, beta, "beta", "1.0.0", "beta\n")
 	if info, activated, updated, err := Install(home, InstallOptions{Operand: beta, Use: true}); err == nil ||
@@ -311,11 +331,11 @@ func TestUseRuntimePreflightIsScopedAndReadOnlyOnRefusal(t *testing.T) {
 	if got := snapshotActivationTree(t, home); !reflect.DeepEqual(got, beforeManager) {
 		t.Fatal("refused scoped use wrote manager state")
 	}
-	setActivationRuntimes(t, "codex")
+	setActivationRuntimesWithoutFallback(t, "codex")
 	if _, err := UseWithPolicy(home, "alpha", "codex_cli", "", false, Policy{}); err != nil {
 		t.Fatalf("codex-only scoped use failed with its runtime present: %v", err)
 	}
-	setActivationRuntimes(t, "claude", "opencode", "pi")
+	setActivationRuntimesWithoutFallback(t, "claude", "opencode", "pi")
 	if _, err := UseWithPolicy(home, "alpha", "", "", false, Policy{}); err != nil {
 		t.Fatalf("machine use refused a missing runtime outside machine scope: %v", err)
 	}
