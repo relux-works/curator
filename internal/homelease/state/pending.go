@@ -3,6 +3,7 @@ package state
 import (
 	"path/filepath"
 
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -11,6 +12,11 @@ import (
 // validate/reconcile its contents; the existence of its intent prevents a new
 // reservation, reconciliation or collector from assuming a settled home.
 func LegacyPending(home string) error {
+	identity, err := managerlock.New(home)
+	if err != nil {
+		return Refuse("environment_lease_unreadable", "state_unreadable")
+	}
+	home = identity.Home()
 	path := filepath.Join(home, "state", "env-migration.json")
 	if err := CheckRoute(home, path); err != nil {
 		return Refuse("environment_lease_unreadable", "state_unreadable")

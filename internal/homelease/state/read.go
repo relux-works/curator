@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/stateread"
@@ -120,6 +121,13 @@ func HasState(home string) bool {
 
 // Load reads and validates the home-lease ledger under home, returning Empty when proven absent.
 func Load(home string) (*Ledger, error) {
+	// Match the canonical physical manager root hashed into ManagerRootID at
+	// acquisition (including Windows case-canonicalized paths and root aliases).
+	identity, err := managerlock.New(home)
+	if err != nil {
+		return nil, Refuse("environment_lease_unreadable", "state_unreadable")
+	}
+	home = identity.Home()
 	raw, err := Read(home, LedgerPath(home))
 	if errors.Is(err, os.ErrNotExist) && !HasState(home) {
 		return Empty(), nil

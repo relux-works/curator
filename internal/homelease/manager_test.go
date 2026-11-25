@@ -315,3 +315,63 @@ func TestReadOnlyAbsenceAndMissingLedger(t *testing.T) {
 	requireRefusal(t, err, "environment_lease_unreadable", "ledger_missing")
 	unchanged(t, before, f.m.home)
 }
+
+// HL03: state.Load, state.LegacyPending and state.Guard resolve manager-root
+// aliases (Windows case-canonicalized spellings and Unix directory symlinks)
+// to the same canonical root identity hashed at acquisition.
+func TestLoadAndGuardThroughManagerAlias(t *testing.T) {
+	f := newFixture(t)
+	lease := acquire(t, f)
+	aliases := []string{}
+	addAlias := func(candidate string) {
+		if candidate == "" || candidate == f.m.home {
+			return
+		}
+		if id, err := managerlock.New(candidate); err == nil && id.Home() == f.m.home {
+			aliases = append(aliases, candidate)
+		}
+	}
+	// Case-variant alias on platforms where managerlock canonicalizes case (Windows).
+	parent, base := filepath.Dir(f.m.home), filepath.Base(f.m.home)
+	toggled := strings.ToLower(base)
+	if toggled == base {
+		toggled = strings.ToUpper(base)
+	}
+	addAlias(filepath.Join(parent, toggled))
+	// Symlinked manager root alias where symlinks are permitted (Unix/dev-mode Windows).
+	link := filepath.Join(t.TempDir(), "manager-alias")
+	if err := os.Symlink(f.m.home, link); err == nil {
+		addAlias(link)
+	}
+	if len(aliases) == 0 {
+		t.Fatal("expected at least one distinct canonical manager-root alias")
+	}
+	locks, err := managerlock.New(f.m.home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := locks.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lock.Close() }()
+	for _, alias := range aliases {
+		if err := state.LegacyPending(alias); err != nil {
+			t.Fatalf("LegacyPending(%q): %v", alias, err)
+		}
+		ledger, err := state.Load(alias)
+		if err != nil {
+			t.Fatalf("Load(%q): %v", alias, err)
+		}
+		entry, ok := ledger.Leases[lease.LeaseID]
+		if !ok {
+			t.Fatalf("Load(%q) missing lease %s", alias, lease.LeaseID)
+		}
+		// Overlapping target refuses with blocking_holders, not invalid_record.
+		requireRefusal(t, state.Guard(alias, lock.Held(), []string{entry.Admission.Home}), "environment_home_leased", "blocking_holders")
+		// Positive control: disjoint target under the same alias passes.
+		if err := state.Guard(alias, lock.Held(), []string{filepath.Join(f.m.home, "disjoint")}); err != nil {
+			t.Fatalf("Guard disjoint(%q): %v", alias, err)
+		}
+	}
+}
