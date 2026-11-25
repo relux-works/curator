@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/capabilities"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 // Production entry points under test: ParseManifest, ParseMCP, LoadManifest,
@@ -151,6 +152,53 @@ func TestProfileSkillCapabilitiesMalformedHaveSpecificCode(t *testing.T) {
 		payload := []byte(`{"schema_version":4,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*","capabilities":` + raw + `}}}}`)
 		if _, err := ParseManifest(payload); err == nil || !strings.Contains(err.Error(), DiagSkillCapabilityInvalid) {
 			t.Errorf("invalid capability %s: got %v", raw, err)
+		}
+	}
+}
+
+func TestProfileSkillFilesSelection(t *testing.T) {
+	payload := `{"schema_version":5,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","revision":"` + strings.Repeat("a", 40) + `","files":{"include":["data/*.json"],"exclude":["references/private"]}}}}}`
+	manifest, err := ParseManifest([]byte(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &whitelist.FileSelection{Include: []string{"data/*.json"}, Exclude: []string{"references/private"}}
+	if !reflect.DeepEqual(manifest.Skills["guide"].Files, want) {
+		t.Fatalf("file selection = %+v, want %+v", manifest.Skills["guide"].Files, want)
+	}
+
+	legacy := strings.Replace(payload, `"schema_version":5`, `"schema_version":4`, 1)
+	if _, err := ParseManifest([]byte(legacy)); err == nil || !strings.Contains(err.Error(), DiagManifestInvalid) {
+		t.Fatalf("schema 4 must keep rejecting file selection, got %v", err)
+	}
+	absent := strings.Replace(payload, `,"files":{"include":["data/*.json"],"exclude":["references/private"]}`, "", 1)
+	unchanged, err := ParseManifest([]byte(absent))
+	if err != nil || unchanged.Skills["guide"].Files != nil {
+		t.Fatalf("schema 5 without a selection changed legacy parsing: %+v %v", unchanged, err)
+	}
+	empty := strings.Replace(payload, `"files":{"include":["data/*.json"],"exclude":["references/private"]}`, `"files":{}`, 1)
+	emptyRules, err := ParseManifest([]byte(empty))
+	if err != nil || emptyRules.Skills["guide"].Files != nil {
+		t.Fatalf("empty file selection should have no rules: %+v %v", emptyRules, err)
+	}
+}
+
+func TestProfileSkillFilesSelectionRejectsInvalidPatterns(t *testing.T) {
+	for _, raw := range []string{
+		`null`,
+		`[]`,
+		`{"include":null}`,
+		`{"include":["../outside.md"]}`,
+		`{"include":["/outside.md"]}`,
+		`{"include":["references/[broken"]}`,
+		`{"exclude":["SKILL.md"]}`,
+		`{"exclude":["agent-skill.json"]}`,
+		`{"include":["data/guide.json"],"exclude":["data/guide.json"]}`,
+		`{"include":["data/*.json"],"extra":true}`,
+	} {
+		payload := `{"schema_version":5,"name":"profile","version":"1.0.0","requires":{"skills":{"guide":{"git":"https://source.example.org/guide","range":"*","files":` + raw + `}}}}`
+		if _, err := ParseManifest([]byte(payload)); err == nil || !strings.Contains(err.Error(), DiagSkillFilesInvalid) {
+			t.Errorf("invalid file selection %s: got %v", raw, err)
 		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -28,7 +29,6 @@ var AgentPaths = projectAgentPaths()
 var legacyAgentPaths = map[string]string{
 	"codex_cli":   ".codex/skills",
 	"claude_code": ".claude/skills",
-	"gemini":      ".gemini/skills",
 }
 
 func projectAgentPaths() map[string]string {
@@ -58,7 +58,11 @@ func registeredSkillProjection(agent string, scope harnessapi.Scope) (harnessapi
 	if !adapter.Capabilities().Has(harnessapi.SkillProjection) {
 		return harnessapi.SkillDiscovery{}, false
 	}
-	discovery, err := adapter.Skills(harnessapi.Context{}, scope)
+	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
+	if err != nil {
+		panic(fmt.Errorf("create skill projection context for %q: %w", agent, err))
+	}
+	discovery, err := adapter.Skills(context, scope)
 	if err != nil {
 		panic(fmt.Errorf("read skill projection for %q: %w", agent, err))
 	}
@@ -74,6 +78,25 @@ func oneSkillPath(agent string, paths harnessapi.NamedPaths) string {
 		panic(fmt.Errorf("skill projection for %q has %d paths; want exactly one", agent, len(values)))
 	}
 	return values[0].String()
+}
+
+func skillPath(agent string, scope harnessapi.Scope) (string, bool, error) {
+	discovery, declared, err := registeredSkills(agent, scope)
+	if declared {
+		if err != nil {
+			return "", false, err
+		}
+		paths := discovery.Paths().Paths()
+		if len(paths) == 0 {
+			return "", false, fmt.Errorf("harness_skill_path_missing")
+		}
+		return paths[0].String(), true, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	path, known := AgentPaths[agent]
+	return path, known, nil
 }
 
 // NativeDiscoveryAgents discover the canonical .agents/skills directory

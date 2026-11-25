@@ -28,6 +28,7 @@ var projectSources = map[string][]string{
 	"claude_code": {".mcp.json"},
 	"codex_cli":   {".codex/config.toml"},
 	"gemini":      {".gemini/settings.json"},
+	"opencode":    {"opencode.json", "opencode.jsonc"},
 }
 
 // homeSources maps agents to home-relative config files.
@@ -35,6 +36,7 @@ var homeSources = map[string][]string{
 	"claude_code": {".claude.json"},
 	"codex_cli":   {".codex/config.toml"},
 	"gemini":      {".gemini/settings.json"},
+	"opencode":    {".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
 }
 
 // claudeSettings can reject servers declared in .mcp.json; a rejected server

@@ -556,10 +556,7 @@ func replayLocalDraftSnapshot(cfg *config.Config, projectRoot string, member sou
 	for alias := range projectManifest.Sources {
 		knownAliases[alias] = true
 	}
-	outputs := []string{filepath.Join(projectAbs, ".agents"), snapshot.LocalStoreDir(cfg.Home())}
-	for _, path := range adapters.AgentPaths {
-		outputs = append(outputs, filepath.Join(projectAbs, filepath.FromSlash(path)))
-	}
+	outputs := append(adapters.ProjectOutputRoots(projectAbs), snapshot.LocalStoreDir(cfg.Home()))
 	acquisition, err := snapshot.PrepareLocalAcquisition(sourceRoot, source.Directory, projectAbs, source.Alias, outputs, map[string][]string{source.Alias: rootInputs}, knownAliases, os.TempDir())
 	if err != nil {
 		if strings.Contains(err.Error(), "source_member_missing") || strings.Contains(err.Error(), "permission denied") || errors.Is(err, os.ErrPermission) {

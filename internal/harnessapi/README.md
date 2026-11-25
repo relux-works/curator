@@ -1,14 +1,17 @@
 # Harness contract v1
 
-The harness seam is staged. Existing native operations continue through their
-unchanged legacy callers. The eight registered IDs have real identity/version
-metadata. The five baseline release-probe methods return real value-only specs;
-other probe requests return `harness_capability_unsupported`.
+The harness seam migrates native operations one adapter at a time. Unported
+operations continue through their legacy callers. The eight registered IDs
+have real identity/version metadata. The five baseline release-probe methods
+return real value-only specs; other probe requests return
+`harness_capability_unsupported`.
 
-Every other staged method returns `harness_adapter_operation_not_ported`.
-That refusal does not claim that the vendor lacks the capability. Capabilities
-describe only ported operations. ParseReleaseProbe and vendor qualification
-remain unported, independently of the adapter API version.
+The Gemini adapter also declares skill projection and read-only MCP
+inspection. Other unported staged methods return
+`harness_adapter_operation_not_ported`; that refusal does not claim that the
+vendor lacks the capability. Capabilities describe only ported operations.
+ParseReleaseProbe and vendor qualification remain unported, independently of
+the adapter API version.
 
 Context, Snapshot and plans have private fields and bounded constructors.
 Snapshot currently accepts only closed nonsecret observations. A migration

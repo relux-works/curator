@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/pkgversion"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 // Diagnostic codes (environments §1.1, §2.1, §6.1).
@@ -41,6 +42,7 @@ const (
 	DiagSourceSignerRejected           = "context_source_signer_rejected"
 	DiagSourceSignersMissing           = "context_source_signers_missing"
 	DiagProfileSkillCapabilityConflict = "profile_skill_capability_conflict"
+	DiagProfileSkillFilesConflict      = "profile_skill_files_conflict"
 )
 
 // MachineRequirer names the machine as the requirer of the install
@@ -62,6 +64,7 @@ type Requirement struct {
 	ProfileSkillRequirement bool
 	Capabilities            capabilities.Manifest
 	CapabilitiesPresent     bool
+	Files                   *whitelist.FileSelection
 }
 
 // Form renders the requirement's constraint for diagnostics: "range ^3",
@@ -269,6 +272,7 @@ type Resolved struct {
 	Package                    *Package
 	ProfileCapabilities        capabilities.Manifest
 	ProfileCapabilitiesPresent bool
+	ProfileFileSelection       *whitelist.FileSelection
 }
 
 // VerifyMCPPin rechecks signer policy against an exact locked commit without
@@ -1061,6 +1065,11 @@ func (r *resolver) build() (*Result, error) {
 			}
 			resolved.ProfileCapabilities = caps
 			resolved.ProfileCapabilitiesPresent = present
+			files, err := r.profileSkillFiles(name)
+			if err != nil {
+				return nil, err
+			}
+			resolved.ProfileFileSelection = files
 		}
 		result.Members[Key(sel.kind, name)] = resolved
 	}
@@ -1071,6 +1080,47 @@ func (r *resolver) build() (*Result, error) {
 	}
 	result.Lock, result.LockHash, result.Warnings = lock, hash, warnings
 	return result, nil
+}
+
+func (r *resolver) profileSkillFiles(name string) (*whitelist.FileSelection, error) {
+	var first *whitelist.FileSelection
+	seen := false
+	for _, edge := range r.constraints[name] {
+		requirement := edge.requirement
+		if requirement.Kind != contextlock.KindSkill || !requirement.ProfileSkillRequirement {
+			continue
+		}
+		current := canonicalFileSelection(requirement.Files)
+		if !seen {
+			first = current
+			seen = true
+			continue
+		}
+		if !equalFileSelection(first, current) {
+			return nil, fmt.Errorf("%s: skill %s has conflicting profile file selections", DiagProfileSkillFilesConflict, name)
+		}
+	}
+	return first, nil
+}
+
+func canonicalFileSelection(selection *whitelist.FileSelection) *whitelist.FileSelection {
+	if selection == nil {
+		return nil
+	}
+	clone := &whitelist.FileSelection{
+		Include: append([]string(nil), selection.Include...),
+		Exclude: append([]string(nil), selection.Exclude...),
+	}
+	sort.Strings(clone.Include)
+	sort.Strings(clone.Exclude)
+	return clone
+}
+
+func equalFileSelection(left, right *whitelist.FileSelection) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return slices.Equal(left.Include, right.Include) && slices.Equal(left.Exclude, right.Exclude)
 }
 
 // profileSkillCapabilities combines only profile requires.skills edges. Other
