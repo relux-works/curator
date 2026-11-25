@@ -60,6 +60,35 @@ func TestProjectSkillResolverStillFailsForOtherHarnessRefusals(t *testing.T) {
 	}
 }
 
+func TestNativeDiscoveryProjectRefusalAllowlist(t *testing.T) {
+	capabilities, err := harnessapi.NewCapabilitySet(harnessapi.SkillProjection, harnessapi.NativeSkillDiscovery)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("agreed typed refusal means no mirror", func(t *testing.T) {
+		adapter := skillProjectionTestAdapter{
+			capabilities: capabilities,
+			err:          fmt.Errorf("wrapped: %w", harnessapi.NewRefusal(harnessapi.CapabilityUnsupported)),
+		}
+		if _, supported, err := registeredSkillProjection("fixture-native", harnessapi.Context{}, harnessapi.ProjectScope, adapter); supported || err != nil {
+			t.Fatalf("native project refusal = supported %t, error %v; want no mirror", supported, err)
+		}
+	})
+
+	t.Run("other refusal propagates", func(t *testing.T) {
+		adapter := skillProjectionTestAdapter{
+			capabilities: capabilities,
+			err:          fmt.Errorf("wrapped: %w", harnessapi.NewRefusal(harnessapi.OperationNotPorted)),
+		}
+		_, supported, err := registeredSkillProjection("fixture-native", harnessapi.Context{}, harnessapi.ProjectScope, adapter)
+		var refusal harnessapi.Refusal
+		if supported || !errors.As(err, &refusal) || refusal.Code() != harnessapi.OperationNotPorted {
+			t.Fatalf("native project refusal = supported %t, error %v; want OperationNotPorted", supported, err)
+		}
+	})
+}
+
 func TestProjectSkillResolverKeepsDeclaredMirrorPath(t *testing.T) {
 	path, err := harnessvalue.NewRelativePath("fixture/skills")
 	if err != nil {

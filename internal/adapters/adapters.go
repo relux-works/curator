@@ -59,14 +59,17 @@ func projectAgentPaths() map[string]string {
 
 func registeredSkillProjection(agent string, context harnessapi.Context, scope harnessapi.Scope, adapter harnessapi.Adapter) (harnessapi.SkillDiscovery, bool, error) {
 	capabilities := adapter.Capabilities()
-	if scope == harnessapi.ProjectScope && capabilities.Has(harnessapi.NativeSkillDiscovery) {
-		return harnessapi.SkillDiscovery{}, false, nil
-	}
 	if !capabilities.Has(harnessapi.SkillProjection) {
 		return harnessapi.SkillDiscovery{}, false, nil
 	}
 	discovery, err := adapter.Skills(context, scope)
 	if err != nil {
+		if scope == harnessapi.ProjectScope && capabilities.Has(harnessapi.NativeSkillDiscovery) {
+			var refusal harnessapi.Refusal
+			if errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
+				return harnessapi.SkillDiscovery{}, false, nil
+			}
+		}
 		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("read skill projection for %q: %w", agent, err)
 	}
 	if !validSkillProjection(scope, discovery) {
