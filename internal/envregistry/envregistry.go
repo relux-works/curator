@@ -6,7 +6,6 @@
 package envregistry
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -441,10 +440,6 @@ func ByID(id string) (Adapter, error) {
 
 func stagedSkillsDirectory(skills harnessapi.SkillDiscovery, err error) (string, error) {
 	if err != nil {
-		var refusal harnessapi.Refusal
-		if errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
-			return "", nil
-		}
 		return "", fmt.Errorf("%s: staged skill declaration failed: %w", DiagUnknown, err)
 	}
 	paths := skills.Paths().Paths()

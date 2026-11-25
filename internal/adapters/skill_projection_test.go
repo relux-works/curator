@@ -23,27 +23,28 @@ func (a skillProjectionTestAdapter) Skills(_ harnessapi.Context, _ harnessapi.Sc
 	return a.discovery, a.err
 }
 
-func TestProjectSkillResolverTreatsPiScopeRefusalAsNoMirror(t *testing.T) {
+func TestProjectSkillResolverLeavesNativeDiscoveryWithoutMirror(t *testing.T) {
 	pi, err := harnessregistry.Lookup("pi")
 	if err != nil {
 		t.Fatal(err)
 	}
 	paths := projectAgentPaths()
 	if _, ok := paths["pi"]; ok {
-		t.Fatalf("Pi project path = %q, want no project mirror", paths["pi"])
+		t.Fatalf("native discovery project path = %q, want no project mirror", paths["pi"])
 	}
-	if _, ok := registeredSkillProjection("pi", harnessapi.ProjectScope, pi); ok {
-		t.Fatal("Pi project scope unexpectedly produced a mirror")
+	if _, ok, err := registeredSkillProjection("pi", harnessapi.Context{}, harnessapi.ProjectScope, pi); ok || err != nil {
+		t.Fatalf("native discovery project scope = supported %t, error %v; want no mirror", ok, err)
 	}
 }
 
-func TestProjectSkillResolverStillFailsForOtherErrors(t *testing.T) {
+func TestProjectSkillResolverStillFailsForOtherHarnessRefusals(t *testing.T) {
 	cases := []struct {
 		name string
 		err  error
 	}{
 		{name: "ordinary error", err: errors.New("unexpected skill failure")},
 		{name: "other typed refusal", err: fmt.Errorf("wrapped: %w", harnessapi.NewRefusal(harnessapi.OperationNotPorted))},
+		{name: "non-Pi project capability refusal", err: fmt.Errorf("wrapped: %w", harnessapi.NewRefusal(harnessapi.CapabilityUnsupported))},
 	}
 	capabilities, err := harnessapi.NewCapabilitySet(harnessapi.SkillProjection)
 	if err != nil {
@@ -52,12 +53,9 @@ func TestProjectSkillResolverStillFailsForOtherErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			adapter := skillProjectionTestAdapter{capabilities: capabilities, err: tc.err}
-			defer func() {
-				if recover() == nil {
-					t.Fatal("unexpected Skills error did not fail the resolver")
-				}
-			}()
-			_, _ = registeredSkillProjection("fixture", harnessapi.ProjectScope, adapter)
+			if _, supported, err := registeredSkillProjection("fixture", harnessapi.Context{}, harnessapi.ProjectScope, adapter); supported || err == nil {
+				t.Fatalf("project refusal = supported %t, error %v; want propagated error", supported, err)
+			}
 		})
 	}
 }
@@ -85,9 +83,9 @@ func TestProjectSkillResolverKeepsDeclaredMirrorPath(t *testing.T) {
 	}
 	adapter := skillProjectionTestAdapter{capabilities: capabilities, discovery: discovery}
 
-	got, ok := registeredSkillProjection("fixture", harnessapi.ProjectScope, adapter)
-	if !ok || !got.Mirror() || got.Scope() != harnessapi.ProjectScope {
-		t.Fatalf("project skill declaration = %#v, supported=%v", got, ok)
+	got, ok, err := registeredSkillProjection("fixture", harnessapi.Context{}, harnessapi.ProjectScope, adapter)
+	if err != nil || !ok || !got.Mirror() || got.Scope() != harnessapi.ProjectScope {
+		t.Fatalf("project skill declaration = %#v, supported=%v, error=%v", got, ok, err)
 	}
 	if path := oneSkillPath("fixture", got.Paths()); path != "fixture/skills" {
 		t.Fatalf("project skill path = %q, want fixture/skills", path)
@@ -99,9 +97,9 @@ func TestUserSkillResolverAcceptsPiNativeDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	discovery, ok := registeredSkillProjection("pi", harnessapi.UserScope, pi)
-	if !ok || discovery.Scope() != harnessapi.UserScope || !discovery.NativeDiscovery() || discovery.Mirror() {
-		t.Fatalf("Pi user-scope declaration = %#v, supported=%v; want native discovery without a mirror", discovery, ok)
+	discovery, ok, err := registeredSkillProjection("pi", harnessapi.Context{}, harnessapi.UserScope, pi)
+	if err != nil || !ok || discovery.Scope() != harnessapi.UserScope || !discovery.NativeDiscovery() || discovery.Mirror() {
+		t.Fatalf("Pi user-scope declaration = %#v, supported=%v, error=%v; want native discovery without a mirror", discovery, ok, err)
 	}
 	paths := discovery.Paths().Paths()
 	if len(paths) != 1 || paths[0].String() != "skills" {
@@ -144,12 +142,9 @@ func TestSkillResolverRejectsUndeclaredFlagCombinations(t *testing.T) {
 				t.Fatal(err)
 			}
 			adapter := skillProjectionTestAdapter{capabilities: capabilities, discovery: discovery}
-			defer func() {
-				if recover() == nil {
-					t.Fatal("resolver accepted a flag combination outside the scope allowlist")
-				}
-			}()
-			_, _ = registeredSkillProjection("fixture", tc.scope, adapter)
+			if _, _, err := registeredSkillProjection("fixture", harnessapi.Context{}, tc.scope, adapter); err == nil {
+				t.Fatal("resolver accepted a flag combination outside the scope allowlist")
+			}
 		})
 	}
 }

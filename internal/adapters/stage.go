@@ -123,18 +123,7 @@ func registeredSkills(agent string, scope harnessapi.Scope) (harnessapi.SkillDis
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
 	}
-	discovery, err := adapter.Skills(context, scope)
-	if refusalIs(err, harnessapi.OperationNotPorted) ||
-		(scope == harnessapi.ProjectScope && refusalIs(err, harnessapi.CapabilityUnsupported)) {
-		return harnessapi.SkillDiscovery{}, false, nil
-	}
-	if err != nil {
-		return harnessapi.SkillDiscovery{}, false, err
-	}
-	if !validSkillProjection(scope, discovery) {
-		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("invalid skill projection declaration for %q", agent)
-	}
-	return discovery, true, nil
+	return registeredSkillProjection(agent, context, scope, adapter)
 }
 
 func refusalIs(err error, code string) bool {

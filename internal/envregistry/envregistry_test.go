@@ -80,7 +80,7 @@ func TestByIDProjectsStagedPiFacts(t *testing.T) {
 	}
 }
 
-func TestStagedSkillsDirectoryUsesTypedUnsupportedAllowlist(t *testing.T) {
+func TestStagedSkillsDirectoryPropagatesUserScopeRefusals(t *testing.T) {
 	staged, err := harnessregistry.Lookup(harnessapi.ID(Pi))
 	if err != nil {
 		t.Fatal(err)
@@ -96,8 +96,14 @@ func TestStagedSkillsDirectoryUsesTypedUnsupportedAllowlist(t *testing.T) {
 	if got, err := stagedSkillsDirectory(discovery, nil); err != nil || got != "skills" {
 		t.Fatalf("valid native user-skill path = %q, %v; want skills", got, err)
 	}
-	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, harnessapi.NewRefusal(harnessapi.CapabilityUnsupported)); err != nil || got != "" {
-		t.Fatalf("typed unsupported user-skill path = %q, %v; want empty path without error", got, err)
+	unsupported := harnessapi.NewRefusal(harnessapi.CapabilityUnsupported)
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, unsupported); got != "" || err == nil {
+		t.Fatalf("typed unsupported user-skill path = %q, %v; want propagated error", got, err)
+	} else {
+		var refusal harnessapi.Refusal
+		if !errors.As(err, &refusal) || refusal.Code() != harnessapi.CapabilityUnsupported {
+			t.Fatalf("typed unsupported user-skill error lost refusal: %v", err)
+		}
 	}
 	other := errors.New("unexpected user-skill projection failure")
 	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, fmt.Errorf("wrapped: %w", other)); !errors.Is(err, other) || got != "" {

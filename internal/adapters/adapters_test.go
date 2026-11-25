@@ -336,7 +336,7 @@ func TestNativeDiscoveryAgentsGetNoProjectMirror(t *testing.T) {
 	stageRoot := t.TempDir()
 	canonical := filepath.Join(project, ".agents", "skills")
 	makeSkill(t, canonical, "skill-a")
-	mirror, err := StageProject(stageRoot, project, []string{"opencode", "windsurf"},
+	mirror, err := StageProject(stageRoot, project, []string{"opencode", "windsurf", "pi"},
 		[]Group{{Root: canonical, Skills: []string{"skill-a"}}}, "copy")
 	if err != nil {
 		t.Fatal(err)
@@ -387,6 +387,9 @@ func TestWindsurfNativeDiscoveryLegacyContract(t *testing.T) {
 func TestRegisteredSkillRoutingFallbackAndPathExpansion(t *testing.T) {
 	if _, ported, err := registeredSkills("cursor", harnessapi.ProjectScope); err != nil || !ported {
 		t.Fatalf("registered Cursor adapter did not select its registry declaration: ported=%t err=%v", ported, err)
+	}
+	if _, ported, err := registeredSkills("pi", harnessapi.ProjectScope); err != nil || ported {
+		t.Fatalf("native-discovery project scope selected a mirror: ported=%t err=%v", ported, err)
 	}
 	if _, ported, err := registeredSkills("claude_code", harnessapi.ProjectScope); err != nil || ported {
 		t.Fatalf("unported adapter did not select the explicit legacy fallback: ported=%t err=%v", ported, err)

@@ -45,7 +45,10 @@ func projectAgentPaths() map[string]string {
 			}
 			panic(fmt.Errorf("lookup harness adapter %q: %w", id, err))
 		}
-		discovery, supported := registeredSkillProjection(string(id), harnessapi.ProjectScope, adapter)
+		discovery, supported, err := registeredSkillProjection(string(id), harnessapi.Context{}, harnessapi.ProjectScope, adapter)
+		if err != nil {
+			panic(err)
+		}
 		if !supported || !discovery.Mirror() {
 			continue
 		}
@@ -54,24 +57,22 @@ func projectAgentPaths() map[string]string {
 	return paths
 }
 
-func registeredSkillProjection(agent string, scope harnessapi.Scope, adapter harnessapi.Adapter) (harnessapi.SkillDiscovery, bool) {
-	if !adapter.Capabilities().Has(harnessapi.SkillProjection) {
-		return harnessapi.SkillDiscovery{}, false
+func registeredSkillProjection(agent string, context harnessapi.Context, scope harnessapi.Scope, adapter harnessapi.Adapter) (harnessapi.SkillDiscovery, bool, error) {
+	capabilities := adapter.Capabilities()
+	if scope == harnessapi.ProjectScope && capabilities.Has(harnessapi.NativeSkillDiscovery) {
+		return harnessapi.SkillDiscovery{}, false, nil
 	}
-	discovery, err := adapter.Skills(harnessapi.Context{}, scope)
+	if !capabilities.Has(harnessapi.SkillProjection) {
+		return harnessapi.SkillDiscovery{}, false, nil
+	}
+	discovery, err := adapter.Skills(context, scope)
 	if err != nil {
-		var refusal harnessapi.Refusal
-		// A typed project-scope capability refusal means this harness has no
-		// project mirror. Every other declaration error remains fatal.
-		if scope == harnessapi.ProjectScope && errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
-			return harnessapi.SkillDiscovery{}, false
-		}
-		panic(fmt.Errorf("read skill projection for %q: %w", agent, err))
+		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("read skill projection for %q: %w", agent, err)
 	}
 	if !validSkillProjection(scope, discovery) {
-		panic(fmt.Errorf("invalid skill projection declaration for %q", agent))
+		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("invalid skill projection declaration for %q", agent)
 	}
-	return discovery, true
+	return discovery, true, nil
 }
 
 func validSkillProjection(scope harnessapi.Scope, discovery harnessapi.SkillDiscovery) bool {
