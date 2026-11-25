@@ -60,10 +60,11 @@ func TestReviewMissingPinPreservesProtocolAllowlist(t *testing.T) {
 	}
 }
 
-// Actual Git HTTPS transport talks to a loopback TLS server with an explicitly
-// trusted fixture certificate. SSH dispatches through Git's SSH transport into
-// a controlled upload-pack executable. It tests protocol admission and operator
-// configuration, not SSH encryption/authentication or external connectivity.
+// Actual Git HTTPS transport talks to a loopback TLS smart-HTTP server with an
+// explicitly trusted fixture certificate. SSH dispatches through Git's SSH
+// transport into a controlled upload-pack executable. It tests protocol
+// admission and operator configuration, not SSH encryption/authentication or
+// external connectivity.
 func TestInstallMissingPinAllowedTransports(t *testing.T) {
 	for _, transport := range []string{"https", "ssh"} {
 		for _, rewrite := range []bool{false, true} {
@@ -72,11 +73,9 @@ func TestInstallMissingPinAllowedTransports(t *testing.T) {
 				var requests atomic.Int32
 				remote := "ssh://fixture.invalid/repository"
 				if transport == "https" {
-					gitRun(t, f.repo, "update-server-info")
-					handler := http.FileServer(http.Dir(filepath.Join(f.repo, ".git")))
 					server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						requests.Add(1)
-						handler.ServeHTTP(w, r)
+						smartUploadPackHandler(t, f.repo).ServeHTTP(w, r)
 					}))
 					defer server.Close()
 					cert := filepath.Join(t.TempDir(), "ca.pem")
@@ -125,6 +124,42 @@ func TestInstallMissingPinAllowedTransports(t *testing.T) {
 			})
 		}
 	}
+}
+
+// smartUploadPackHandler serves the two Git smart-HTTP requests needed by a
+// shallow fetch. A static .git file server only supports dumb HTTP, which
+// cannot serve depth-limited requests.
+func smartUploadPackHandler(t *testing.T, repo string) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var cmd *exec.Cmd
+		switch {
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/info/refs") && r.URL.Query().Get("service") == "git-upload-pack":
+			cmd = exec.Command("git", "-C", repo, "upload-pack", "--stateless-rpc", "--advertise-refs", ".")
+			payload, err := cmd.Output()
+			if err != nil {
+				t.Errorf("fixture upload-pack advertisement failed")
+				http.Error(w, "fixture upload-pack failed", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/x-git-upload-pack-advertisement")
+			_, _ = w.Write([]byte("001e# service=git-upload-pack\n0000"))
+			_, _ = w.Write(payload)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/git-upload-pack"):
+			cmd = exec.Command("git", "-C", repo, "upload-pack", "--stateless-rpc", ".")
+			cmd.Stdin = r.Body
+			payload, err := cmd.Output()
+			if err != nil {
+				t.Errorf("fixture upload-pack request failed")
+				http.Error(w, "fixture upload-pack failed", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
+			_, _ = w.Write(payload)
+		default:
+			http.NotFound(w, r)
+		}
+	})
 }
 
 const pinTransportBytes = "exact transport fixture bytes\r\nwith trailing spaces  \n"

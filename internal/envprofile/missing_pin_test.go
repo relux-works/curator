@@ -336,7 +336,7 @@ func TestReinstallMissingDependencyPin(t *testing.T) {
 				t.Fatal("warm reinstall cloned an unrelated or replacement source")
 			}
 			if wantFetches == 1 && mode != "still-absent" {
-				want := "built-in: git fetch --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin " + pin
+				want := "built-in: git fetch --depth=1 --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin " + pin
 				if !strings.Contains(string(raw), want) {
 					t.Fatal("acquisition did not use the exact no-ref/no-submodule command")
 				}

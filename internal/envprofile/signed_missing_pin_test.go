@@ -90,7 +90,7 @@ func TestIndependentSignedMissingPin(t *testing.T) {
 			if got := strings.Count(string(raw), "built-in: git fetch "); got != want {
 				t.Fatalf("fetches = %d, want %d", got, want)
 			}
-			if want == 1 && !strings.Contains(string(raw), "fetch --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin "+f.pin) {
+			if want == 1 && !strings.Contains(string(raw), "fetch --depth=1 --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin "+f.pin) {
 				t.Fatal("exact acquisition flags missing")
 			}
 		})
