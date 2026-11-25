@@ -82,12 +82,13 @@ func TestSkillsAndMCP(t *testing.T) {
 			t.Fatalf("Skills(%q) scope/native/mirror = %q/%t/%t", scope, skills.Scope(), skills.NativeDiscovery(), skills.Mirror())
 		}
 		gotIgnores := pathStrings(skills.IgnorePaths())
-		wantIgnores := []string(nil)
 		if scope == harnessapi.ProjectScope {
-			wantIgnores = []string{".codex/skills"}
-		}
-		if !reflect.DeepEqual(gotIgnores, wantIgnores) {
-			t.Fatalf("Skills(%q).IgnorePaths() = %v, want %v", scope, gotIgnores, wantIgnores)
+			wantIgnores := []string{".codex/skills"}
+			if !reflect.DeepEqual(gotIgnores, wantIgnores) {
+				t.Fatalf("Skills(%q).IgnorePaths() = %v, want %v", scope, gotIgnores, wantIgnores)
+			}
+		} else if len(gotIgnores) != 0 {
+			t.Fatalf("Skills(%q).IgnorePaths() = %v, want no paths", scope, gotIgnores)
 		}
 
 		mcp, err := adapter.MCP(harnessapi.Context{}, scope)
