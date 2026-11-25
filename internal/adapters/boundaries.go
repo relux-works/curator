@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
+	"github.com/relux-works/curator/internal/harnessapi"
 	"github.com/relux-works/curator/internal/staging"
 )
 
@@ -21,11 +23,25 @@ import (
 // agents share .agents/skills and need no extra root. Callers add manager
 // runtime stores, build caches, transaction staging and the snapshot store.
 func ProjectOutputRoots(projectRoot string) []string {
-	roots := []string{filepath.Join(projectRoot, ".agents")}
-	for _, rel := range AgentPaths {
-		roots = append(roots, filepath.Join(projectRoot, filepath.FromSlash(rel)))
+	roots := map[string]bool{filepath.Join(projectRoot, ".agents"): true}
+	for agent := range KnownAgents() {
+		if NativeDiscoveryAgents[agent] {
+			continue
+		}
+		rel, known, err := skillPath(agent, harnessapi.ProjectScope)
+		if err != nil {
+			return []string{projectRoot}
+		}
+		if known {
+			roots[filepath.Join(projectRoot, filepath.FromSlash(rel))] = true
+		}
 	}
-	return roots
+	out := make([]string, 0, len(roots))
+	for root := range roots {
+		out = append(out, root)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ValidateDestinations refuses adapter plans whose live paths would

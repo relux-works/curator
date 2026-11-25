@@ -27,7 +27,6 @@ import (
 var projectSources = map[string][]string{
 	"claude_code": {".mcp.json"},
 	"codex_cli":   {".codex/config.toml"},
-	"gemini":      {".gemini/settings.json"},
 	"opencode":    {"opencode.json", "opencode.jsonc"},
 }
 
@@ -35,7 +34,6 @@ var projectSources = map[string][]string{
 var homeSources = map[string][]string{
 	"claude_code": {".claude.json"},
 	"codex_cli":   {".codex/config.toml"},
-	"gemini":      {".gemini/settings.json"},
 	"opencode":    {".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
 }
 

@@ -920,10 +920,7 @@ func sameExpansion(first, second []manifest.Selection) bool {
 
 func draftOutputs(projectAbs, home string, extra []string) []string {
 	outputs := append([]string(nil), extra...)
-	outputs = append(outputs, filepath.Join(projectAbs, ".agents"))
-	for _, rel := range adapters.AgentPaths {
-		outputs = append(outputs, filepath.Join(projectAbs, filepath.FromSlash(rel)))
-	}
+	outputs = append(outputs, adapters.ProjectOutputRoots(projectAbs)...)
 	outputs = append(outputs, snapshot.LocalStoreDir(home))
 	return outputs
 }
