@@ -869,3 +869,20 @@ func TestEnvResolvePreserveLockRefusesCurrentV1AndPlainRepairMigrates(t *testing
 		t.Fatal("plain repair did not migrate lock")
 	}
 }
+
+func TestProfileNativeHomeResolverUsesRegisteredHomeLayout(t *testing.T) {
+	userHome := t.TempDir()
+	resolver := (cli{userHome: func() (string, error) { return userHome, nil }}).profileNativeHomeResolver()
+
+	got, err := resolver("opencode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(userHome, ".config", "opencode")
+	if got != want {
+		t.Fatalf("resolved native home = %q, want %q", got, want)
+	}
+	if _, err := resolver("unknown"); err == nil {
+		t.Fatal("unknown native home was accepted")
+	}
+}

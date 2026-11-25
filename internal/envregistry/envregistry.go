@@ -1,12 +1,6 @@
-// Package envregistry is the closed revision-1 environment adapter
-// registry (environments §7). Adapters are manager code, never package
-// code: every per-adapter fact — home mechanism, root-context target,
-// supported forms, system-prompt and MCP channel descriptors, credential
-// passthrough, provisioning seeds, the isolation matrix, shadowing paths,
-// secondary targets, size advisories, and recorded tool releases — lives in
-// this table, validated against the section it cites. Profile bytes never
-// select an adapter fact; machine configuration selects among the declared
-// values with the section 12.1 defaults.
+// Package envregistry holds the remaining revision-1 environment facts and
+// compatibility lookup (environments §7). Facts already represented by the
+// versioned harness contract are read from the closed harness registry.
 package envregistry
 
 import (
@@ -14,6 +8,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 )
 
 // Environment identifiers (environments §7.1, closed in revision 1).
@@ -181,9 +178,7 @@ type Target struct {
 // Adapter is the closed per-adapter record.
 type Adapter struct {
 	ID string
-	// EnvVar is the fragment variable naming the home. For opencode it
-	// names the managed parent: the tool reads <parent>/opencode/ as the
-	// home (environments §7.1).
+	// EnvVar is the fragment variable naming the home.
 	EnvVar string
 	// HomeVariables lists ordered home-relative parents for a multi-variable adapter.
 	HomeVariables [][2]string
@@ -192,12 +187,11 @@ type Adapter struct {
 	// RootTarget is the home-relative portable path of the root-context file.
 	RootTarget string
 	// SkillsDir is the skills directory name in the home; empty where the
-	// adapter uses the machine-global native surface (opencode,
-	// split-brain by construction, §7.1).
+	// adapter uses a native discovery surface.
 	SkillsDir   string
 	Forms       []string
 	DefaultForm string
-	// SystemPrompt holds the §7.3 channel descriptors, nil for opencode.
+	// SystemPrompt holds the §7.3 channel descriptors, when present.
 	SystemPrompt []Channel
 	// MCP holds the single §7.8 channel descriptor, nil for pi.
 	MCP *Channel
@@ -215,7 +209,7 @@ type Adapter struct {
 	Shadows     []Shadow
 	// VerifiedRelease is the tool release the facts were verified on
 	// (§7.9); empty where the tool was not installed on the recording
-	// machine (opencode, docs-confidence throughout).
+	// machine or its release remains unqualified.
 	VerifiedRelease string
 	// Probe runs "<tool> --version" read-only for the detected release.
 	Probe []string
@@ -298,19 +292,9 @@ var Registry = []Adapter{
 	},
 	{
 		ID:                OpenCode,
-		EnvVar:            "XDG_CONFIG_HOME",
-		ParentVar:         true,
-		RootTarget:        "AGENTS.md",
-		SkillsDir:         "",
-		Forms:             []string{FormMonolithic, FormReferenced},
-		DefaultForm:       FormMonolithic,
-		SystemPrompt:      nil,
 		MCP:               &Channel{Kind: KindVariable, Variable: "OPENCODE_CONFIG"},
 		Passthrough:       map[string][]Passthrough{"default": {}},
-		Seeds:             nil,
-		SeedWritten:       map[string]bool{},
 		VerifiedRelease:   "",
-		Probe:             []string{"opencode", "--version"},
 		SizeAdvisoryBytes: 32768,
 		CredentialScope:   "xdg-data",
 		GlobalContextCap:  "docs-confidence",
@@ -378,10 +362,61 @@ var Targets = []Target{
 // the CLI normalizes them with NormalizeEnvID first, so a raw alias here
 // is still environment_unknown.
 func ByID(id string) (Adapter, error) {
-	for _, adapter := range Registry {
-		if adapter.ID == id {
-			return adapter, nil
+	for _, declared := range Registry {
+		if declared.ID != id {
+			continue
 		}
+		adapter := declared
+		staged, err := harnessregistry.Lookup(harnessapi.ID(id))
+		if err != nil {
+			return Adapter{}, err
+		}
+		capabilities := staged.Capabilities()
+		if capabilities.Has(harnessapi.ReleaseProbing) {
+			probe, err := staged.ReleaseProbe(harnessapi.Context{})
+			if err != nil {
+				return Adapter{}, err
+			}
+			adapter.Probe = append([]string{probe.ExecutableAlias()}, probe.Arguments()...)
+		}
+		context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if err != nil {
+			return Adapter{}, err
+		}
+		if capabilities.Has(harnessapi.ManagedHome) {
+			home, err := staged.Home(context)
+			if err != nil {
+				return Adapter{}, err
+			}
+			adapter.EnvVar = home.EnvironmentVariable()
+			adapter.ParentVar = home.ParentValued()
+		}
+		if capabilities.Has(harnessapi.InstructionOutput) {
+			defaultInstructions, err := staged.Instructions(context, "")
+			if err != nil {
+				return Adapter{}, err
+			}
+			adapter.DefaultForm = string(defaultInstructions.Form())
+			forms := []string{}
+			for _, form := range []harnessapi.Form{harnessapi.Monolithic, harnessapi.Referenced} {
+				instructions, err := staged.Instructions(context, form)
+				if err != nil {
+					continue
+				}
+				forms = append(forms, string(instructions.Form()))
+				if form == harnessapi.Monolithic {
+					paths := instructions.Paths().Paths()
+					if len(paths) > 0 {
+						adapter.RootTarget = paths[0].String()
+					}
+				}
+			}
+			adapter.Forms = forms
+		}
+		if capabilities.Has(harnessapi.NativeSkillDiscovery) {
+			adapter.SkillsDir = ""
+		}
+		return adapter, nil
 	}
 	return Adapter{}, fmt.Errorf("%s: unregistered environment %q", DiagUnknown, id)
 }
@@ -399,7 +434,7 @@ func TargetByID(id string) (Target, error) {
 }
 
 // TargetsFor reports the declared secondary targets of one adapter.
-// Adapters without a §7.6 row (opencode, pi) report none.
+// Adapters without a §7.6 row report none.
 func TargetsFor(adapterID string) []Target {
 	var out []Target
 	for _, target := range Targets {

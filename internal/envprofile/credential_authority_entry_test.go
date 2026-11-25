@@ -292,7 +292,11 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 
 func isolateAuthorityNativeHomes(t *testing.T, fx *managedFixture) {
 	t.Helper()
-	for _, adapter := range envregistry.Registry {
+	for _, declared := range envregistry.Registry {
+		adapter, err := envregistry.ByID(declared.ID)
+		if err != nil {
+			t.Fatalf("resolve native home descriptor for %s: %v", declared.ID, err)
+		}
 		path := fx.native[adapter.ID]
 		if adapter.ID == envregistry.OpenCode {
 			path = fx.xdg

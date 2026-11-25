@@ -14,7 +14,11 @@ import (
 // A repair may seed from a native home only when its physical location is
 // outside managed environment ownership. This checks paths, never credentials.
 func (req *ResolveRequest) validateRepairNativeHome(adapter envregistry.Adapter) error {
-	if adapter.ID == envregistry.OpenCode {
+	parentValued, _, err := registeredNativeHome(adapter.ID)
+	if err != nil {
+		return err
+	}
+	if parentValued {
 		if _, err := req.externalOperatorXDG(); err != nil {
 			return err
 		}

@@ -36,6 +36,8 @@ import (
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/mcpnative"
@@ -84,18 +86,24 @@ const (
 // EnvRoot returns the manager-owned environments root.
 func EnvRoot(home string) string { return filepath.Join(home, EnvRootName) }
 
-// ManagedParent returns the fragment env-value directory for a profile ×
-// environment: the tool's home, except for opencode where the variable
-// names the managed XDG parent and the tool reads the opencode child
-// (environments §7.1).
+// ManagedParent returns the fragment env-value directory for a profile × environment.
 func ManagedParent(home, profile, envID string) string {
 	return filepath.Join(EnvRoot(home), profile, envID)
 }
 
 // ManagedHomeDir returns the tool's home directory.
 func ManagedHomeDir(home, profile, envID string) string {
-	if envID == envregistry.OpenCode {
-		return filepath.Join(ManagedParent(home, profile, envID), "opencode")
+	adapter, err := harnessregistry.Lookup(harnessapi.ID(envID))
+	if err == nil && adapter.Capabilities().Has(harnessapi.ManagedHome) {
+		context, contextErr := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if contextErr == nil {
+			if layout, homeErr := adapter.Home(context); homeErr == nil && layout.ParentValued() {
+				roots := layout.Roots().Paths()
+				if len(roots) > 0 {
+					return filepath.Join(ManagedParent(home, profile, envID), filepath.FromSlash(roots[0].String()))
+				}
+			}
+		}
 	}
 	return ManagedParent(home, profile, envID)
 }
@@ -3760,9 +3768,8 @@ func (p *homePlan) systemPrompt(req *ResolveRequest, lock *contextlock.Lock, pre
 // skills assembles the per-profile skills surface: one symlink per lock
 // skill member into its shared core context projection (§7.1, §7.4 matrix).
 // The surface hash binds the publication revision and projected bytes, so
-// identical inputs hash identically on every machine (§5.6). opencode
-// carries no skills surface: its skills target is the machine-global
-// native surface, split-brain by construction (§7.1).
+// identical inputs hash identically on every machine (§5.6). Native-discovery
+// adapters carry no profile-local skills surface.
 func (p *homePlan) skills(req *ResolveRequest, skills []skillOf, surfaces map[string]envmarker.Surface) {
 	_ = req
 	if p.adapter.SkillsDir == "" {

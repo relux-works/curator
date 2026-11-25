@@ -15,8 +15,9 @@ import (
 const DiagNativeHomeBindingRequired = "native_home_binding_required"
 
 // NativeHomeBindings names exact native adapter directories admitted by the
-// caller. Opencode binds its actual directory, not the XDG parent. Bindings
-// grant no takeover or credential authority; operation gates still apply.
+// caller. Parent-valued layouts bind their actual child directory, not the
+// selector parent. Bindings grant no takeover or credential authority;
+// operation gates still apply.
 type NativeHomeBindings map[string]string
 
 // nativeHomeBindingAdmission carries the directory identity observed before

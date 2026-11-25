@@ -14,11 +14,14 @@ package contextmaterialize
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
@@ -45,6 +48,15 @@ const OpenCodeConfigName = "opencode.json"
 // SupportsReferenced reports whether the adapter supports the referenced
 // root-context form (environments §7.2).
 func SupportsReferenced(environment string) bool {
+	adapter, err := harnessregistry.Lookup(harnessapi.ID(environment))
+	if err == nil && adapter.Capabilities().Has(harnessapi.InstructionOutput) {
+		context, contextErr := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if contextErr != nil {
+			return false
+		}
+		_, err = adapter.Instructions(context, harnessapi.Referenced)
+		return err == nil
+	}
 	return environment == "claude_code" || environment == "opencode"
 }
 
@@ -52,6 +64,18 @@ func SupportsReferenced(environment string) bool {
 // §7.1): CLAUDE.md for claude_code, AGENTS.md for every other revision-1
 // adapter.
 func RootTarget(environment string) string {
+	adapter, err := harnessregistry.Lookup(harnessapi.ID(environment))
+	if err == nil && adapter.Capabilities().Has(harnessapi.InstructionOutput) {
+		context, contextErr := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if contextErr == nil {
+			if instructions, instructionErr := adapter.Instructions(context, harnessapi.Monolithic); instructionErr == nil {
+				paths := instructions.Paths().Paths()
+				if len(paths) > 0 {
+					return paths[0].String()
+				}
+			}
+		}
+	}
 	if environment == "claude_code" {
 		return "CLAUDE.md"
 	}
@@ -159,9 +183,22 @@ func referenced(lock *contextlock.Lock, lockHash string, precedence Precedence, 
 		if err != nil {
 			return nil, false, err
 		}
-		files[OpenCodeConfigName] = document
+		wrapperPath := OpenCodeConfigName
+		adapter, lookupErr := harnessregistry.Lookup(harnessapi.ID(environment))
+		if lookupErr == nil && adapter.Capabilities().Has(harnessapi.InstructionOutput) {
+			context, contextErr := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+			if contextErr == nil {
+				if spec, specErr := adapter.Instructions(context, harnessapi.Referenced); specErr == nil {
+					paths := spec.Paths().Paths()
+					if len(paths) > 1 {
+						wrapperPath = paths[1].String()
+					}
+				}
+			}
+		}
+		files[wrapperPath] = document
 		if traces != nil {
-			traces[OpenCodeConfigName] = JoinParts([]Part{{Kind: "wrapper", Bytes: document}})
+			traces[wrapperPath] = JoinParts([]Part{{Kind: "wrapper", Bytes: document}})
 		}
 	}
 	names := make([]string, 0, len(files))

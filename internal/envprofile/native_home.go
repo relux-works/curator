@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -27,6 +30,10 @@ func nativeHomeRefusal(path string, cause error) error {
 }
 
 func nativeHomeSelection(adapter Adapter, managerHome, value string) (string, bool, error) {
+	parentValued, root, err := registeredNativeHome(adapter.ID)
+	if err != nil {
+		return "", false, err
+	}
 	fallback := false
 	if value != "" {
 		if _, err := nativeComparablePath(value); err != nil {
@@ -35,6 +42,8 @@ func nativeHomeSelection(adapter Adapter, managerHome, value string) (string, bo
 		candidate := value
 		if adapter.ID == "opencode" || adapter.ID == envregistry.Muse {
 			candidate = filepath.Join(value, adapter.ID)
+		} else if parentValued {
+			candidate = filepath.Join(value, filepath.FromSlash(root))
 		}
 		managed, err := nativePathIsManaged(candidate, managerHome)
 		if err != nil {
@@ -44,7 +53,7 @@ func nativeHomeSelection(adapter Adapter, managerHome, value string) (string, bo
 			if adapter.ID == "opencode" || adapter.ID == envregistry.Muse {
 				return filepath.Join(value, adapter.ID), false, nil
 			}
-			return value, false, nil
+			return candidate, false, nil
 		}
 		fallback = true
 	}
@@ -56,6 +65,9 @@ func nativeHomeSelection(adapter Adapter, managerHome, value string) (string, bo
 		return "", false, nativeHomeRefusal(home, err)
 	}
 	native := filepath.Join(home, adapter.DefaultDir)
+	if parentValued {
+		native = filepath.Join(native, filepath.FromSlash(root))
+	}
 	if adapter.ID == "opencode" || adapter.ID == envregistry.Muse {
 		native = filepath.Join(home, ".config", adapter.ID)
 	}
@@ -67,6 +79,32 @@ func nativeHomeSelection(adapter Adapter, managerHome, value string) (string, bo
 		return "", false, fmt.Errorf("%s: native home %s is inside managed environments; run repair with the intended external native home", envregistry.DiagCredentialConflict, native)
 	}
 	return native, fallback, nil
+}
+
+func registeredNativeHome(id string) (bool, string, error) {
+	adapter, err := harnessregistry.Lookup(harnessapi.ID(id))
+	if err != nil {
+		return false, "", fmt.Errorf("lookup harness adapter %q: %w", id, err)
+	}
+	if !adapter.Capabilities().Has(harnessapi.ManagedHome) {
+		return false, "", nil
+	}
+	context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+	if err != nil {
+		return false, "", err
+	}
+	layout, err := adapter.Home(context)
+	if err != nil {
+		return false, "", err
+	}
+	if !layout.ParentValued() {
+		return false, "", nil
+	}
+	roots := layout.Roots().Paths()
+	if len(roots) != 1 {
+		return false, "", fmt.Errorf("harness adapter %q declares a parent-valued home without one child root", id)
+	}
+	return true, roots[0].String(), nil
 }
 
 func nativePathIsManaged(path, managerHome string) (bool, error) {

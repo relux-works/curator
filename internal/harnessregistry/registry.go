@@ -26,8 +26,9 @@ type registration struct {
 	hasProbe     bool
 }
 
-func probing() harnessapi.CapabilitySet {
-	set, _ := harnessapi.NewCapabilitySet(harnessapi.ReleaseProbing)
+func probing(additional ...harnessapi.Capability) harnessapi.CapabilitySet {
+	values := append([]harnessapi.Capability{harnessapi.ReleaseProbing}, additional...)
+	set, _ := harnessapi.NewCapabilitySet(values...)
 	return set
 }
 
@@ -50,7 +51,7 @@ var entries = [...]registration{
 	{cursor.ID, 1, skillAndMCPInspection(), cursor.New, harnessapi.ProbeSpec{}, false},
 	{gemini.ID, 1, gemini.Capabilities(), gemini.New, harnessapi.ProbeSpec{}, false},
 	{muse.ID, 1, probing(), muse.New, harnessapi.NewProbeSpec("muse", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
-	{opencode.ID, 1, probing(), opencode.New, harnessapi.NewProbeSpec("opencode", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
+	{opencode.ID, 1, probing(harnessapi.ManagedHome, harnessapi.InstructionOutput, harnessapi.NativeSkillDiscovery, harnessapi.MCPInspection, harnessapi.TrustObservation), opencode.New, harnessapi.NewProbeSpec("opencode", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{pi.ID, 1, probing(), pi.New, harnessapi.NewProbeSpec("pi", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{windsurf.ID, 1, nativeSkillsAndMCPInspection(), windsurf.New, harnessapi.ProbeSpec{}, false},
 }

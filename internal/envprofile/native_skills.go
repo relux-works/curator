@@ -14,8 +14,8 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
-// inPlaceSkillsDir preserves opencode staging; only the single-home native
-// adapters participate in the native skills ownership contract.
+// inPlaceSkillsDir keeps profile staging separate from the native skills
+// ownership contract, which only single-home adapters participate in.
 func inPlaceSkillsDir(id string) string {
 	switch id {
 	case envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Pi:

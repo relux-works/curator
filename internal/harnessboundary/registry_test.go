@@ -52,10 +52,14 @@ func notPortedResults(t *testing.T, adapter harnessapi.Adapter, effects *effectS
 	var errors []error
 	v, err := adapter.ParseReleaseProbe(projectContext, harnessapi.ProbeOutput{})
 	errors = append(errors, effects.observe(v, err))
-	vh, err := adapter.Home(projectContext)
-	errors = append(errors, effects.observe(vh, err))
-	vi, err := adapter.Instructions(projectContext, harnessapi.Monolithic)
-	errors = append(errors, effects.observe(vi, err))
+	if !capabilities.Has(harnessapi.ManagedHome) {
+		vh, err := adapter.Home(projectContext)
+		errors = append(errors, effects.observe(vh, err))
+	}
+	if !capabilities.Has(harnessapi.InstructionOutput) {
+		vi, err := adapter.Instructions(projectContext, harnessapi.Monolithic)
+		errors = append(errors, effects.observe(vi, err))
+	}
 	if !capabilities.Has(harnessapi.SkillProjection) && !capabilities.Has(harnessapi.NativeSkillDiscovery) {
 		vs, err := adapter.Skills(projectContext, harnessapi.ProjectScope)
 		errors = append(errors, effects.observe(vs, err))
@@ -66,20 +70,30 @@ func notPortedResults(t *testing.T, adapter harnessapi.Adapter, effects *effectS
 		vmcp, err := adapter.MCP(userContext, harnessapi.UserScope)
 		errors = append(errors, effects.observe(vmcp, err))
 	}
-	vc, err := adapter.Credentials(projectContext)
-	errors = append(errors, effects.observe(vc, err))
-	vt, err := adapter.Trust(projectContext)
-	errors = append(errors, effects.observe(vt, err))
-	vr, err := adapter.Preflight(projectContext, s, r)
-	errors = append(errors, effects.observe(vr, err))
-	vp, err := adapter.PlanSeed(projectContext, s, r)
-	errors = append(errors, effects.observe(vp, err))
-	vpc, err := adapter.ProjectContext(projectContext, s, r)
-	errors = append(errors, effects.observe(vpc, err))
-	vstatus, err := adapter.Status(projectContext, s)
-	errors = append(errors, effects.observe(vstatus, err))
-	vd, err := adapter.Drift(projectContext, s)
-	errors = append(errors, effects.observe(vd, err))
+	if !capabilities.Has(harnessapi.CredentialMetadata) {
+		vc, err := adapter.Credentials(projectContext)
+		errors = append(errors, effects.observe(vc, err))
+	}
+	if !capabilities.Has(harnessapi.TrustObservation) {
+		vt, err := adapter.Trust(projectContext)
+		errors = append(errors, effects.observe(vt, err))
+	}
+	if !capabilities.Has(harnessapi.ManagedHome) && !capabilities.Has(harnessapi.NativeMCPWrite) {
+		vr, err := adapter.Preflight(projectContext, s, r)
+		errors = append(errors, effects.observe(vr, err))
+	}
+	if !capabilities.Has(harnessapi.ManagedHome) {
+		vp, err := adapter.PlanSeed(projectContext, s, r)
+		errors = append(errors, effects.observe(vp, err))
+		vstatus, err := adapter.Status(projectContext, s)
+		errors = append(errors, effects.observe(vstatus, err))
+		vd, err := adapter.Drift(projectContext, s)
+		errors = append(errors, effects.observe(vd, err))
+	}
+	if !capabilities.Has(harnessapi.ProjectContextOutput) {
+		vpc, err := adapter.ProjectContext(projectContext, s, r)
+		errors = append(errors, effects.observe(vpc, err))
+	}
 	return errors
 }
 
@@ -91,7 +105,34 @@ func stagedCapabilities(t *testing.T, adapter harnessapi.Adapter) error {
 	capabilities := adapter.Capabilities()
 	for _, capability := range capabilities.Values() {
 		switch capability {
+		case harnessapi.ManagedHome:
+			layout, err := adapter.Home(harnessapi.Context{})
+			if err != nil || layout.EnvironmentVariable() == "" || len(layout.Roots().Paths()) == 0 {
+				return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+			}
+		case harnessapi.InstructionOutput:
+			instructions, err := adapter.Instructions(harnessapi.Context{}, harnessapi.Monolithic)
+			if err != nil || instructions.Form() != harnessapi.Monolithic || len(instructions.Paths().Paths()) == 0 {
+				return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+			}
 		case harnessapi.ReleaseProbing:
+		case harnessapi.TrustObservation:
+			userContext, err := harnessapi.NewContext("linux", harnessapi.UserScope, harnessapi.VerifiedRelease{})
+			if err != nil {
+				return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+			}
+			userPolicy, err := adapter.Trust(userContext)
+			if err != nil || userPolicy.Required() || !userPolicy.ObservationOnly() {
+				return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+			}
+			projectContext, err := harnessapi.NewContext("linux", harnessapi.ProjectScope, harnessapi.VerifiedRelease{})
+			if err != nil {
+				return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+			}
+			projectPolicy, err := adapter.Trust(projectContext)
+			if err != nil || !projectPolicy.Required() || !projectPolicy.ObservationOnly() {
+				return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+			}
 		case harnessapi.SkillProjection, harnessapi.NativeSkillDiscovery:
 			discovery, err := adapter.Skills(projectContext, harnessapi.ProjectScope)
 			if err != nil || discovery.Scope() != harnessapi.ProjectScope {
@@ -128,6 +169,31 @@ func stagedCapabilities(t *testing.T, adapter harnessapi.Adapter) error {
 		return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
 	}
 	expectedEffects := 0
+	if capabilities.Has(harnessapi.ManagedHome) {
+		value, err := adapter.Home(harnessapi.Context{})
+		if !declaredResult(value, err, true, &effects) {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		expectedEffects++
+	}
+	if capabilities.Has(harnessapi.InstructionOutput) {
+		value, err := adapter.Instructions(harnessapi.Context{}, harnessapi.Monolithic)
+		if !declaredResult(value, err, true, &effects) {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		expectedEffects++
+	}
+	if capabilities.Has(harnessapi.TrustObservation) {
+		context, err := harnessapi.NewContext("linux", harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if err != nil {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		value, err := adapter.Trust(context)
+		if !declaredResult(value, err, true, &effects) {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		expectedEffects++
+	}
 	if capabilities.Has(harnessapi.NativeSkillDiscovery) || capabilities.Has(harnessapi.SkillProjection) {
 		value, err := adapter.Skills(projectContext, harnessapi.ProjectScope)
 		if !declaredResult(value, err, true, &effects) {
@@ -180,11 +246,23 @@ func declaredResult(value any, err error, declared bool, effects *effectSpy) boo
 	return code(err) == harnessapi.OperationNotPorted && reflect.ValueOf(value).IsZero()
 }
 
-type falseCapability struct{ harnessapi.Adapter }
+type falseCapability struct {
+	harnessapi.Adapter
+	capabilities harnessapi.CapabilitySet
+}
 
-func (falseCapability) Capabilities() harnessapi.CapabilitySet {
-	set, _ := harnessapi.NewCapabilitySet(harnessapi.ManagedHome)
-	return set
+func (a falseCapability) Capabilities() harnessapi.CapabilitySet {
+	return a.capabilities
+}
+
+func wrongCapabilities(adapter harnessapi.Adapter) harnessapi.CapabilitySet {
+	for capability := harnessapi.ManagedHome; capability <= harnessapi.ReleaseProbing; capability++ {
+		if !adapter.Capabilities().Has(capability) {
+			set, _ := harnessapi.NewCapabilitySet(capability)
+			return set
+		}
+	}
+	return harnessapi.CapabilitySet{}
 }
 
 func TestStagedOperationsAndCapabilities(t *testing.T) {
@@ -204,7 +282,7 @@ func TestStagedOperationsAndCapabilities(t *testing.T) {
 			if err := stagedCapabilities(t, adapter); err != nil {
 				t.Fatal(err)
 			}
-			if err := stagedCapabilities(t, falseCapability{adapter}); code(err) != harnessapi.RegistryMismatch {
+			if err := stagedCapabilities(t, falseCapability{Adapter: adapter, capabilities: wrongCapabilities(adapter)}); code(err) != harnessapi.RegistryMismatch {
 				t.Fatalf("false claim escaped: %v", err)
 			}
 		})
