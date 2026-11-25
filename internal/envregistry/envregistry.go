@@ -1,12 +1,8 @@
-// Package envregistry is the closed revision-1 environment adapter
-// registry (environments §7). Adapters are manager code, never package
-// code: every per-adapter fact — home mechanism, root-context target,
-// supported forms, system-prompt and MCP channel descriptors, credential
-// passthrough, provisioning seeds, the isolation matrix, shadowing paths,
-// secondary targets, size advisories, and recorded tool releases — lives in
-// this table, validated against the section it cites. Profile bytes never
-// select an adapter fact; machine configuration selects among the declared
-// values with the section 12.1 defaults.
+// Package envregistry projects the closed revision-1 environment records
+// (environments §7). ByID sources values declared by the staged harness
+// contract there and overlays the remaining legacy policy from Registry.
+// Profile bytes never select an adapter fact; machine configuration selects
+// among declared values with the section 12.1 defaults.
 package envregistry
 
 import (
@@ -14,6 +10,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 )
 
 // Environment identifiers (environments §7.1, closed in revision 1).
@@ -199,7 +198,7 @@ type Adapter struct {
 	DefaultForm string
 	// SystemPrompt holds the §7.3 channel descriptors, nil for opencode.
 	SystemPrompt []Channel
-	// MCP holds the single §7.8 channel descriptor, nil for pi.
+	// MCP holds the single §7.8 channel descriptor where one is declared.
 	MCP *Channel
 	// Passthrough holds the per-platform entries. The key is the GOOS
 	// value; "default" applies where no platform row exists.
@@ -317,17 +316,16 @@ var Registry = []Adapter{
 	},
 	{
 		ID:          Pi,
-		EnvVar:      "PI_CODING_AGENT_DIR",
-		RootTarget:  "AGENTS.md",
-		SkillsDir:   "skills",
-		Forms:       []string{FormMonolithic},
-		DefaultForm: FormMonolithic,
+		EnvVar:      "",
+		RootTarget:  "",
+		SkillsDir:   "",
+		Forms:       []string{},
+		DefaultForm: "",
 		SystemPrompt: []Channel{
 			{Kind: KindFlag, Semantics: SemanticsAppend, Flag: "--append-system-prompt", Argument: ArgumentPath},
 			{Kind: KindFile, Semantics: SemanticsAppend, Filename: "APPEND_SYSTEM.md"},
 			{Kind: KindFile, Semantics: SemanticsReplace, Filename: "SYSTEM.md"},
 		},
-		MCP: nil,
 		Passthrough: map[string][]Passthrough{
 			// Decision 0017 choice 3: the native credential root is
 			// ~/.pi/agent, not ~/.pi — the managed auth.json links to
@@ -341,7 +339,7 @@ var Registry = []Adapter{
 		SeedWritten:       map[string]bool{},
 		Shadows:           []Shadow{{Path: "AGENTS.override.md", Surface: "root-context"}},
 		VerifiedRelease:   "0.84.2",
-		Probe:             []string{"pi", "--version"},
+		Probe:             []string{},
 		SizeAdvisoryBytes: 32768,
 		CredentialScope:   "home",
 		AuthWrite:         "in-place (lockfile)",
@@ -380,10 +378,75 @@ var Targets = []Target{
 func ByID(id string) (Adapter, error) {
 	for _, adapter := range Registry {
 		if adapter.ID == id {
+			staged, err := harnessregistry.Lookup(harnessapi.ID(id))
+			if err != nil {
+				return Adapter{}, fmt.Errorf("%s: staged adapter lookup failed: %w", DiagUnknown, err)
+			}
+			capabilities := staged.Capabilities()
+			ctx, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+			if err != nil {
+				return Adapter{}, fmt.Errorf("%s: staged adapter context failed: %w", DiagUnknown, err)
+			}
+			if capabilities.Has(harnessapi.ManagedHome) {
+				home, err := staged.Home(ctx)
+				if err != nil {
+					return Adapter{}, fmt.Errorf("%s: staged home declaration failed: %w", DiagUnknown, err)
+				}
+				adapter.EnvVar = home.EnvironmentVariable()
+				adapter.ParentVar = home.ParentValued()
+			}
+			if capabilities.Has(harnessapi.InstructionOutput) {
+				for _, form := range []harnessapi.Form{harnessapi.Monolithic, harnessapi.Referenced} {
+					instructions, err := staged.Instructions(ctx, form)
+					if err != nil {
+						if refusal, ok := err.(harnessapi.Refusal); ok && refusal.Code() == DiagFormUnsupported {
+							continue
+						}
+						return Adapter{}, fmt.Errorf("%s: staged instruction declaration failed: %w", DiagUnknown, err)
+					}
+					paths := instructions.Paths().Paths()
+					if len(paths) == 0 {
+						return Adapter{}, fmt.Errorf("%s: staged instruction declaration has no target", DiagUnknown)
+					}
+					adapter.Forms = append(adapter.Forms, string(instructions.Form()))
+					if adapter.DefaultForm == "" {
+						adapter.DefaultForm = string(instructions.Form())
+						adapter.RootTarget = paths[0].String()
+					}
+				}
+				if adapter.DefaultForm == "" {
+					return Adapter{}, fmt.Errorf("%s: staged adapter declares no instruction form", DiagUnknown)
+				}
+			}
+			if capabilities.Has(harnessapi.SkillProjection) || capabilities.Has(harnessapi.NativeSkillDiscovery) {
+				skills, err := staged.Skills(ctx, harnessapi.UserScope)
+				adapter.SkillsDir, err = stagedSkillsDirectory(skills, err)
+				if err != nil {
+					return Adapter{}, err
+				}
+			}
+			if capabilities.Has(harnessapi.ReleaseProbing) {
+				probe, err := staged.ReleaseProbe(ctx)
+				if err != nil {
+					return Adapter{}, fmt.Errorf("%s: staged release probe failed: %w", DiagUnknown, err)
+				}
+				adapter.Probe = append([]string{probe.ExecutableAlias()}, probe.Arguments()...)
+			}
 			return adapter, nil
 		}
 	}
 	return Adapter{}, fmt.Errorf("%s: unregistered environment %q", DiagUnknown, id)
+}
+
+func stagedSkillsDirectory(skills harnessapi.SkillDiscovery, err error) (string, error) {
+	if err != nil {
+		return "", fmt.Errorf("%s: staged skill declaration failed: %w", DiagUnknown, err)
+	}
+	paths := skills.Paths().Paths()
+	if len(paths) == 0 {
+		return "", fmt.Errorf("%s: staged skill declaration has no paths", DiagUnknown)
+	}
+	return paths[0].String(), nil
 }
 
 // TargetByID resolves a declared secondary target or reports

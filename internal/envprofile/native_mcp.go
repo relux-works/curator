@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,6 +22,8 @@ import (
 	"github.com/relux-works/curator/internal/envauthority"
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
@@ -307,9 +310,21 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 						p = &path
 					}
 					row := ProfileMCPRow{Name: m.Name, Environment: id, Path: p, State: "refused", Code: "mcp_contribution_policy_refused"}
-					if id == "pi" || id == "opencode" {
-						row.State = "unsupported"
-						row.Code = ""
+					if p == nil {
+						legacy, legacyErr := envregistry.ByID(id)
+						staged, stagedErr := harnessregistry.Lookup(harnessapi.ID(id))
+						if legacyErr == nil && stagedErr == nil {
+							_, mcpErr := staged.MCP(harnessapi.Context{}, harnessapi.ProjectScope)
+							unsupported := legacy.MCP != nil
+							var refusal harnessapi.Refusal
+							if errors.As(mcpErr, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
+								unsupported = true
+							}
+							if unsupported {
+								row.State = "unsupported"
+								row.Code = ""
+							}
+						}
 					}
 					result.Rows = append(result.Rows, row)
 				}

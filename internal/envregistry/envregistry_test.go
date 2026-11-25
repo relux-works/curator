@@ -1,8 +1,14 @@
 package envregistry
 
 import (
+	"errors"
+	"fmt"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 )
 
 func mustAdapter(t *testing.T, id string) Adapter {
@@ -32,7 +38,11 @@ func TestRegistryClosed(t *testing.T) {
 			t.Fatalf("duplicate adapter %s", adapter.ID)
 		}
 		seen[adapter.ID] = true
-		if adapter.EnvVar == "" || adapter.RootTarget == "" {
+		projected, err := ByID(adapter.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if projected.EnvVar == "" || projected.RootTarget == "" {
 			t.Fatalf("adapter %s names no home variable or root target", adapter.ID)
 		}
 	}
@@ -40,6 +50,68 @@ func TestRegistryClosed(t *testing.T) {
 		if !seen[id] {
 			t.Fatalf("adapter %s is missing from the registry", id)
 		}
+	}
+}
+
+func TestByIDProjectsStagedPiFacts(t *testing.T) {
+	var raw Adapter
+	for _, adapter := range Registry {
+		if adapter.ID == Pi {
+			raw = adapter
+			break
+		}
+	}
+	if raw.ID == "" {
+		t.Fatal("Pi row is missing")
+	}
+	if raw.EnvVar != "" || raw.RootTarget != "" || raw.SkillsDir != "" || len(raw.Forms) != 0 || raw.DefaultForm != "" || len(raw.Probe) != 0 {
+		t.Fatalf("Pi's staged facts remain duplicated in envregistry.Registry: %+v", raw)
+	}
+
+	projected, err := ByID(Pi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projected.EnvVar != "PI_CODING_AGENT_DIR" || projected.RootTarget != "AGENTS.md" || projected.SkillsDir != "skills" || projected.DefaultForm != FormMonolithic || len(projected.Forms) != 1 || projected.Forms[0] != FormMonolithic {
+		t.Fatalf("Pi's staged home, instruction, or skill facts differ: %+v", projected)
+	}
+	if len(projected.Probe) != 2 || projected.Probe[0] != "pi" || projected.Probe[1] != "--version" {
+		t.Fatalf("Pi's staged probe = %v, want [pi --version]", projected.Probe)
+	}
+}
+
+func TestStagedSkillsDirectoryPropagatesUserScopeRefusals(t *testing.T) {
+	staged, err := harnessregistry.Lookup(harnessapi.ID(Pi))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovery, err := staged.Skills(ctx, harnessapi.UserScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := stagedSkillsDirectory(discovery, nil); err != nil || got != "skills" {
+		t.Fatalf("valid native user-skill path = %q, %v; want skills", got, err)
+	}
+	unsupported := harnessapi.NewRefusal(harnessapi.CapabilityUnsupported)
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, unsupported); got != "" || err == nil {
+		t.Fatalf("typed unsupported user-skill path = %q, %v; want propagated error", got, err)
+	} else {
+		var refusal harnessapi.Refusal
+		if !errors.As(err, &refusal) || refusal.Code() != harnessapi.CapabilityUnsupported {
+			t.Fatalf("typed unsupported user-skill error lost refusal: %v", err)
+		}
+	}
+	other := errors.New("unexpected user-skill projection failure")
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, fmt.Errorf("wrapped: %w", other)); !errors.Is(err, other) || got != "" {
+		t.Fatalf("unexpected user-skill failure = %q, %v; want preserved error", got, err)
+	}
+	ported := harnessapi.NewRefusal(harnessapi.OperationNotPorted)
+	if got, err := stagedSkillsDirectory(harnessapi.SkillDiscovery{}, ported); err == nil || got != "" {
+		t.Fatalf("operation-not-ported skill failure = %q, %v; want error", got, err)
 	}
 }
 

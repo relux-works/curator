@@ -336,7 +336,7 @@ func TestNativeDiscoveryAgentsGetNoProjectMirror(t *testing.T) {
 	stageRoot := t.TempDir()
 	canonical := filepath.Join(project, ".agents", "skills")
 	makeSkill(t, canonical, "skill-a")
-	mirror, err := StageProject(stageRoot, project, []string{"opencode", "windsurf"},
+	mirror, err := StageProject(stageRoot, project, []string{"opencode", "windsurf", "pi"},
 		[]Group{{Root: canonical, Skills: []string{"skill-a"}}}, "copy")
 	if err != nil {
 		t.Fatal(err)
@@ -388,6 +388,9 @@ func TestRegisteredSkillRoutingFallbackAndPathExpansion(t *testing.T) {
 	if _, ported, err := registeredSkills("cursor", harnessapi.ProjectScope); err != nil || !ported {
 		t.Fatalf("registered Cursor adapter did not select its registry declaration: ported=%t err=%v", ported, err)
 	}
+	if _, ported, err := registeredSkills("pi", harnessapi.ProjectScope); err != nil || ported {
+		t.Fatalf("native-discovery project scope selected a mirror: ported=%t err=%v", ported, err)
+	}
 	if _, ported, err := registeredSkills("claude_code", harnessapi.ProjectScope); err != nil || ported {
 		t.Fatalf("unported adapter did not select the explicit legacy fallback: ported=%t err=%v", ported, err)
 	}
@@ -437,6 +440,38 @@ func TestStageGlobalCoversTheNativeDiscoveryMirrorOnce(t *testing.T) {
 		if _, found := find(plan, filepath.Join(userHome, filepath.FromSlash(rel))); !found {
 			t.Fatalf("global mirror %s is not a journaled target", rel)
 		}
+	}
+}
+
+func TestStageGlobalMirrorsPiAtItsDeclaredNativeSkillsPath(t *testing.T) {
+	home := t.TempDir()
+	userHome := t.TempDir()
+	stageRoot := t.TempDir()
+	canonical := filepath.Join(home, "global", "skills")
+	makeSkill(t, canonical, "skill-pi")
+
+	mirror, err := StageGlobal(stageRoot, home, userHome,
+		[]string{"pi"}, []string{"skill-pi"}, "copy", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := mirror.Plan()
+	if err := plan.Validate(); err != nil {
+		t.Fatalf("staged Pi global adapter plan is invalid: %v", err)
+	}
+	root := filepath.Join(userHome, "skills")
+	entry, found := find(plan, filepath.Join(root, "skill-pi"))
+	if !found {
+		t.Fatalf("Pi native skill path %s is not a journaled target", filepath.Join(root, "skill-pi"))
+	}
+	if _, err := os.Stat(filepath.Join(entry.StagedPath, "SKILL.md")); err != nil {
+		t.Fatalf("staged Pi skill is incomplete: %v", err)
+	}
+	if _, found := find(plan, filepath.Join(root, LedgerName)); !found {
+		t.Fatal("Pi native skills ownership ledger is not a journaled target")
+	}
+	if _, err := os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatalf("staging touched the live Pi skill root: %v", err)
 	}
 }
 

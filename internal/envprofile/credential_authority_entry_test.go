@@ -292,13 +292,20 @@ func TestCredentialAuthorityEntryPoints(t *testing.T) {
 
 func isolateAuthorityNativeHomes(t *testing.T, fx *managedFixture) {
 	t.Helper()
-	for _, adapter := range envregistry.Registry {
-		path := fx.native[adapter.ID]
-		if adapter.ID == envregistry.OpenCode {
+	for _, legacy := range envregistry.Registry {
+		adapter, err := envregistry.ByID(legacy.ID)
+		if err != nil {
+			t.Fatalf("project native-home declaration for %s: %v", legacy.ID, err)
+		}
+		path := fx.native[legacy.ID]
+		if legacy.ID == envregistry.OpenCode {
 			path = fx.xdg
 		}
 		if path == "" {
 			path = t.TempDir()
+		}
+		if adapter.EnvVar == "" {
+			t.Fatalf("project native-home declaration for %s has no environment variable", legacy.ID)
 		}
 		t.Setenv(adapter.EnvVar, path)
 	}

@@ -559,6 +559,10 @@ func (op *operation) captureNative(native string, adapter Adapter, skills []skil
 	if op.undo == nil {
 		return nil
 	}
+	skillsDir, err := inPlaceSkillsDir(adapter.ID)
+	if err != nil {
+		return err
+	}
 	if op.undo.nativeRoots == nil {
 		op.undo.nativeRoots = map[string]bool{}
 	}
@@ -580,7 +584,7 @@ func (op *operation) captureNative(native string, adapter Adapter, skills []skil
 		}
 	}
 	for _, skill := range skills {
-		paths = append(paths, filepath.Join(native, inPlaceSkillsDir(adapter.ID), skill.name))
+		paths = append(paths, filepath.Join(native, skillsDir, skill.name))
 	}
 	state, err := stateread.Stat(native)
 	if err != nil {

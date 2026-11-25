@@ -249,6 +249,33 @@ func TestStageGlobalTargetsPopulatesBoundaries(t *testing.T) {
 	}
 }
 
+func TestStageGlobalTargetsMirrorsPiAtDeclaredUserScopePath(t *testing.T) {
+	t.Parallel()
+	fixture := newBoundaryFixture(t)
+	request := fixture.globalRequest(t.TempDir())
+	request.agents = []string{"claude_code", "pi"}
+
+	targets, err := stageGlobalTargets(request)
+	if err != nil {
+		t.Fatalf("stageGlobalTargets with Pi: %v", err)
+	}
+	for _, live := range []string{
+		filepath.Join(fixture.userHome, filepath.FromSlash(adapters.AgentPaths["claude_code"]), "skill-a"),
+		filepath.Join(fixture.userHome, "skills", "skill-a"),
+	} {
+		target := findLive(t, targets.plan.Targets, live)
+		if target.StagedPath == "" {
+			t.Fatalf("global adapter target %s is a removal", live)
+		}
+		if _, err := os.Stat(filepath.Join(target.StagedPath, "SKILL.md")); err != nil {
+			t.Fatalf("staged global skill for %s is incomplete: %v", live, err)
+		}
+		if _, err := os.Lstat(live); !os.IsNotExist(err) {
+			t.Fatalf("planning global adapter target %s touched its live path: %v", live, err)
+		}
+	}
+}
+
 func TestStageGlobalTargetsRefusesMirrorOverSnapshot(t *testing.T) {
 	t.Parallel()
 	fixture := newBoundaryFixture(t)

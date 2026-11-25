@@ -36,8 +36,23 @@ func projectAgentPaths() map[string]string {
 	for agent, path := range legacyAgentPaths {
 		paths[agent] = path
 	}
+	projectContext, err := harnessapi.NewContext(runtime.GOOS, harnessapi.ProjectScope, harnessapi.VerifiedRelease{})
+	if err != nil {
+		panic(fmt.Errorf("create project skill projection context: %w", err))
+	}
 	for _, id := range harnessregistry.IDs() {
-		discovery, supported := registeredSkillProjection(string(id), harnessapi.ProjectScope)
+		adapter, err := harnessregistry.Lookup(id)
+		if err != nil {
+			var refusal harnessapi.Refusal
+			if errors.As(err, &refusal) && refusal.Code() == harnessapi.UnknownID {
+				continue
+			}
+			panic(fmt.Errorf("lookup harness adapter %q: %w", id, err))
+		}
+		discovery, supported, err := registeredSkillProjection(string(id), projectContext, harnessapi.ProjectScope, adapter)
+		if err != nil {
+			panic(err)
+		}
 		if !supported || !discovery.Mirror() {
 			continue
 		}
@@ -46,30 +61,39 @@ func projectAgentPaths() map[string]string {
 	return paths
 }
 
-func registeredSkillProjection(agent string, scope harnessapi.Scope) (harnessapi.SkillDiscovery, bool) {
-	adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
-	if err != nil {
-		var refusal harnessapi.Refusal
-		if errors.As(err, &refusal) && refusal.Code() == harnessapi.UnknownID {
-			return harnessapi.SkillDiscovery{}, false
-		}
-		panic(fmt.Errorf("lookup harness adapter %q: %w", agent, err))
-	}
-	if !adapter.Capabilities().Has(harnessapi.SkillProjection) {
-		return harnessapi.SkillDiscovery{}, false
-	}
-	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
-	if err != nil {
-		panic(fmt.Errorf("create skill projection context for %q: %w", agent, err))
+func registeredSkillProjection(agent string, context harnessapi.Context, scope harnessapi.Scope, adapter harnessapi.Adapter) (harnessapi.SkillDiscovery, bool, error) {
+	capabilities := adapter.Capabilities()
+	if !capabilities.Has(harnessapi.SkillProjection) {
+		return harnessapi.SkillDiscovery{}, false, nil
 	}
 	discovery, err := adapter.Skills(context, scope)
 	if err != nil {
-		panic(fmt.Errorf("read skill projection for %q: %w", agent, err))
+		if scope == harnessapi.ProjectScope && capabilities.Has(harnessapi.NativeSkillDiscovery) {
+			var refusal harnessapi.Refusal
+			if errors.As(err, &refusal) && refusal.Code() == harnessapi.CapabilityUnsupported {
+				return harnessapi.SkillDiscovery{}, false, nil
+			}
+		}
+		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("read skill projection for %q: %w", agent, err)
 	}
-	if discovery.Scope() != scope || discovery.NativeDiscovery() || !discovery.Mirror() {
-		panic(fmt.Errorf("invalid skill projection declaration for %q", agent))
+	if !validSkillProjection(scope, discovery) {
+		return harnessapi.SkillDiscovery{}, false, fmt.Errorf("invalid skill projection declaration for %q", agent)
 	}
-	return discovery, true
+	return discovery, true, nil
+}
+
+func validSkillProjection(scope harnessapi.Scope, discovery harnessapi.SkillDiscovery) bool {
+	valid := discovery.Scope() == scope
+	switch scope {
+	case harnessapi.ProjectScope:
+		valid = valid && !discovery.NativeDiscovery() && discovery.Mirror()
+	case harnessapi.UserScope:
+		// User-scope adapters declare either a mirrored path or a native path.
+		valid = valid && discovery.NativeDiscovery() != discovery.Mirror()
+	default:
+		valid = false
+	}
+	return valid
 }
 
 func oneSkillPath(agent string, paths harnessapi.NamedPaths) string {

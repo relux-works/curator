@@ -36,6 +36,8 @@ import (
 	"github.com/relux-works/curator/internal/envfragment"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/mcpnative"
@@ -2774,6 +2776,23 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 			return nil, err
 		}
 		if adapter.MCP == nil {
+			staged, err := harnessregistry.Lookup(harnessapi.ID(adapter.ID))
+			if err != nil {
+				return nil, err
+			}
+			_, err = staged.MCP(harnessapi.Context{}, harnessapi.UserScope)
+			if err != nil {
+				var refusal harnessapi.Refusal
+				if !errors.As(err, &refusal) {
+					return nil, err
+				}
+				switch refusal.Code() {
+				case harnessapi.CapabilityUnsupported, harnessapi.OperationNotPorted:
+					return nil, fmt.Errorf("managed home carries an mcp surface the %s adapter declares no channel for", adapter.ID)
+				default:
+					return nil, err
+				}
+			}
 			return nil, fmt.Errorf("managed home carries an mcp surface the %s adapter declares no channel for", adapter.ID)
 		}
 		// The §10.3 S4 bound, once per resolution: the active profile

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/harnessapi"
 	"github.com/relux-works/curator/internal/skillspec"
 )
 
@@ -120,6 +121,31 @@ func TestMCPSourceUsesAdapterAndFallbackIsNarrow(t *testing.T) {
 	}
 	if _, err := mcpSources("cursor", "unsupported", fallback); err == nil || err.Error() != "harness_scope_unsupported" {
 		t.Fatalf("registry context refusal was masked by fallback: %v", err)
+	}
+}
+
+// TestPiInspectionHasNoSources is the negative control for unsupported Pi
+// MCP inspection: files at plausible home and project paths are not read as
+// configuration by Curator.
+func TestPiInspectionHasNoSources(t *testing.T) {
+	env := newEnv(t)
+	write(t, env.ProjectRoot, ".pi/mcp.json", `{"mcpServers":{"project-only":{"command":"fixture"}}}`)
+	write(t, env.UserHome, ".pi/agent/mcp.json", `{"mcpServers":{"home-only":{"command":"fixture"}}}`)
+
+	for _, scope := range []harnessapi.Scope{harnessapi.ProjectScope, harnessapi.UserScope} {
+		sources, err := mcpSources("pi", scope, nil)
+		if !refusalIs(err, harnessapi.CapabilityUnsupported) {
+			t.Fatalf("Pi %s MCP inspection error = %v, want typed unsupported refusal", scope, err)
+		}
+		if len(sources) != 0 {
+			t.Fatalf("Pi %s MCP inspection returned paths: %v", scope, sources)
+		}
+	}
+	if _, err := ConfiguredServers(env, "pi"); !refusalIs(err, harnessapi.CapabilityUnsupported) {
+		t.Fatalf("Pi configured-server result error = %v, want typed unsupported refusal", err)
+	}
+	if _, err := ProjectOnlyServers(env, "pi"); !refusalIs(err, harnessapi.CapabilityUnsupported) {
+		t.Fatalf("Pi project-only result error = %v, want typed unsupported refusal", err)
 	}
 }
 

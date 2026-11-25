@@ -377,7 +377,11 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	installed := map[string]bool{}
 	for _, info := range infos {
 		installed[info.Name] = true
-		for _, adapter := range envregistry.Registry {
+		for _, registered := range envregistry.Registry {
+			adapter, err := envregistry.ByID(registered.ID)
+			if err != nil {
+				return nil, err
+			}
 			if adapter.ID == envregistry.CodexCLI {
 				adapter.CodexSeedRevision = shippedCodexSeedRevision
 			}
@@ -407,7 +411,10 @@ func StatusOf(req StatusRequest) (*Status, error) {
 			status.NonCurrent = true
 		}
 	}
-	status.Adapters = adapterStates(req)
+	status.Adapters, err = adapterStates(req)
+	if err != nil {
+		return nil, err
+	}
 	status.Targets = targetStates(req)
 	var profileDiagnostics []StateDiagnostic
 	status.Profiles, profileDiagnostics, err = profileStates(req, infos)
@@ -1171,12 +1178,16 @@ func readLockError(err error) string {
 // adapterStates reports the recorded and detected tool release per
 // adapter (§7.9). Status does not execute a vendor: unavailable metadata
 // reports unknown, never matching. Detect may supply an existing observation.
-func adapterStates(req StatusRequest) []AdapterState {
+func adapterStates(req StatusRequest) ([]AdapterState, error) {
 	var out []AdapterState
 	for _, adapter := range envregistry.Registry {
+		projected, err := projectedSkillsAdapterByID(adapter.ID)
+		if err != nil {
+			return nil, fmt.Errorf("%s: project adapter status for %q: %w", envregistry.DiagUnknown, adapter.ID, err)
+		}
 		var detected string
 		if req.Detect != nil {
-			detected = req.Detect(adapter)
+			detected = req.Detect(projected)
 		}
 		if detected == "" {
 			detected = "unknown"
@@ -1187,10 +1198,10 @@ func adapterStates(req StatusRequest) []AdapterState {
 		}
 		out = append(out, AdapterState{
 			ID: adapter.ID, Recorded: recorded, Detected: detected,
-			Supported: append([]string{}, adapter.Forms...),
+			Supported: append([]string{}, projected.Forms...),
 		})
 	}
-	return out
+	return out, nil
 }
 
 // targetStates evaluates secondary-target participation with the standing
