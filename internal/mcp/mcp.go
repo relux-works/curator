@@ -294,14 +294,14 @@ func mcpSourcesWithLookup(
 	if err != nil {
 		return nil, err
 	}
+	if !adapter.Capabilities().Has(harnessapi.MCPInspection) {
+		return legacy, nil
+	}
 	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
 	if err != nil {
 		return nil, err
 	}
 	channel, err := adapter.MCP(context, scope)
-	if refusalIs(err, harnessapi.OperationNotPorted) {
-		return legacy, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -313,20 +313,18 @@ func mcpSourcesWithLookup(
 	for _, path := range paths {
 		sources = append(sources, path.String())
 	}
-	if scope == harnessapi.UserScope {
+	if scope == harnessapi.UserScope && adapter.Capabilities().Has(harnessapi.ManagedHome) {
 		home, homeErr := adapter.Home(context)
-		if !refusalIs(homeErr, harnessapi.OperationNotPorted) {
-			if homeErr != nil {
-				return nil, homeErr
-			}
-			roots := home.Roots().Paths()
-			if len(roots) > 1 {
-				return nil, harnessapi.NewRefusal("harness_home_layout_unsupported")
-			}
-			if len(roots) == 1 {
-				for i, source := range sources {
-					sources[i] = filepath.Join(filepath.FromSlash(roots[0].String()), filepath.FromSlash(source))
-				}
+		if homeErr != nil {
+			return nil, homeErr
+		}
+		roots := home.Roots().Paths()
+		if len(roots) > 1 {
+			return nil, harnessapi.NewRefusal("harness_home_layout_unsupported")
+		}
+		if len(roots) == 1 {
+			for i, source := range sources {
+				sources[i] = filepath.Join(filepath.FromSlash(roots[0].String()), filepath.FromSlash(source))
 			}
 		}
 	}

@@ -11,6 +11,8 @@ type refusalMCPAdapterFixture struct {
 	harnessapi.UnportedOperations
 	capabilities harnessapi.CapabilitySet
 	channel      harnessapi.MCPChannel
+	mcpCalls     int
+	homeCalls    int
 	mcpErr       error
 	homeErr      error
 }
@@ -28,10 +30,12 @@ func (a *refusalMCPAdapterFixture) APIVersion() harnessapi.APIVersion {
 func (a *refusalMCPAdapterFixture) Capabilities() harnessapi.CapabilitySet { return a.capabilities }
 
 func (a *refusalMCPAdapterFixture) MCP(harnessapi.Context, harnessapi.Scope) (harnessapi.MCPChannel, error) {
+	a.mcpCalls++
 	return a.channel, a.mcpErr
 }
 
 func (a *refusalMCPAdapterFixture) Home(harnessapi.Context) (harnessapi.HomeLayout, error) {
+	a.homeCalls++
 	return harnessapi.HomeLayout{}, a.homeErr
 }
 
@@ -86,6 +90,9 @@ func TestMCPUsesLegacySourcesOnlyWhenInspectionIsUndeclared(t *testing.T) {
 	if err != nil || len(sources) != 1 || sources[0] != want[0] {
 		t.Fatalf("undeclared inspection did not preserve legacy source: sources=%v err=%v", sources, err)
 	}
+	if adapter.mcpCalls != 0 {
+		t.Fatalf("caller invoked undeclared MCP %d times", adapter.mcpCalls)
+	}
 }
 
 func TestMCPKeepsRelativePathWhenManagedHomeIsUndeclared(t *testing.T) {
@@ -94,5 +101,8 @@ func TestMCPKeepsRelativePathWhenManagedHomeIsUndeclared(t *testing.T) {
 	sources, err := mcpSourcesWithLookup("synthetic", harnessapi.UserScope, []string{"legacy.json"}, withMCPFixture(adapter))
 	if err != nil || len(sources) != 1 || sources[0] != "config.toml" {
 		t.Fatalf("missing optional home changed declared MCP source: sources=%v err=%v", sources, err)
+	}
+	if adapter.homeCalls != 0 {
+		t.Fatalf("caller invoked undeclared Home %d times", adapter.homeCalls)
 	}
 }

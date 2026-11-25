@@ -12,6 +12,8 @@ type refusalAdapterFixture struct {
 	harnessapi.UnportedOperations
 	capabilities harnessapi.CapabilitySet
 	discovery    harnessapi.SkillDiscovery
+	skillsCalls  int
+	homeCalls    int
 	skillsErr    error
 	homeErr      error
 }
@@ -29,10 +31,12 @@ func (a *refusalAdapterFixture) APIVersion() harnessapi.APIVersion {
 func (a *refusalAdapterFixture) Capabilities() harnessapi.CapabilitySet { return a.capabilities }
 
 func (a *refusalAdapterFixture) Skills(harnessapi.Context, harnessapi.Scope) (harnessapi.SkillDiscovery, error) {
+	a.skillsCalls++
 	return a.discovery, a.skillsErr
 }
 
 func (a *refusalAdapterFixture) Home(harnessapi.Context) (harnessapi.HomeLayout, error) {
+	a.homeCalls++
 	return harnessapi.HomeLayout{}, a.homeErr
 }
 
@@ -98,5 +102,21 @@ func TestStageGlobalKeepsDefaultRootWhenHomeCapabilityIsAbsent(t *testing.T) {
 	}
 	if _, found := find(mirror.Plan(), expected); !found {
 		t.Fatalf("skill was not staged beneath the legacy default root: %+v", mirror.Plan().Targets)
+	}
+	if adapter.homeCalls != 0 {
+		t.Fatalf("staging called undeclared Home %d times", adapter.homeCalls)
+	}
+}
+
+func TestRegisteredSkillsUsesLegacyRouteWhenCapabilitiesAreAbsent(t *testing.T) {
+	adapter := newRefusalAdapterFixture(t)
+	adapter.skillsErr = harnessapi.NewRefusal(harnessapi.OperationNotPorted)
+	lookup := func(harnessapi.ID) (harnessapi.Adapter, error) { return adapter, nil }
+	_, ported, err := registeredSkillsWithLookup("synthetic", harnessapi.ProjectScope, lookup)
+	if err != nil || ported {
+		t.Fatalf("undeclared skills capability did not select the legacy route: ported=%t err=%v", ported, err)
+	}
+	if adapter.skillsCalls != 0 {
+		t.Fatalf("caller invoked undeclared Skills %d times", adapter.skillsCalls)
 	}
 }

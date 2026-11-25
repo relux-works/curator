@@ -113,15 +113,15 @@ func stageGlobalWithLookup(
 				if err != nil {
 					return Mirror{}, err
 				}
-				context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
-				if err != nil {
-					return Mirror{}, err
-				}
-				homeLayout, err := adapter.Home(context)
-				if err != nil && !refusalIs(err, harnessapi.OperationNotPorted) {
-					return Mirror{}, err
-				}
-				if err == nil {
+				if adapter.Capabilities().Has(harnessapi.ManagedHome) {
+					context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+					if err != nil {
+						return Mirror{}, err
+					}
+					homeLayout, err := adapter.Home(context)
+					if err != nil {
+						return Mirror{}, err
+					}
 					homeRoots := homeLayout.Roots().Paths()
 					if len(homeRoots) > 1 {
 						return Mirror{}, harnessapi.NewRefusal("harness_home_layout_unsupported")
@@ -160,16 +160,17 @@ func registeredSkillsWithLookup(
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
 	}
+	capabilities := adapter.Capabilities()
+	if !capabilities.Has(harnessapi.SkillProjection) && !capabilities.Has(harnessapi.NativeSkillDiscovery) {
+		return harnessapi.SkillDiscovery{}, false, nil
+	}
 	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
 	}
 	discovery, err := adapter.Skills(context, scope)
-	if refusalIs(err, harnessapi.OperationNotPorted) {
-		return harnessapi.SkillDiscovery{}, false, nil
-	}
 	if err != nil {
-		return harnessapi.SkillDiscovery{}, false, err
+		return harnessapi.SkillDiscovery{}, true, err
 	}
 	return discovery, true, nil
 }
