@@ -1,6 +1,8 @@
 package scopes
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -431,6 +433,8 @@ func markSourceLock(root string, marked *marks) {
 
 func sourceSnapshotKey(source, commit string) string { return source + "\x00" + commit }
 
+const retiredSourceSnapshotPrefix = ".curator-source-snapshot-gc-"
+
 type snapshotCandidate struct {
 	label string
 	path  string
@@ -502,6 +506,10 @@ func sweepLegacySkillSnapshots(home string, referenced map[string]bool, lock Hom
 }
 
 func sweepSourceSnapshots(home string, sourceRefs, skillRefs map[string]bool, lock HomeLock, dryRun bool) (removed, wouldRemove []string, err error) {
+	return sweepSourceSnapshotsWithRemove(home, sourceRefs, skillRefs, lock, dryRun, os.RemoveAll)
+}
+
+func sweepSourceSnapshotsWithRemove(home string, sourceRefs, skillRefs map[string]bool, lock HomeLock, dryRun bool, remove func(string) error) (removed, wouldRemove []string, err error) {
 	root := filepath.Join(home, "cache")
 	listing, err := stateread.ReadDir(root)
 	if err != nil {
@@ -540,6 +548,32 @@ func sweepSourceSnapshots(home string, sourceRefs, skillRefs map[string]bool, lo
 				childSource = filepath.ToSlash(filepath.Join(source, entry.Name()))
 			}
 			if contextpkg.ValidCommit(entry.Name()) && (identity.ValidCanonical(source) || (strings.Count(source, "/") == 0 && identifiers.Valid(source))) {
+				retiredEntries, retiredErr := stateread.ReadDir(child)
+				if retiredErr != nil {
+					return retiredErr
+				}
+				for _, retiredEntry := range retiredEntries.Entries {
+					if !strings.HasPrefix(retiredEntry.Name(), retiredSourceSnapshotPrefix) {
+						continue
+					}
+					retiredPath := filepath.Join(child, retiredEntry.Name())
+					retiredState, stateErr := stateread.Lstat(retiredPath)
+					if stateErr != nil {
+						return stateErr
+					}
+					if retiredState.Kind == stateread.KindAbsent {
+						continue
+					}
+					if retiredState.Info == nil || retiredState.Info.Mode()&os.ModeSymlink != 0 || !retiredState.Info.IsDir() {
+						return fmt.Errorf("refuse invalid retired source snapshot %s", retiredPath)
+					}
+					if boundaryErr := pathboundary.ValidateWithin(root, retiredPath); boundaryErr != nil {
+						return fmt.Errorf("refuse retired source snapshot outside the cache store: %w", boundaryErr)
+					}
+					candidates = append(candidates, snapshotCandidate{
+						label: "retired:" + filepath.ToSlash(filepath.Join(source, entry.Name(), retiredEntry.Name())), path: retiredPath,
+					})
+				}
 				snapshotPath := filepath.Join(child, "snapshot")
 				snapshotState, snapshotErr := stateread.Lstat(snapshotPath)
 				if snapshotErr != nil {
@@ -581,7 +615,17 @@ func sweepSourceSnapshots(home string, sourceRefs, skillRefs map[string]bool, lo
 		if err := pathboundary.ValidateWithin(root, candidate.path); err != nil {
 			return removed, wouldRemove, fmt.Errorf("refuse source snapshot outside the cache store: %w", err)
 		}
-		if err := os.RemoveAll(candidate.path); err != nil {
+		if strings.HasPrefix(filepath.Base(candidate.path), retiredSourceSnapshotPrefix) {
+			if remove == nil {
+				return removed, wouldRemove, fmt.Errorf("remove retired source snapshot: removal operation is unavailable")
+			}
+			if err := remove(candidate.path); err != nil {
+				return removed, wouldRemove, fmt.Errorf("remove retired source snapshot %s: %w", filepath.Base(candidate.path), err)
+			}
+			removed = append(removed, candidate.label)
+			continue
+		}
+		if err := retireSourceSnapshot(root, candidate.path, remove); err != nil {
 			return removed, wouldRemove, err
 		}
 		removed = append(removed, candidate.label)
@@ -589,6 +633,46 @@ func sweepSourceSnapshots(home string, sourceRefs, skillRefs map[string]bool, lo
 	sort.Strings(removed)
 	sort.Strings(wouldRemove)
 	return removed, wouldRemove, nil
+}
+
+// retireSourceSnapshot removes the canonical cache name before deleting its
+// tree. A failed recursive removal therefore leaves a hidden tombstone for a
+// later sweep, never a partial tree that a cache lookup could mistake for the
+// immutable snapshot.
+func retireSourceSnapshot(root, path string, remove func(string) error) error {
+	if remove == nil {
+		return fmt.Errorf("remove source snapshot: removal operation is unavailable")
+	}
+	retired, err := reserveRetiredSourceSnapshot(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	if err := pathboundary.ValidateWithin(root, filepath.Dir(retired)); err != nil {
+		return fmt.Errorf("refuse retired source snapshot outside the cache store: %w", err)
+	}
+	if err := os.Rename(path, retired); err != nil {
+		return fmt.Errorf("retire source snapshot %s: %w", path, err)
+	}
+	if err := remove(retired); err != nil {
+		return fmt.Errorf("remove retired source snapshot %s: %w", filepath.Base(retired), err)
+	}
+	return nil
+}
+
+func reserveRetiredSourceSnapshot(parent string) (string, error) {
+	for attempt := 0; attempt < 16; attempt++ {
+		var suffix [8]byte
+		if _, err := rand.Read(suffix[:]); err != nil {
+			return "", fmt.Errorf("reserve a retired source snapshot name: %w", err)
+		}
+		path := filepath.Join(parent, retiredSourceSnapshotPrefix+hex.EncodeToString(suffix[:]))
+		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+			return path, nil
+		} else if err != nil {
+			return "", fmt.Errorf("inspect retired source snapshot name: %w", err)
+		}
+	}
+	return "", fmt.Errorf("could not reserve a retired source snapshot name")
 }
 
 func previewRuntimeChecked(home string, referenced map[string]bool, check func() error) ([]string, error) {

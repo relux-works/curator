@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/snapshot"
 )
 
 // writeLegacyBuildSkill writes one schema-9 skill declaring a local go-v1
@@ -58,6 +59,22 @@ func setupLegacyBuildRepo(e *env, name string) {
 	e.git(dir, "tag", "v1")
 }
 
+// assertSourceSnapshotAbsentOrExact allows maintenance to retire an unpinned
+// cache entry, but never to leave a partial tree at its immutable key.
+func assertSourceSnapshotAbsentOrExact(t *testing.T, home, source, repo, commit string) {
+	t.Helper()
+	path := snapshot.Dir(home, source, commit)
+	if _, err := os.Lstat(path); err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		t.Fatalf("inspect source snapshot %s: %v", path, err)
+	}
+	if _, err := snapshot.AuthenticateGit(home, source, repo, commit); err != nil {
+		t.Fatalf("source snapshot at its immutable key is not exact: %v", err)
+	}
+}
+
 // TestLegacyLaneBuildsPublishReceipt3 is the F3 acceptance at the real
 // install entry: a schema-9 skill with a compiled command installs on the
 // schema-1 lane (no schema-2 refusal), records a v6 package marker whose
@@ -81,6 +98,8 @@ func TestLegacyLaneBuildsPublishReceipt3(t *testing.T) {
 	if recorded == nil || recorded.SchemaVersion != marker.SchemaV6 || recorded.Package == nil {
 		t.Fatalf("marker = %+v, want a v6 package marker", recorded)
 	}
+	repo := filepath.Join(e.skillsRoot, "tooling")
+	assertSourceSnapshotAbsentOrExact(t, e.home, "tooling", repo, e.gitOutput(repo, "rev-parse", "HEAD"))
 	local, ok := recorded.Builds["ltool"]
 	if !ok {
 		t.Fatalf("marker builds = %+v, want ltool", recorded.Builds)
@@ -190,6 +209,8 @@ func TestLegacyLaneBuildMarkerRebindsTamperedReceipt(t *testing.T) {
 	if recorded == nil {
 		t.Fatal("marker missing after install")
 	}
+	repo := filepath.Join(e.skillsRoot, "tooling")
+	assertSourceSnapshotAbsentOrExact(t, e.home, "tooling", repo, e.gitOutput(repo, "rev-parse", "HEAD"))
 	wantBuilds := recorded.Builds
 
 	markerPath := filepath.Join(installed, marker.Name)

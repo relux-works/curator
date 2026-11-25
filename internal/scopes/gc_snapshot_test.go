@@ -1,6 +1,7 @@
 package scopes
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,6 +182,65 @@ func TestSourceSnapshotSweepRefusesOutsideStore(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(snapshot, "payload")); err != nil {
 		t.Fatalf("outside snapshot was changed: %v", err)
+	}
+}
+
+func TestSourceSnapshotSweepRetiresBeforePartialRemoval(t *testing.T) {
+	home := t.TempDir()
+	source := "example.com/team/skill"
+	commit := strings.Repeat("d", 40)
+	commitDir := filepath.Join(home, "cache", filepath.FromSlash(source), commit)
+	snapshot := filepath.Join(commitDir, "snapshot")
+	if err := os.MkdirAll(snapshot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshot, "payload"), []byte("immutable\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	injected := errors.New("injected partial removal")
+	partialRemove := func(path string) error {
+		if !strings.HasPrefix(filepath.Base(path), retiredSourceSnapshotPrefix) {
+			t.Fatalf("remove called before retirement: %s", path)
+		}
+		if err := os.Remove(filepath.Join(path, "payload")); err != nil {
+			t.Fatal(err)
+		}
+		return injected
+	}
+	_, _, err := sweepSourceSnapshotsWithRemove(
+		home, map[string]bool{}, map[string]bool{}, maintenanceLock{check: func() error { return nil }}, false, partialRemove,
+	)
+	if !errors.Is(err, injected) {
+		t.Fatalf("partial cleanup error = %v, want injected removal failure", err)
+	}
+	if _, err := os.Lstat(snapshot); !os.IsNotExist(err) {
+		t.Fatalf("partially removed tree remains at immutable snapshot key: %v", err)
+	}
+	entries, err := os.ReadDir(commitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var retired string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), retiredSourceSnapshotPrefix) {
+			retired = filepath.Join(commitDir, entry.Name())
+			break
+		}
+	}
+	if retired == "" {
+		t.Fatal("failed cleanup did not leave a retired tree for a later sweep")
+	}
+	if _, err := os.Stat(filepath.Join(retired, "payload")); !os.IsNotExist(err) {
+		t.Fatalf("injected partial deletion did not affect the retired tree: %v", err)
+	}
+	removed, _, err := sweepSourceSnapshotsWithRemove(
+		home, map[string]bool{}, map[string]bool{}, maintenanceLock{check: func() error { return nil }}, false, os.RemoveAll,
+	)
+	if err != nil || len(removed) != 1 || !strings.HasPrefix(removed[0], "retired:") {
+		t.Fatalf("retry did not clean the retired tree: removed=%v err=%v", removed, err)
+	}
+	if _, err := os.Lstat(retired); !os.IsNotExist(err) {
+		t.Fatalf("retired tree remains after successful retry: %v", err)
 	}
 }
 
