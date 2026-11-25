@@ -106,11 +106,10 @@ func StageGlobalWithOwnership(
 					return Mirror{}, err
 				}
 				homeLayout, err := adapter.Home(context)
-				if refusalIs(err, harnessapi.OperationNotPorted) {
-					// The skill path is already relative to the user home.
-				} else if err != nil {
+				if err != nil && !refusalIs(err, harnessapi.OperationNotPorted) {
 					return Mirror{}, err
-				} else {
+				}
+				if err == nil {
 					homeRoots := homeLayout.Roots().Paths()
 					if len(homeRoots) > 1 {
 						return Mirror{}, harnessapi.NewRefusal("harness_home_layout_unsupported")
