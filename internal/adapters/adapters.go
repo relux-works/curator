@@ -80,8 +80,7 @@ func validSkillProjection(scope harnessapi.Scope, discovery harnessapi.SkillDisc
 	case harnessapi.ProjectScope:
 		valid = valid && !discovery.NativeDiscovery() && discovery.Mirror()
 	case harnessapi.UserScope:
-		// User-scope adapters may either request a mirror (Cursor) or declare
-		// a native-discovery path without a mirror (Pi).
+		// User-scope adapters declare either a mirrored path or a native path.
 		valid = valid && discovery.NativeDiscovery() != discovery.Mirror()
 	default:
 		valid = false
