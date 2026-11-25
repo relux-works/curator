@@ -172,13 +172,16 @@ func Entries(environment string, data []byte) (map[string][]byte, error) {
 		default:
 			err = fmt.Errorf("unsupported MCP format")
 		}
-	} else {
-		switch environment {
-		case "claude_code":
-			entries, err = jsonEntries(data)
-		default:
-			err = fmt.Errorf("unsupported adapter")
+		if err != nil {
+			return nil, fmt.Errorf("%s: native MCP document cannot be inspected", Unreadable)
 		}
+		return entries, nil
+	}
+	switch environment {
+	case "claude_code":
+		entries, err = jsonEntries(data)
+	default:
+		err = fmt.Errorf("unsupported adapter")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: native MCP document cannot be inspected", Unreadable)

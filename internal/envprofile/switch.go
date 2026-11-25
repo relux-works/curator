@@ -80,13 +80,14 @@ type Adapter struct {
 	Target     string
 }
 
-// Adapters combines legacy in-place rows with complete v1 home descriptors.
-var Adapters = func() []Adapter {
-	byID := map[string]Adapter{
-		"claude_code": {ID: "claude_code", EnvVar: "CLAUDE_CONFIG_DIR", DefaultDir: ".claude", Target: "CLAUDE.md"},
-		"opencode":    {ID: "opencode", EnvVar: "XDG_CONFIG_HOME", DefaultDir: ".config", Target: "AGENTS.md"},
-		"pi":          {ID: "pi", EnvVar: "PI_CODING_AGENT_DIR", DefaultDir: ".pi", Target: "AGENTS.md"},
-	}
+// Adapters is the closed revision-1 registry.
+var Adapters = []Adapter{
+	{ID: "claude_code", EnvVar: "CLAUDE_CONFIG_DIR", DefaultDir: ".claude", Target: "CLAUDE.md"},
+	{ID: "opencode", EnvVar: "XDG_CONFIG_HOME", DefaultDir: ".config", Target: "AGENTS.md"},
+	{ID: "pi", EnvVar: "PI_CODING_AGENT_DIR", DefaultDir: ".pi", Target: "AGENTS.md"},
+}
+
+func init() {
 	for _, id := range harnessregistry.IDs() {
 		adapter, err := harnessregistry.Lookup(id)
 		if err != nil {
@@ -109,21 +110,35 @@ var Adapters = func() []Adapter {
 		if len(roots) != 1 || len(targets) != 1 {
 			panic(fmt.Errorf("home or instruction layout for %q is not representable by the switch registry", id))
 		}
-		byID[string(id)] = Adapter{
+		projected := Adapter{
 			ID:         string(id),
 			EnvVar:     home.EnvironmentVariable(),
 			DefaultDir: roots[0].String(),
 			Target:     targets[0].String(),
 		}
-	}
-	var adapters []Adapter
-	for _, adapter := range envregistry.Registry {
-		if legacy, ok := byID[adapter.ID]; ok {
-			adapters = append(adapters, legacy)
+		replaced := false
+		for i := range Adapters {
+			if Adapters[i].ID == string(id) {
+				Adapters[i] = projected
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			Adapters = append(Adapters, projected)
 		}
 	}
-	return adapters
-}()
+	var ordered []Adapter
+	for _, adapter := range envregistry.Registry {
+		for _, projected := range Adapters {
+			if projected.ID == adapter.ID {
+				ordered = append(ordered, projected)
+				break
+			}
+		}
+	}
+	Adapters = ordered
+}
 
 // adapterByID returns the adapter or false for an unregistered identifier.
 func adapterByID(id string) (Adapter, bool) {
