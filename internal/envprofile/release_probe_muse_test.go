@@ -64,7 +64,11 @@ func copyProbeExecutable(t *testing.T, sourcePath, destinationPath string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer source.Close()
+	defer func() {
+		if err := source.Close(); err != nil {
+			t.Errorf("close source: %v", err)
+		}
+	}()
 	info, err := source.Stat()
 	if err != nil {
 		t.Fatal(err)
