@@ -49,6 +49,8 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/opaquescan"
@@ -81,9 +83,61 @@ type Adapter struct {
 // Adapters is the closed revision-1 registry.
 var Adapters = []Adapter{
 	{ID: "claude_code", EnvVar: "CLAUDE_CONFIG_DIR", DefaultDir: ".claude", Target: "CLAUDE.md"},
-	{ID: "codex_cli", EnvVar: "CODEX_HOME", DefaultDir: ".codex", Target: "AGENTS.md"},
 	{ID: "opencode", EnvVar: "XDG_CONFIG_HOME", DefaultDir: ".config", Target: "AGENTS.md"},
 	{ID: "pi", EnvVar: "PI_CODING_AGENT_DIR", DefaultDir: ".pi", Target: "AGENTS.md"},
+}
+
+func init() {
+	for _, id := range harnessregistry.IDs() {
+		adapter, err := harnessregistry.Lookup(id)
+		if err != nil {
+			panic(fmt.Errorf("lookup harness adapter %q: %w", id, err))
+		}
+		capabilities := adapter.Capabilities()
+		if !capabilities.Has(harnessapi.ManagedHome) || !capabilities.Has(harnessapi.InstructionOutput) {
+			continue
+		}
+		home, err := adapter.Home(harnessapi.Context{})
+		if err != nil {
+			panic(fmt.Errorf("read home layout for %q: %w", id, err))
+		}
+		instructions, err := adapter.Instructions(harnessapi.Context{}, harnessapi.Monolithic)
+		if err != nil {
+			panic(fmt.Errorf("read instruction layout for %q: %w", id, err))
+		}
+		roots := home.Roots().Paths()
+		targets := instructions.Paths().Paths()
+		if len(roots) != 1 || len(targets) != 1 {
+			panic(fmt.Errorf("home or instruction layout for %q is not representable by the switch registry", id))
+		}
+		projected := Adapter{
+			ID:         string(id),
+			EnvVar:     home.EnvironmentVariable(),
+			DefaultDir: roots[0].String(),
+			Target:     targets[0].String(),
+		}
+		replaced := false
+		for i := range Adapters {
+			if Adapters[i].ID == string(id) {
+				Adapters[i] = projected
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			Adapters = append(Adapters, projected)
+		}
+	}
+	var ordered []Adapter
+	for _, adapter := range envregistry.Registry {
+		for _, projected := range Adapters {
+			if projected.ID == adapter.ID {
+				ordered = append(ordered, projected)
+				break
+			}
+		}
+	}
+	Adapters = ordered
 }
 
 // adapterByID returns the adapter or false for an unregistered identifier.

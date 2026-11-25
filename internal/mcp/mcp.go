@@ -26,7 +26,6 @@ import (
 // projectSources maps agents to project-relative config files (Spec §11.1).
 var projectSources = map[string][]string{
 	"claude_code": {".mcp.json"},
-	"codex_cli":   {".codex/config.toml"},
 	"gemini":      {".gemini/settings.json"},
 	"opencode":    {"opencode.json", "opencode.jsonc"},
 }
@@ -34,7 +33,6 @@ var projectSources = map[string][]string{
 // homeSources maps agents to home-relative config files.
 var homeSources = map[string][]string{
 	"claude_code": {".claude.json"},
-	"codex_cli":   {".codex/config.toml"},
 	"gemini":      {".gemini/settings.json"},
 	"opencode":    {".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
 }
@@ -280,21 +278,30 @@ func homeEntries(env Env, agent string) (map[string]any, error) {
 }
 
 func mcpSources(agent string, scope harnessapi.Scope, legacy []string) ([]string, error) {
-	adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+	return mcpSourcesWithLookup(agent, scope, legacy, harnessregistry.Lookup)
+}
+
+func mcpSourcesWithLookup(
+	agent string,
+	scope harnessapi.Scope,
+	legacy []string,
+	lookup func(harnessapi.ID) (harnessapi.Adapter, error),
+) ([]string, error) {
+	adapter, err := lookup(harnessapi.ID(agent))
 	if refusalIs(err, harnessapi.UnknownID) {
 		return legacy, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	if !adapter.Capabilities().Has(harnessapi.MCPInspection) {
+		return legacy, nil
+	}
 	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
 	if err != nil {
 		return nil, err
 	}
 	channel, err := adapter.MCP(context, scope)
-	if refusalIs(err, harnessapi.OperationNotPorted) {
-		return legacy, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -305,6 +312,21 @@ func mcpSources(agent string, scope harnessapi.Scope, legacy []string) ([]string
 	sources := make([]string, 0, len(paths))
 	for _, path := range paths {
 		sources = append(sources, path.String())
+	}
+	if scope == harnessapi.UserScope && adapter.Capabilities().Has(harnessapi.ManagedHome) {
+		home, homeErr := adapter.Home(context)
+		if homeErr != nil {
+			return nil, homeErr
+		}
+		roots := home.Roots().Paths()
+		if len(roots) > 1 {
+			return nil, harnessapi.NewRefusal("harness_home_layout_unsupported")
+		}
+		if len(roots) == 1 {
+			for i, source := range sources {
+				sources[i] = filepath.Join(filepath.FromSlash(roots[0].String()), filepath.FromSlash(source))
+			}
+		}
 	}
 	return sources, nil
 }

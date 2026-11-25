@@ -87,16 +87,50 @@ func StageGlobalWithOwnership(
 	admitted []string,
 	owner GlobalOwnership,
 ) (Mirror, error) {
+	return stageGlobalWithLookup(stageRoot, home, userHome, agents, skills, mode, sources, admitted, owner, harnessregistry.Lookup)
+}
+
+func stageGlobalWithLookup(
+	stageRoot, home, userHome string,
+	agents, skills []string,
+	mode string,
+	sources map[string]string,
+	admitted []string,
+	owner GlobalOwnership,
+	lookup func(harnessapi.ID) (harnessapi.Adapter, error),
+) (Mirror, error) {
 	canonical := filepath.Join(home, "global", "skills")
 	roots := map[string]string{}
 	for _, agent := range agents {
-		discovery, ported, err := registeredSkills(agent, harnessapi.UserScope)
+		discovery, ported, err := registeredSkillsWithLookup(agent, harnessapi.UserScope, lookup)
 		if err != nil {
 			return Mirror{}, err
 		}
 		if ported {
 			if discovery.Mirror() {
-				addSkillRoots(roots, agent, userHome, discovery.Paths())
+				base := userHome
+				adapter, err := lookup(harnessapi.ID(agent))
+				if err != nil {
+					return Mirror{}, err
+				}
+				if adapter.Capabilities().Has(harnessapi.ManagedHome) {
+					context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+					if err != nil {
+						return Mirror{}, err
+					}
+					homeLayout, err := adapter.Home(context)
+					if err != nil {
+						return Mirror{}, err
+					}
+					homeRoots := homeLayout.Roots().Paths()
+					if len(homeRoots) > 1 {
+						return Mirror{}, harnessapi.NewRefusal("harness_home_layout_unsupported")
+					}
+					if len(homeRoots) == 1 {
+						base = filepath.Join(base, filepath.FromSlash(homeRoots[0].String()))
+					}
+				}
+				addSkillRoots(roots, agent, base, discovery.Paths())
 			}
 			continue
 		}
@@ -111,23 +145,32 @@ func StageGlobalWithOwnership(
 }
 
 func registeredSkills(agent string, scope harnessapi.Scope) (harnessapi.SkillDiscovery, bool, error) {
-	adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+	return registeredSkillsWithLookup(agent, scope, harnessregistry.Lookup)
+}
+
+func registeredSkillsWithLookup(
+	agent string,
+	scope harnessapi.Scope,
+	lookup func(harnessapi.ID) (harnessapi.Adapter, error),
+) (harnessapi.SkillDiscovery, bool, error) {
+	adapter, err := lookup(harnessapi.ID(agent))
 	if refusalIs(err, harnessapi.UnknownID) {
 		return harnessapi.SkillDiscovery{}, false, nil
 	}
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
 	}
+	capabilities := adapter.Capabilities()
+	if !capabilities.Has(harnessapi.SkillProjection) && !capabilities.Has(harnessapi.NativeSkillDiscovery) {
+		return harnessapi.SkillDiscovery{}, false, nil
+	}
 	context, err := harnessapi.NewContext(runtime.GOOS, scope, harnessapi.VerifiedRelease{})
 	if err != nil {
 		return harnessapi.SkillDiscovery{}, false, err
 	}
 	discovery, err := adapter.Skills(context, scope)
-	if refusalIs(err, harnessapi.OperationNotPorted) {
-		return harnessapi.SkillDiscovery{}, false, nil
-	}
 	if err != nil {
-		return harnessapi.SkillDiscovery{}, false, err
+		return harnessapi.SkillDiscovery{}, true, err
 	}
 	return discovery, true, nil
 }

@@ -39,10 +39,14 @@ func notPortedResults(adapter harnessapi.Adapter, effects *effectSpy, capabiliti
 	var errors []error
 	v, err := adapter.ParseReleaseProbe(c, harnessapi.ProbeOutput{})
 	errors = append(errors, effects.observe(v, err))
-	vh, err := adapter.Home(c)
-	errors = append(errors, effects.observe(vh, err))
-	vi, err := adapter.Instructions(c, harnessapi.Monolithic)
-	errors = append(errors, effects.observe(vi, err))
+	if !capabilities.Has(harnessapi.ManagedHome) {
+		vh, err := adapter.Home(c)
+		errors = append(errors, effects.observe(vh, err))
+	}
+	if !capabilities.Has(harnessapi.InstructionOutput) {
+		vi, err := adapter.Instructions(c, harnessapi.Monolithic)
+		errors = append(errors, effects.observe(vi, err))
+	}
 	if !capabilities.Has(harnessapi.SkillProjection) && !capabilities.Has(harnessapi.NativeSkillDiscovery) {
 		vs, err := adapter.Skills(c, harnessapi.ProjectScope)
 		errors = append(errors, effects.observe(vs, err))
@@ -53,8 +57,10 @@ func notPortedResults(adapter harnessapi.Adapter, effects *effectSpy, capabiliti
 		vmcp, err := adapter.MCP(c, harnessapi.UserScope)
 		errors = append(errors, effects.observe(vmcp, err))
 	}
-	vc, err := adapter.Credentials(c)
-	errors = append(errors, effects.observe(vc, err))
+	if !capabilities.Has(harnessapi.CredentialMetadata) {
+		vc, err := adapter.Credentials(c)
+		errors = append(errors, effects.observe(vc, err))
+	}
 	vt, err := adapter.Trust(c)
 	errors = append(errors, effects.observe(vt, err))
 	vr, err := adapter.Preflight(c, s, r)
@@ -76,6 +82,7 @@ func stagedCapabilities(adapter harnessapi.Adapter) error {
 	capabilities := adapter.Capabilities()
 	for _, capability := range capabilities.Values() {
 		switch capability {
+		case harnessapi.ManagedHome, harnessapi.InstructionOutput, harnessapi.CredentialMetadata:
 		case harnessapi.ReleaseProbing:
 		case harnessapi.SkillProjection, harnessapi.NativeSkillDiscovery:
 			discovery, err := adapter.Skills(harnessapi.Context{}, harnessapi.ProjectScope)
@@ -113,6 +120,27 @@ func stagedCapabilities(adapter harnessapi.Adapter) error {
 		return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
 	}
 	expectedEffects := 0
+	if capabilities.Has(harnessapi.ManagedHome) {
+		value, err := adapter.Home(harnessapi.Context{})
+		if !declaredResult(value, err, true, &effects) {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		expectedEffects++
+	}
+	if capabilities.Has(harnessapi.InstructionOutput) {
+		value, err := adapter.Instructions(harnessapi.Context{}, harnessapi.Monolithic)
+		if !declaredResult(value, err, true, &effects) {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		expectedEffects++
+	}
+	if capabilities.Has(harnessapi.CredentialMetadata) {
+		value, err := adapter.Credentials(harnessapi.Context{})
+		if !declaredResult(value, err, true, &effects) {
+			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
+		}
+		expectedEffects++
+	}
 	if capabilities.Has(harnessapi.NativeSkillDiscovery) || capabilities.Has(harnessapi.SkillProjection) {
 		value, err := adapter.Skills(harnessapi.Context{}, harnessapi.ProjectScope)
 		if !declaredResult(value, err, true, &effects) {
@@ -168,7 +196,7 @@ func declaredResult(value any, err error, declared bool, effects *effectSpy) boo
 type falseCapability struct{ harnessapi.Adapter }
 
 func (falseCapability) Capabilities() harnessapi.CapabilitySet {
-	set, _ := harnessapi.NewCapabilitySet(harnessapi.ManagedHome)
+	set, _ := harnessapi.NewCapabilitySet(harnessapi.HomeLease)
 	return set
 }
 

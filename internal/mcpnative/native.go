@@ -8,11 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/relux-works/curator/internal/contextmaterialize"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/projectmcp"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -151,11 +154,32 @@ func Entries(environment string, data []byte) (map[string][]byte, error) {
 	}
 	var entries map[string][]byte
 	var err error
+	adapter, lookupErr := harnessregistry.Lookup(harnessapi.ID(environment))
+	if lookupErr == nil && adapter.ID() == harnessapi.ID(environment) && Path(environment) != "" && adapter.Capabilities().Has(harnessapi.MCPInspection) {
+		context, contextErr := harnessapi.NewContext(runtime.GOOS, harnessapi.ProjectScope, harnessapi.VerifiedRelease{})
+		if contextErr != nil {
+			return nil, fmt.Errorf("%s: native MCP context is unsupported", Unreadable)
+		}
+		channel, channelErr := adapter.MCP(context, harnessapi.ProjectScope)
+		if channelErr != nil || !channel.Inspect() {
+			return nil, fmt.Errorf("%s: native MCP inspection is unsupported", Unreadable)
+		}
+		switch channel.Format() {
+		case harnessapi.JSON:
+			entries, err = jsonEntries(data)
+		case harnessapi.TOML:
+			entries, err = tomlEntries(data)
+		default:
+			err = fmt.Errorf("unsupported MCP format")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%s: native MCP document cannot be inspected", Unreadable)
+		}
+		return entries, nil
+	}
 	switch environment {
 	case "claude_code":
 		entries, err = jsonEntries(data)
-	case "codex_cli":
-		entries, err = tomlEntries(data)
 	default:
 		err = fmt.Errorf("unsupported adapter")
 	}

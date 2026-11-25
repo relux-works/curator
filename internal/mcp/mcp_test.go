@@ -106,6 +106,14 @@ func TestWindsurfMCPUsesHomeConfigurationOnly(t *testing.T) {
 
 func TestMCPSourceFallbackIsNarrow(t *testing.T) {
 	fallback := []string{"legacy.json"}
+	codexPaths, err := mcpSources("codex_cli", "project", fallback)
+	if err != nil || len(codexPaths) != 1 || codexPaths[0] != ".codex/config.toml" {
+		t.Fatalf("registered Codex CLI MCP path: paths=%v err=%v", codexPaths, err)
+	}
+	codexHomePaths, err := mcpSources("codex_cli", "user", fallback)
+	if err != nil || len(codexHomePaths) != 1 || codexHomePaths[0] != ".codex/config.toml" {
+		t.Fatalf("registered Codex CLI home MCP path: paths=%v err=%v", codexHomePaths, err)
+	}
 	cursorPaths, err := mcpSources("cursor", "user", fallback)
 	if err != nil || len(cursorPaths) != 1 || cursorPaths[0] != ".cursor/mcp.json" {
 		t.Fatalf("registered Cursor MCP path: paths=%v err=%v", cursorPaths, err)
@@ -120,6 +128,9 @@ func TestMCPSourceFallbackIsNarrow(t *testing.T) {
 	}
 	if _, err := mcpSources("cursor", "unsupported", fallback); err == nil || err.Error() != "harness_scope_unsupported" {
 		t.Fatalf("registry context refusal was masked by fallback: %v", err)
+	}
+	if _, err := mcpSources("codex_cli", "unsupported", fallback); err == nil || err.Error() != "harness_scope_unsupported" {
+		t.Fatalf("Codex CLI scope refusal was masked by fallback: %v", err)
 	}
 }
 

@@ -190,6 +190,22 @@ func TestNoHarnessBranches(t *testing.T) {
 	})
 }
 
+func TestRemovedCodexSkillAllowanceCannotReturn(t *testing.T) {
+	var active ExceptionSet
+	readJSON(t, "exceptions.json", &active)
+	root := t.TempDir()
+	rel := "internal/adapters/adapters.go"
+	plant(t, root, rel, "package adapters\nvar legacyAgentPaths = map[string]string{\n\t\"codex_cli\":   \".codex/skills\",\n}\n")
+	findings, err := ScanBranches(root, vocabulary(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, rel, 3)
+	if unmatched := ApplyExceptions(findings, active); len(unmatched) != 1 {
+		t.Fatalf("restored Codex skill-path branch was not rejected: %v", unmatched)
+	}
+}
+
 // Each effect plant is parsed, never executed; imports and concrete call lines
 // are rejected. Positive fixtures cover the complete direct import allowlist
 // and lexical layouts, not native vendor behavior.
