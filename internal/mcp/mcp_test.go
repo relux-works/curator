@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/harnessapi"
 	"github.com/relux-works/curator/internal/skillspec"
 )
 
@@ -131,19 +132,20 @@ func TestPiInspectionHasNoSources(t *testing.T) {
 	write(t, env.ProjectRoot, ".pi/mcp.json", `{"mcpServers":{"project-only":{"command":"fixture"}}}`)
 	write(t, env.UserHome, ".pi/agent/mcp.json", `{"mcpServers":{"home-only":{"command":"fixture"}}}`)
 
-	got, err := ConfiguredServers(env, "pi")
-	if err != nil {
-		t.Fatal(err)
+	for _, scope := range []harnessapi.Scope{harnessapi.ProjectScope, harnessapi.UserScope} {
+		sources, err := mcpSources("pi", scope, nil)
+		if !refusalIs(err, harnessapi.CapabilityUnsupported) {
+			t.Fatalf("Pi %s MCP inspection error = %v, want typed unsupported refusal", scope, err)
+		}
+		if len(sources) != 0 {
+			t.Fatalf("Pi %s MCP inspection returned paths: %v", scope, sources)
+		}
 	}
-	if len(got) != 0 {
-		t.Fatalf("Pi inspection found unsupported MCP sources: %v", got)
+	if _, err := ConfiguredServers(env, "pi"); !refusalIs(err, harnessapi.CapabilityUnsupported) {
+		t.Fatalf("Pi configured-server result error = %v, want typed unsupported refusal", err)
 	}
-	projectOnly, err := ProjectOnlyServers(env, "pi")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(projectOnly) != 0 {
-		t.Fatalf("Pi project-only inspection found unsupported MCP sources: %v", projectOnly)
+	if _, err := ProjectOnlyServers(env, "pi"); !refusalIs(err, harnessapi.CapabilityUnsupported) {
+		t.Fatalf("Pi project-only result error = %v, want typed unsupported refusal", err)
 	}
 }
 
