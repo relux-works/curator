@@ -78,18 +78,18 @@ func RetainProfilePin(repo, commit string) error {
 	}
 	ref := profilePinRef(commit)
 	zero := strings.Repeat("0", len(commit))
-	if _, err := run(repo, "update-ref", ref, commit, zero); err == nil {
+	_, err := run(repo, "update-ref", ref, commit, zero)
+	if err == nil {
 		return nil
-	} else {
-		current, checkErr := run(repo, "rev-parse", "--verify", ref+"^{commit}")
-		if checkErr == nil && current == commit {
-			return nil
-		}
-		if checkErr == nil {
-			return fmt.Errorf("refusing to retarget profile pin ref %q", ref)
-		}
-		return fmt.Errorf("retain profile pin %s: %w", commit, err)
 	}
+	current, checkErr := run(repo, "rev-parse", "--verify", ref+"^{commit}")
+	if checkErr == nil && current == commit {
+		return nil
+	}
+	if checkErr == nil {
+		return fmt.Errorf("refusing to retarget profile pin ref %q", ref)
+	}
+	return fmt.Errorf("retain profile pin %s: %w", commit, err)
 }
 
 func profilePinRef(commit string) string {
