@@ -26,7 +26,6 @@ import (
 // projectSources maps agents to project-relative config files (Spec §11.1).
 var projectSources = map[string][]string{
 	"claude_code": {".mcp.json"},
-	"codex_cli":   {".codex/config.toml"},
 	"gemini":      {".gemini/settings.json"},
 	"opencode":    {"opencode.json", "opencode.jsonc"},
 }
@@ -34,7 +33,6 @@ var projectSources = map[string][]string{
 // homeSources maps agents to home-relative config files.
 var homeSources = map[string][]string{
 	"claude_code": {".claude.json"},
-	"codex_cli":   {".codex/config.toml"},
 	"gemini":      {".gemini/settings.json"},
 	"opencode":    {".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
 }
@@ -305,6 +303,23 @@ func mcpSources(agent string, scope harnessapi.Scope, legacy []string) ([]string
 	sources := make([]string, 0, len(paths))
 	for _, path := range paths {
 		sources = append(sources, path.String())
+	}
+	if scope == harnessapi.UserScope {
+		home, homeErr := adapter.Home(context)
+		if !refusalIs(homeErr, harnessapi.OperationNotPorted) {
+			if homeErr != nil {
+				return nil, homeErr
+			}
+			roots := home.Roots().Paths()
+			if len(roots) > 1 {
+				return nil, harnessapi.NewRefusal("harness_home_layout_unsupported")
+			}
+			if len(roots) == 1 {
+				for i, source := range sources {
+					sources[i] = filepath.Join(filepath.FromSlash(roots[0].String()), filepath.FromSlash(source))
+				}
+			}
+		}
 	}
 	return sources, nil
 }

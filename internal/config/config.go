@@ -17,6 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
@@ -54,7 +55,7 @@ const (
 )
 
 // DefaultAgents applies when a project declares no agents anywhere.
-var DefaultAgents = []string{"codex_cli"}
+var DefaultAgents = []string{string(harnessregistry.DefaultID)}
 
 // LockableKeys are the top-level keys an organization may lock from the
 // system config (Spec §7.2). Operator credential selections — build_ssh

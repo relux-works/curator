@@ -101,6 +101,12 @@ func TestUnreadableNativeDocuments(t *testing.T) {
 	}
 }
 
+func TestEntriesDoesNotCanonicalizeCLIAliases(t *testing.T) {
+	if _, err := Entries("codex", []byte("[mcp_servers.foreign]\ncommand='external'\n")); err == nil || !strings.Contains(err.Error(), Unreadable) {
+		t.Fatalf("Entries accepted CLI alias: %v", err)
+	}
+}
+
 // Complete canonical markers bind owner, profile, environment and selected path;
 // no hash-only, open-shape or cross-home record confers ownership.
 func TestOwnershipClosedAndBound(t *testing.T) {

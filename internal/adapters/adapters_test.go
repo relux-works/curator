@@ -472,6 +472,35 @@ func TestStageGlobalMirrorsCursorAtItsExistingHomePath(t *testing.T) {
 	}
 }
 
+func TestStageGlobalMirrorsCodexInsideDeclaredHomeRoot(t *testing.T) {
+	home := t.TempDir()
+	userHome := t.TempDir()
+	stageRoot := t.TempDir()
+	canonical := filepath.Join(home, "global", "skills")
+	makeSkill(t, canonical, "skill-codex")
+
+	mirror, err := StageGlobal(stageRoot, home, userHome,
+		[]string{"codex_cli"}, []string{"skill-codex"}, "copy", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := mirror.Plan()
+	if err := plan.Validate(); err != nil {
+		t.Fatalf("staged global adapter plan is invalid: %v", err)
+	}
+	root := filepath.Join(userHome, ".codex", "skills")
+	if _, err := os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatalf("staging touched the live Codex root: %v", err)
+	}
+	entry, found := find(plan, filepath.Join(root, "skill-codex"))
+	if !found {
+		t.Fatal("Codex skill directory is not a journaled target under its declared home")
+	}
+	if _, err := os.Stat(filepath.Join(entry.StagedPath, "SKILL.md")); err != nil {
+		t.Fatalf("staged Codex skill is incomplete: %v", err)
+	}
+}
+
 func TestGitignoreEntriesAndUnknownAgents(t *testing.T) {
 	entries := RequiredGitignoreEntries([]string{"claude_code", "opencode", "bogus"})
 	joined := strings.Join(entries, " ")

@@ -46,7 +46,17 @@ func nativeSkillsAndMCPInspection() harnessapi.CapabilitySet {
 // the five-second deadline and empty overrides are the v1 contract policy.
 var entries = [...]registration{
 	{claude_code.ID, 1, probing(), claude_code.New, harnessapi.NewProbeSpec("claude", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
-	{codex_cli.ID, 1, probing(), codex_cli.New, harnessapi.NewProbeSpec("codex", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
+	{codex_cli.ID, 1, func() harnessapi.CapabilitySet {
+		set, _ := harnessapi.NewCapabilitySet(
+			harnessapi.ManagedHome,
+			harnessapi.InstructionOutput,
+			harnessapi.SkillProjection,
+			harnessapi.MCPInspection,
+			harnessapi.CredentialMetadata,
+			harnessapi.ReleaseProbing,
+		)
+		return set
+	}(), codex_cli.New, harnessapi.NewProbeSpec("codex", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{cursor.ID, 1, skillAndMCPInspection(), cursor.New, harnessapi.ProbeSpec{}, false},
 	{gemini.ID, 1, harnessapi.CapabilitySet{}, gemini.New, harnessapi.ProbeSpec{}, false},
 	{muse.ID, 1, probing(), muse.New, harnessapi.NewProbeSpec("muse", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},

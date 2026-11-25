@@ -96,7 +96,30 @@ func StageGlobalWithOwnership(
 		}
 		if ported {
 			if discovery.Mirror() {
-				addSkillRoots(roots, agent, userHome, discovery.Paths())
+				base := userHome
+				adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+				if err != nil {
+					return Mirror{}, err
+				}
+				context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+				if err != nil {
+					return Mirror{}, err
+				}
+				homeLayout, err := adapter.Home(context)
+				if refusalIs(err, harnessapi.OperationNotPorted) {
+					// The skill path is already relative to the user home.
+				} else if err != nil {
+					return Mirror{}, err
+				} else {
+					homeRoots := homeLayout.Roots().Paths()
+					if len(homeRoots) > 1 {
+						return Mirror{}, harnessapi.NewRefusal("harness_home_layout_unsupported")
+					}
+					if len(homeRoots) == 1 {
+						base = filepath.Join(base, filepath.FromSlash(homeRoots[0].String()))
+					}
+				}
+				addSkillRoots(roots, agent, base, discovery.Paths())
 			}
 			continue
 		}

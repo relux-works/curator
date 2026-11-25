@@ -1,12 +1,7 @@
-// Package envregistry is the closed revision-1 environment adapter
-// registry (environments §7). Adapters are manager code, never package
-// code: every per-adapter fact — home mechanism, root-context target,
-// supported forms, system-prompt and MCP channel descriptors, credential
-// passthrough, provisioning seeds, the isolation matrix, shadowing paths,
-// secondary targets, size advisories, and recorded tool releases — lives in
-// this table, validated against the section it cites. Profile bytes never
-// select an adapter fact; machine configuration selects among the declared
-// values with the section 12.1 defaults.
+// Package envregistry carries the legacy managed-environment catalog.
+// Surfaces already expressible by harnessapi v1 are projected from the
+// registered adapter; remaining catalog fields stay here until the contract
+// can represent them. Profile bytes never select an adapter fact.
 package envregistry
 
 import (
@@ -14,6 +9,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 )
 
 // Environment identifiers (environments §7.1, closed in revision 1).
@@ -46,7 +44,6 @@ const (
 // identifiers, schemas, and vectors are unchanged.
 var EnvAliases = map[string]string{
 	"claude": ClaudeCode,
-	"codex":  CodexCLI,
 }
 
 // NormalizeEnvID maps a command-line environment operand to its
@@ -57,7 +54,7 @@ func NormalizeEnvID(id string) string {
 	if canonical, ok := EnvAliases[id]; ok {
 		return canonical
 	}
-	return id
+	return string(harnessregistry.CanonicalID(harnessapi.ID(id)))
 }
 
 // Diagnostics (environments §7.7, §8.4.1, §10.4, §11.1).
@@ -272,23 +269,16 @@ var Registry = []Adapter{
 	},
 	{
 		ID:          CodexCLI,
-		EnvVar:      "CODEX_HOME",
-		RootTarget:  "AGENTS.md",
-		SkillsDir:   "skills",
 		Forms:       []string{FormMonolithic},
 		DefaultForm: FormMonolithic,
 		SystemPrompt: []Channel{
 			{Kind: KindConfigKey, Semantics: SemanticsReplace, Key: "model_instructions_file"},
 		},
-		MCP: &Channel{Kind: KindFlag, Flag: "-p", Argument: ArgumentName, Name: "curator-mcp"},
-		Passthrough: map[string][]Passthrough{
-			"default": {{Path: "auth.json", Strategy: StrategyKeyringPreferred, FileLinkTarget: "auth.json"}},
-		},
+		MCP:               &Channel{Kind: KindFlag, Flag: "-p", Argument: ArgumentName, Name: "curator-mcp"},
 		Seeds:             []string{"config.toml"},
 		CodexSeedRevision: CodexSeedRevision,
 		SeedWritten:       map[string]bool{},
 		VerifiedRelease:   "0.162.1",
-		Probe:             []string{"codex", "--version"},
 		SizeAdvisoryBytes: 32768,
 		CredentialScope:   "home",
 		AuthWrite:         "in-place",
@@ -347,6 +337,78 @@ var Registry = []Adapter{
 		AuthWrite:         "in-place (lockfile)",
 		GlobalContextCap:  "none recorded",
 	},
+}
+
+func init() {
+	for i := range Registry {
+		adapter, err := harnessregistry.Lookup(harnessapi.ID(Registry[i].ID))
+		if err != nil {
+			panic(fmt.Errorf("lookup registered harness %q: %w", Registry[i].ID, err))
+		}
+		capabilities := adapter.Capabilities()
+		if !capabilities.Has(harnessapi.ManagedHome) &&
+			!capabilities.Has(harnessapi.InstructionOutput) &&
+			!capabilities.Has(harnessapi.SkillProjection) &&
+			!capabilities.Has(harnessapi.CredentialMetadata) {
+			continue
+		}
+		context, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if err != nil {
+			panic(fmt.Errorf("construct harness context: %w", err))
+		}
+		if capabilities.Has(harnessapi.ManagedHome) {
+			home, err := adapter.Home(context)
+			if err != nil {
+				panic(fmt.Errorf("read home descriptor for %q: %w", Registry[i].ID, err))
+			}
+			Registry[i].EnvVar = home.EnvironmentVariable()
+		}
+		if capabilities.Has(harnessapi.InstructionOutput) {
+			instructions, err := adapter.Instructions(context, harnessapi.Monolithic)
+			if err != nil {
+				panic(fmt.Errorf("read instruction descriptor for %q: %w", Registry[i].ID, err))
+			}
+			paths := instructions.Paths().Paths()
+			if len(paths) != 1 {
+				panic(fmt.Errorf("instruction descriptor for %q has %d root paths; want one", Registry[i].ID, len(paths)))
+			}
+			Registry[i].RootTarget = paths[0].String()
+		}
+		if capabilities.Has(harnessapi.SkillProjection) {
+			skills, err := adapter.Skills(context, harnessapi.UserScope)
+			if err != nil {
+				panic(fmt.Errorf("read skill descriptor for %q: %w", Registry[i].ID, err))
+			}
+			paths := skills.Paths().Paths()
+			if len(paths) != 1 {
+				panic(fmt.Errorf("skill descriptor for %q has %d home paths; want one", Registry[i].ID, len(paths)))
+			}
+			Registry[i].SkillsDir = paths[0].String()
+		}
+		if capabilities.Has(harnessapi.CredentialMetadata) {
+			route, err := adapter.Credentials(context)
+			if err != nil {
+				panic(fmt.Errorf("read credential descriptor for %q: %w", Registry[i].ID, err))
+			}
+			paths := route.Paths().Paths()
+			entries := make([]Passthrough, 0, len(paths))
+			for _, path := range paths {
+				target := ""
+				if route.Strategy() == "file-link" || route.Strategy() == "keyring-preferred" {
+					target = path.String()
+				}
+				entries = append(entries, Passthrough{Path: path.String(), Strategy: Strategy(route.Strategy()), FileLinkTarget: target})
+			}
+			Registry[i].Passthrough = map[string][]Passthrough{"default": entries}
+		}
+		if capabilities.Has(harnessapi.ReleaseProbing) {
+			probe, err := adapter.ReleaseProbe(context)
+			if err != nil {
+				panic(fmt.Errorf("read release probe descriptor for %q: %w", Registry[i].ID, err))
+			}
+			Registry[i].Probe = append([]string{probe.ExecutableAlias()}, probe.Arguments()...)
+		}
+	}
 }
 
 // Targets is the closed revision-1 secondary-target list (§7.6): the Xcode
