@@ -20,6 +20,15 @@ const controlOrigin = "CURATOR_TEST_NATIVE_GUARD_ORIGIN"
 // the plant never selects the OS account home. The paired isolated write passes.
 func Control(t *testing.T, childTest string, childEnv ...string) {
 	t.Helper()
+	rootDir, rootDoc := controlTarget()
+	parentVar := nativeParentEnvVar()
+	scrub := map[string]bool{
+		"HOME": true, "USERPROFILE": true,
+		controlMode: true, controlOrigin: true, supervisorPID: true, observerAddress: true, observerKey: true,
+	}
+	for _, name := range nativeAllEnvVars() {
+		scrub[name] = true
+	}
 	for _, mode := range []string{"isolated", "plant", "settings", "skill-copy", "synced-skill", "env-state", "panic", "exit", "panic-clean", "exit-clean", "forged", "forged-overflow", "overflow"} {
 		t.Run(mode, func(t *testing.T) {
 			origin := t.TempDir()
@@ -28,8 +37,8 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 			}
 			// Existing decoys make settings/copied-skill controls discriminate
 			// the old shallow snapshot: no parent or skill-entry identity changes.
-			for _, name := range []string{"CLAUDE.md", "settings.json", ".agent-environment.json", "skills/copied/nested/SKILL.md", "skills/synced/fixture/SKILL.md"} {
-				path := filepath.Join(origin, ".claude", filepath.FromSlash(name))
+			for _, name := range []string{rootDoc, "settings.json", ".agent-environment.json", "skills/copied/nested/SKILL.md", "skills/synced/fixture/SKILL.md"} {
+				path := filepath.Join(origin, rootDir, filepath.FromSlash(name))
 				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -38,7 +47,7 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 				}
 			}
 			if mode == "overflow" || mode == "forged-overflow" {
-				f, err := os.OpenFile(filepath.Join(origin, ".claude", "CLAUDE.md"), os.O_WRONLY, 0600) // #nosec G304 -- origin is this control's t.TempDir.
+				f, err := os.OpenFile(filepath.Join(origin, rootDir, rootDoc), os.O_WRONLY, 0600) // #nosec G304 -- origin is this control's t.TempDir.
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -53,13 +62,12 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.v", "-test.run=^"+childTest+"$") // #nosec G204,G702 -- Reexecutes this test binary with a test-selected child name; no shell.
 			for _, entry := range os.Environ() {
 				key, _, _ := strings.Cut(entry, "=")
-				switch key {
-				case "HOME", "USERPROFILE", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", controlMode, controlOrigin, supervisorPID, observerAddress, observerKey:
+				if scrub[key] {
 					continue
 				}
 				cmd.Env = append(cmd.Env, entry)
 			}
-			cmd.Env = append(cmd.Env, "HOME="+origin, "USERPROFILE="+origin, "XDG_CONFIG_HOME="+filepath.Join(origin, ".config"), controlMode+"="+mode, controlOrigin+"="+origin)
+			cmd.Env = append(cmd.Env, "HOME="+origin, "USERPROFILE="+origin, parentVar+"="+filepath.Join(origin, ".config"), controlMode+"="+mode, controlOrigin+"="+origin)
 			cmd.Env = append(cmd.Env, childEnv...)
 			if strings.HasPrefix(mode, "forged") {
 				cmd.Env = append(cmd.Env, supervisorPID+"="+strconv.Itoa(os.Getpid()))
@@ -78,7 +86,7 @@ func Control(t *testing.T, childTest string, childEnv ...string) {
 			}
 			if mode != "isolated" && mode != "panic-clean" && mode != "exit-clean" {
 				exit, ok := err.(*exec.ExitError)
-				if !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte(Changed+" ["+fingerprint(filepath.Join(origin, ".claude"))+"]")) || !bytes.Contains(out, []byte("synthetic "+mode+" plant completed")) {
+				if !ok || exit.ExitCode() != 1 || !bytes.Contains(out, []byte(Changed+" ["+fingerprint(filepath.Join(origin, rootDir))+"]")) || !bytes.Contains(out, []byte("synthetic "+mode+" plant completed")) {
 					t.Fatalf("guard did not reject its intended plant: %v\n%s", err, out)
 				}
 				t.Log("expected exit 1: actual package-exit guard detected synthetic unpinned HOME write")
@@ -134,7 +142,7 @@ func Child(t *testing.T, resolve func() (string, error)) {
 		// HOME alone. A package TestMain may pin provider overrides to
 		// its own fixture home for ordinary tests; those deliberate pins
 		// are not the ambient default this control exercises.
-		for _, key := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR"} {
+		for _, key := range nativeDirectEnvVars() {
 			if err := os.Unsetenv(key); err != nil {
 				t.Fatal(err)
 			}
@@ -162,7 +170,7 @@ func Child(t *testing.T, resolve func() (string, error)) {
 		t.Fatal("control resolved outside its synthetic write boundary")
 	}
 	if mode != "panic-clean" && mode != "exit-clean" {
-		name := "CLAUDE.md"
+		_, name := controlTarget()
 		switch mode {
 		case "settings":
 			name = "settings.json"

@@ -19,7 +19,7 @@ import (
 // reconciliation. Terminal tombstones remain visible; no timeout forgets them.
 func (m *Manager) List(ctx context.Context, environment, profile string) ([]Record, error) {
 	environment = envregistry.NormalizeEnvID(environment)
-	if environment != "" && environment != "claude_code" && environment != "codex_cli" && environment != "muse" {
+	if environment != "" && !state.SupportedEnvironment(environment) {
 		return nil, state.Refuse("environment_unknown", "environment_absent")
 	}
 	if profile != "" && !state.ValidID(profile) {

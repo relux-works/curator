@@ -131,7 +131,7 @@ func (m *Manager) withState(ctx context.Context, fn func(*state.Ledger, *manager
 
 func (m *Manager) Acquire(ctx context.Context, req Request) (out Outcome, reason string, err error) {
 	req.Environment = envregistry.NormalizeEnvID(req.Environment)
-	if req.Environment != "claude_code" && req.Environment != "codex_cli" && req.Environment != "muse" {
+	if !state.SupportedEnvironment(req.Environment) {
 		return out, "", state.Refuse("environment_unknown", "environment_absent")
 	}
 	if !state.ValidID(req.Profile) || !state.ValidID(req.RequestID) || !state.ValidDigest(req.LockSHA256) {

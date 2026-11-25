@@ -313,7 +313,7 @@ func homeLeaseNativeTargets(environment string, resolver func(string) (string, e
 		}
 		if value != "" && (err != nil || fallback) {
 			candidate := value
-			if adapter.ID == "opencode" || adapter.ID == envregistry.Muse {
+			if reg, regErr := envregistry.ByID(adapter.ID); regErr == nil && (reg.ParentVar || len(reg.HomeVariables) > 0) {
 				candidate = filepath.Join(value, adapter.ID)
 			}
 			paths = append(paths, candidate)

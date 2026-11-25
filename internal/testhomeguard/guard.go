@@ -58,16 +58,14 @@ func start(inherited bool) (*Guard, error) {
 		}
 	}
 	if inherited {
-		for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR"} {
+		for _, name := range nativeDirectEnvVars() {
 			add(os.Getenv(name))
 		}
-	}
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); inherited && xdg != "" {
-		add(filepath.Join(xdg, "opencode"))
-		add(filepath.Join(xdg, "muse"))
-	}
-	if xdg := os.Getenv("XDG_DATA_HOME"); inherited && xdg != "" {
-		add(filepath.Join(xdg, "muse"))
+		for _, entry := range nativeParentSubdirs() {
+			if base := os.Getenv(entry.envVar); base != "" {
+				add(filepath.Join(base, entry.subdir))
+			}
+		}
 	}
 	g := &Guard{}
 	for root := range roots {
@@ -85,8 +83,9 @@ func start(inherited bool) (*Guard, error) {
 }
 
 func nativeHomePaths(home string) []string {
-	var roots []string
-	for _, suffix := range []string{".claude", ".codex", ".config/opencode", ".config/muse", ".local/share/muse", ".pi", ".pi/agent", ".agents"} {
+	suffixes := nativeHomeSuffixes()
+	roots := make([]string, 0, len(suffixes))
+	for _, suffix := range suffixes {
 		roots = append(roots, filepath.Join(home, filepath.FromSlash(suffix)))
 	}
 	return roots
@@ -148,13 +147,7 @@ const maxSnapshotBytes = 1 << 30
 
 // Native configuration, instructions and Curator environment state only.
 // Runtime databases, logs and session histories are deliberately excluded.
-var files = []string{
-	"CLAUDE.md", "AGENTS.md", "AGENTS.override.md", "SYSTEM.md", "APPEND_SYSTEM.md",
-	"settings.json", "settings.local.json", ".claude.json", "config.json", "config.jsonc", "config.toml",
-	"opencode.json", "opencode.jsonc", "models.json", "trust.json", ".mcp.json",
-	"curator-mcp.config.toml", "curator-mcp.json", ".agent-environment.json",
-	"auth.json", ".credentials.json", "credentials.json", "oauth.json", "tokens.json",
-}
+var files = watchedFiles()
 
 func snapshot(roots []string) (map[string]identity, error) {
 	out := map[string]identity{}

@@ -5,6 +5,8 @@ import (
 	"github.com/relux-works/curator/internal/testgitenv"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -315,5 +317,47 @@ func TestAccountRuntimeOutsideManagedHomes(t *testing.T) {
 	}
 	if same(before, after) {
 		t.Fatal("native context write omitted")
+	}
+}
+
+// Derived native-home inventory stays identical to the closed contract set.
+func TestDerivedNativeCatalogParity(t *testing.T) {
+	wantSuffixes := []string{".agents", ".claude", ".codex", ".config/muse", ".config/opencode", ".local/share/muse", ".pi", ".pi/agent"}
+	if got := nativeHomeSuffixes(); !slices.Equal(got, wantSuffixes) {
+		t.Fatalf("nativeHomeSuffixes = %v, want %v", got, wantSuffixes)
+	}
+	wantDirect := []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR"}
+	if got := nativeDirectEnvVars(); !slices.Equal(got, wantDirect) {
+		t.Fatalf("nativeDirectEnvVars = %v, want %v", got, wantDirect)
+	}
+	if got := nativeParentEnvVar(); got != "XDG_CONFIG_HOME" {
+		t.Fatalf("nativeParentEnvVar = %q, want XDG_CONFIG_HOME", got)
+	}
+	wantAux := []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"}
+	if got := nativeAuxiliaryEnvVars(); !slices.Equal(got, wantAux) {
+		t.Fatalf("nativeAuxiliaryEnvVars = %v, want %v", got, wantAux)
+	}
+	wantParentSubdirs := []parentSubdir{
+		{envVar: "XDG_CONFIG_HOME", subdir: "muse"},
+		{envVar: "XDG_CONFIG_HOME", subdir: "opencode"},
+		{envVar: "XDG_DATA_HOME", subdir: "muse"},
+	}
+	if got := nativeParentSubdirs(); !slices.Equal(got, wantParentSubdirs) {
+		t.Fatalf("nativeParentSubdirs = %v, want %v", got, wantParentSubdirs)
+	}
+	wantFiles := []string{
+		"CLAUDE.md", "AGENTS.md", "AGENTS.override.md", "SYSTEM.md", "APPEND_SYSTEM.md",
+		"settings.json", "settings.local.json", ".claude.json", "config.json", "config.jsonc", "config.toml",
+		"opencode.json", "opencode.jsonc", "models.json", "trust.json", ".mcp.json",
+		"curator-mcp.config.toml", "curator-mcp.json", ".agent-environment.json",
+		"auth.json", ".credentials.json", "credentials.json", "oauth.json", "tokens.json",
+	}
+	sort.Strings(wantFiles)
+	if got := watchedFiles(); !slices.Equal(got, wantFiles) {
+		t.Fatalf("watchedFiles = %v, want %v", got, wantFiles)
+	}
+	rootDir, rootDoc := controlTarget()
+	if rootDir != ".claude" || rootDoc != "CLAUDE.md" {
+		t.Fatalf("controlTarget = (%q, %q), want (.claude, CLAUDE.md)", rootDir, rootDoc)
 	}
 }

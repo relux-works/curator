@@ -132,3 +132,32 @@ func ParseHolder(raw []byte) (Holder, error) {
 	}
 	return h, nil
 }
+
+var supportedEnvironments = sync.OnceValues(func() (map[string]bool, error) {
+	raw, err := schemas.ReadFile("schemas/record.schema.json")
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Properties struct {
+			Environment struct {
+				Enum []string `json:"enum"`
+			} `json:"environment"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	allowed := make(map[string]bool, len(doc.Properties.Environment.Enum))
+	for _, id := range doc.Properties.Environment.Enum {
+		allowed[id] = true
+	}
+	return allowed, nil
+})
+
+// SupportedEnvironment reports whether environment is admitted by the embedded
+// home-leases-v1 record schema.
+func SupportedEnvironment(environment string) bool {
+	allowed, err := supportedEnvironments()
+	return err == nil && allowed[environment]
+}

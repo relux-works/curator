@@ -12,10 +12,11 @@ import (
 // than remaining live; callers may explicitly clear them at the outer runner.
 func CheckIsolation(previousHome string) error {
 	home, err := os.UserHomeDir()
-	if err != nil || !filepath.IsAbs(home) || home == previousHome || os.Getenv("XDG_CONFIG_HOME") == "" {
+	parentVar := nativeParentEnvVar()
+	if err != nil || !filepath.IsAbs(home) || home == previousHome || parentVar == "" || os.Getenv(parentVar) == "" {
 		return fmt.Errorf("testhomeguard: neutral testgitenv HOME isolation required")
 	}
-	for _, name := range []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+	for _, name := range nativeAuxiliaryEnvVars() {
 		if os.Getenv(name) != "" {
 			return fmt.Errorf("testhomeguard: neutral testgitenv isolation leaves an ambient native-home override")
 		}
