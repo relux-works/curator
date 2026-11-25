@@ -666,10 +666,12 @@ func reserveRetiredSourceSnapshot(parent string) (string, error) {
 			return "", fmt.Errorf("reserve a retired source snapshot name: %w", err)
 		}
 		path := filepath.Join(parent, retiredSourceSnapshotPrefix+hex.EncodeToString(suffix[:]))
-		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
-			return path, nil
-		} else if err != nil {
+		state, err := stateread.Lstat(path)
+		if err != nil {
 			return "", fmt.Errorf("inspect retired source snapshot name: %w", err)
+		}
+		if state.Kind == stateread.KindAbsent {
+			return path, nil
 		}
 	}
 	return "", fmt.Errorf("could not reserve a retired source snapshot name")
