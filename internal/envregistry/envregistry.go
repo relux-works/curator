@@ -397,7 +397,7 @@ func init() {
 				if route.Strategy() == "file-link" || route.Strategy() == "keyring-preferred" {
 					target = path.String()
 				}
-				entries = append(entries, Passthrough{Path: path.String(), Strategy: Strategy(route.Strategy()), FileLinkTarget: target})
+				entries = append(entries, Passthrough{Path: path.String(), Strategy: route.Strategy(), FileLinkTarget: target})
 			}
 			Registry[i].Passthrough = map[string][]Passthrough{"default": entries}
 		}
