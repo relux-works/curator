@@ -170,8 +170,7 @@ func stagedCapabilities(adapter harnessapi.Adapter) error {
 	}
 	if !capabilities.Has(harnessapi.MCPInspection) && !capabilities.Has(harnessapi.NativeMCPWrite) {
 		mcp, mcpErr := adapter.MCP(harnessapi.Context{}, harnessapi.UserScope)
-		effects.observe(mcp, mcpErr)
-		if code(mcpErr) != harnessapi.OperationNotPorted {
+		if code(effects.observe(mcp, mcpErr)) != harnessapi.OperationNotPorted {
 			return harnessapi.NewRefusal(harnessapi.RegistryMismatch)
 		}
 	}
