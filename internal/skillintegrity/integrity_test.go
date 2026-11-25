@@ -7,13 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 func fixture(t *testing.T) (string, Identity) {
@@ -41,6 +44,21 @@ func writeFixture(t *testing.T, root, path string, data []byte, mode os.FileMode
 		if err := privatedir.ProtectTree(root); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestBudgetPauseResumeExcludesNonVerificationTime(t *testing.T) {
+	started := time.Now()
+	pausedAt := started.Add(VerificationTimeout - time.Second)
+	resumedAt := pausedAt.Add(2 * VerificationTimeout)
+	budget := &Budget{started: started}
+	budget.pauseAt(pausedAt)
+	if got, want := budget.elapsedAt(resumedAt), VerificationTimeout-time.Second; got != want {
+		t.Fatalf("elapsed while paused = %s, want %s", got, want)
+	}
+	budget.resumeAt(resumedAt)
+	if got, want := budget.elapsedAt(resumedAt.Add(2*time.Second)), VerificationTimeout+time.Second; got != want {
+		t.Fatalf("elapsed after resuming = %s, want %s", got, want)
 	}
 }
 
@@ -86,6 +104,135 @@ func TestBuildAndVerifyEvidence(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProfileSelectionFiltersBeforeCaptureAndKeepsBuildInputs(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "SKILL.md", []byte("---\nname: fixture-skill\ndescription: Fixture skill.\n---\nFixture context.\n"), 0o644)
+	writeFixture(t, root, "agent-skill.json", []byte(`{"schema_version":8,"capabilities":{},"build_roots":["tools/runner"],"commands":{"runner":{"type":"build","driver":"go-v1","source_dir":"tools/runner/cmd/runner","modules":["modules/support"]}}}`), 0o644)
+	writeFixture(t, root, "references/guide.md", []byte("Guide.\n"), 0o644)
+	writeFixture(t, root, "data/public.json", []byte("{}\n"), 0o644)
+	writeFixture(t, root, "tools/runner/go.mod", []byte("module example.invalid/runner\n\ngo 1.24\n"), 0o644)
+	writeFixture(t, root, "tools/runner/cmd/runner/main.go", []byte("package main\nfunc main() {}\n"), 0o644)
+	writeFixture(t, root, "tools/runner/vendor/modules.txt", []byte("# example.invalid/support v0.1.0\n"), 0o644)
+	writeFixture(t, root, "tools/runner/vendor/example.invalid/support/support.go", []byte("package support\n"), 0o644)
+	writeFixture(t, root, "modules/support/go.mod", []byte("module example.invalid/support\n\ngo 1.24\n"), 0o644)
+	writeFixture(t, root, "modules/support/support.go", []byte("package support\n"), 0o644)
+	large := filepath.Join(root, ".excluded-cache", "over-limit.bin")
+	if err := os.MkdirAll(filepath.Dir(large), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Create(large)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(MaxBytes + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	identity := Identity{Name: "fixture-skill", Source: "https://example.org/fixture-skill.git", Commit: strings.Repeat("a", 40)}
+	selection := &whitelist.FileSelection{Include: []string{"data/public.json"}, Exclude: []string{".excluded-cache/**"}}
+	entry, err := BuildWithProfileSelection(context.Background(), root, identity, selection, nil)
+	if err != nil {
+		t.Fatalf("filtered capture failed: %v", err)
+	}
+	wantContext := []string{"SKILL.md", "data/public.json", "references/guide.md"}
+	if !slices.Equal(entry.Manifest.ContextFiles, wantContext) {
+		t.Fatalf("context files = %v, want %v", entry.Manifest.ContextFiles, wantContext)
+	}
+	if entry.Manifest.FileSelection == nil || !slices.Equal(entry.Manifest.FileSelection.Include, selection.Include) || !slices.Equal(entry.Manifest.FileSelection.Exclude, selection.Exclude) {
+		t.Fatalf("selection rules were not recorded: %+v", entry.Manifest.FileSelection)
+	}
+	for _, required := range []string{"agent-skill.json", "tools/runner/go.mod", "tools/runner/cmd/runner/main.go", "tools/runner/vendor/modules.txt", "modules/support/go.mod", "modules/support/support.go"} {
+		if !hasEvidenceFile(entry.Manifest.Files, required) {
+			t.Errorf("declared build input %q was not retained in lock evidence", required)
+		}
+	}
+	if hasEvidenceFile(entry.Manifest.Files, ".excluded-cache/over-limit.bin") {
+		t.Fatal("excluded payload entered integrity capture")
+	}
+	if err := Verify(context.Background(), root, identity, entry, nil); err != nil {
+		t.Fatalf("filtered evidence did not verify: %v", err)
+	}
+	if err := os.Truncate(large, MaxBytes+2); err != nil {
+		t.Fatal(err)
+	}
+	if err := Verify(context.Background(), root, identity, entry, nil); err != nil {
+		t.Fatalf("excluded file drift affected filtered evidence: %v", err)
+	}
+	writeFixture(t, root, "data/public.json", []byte("{\"updated\":true}\n"), 0o644)
+	if err := Verify(context.Background(), root, identity, entry, nil); !IsCode(err, "skill_integrity_mismatch") {
+		t.Fatalf("selected file drift did not refuse: %v", err)
+	}
+
+	if _, err := Build(context.Background(), root, identity, nil); !IsCode(err, "skill_integrity_manifest_invalid") || !strings.Contains(err.Error(), "capture budget exceeded") {
+		t.Fatalf("unfiltered capture did not refuse at the existing limit: %v", err)
+	}
+}
+
+func TestProfileSelectionRefusesRequiredInputsAndProtectedFiles(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "SKILL.md", []byte("---\nname: fixture-skill\ndescription: Fixture skill.\n---\nFixture context.\n"), 0o644)
+	writeFixture(t, root, "agent-skill.json", []byte(`{"schema_version":8,"capabilities":{},"build_roots":["tools/runner"],"commands":{"runner":{"type":"build","driver":"go-v1","source_dir":"tools/runner/cmd/runner","modules":["modules/support"]}}}`), 0o644)
+	writeFixture(t, root, "tools/runner/go.mod", []byte("module example.invalid/runner\n\ngo 1.24\n"), 0o644)
+	writeFixture(t, root, "tools/runner/cmd/runner/main.go", []byte("package main\nfunc main() {}\n"), 0o644)
+	writeFixture(t, root, "modules/support/go.mod", []byte("module example.invalid/support\n\ngo 1.24\n"), 0o644)
+	writeFixture(t, root, "modules/support/support.go", []byte("package support\n"), 0o644)
+	identity := Identity{Name: "fixture-skill", Source: "https://example.org/fixture-skill.git", Commit: strings.Repeat("a", 40)}
+	for _, pattern := range []string{"tools/runner/cmd/runner/main.go", "tools/runner/cmd/runner/**", "modules/support/**"} {
+		t.Run(pattern, func(t *testing.T) {
+			_, err := BuildWithProfileSelection(context.Background(), root, identity, &whitelist.FileSelection{Exclude: []string{pattern}}, nil)
+			if !IsCode(err, "profile_skill_files_build_source_excluded") {
+				t.Fatalf("required build input exclusion did not refuse: %v", err)
+			}
+		})
+	}
+	for _, file := range []string{"SKILL.md", "agent-skill.json"} {
+		t.Run(file, func(t *testing.T) {
+			_, err := BuildWithProfileSelection(context.Background(), root, identity, &whitelist.FileSelection{Exclude: []string{file}}, nil)
+			if !IsCode(err, "profile_skill_files_invalid") {
+				t.Fatalf("protected file exclusion did not refuse: %v", err)
+			}
+		})
+	}
+}
+
+func TestSelectionIntegrityEntryRoundTripsSingleRuleList(t *testing.T) {
+	for _, selection := range []*whitelist.FileSelection{
+		{Include: []string{"extras/data.json"}},
+		{Exclude: []string{"references/private/**"}},
+	} {
+		root, id := fixture(t)
+		writeFixture(t, root, "extras/data.json", []byte("{}\n"), 0o644)
+		entry, err := BuildWithProfileSelection(context.Background(), root, id, selection, nil)
+		if err != nil {
+			t.Fatalf("build with selection %+v: %v", selection, err)
+		}
+		raw, err := protocoljson.MarshalCanonical(entry.Object())
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := DecodeEntry(raw, id)
+		if err != nil {
+			t.Fatalf("decode selection %+v: %v", selection, err)
+		}
+		if !equalFileSelection(decoded.Manifest.FileSelection, selection) {
+			t.Fatalf("decoded selection = %+v, want %+v", decoded.Manifest.FileSelection, selection)
+		}
+	}
+}
+
+func hasEvidenceFile(files []File, path string) bool {
+	for _, file := range files {
+		if file.Path == path {
+			return true
+		}
+	}
+	return false
 }
 
 func parseTestCapabilities(t *testing.T, raw string) capabilities.Manifest {

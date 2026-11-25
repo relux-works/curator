@@ -48,7 +48,7 @@ var entries = [...]registration{
 	{claude_code.ID, 1, probing(), claude_code.New, harnessapi.NewProbeSpec("claude", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{codex_cli.ID, 1, probing(), codex_cli.New, harnessapi.NewProbeSpec("codex", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{cursor.ID, 1, skillAndMCPInspection(), cursor.New, harnessapi.ProbeSpec{}, false},
-	{gemini.ID, 1, harnessapi.CapabilitySet{}, gemini.New, harnessapi.ProbeSpec{}, false},
+	{gemini.ID, 1, gemini.Capabilities(), gemini.New, harnessapi.ProbeSpec{}, false},
 	{muse.ID, 1, probing(), muse.New, harnessapi.NewProbeSpec("muse", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{opencode.ID, 1, probing(), opencode.New, harnessapi.NewProbeSpec("opencode", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{pi.ID, 1, func() harnessapi.CapabilitySet {

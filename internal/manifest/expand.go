@@ -49,10 +49,7 @@ func Expand(m *Manifest, opts ExpansionOptions) ([]Selection, error) {
 		return nil, err
 	}
 	outputs := append([]string{}, opts.OutputRoots...)
-	outputs = append(outputs, filepath.Join(project, ".agents"))
-	for _, rel := range adapters.AgentPaths {
-		outputs = append(outputs, filepath.Join(project, filepath.FromSlash(rel)))
-	}
+	outputs = append(outputs, adapters.ProjectOutputRoots(project)...)
 	for _, output := range outputs {
 		if !filepath.IsAbs(output) {
 			return nil, fmt.Errorf("source_output_overlap: output boundary must be absolute")

@@ -118,16 +118,21 @@ func WalkContext(snapshot string, includeScripts bool, excludeRoots []string, vi
 	return nil
 }
 
-// ContextExcludedRoots returns the sorted union of runtime and build roots
-// used by static context selection. It is independent of command activation,
-// cache state, locale selection, and compiler execution.
-func ContextExcludedRoots(runtimeRoots, buildRoots []string) []string {
+// ContextExcludedRoots returns the sorted union of runtime, build and other
+// declared input roots used by static context selection. It is independent of
+// command activation, cache state, locale selection, and compiler execution.
+func ContextExcludedRoots(runtimeRoots, buildRoots []string, additionalRoots ...[]string) []string {
 	seen := make(map[string]bool, len(runtimeRoots)+len(buildRoots))
 	for _, root := range runtimeRoots {
 		seen[root] = true
 	}
 	for _, root := range buildRoots {
 		seen[root] = true
+	}
+	for _, roots := range additionalRoots {
+		for _, root := range roots {
+			seen[root] = true
+		}
 	}
 	roots := make([]string, 0, len(seen))
 	for root := range seen {
@@ -138,8 +143,9 @@ func ContextExcludedRoots(runtimeRoots, buildRoots []string) []string {
 }
 
 // ContextPathIncluded reports whether a POSIX-relative snapshot path belongs
-// to the static agent-facing context. Callers supply only validated runtime
-// and build roots; scripts are context only for command-less packages.
+// to the static agent-facing context. Callers supply only validated runtime,
+// build and other declared input roots; scripts are context only for
+// command-less packages.
 func ContextPathIncluded(posix string, includeScripts bool, excludeRoots []string) bool {
 	if PathExcluded(posix, excludeRoots) {
 		return false

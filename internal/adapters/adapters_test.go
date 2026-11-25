@@ -521,3 +521,47 @@ func TestGitignoreEntriesAndUnknownAgents(t *testing.T) {
 		t.Fatalf("unknown: %v", unknown)
 	}
 }
+
+// Gemini's project and user skill projections retain their existing native
+// destination while the path facts move behind the adapter contract.
+func TestGeminiSkillProjectionDestinations(t *testing.T) {
+	project := t.TempDir()
+	stageRoot := t.TempDir()
+	canonical := filepath.Join(project, ".agents", "skills")
+	makeSkill(t, canonical, "skill-g")
+
+	projectMirror, err := StageProject(stageRoot, project, []string{"gemini"},
+		[]Group{{Root: canonical, Skills: []string{"skill-g"}}}, "copy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectTarget := filepath.Join(project, ".gemini", "skills", "skill-g")
+	if _, found := find(projectMirror.Plan(), projectTarget); !found {
+		t.Fatalf("project mirror missing existing Gemini destination %s", projectTarget)
+	}
+	entries := strings.Join(RequiredGitignoreEntries([]string{"gemini"}), "\n")
+	if !strings.Contains(entries, ".gemini/skills/") {
+		t.Fatalf("generated-path ignore entry missing Gemini destination: %q", entries)
+	}
+
+	home := t.TempDir()
+	userHome := t.TempDir()
+	globalStage := t.TempDir()
+	globalCanonical := filepath.Join(home, "global", "skills")
+	makeSkill(t, globalCanonical, "skill-g")
+	globalMirror, err := StageGlobal(globalStage, home, userHome, []string{"gemini"},
+		[]string{"skill-g"}, "copy", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userTarget := filepath.Join(userHome, ".gemini", "skills", "skill-g")
+	if _, found := find(globalMirror.Plan(), userTarget); !found {
+		t.Fatalf("user mirror missing existing Gemini destination %s", userTarget)
+	}
+}
+
+func TestGeminiRemainsARecognizedSkillTarget(t *testing.T) {
+	if unknown := UnknownAgents([]string{"gemini"}); len(unknown) != 0 {
+		t.Fatalf("registered skill target rejected as unknown: %v", unknown)
+	}
+}

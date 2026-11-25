@@ -1032,7 +1032,7 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Mode: requirement.Mode, Commands: requirement.Commands,
 			ProfileSkillRequirement: true, Capabilities: requirement.Capabilities,
-			CapabilitiesPresent: requirement.CapabilitiesPresent,
+			CapabilitiesPresent: requirement.CapabilitiesPresent, Files: requirement.Files,
 		})
 	}
 	for _, name := range contextpkg.SortedNames(manifest.MCP) {

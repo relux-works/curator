@@ -29,42 +29,95 @@ func skillSurfaceIdentity(skill skillOf) []byte {
 	return []byte(skillProjectionVersion + ":" + skill.hash)
 }
 
+type skillProjectionWithFiles struct {
+	skill     skillOf
+	files     []string
+	selection *whitelist.FileSelection
+}
+
 // projectSkill plans without writing. Both the digest and the eventual copy
 // use the same core context walker, including canonical filesystem aliases.
 func projectSkill(home, source string, version hashing.Version) (skillOf, error) {
+	projection, err := projectSkillWithFiles(home, source, version, nil)
+	return projection.skill, err
+}
+
+func projectSkillWithFiles(home, source string, version hashing.Version, selection *whitelist.FileSelection) (skillProjectionWithFiles, error) {
 	if err := opaquescan.RefuseNULV1(source, version); err != nil {
-		return skillOf{}, err
+		return skillProjectionWithFiles{}, err
 	}
 	spec, err := skillspec.Load(source)
 	if err != nil {
-		return skillOf{}, err
+		return skillProjectionWithFiles{}, err
 	}
 	skill := skillOf{source: source, includeScripts: len(spec.Commands) == 0,
-		excludeRoots: whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots), version: version}
+		excludeRoots: profileSkillExcludedRoots(spec, selection), version: version}
 	files := map[string][]byte{}
-	err = whitelist.WalkContext(source, skill.includeScripts, skill.excludeRoots, func(path, posix string) error {
-		body, err := os.ReadFile(path) // #nosec G304 -- canonical file selected by the shared snapshot context walker
-		if err != nil {
-			return err
+	var selected []string
+	if selection == nil {
+		err = whitelist.WalkContext(source, skill.includeScripts, skill.excludeRoots, func(path, posix string) error {
+			body, err := os.ReadFile(path) // #nosec G304 -- canonical file selected by the shared snapshot context walker
+			if err != nil {
+				return err
+			}
+			files[posix] = body
+			return nil
+		})
+	} else {
+		selected, err = whitelist.ContextFiles(source, skill.includeScripts, skill.excludeRoots, selection)
+		if err == nil {
+			for _, posix := range selected {
+				body, readErr := os.ReadFile(filepath.Join(source, filepath.FromSlash(posix))) // #nosec G304 -- selected by the validated profile skill file set
+				if readErr != nil {
+					err = readErr
+					break
+				}
+				files[posix] = body
+			}
 		}
-		files[posix] = body
-		return nil
-	})
+	}
 	if err != nil {
-		return skillOf{}, err
+		return skillProjectionWithFiles{}, err
+	}
+	skill.files = append([]string(nil), selected...)
+	if selection != nil {
+		skill.selection = &whitelist.FileSelection{
+			Include: append([]string(nil), selection.Include...),
+			Exclude: append([]string(nil), selection.Exclude...),
+		}
 	}
 	skill.hash, err = hashing.ContentSHA256Files(files, version)
 	if err != nil {
-		return skillOf{}, err
+		return skillProjectionWithFiles{}, err
 	}
 	skill.root = filepath.Join(contextstore.Root(home), "skill-context", skillProjectionVersion, fmt.Sprintf("v%d", version), hashing.Normalize(skill.hash))
-	return skill, nil
+	return skillProjectionWithFiles{skill: skill, files: selected, selection: selection}, nil
+}
+
+func profileSkillExcludedRoots(spec *skillspec.Spec, selection *whitelist.FileSelection) []string {
+	var modules []string
+	if selection != nil {
+		for _, command := range spec.Commands {
+			if command.Driver == "go-v1" {
+				modules = append(modules, command.Modules...)
+			}
+		}
+	}
+	return whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots, modules)
 }
 
 // publishSkillProjection runs only during materialization under its mutation
 // lock. A complete private staging tree is renamed into the shared store;
 // raw package snapshots and command/runtime stores remain untouched.
 func publishSkillProjection(op *operation, home string, skill skillOf) (resultErr error) {
+	return publishSkillProjectionSelected(op, home, skill, skill.files, skill.selection)
+}
+
+func publishSkillProjectionWithFiles(op *operation, home string, projection skillProjectionWithFiles) error {
+	return publishSkillProjectionSelected(op, home, projection.skill, projection.files, projection.selection)
+}
+
+func publishSkillProjectionSelected(op *operation, home string, skill skillOf, files []string, selection *whitelist.FileSelection) (resultErr error) {
 	parent := filepath.Dir(skill.root)
 	if err := privatedir.MakeAll(parent); err != nil {
 		return err
@@ -93,7 +146,11 @@ func publishSkillProjection(op *operation, home string, skill skillOf) (resultEr
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(staging)) }()
-	if _, err := whitelist.CopyContext(skill.source, staging, skill.includeScripts, skill.excludeRoots); err != nil {
+	if files == nil {
+		if _, err := whitelist.CopyContext(skill.source, staging, skill.includeScripts, skill.excludeRoots); err != nil {
+			return err
+		}
+	} else if err := whitelist.CopyContextFiles(skill.source, staging, files, skill.excludeRoots, selection); err != nil {
 		return err
 	}
 	digest, err := skillProjectionHash(staging, skill.version)

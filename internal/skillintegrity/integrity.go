@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/pathboundary"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/skillspec"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 // Schema identifies the unsigned skill evidence format.
@@ -80,13 +82,15 @@ type File struct {
 type Manifest struct {
 	Schema string `json:"schema"`
 	Identity
-	ManifestKind      string          `json:"manifest_kind"`
-	DeclarationPath   string          `json:"declaration_path"`
-	DeclarationSHA256 string          `json:"declaration_sha256"`
-	Declaration       json.RawMessage `json:"declaration"`
-	HashVersion       int             `json:"hash_version"`
-	ContentSHA256     string          `json:"content_sha256"`
-	Files             []File          `json:"files"`
+	ManifestKind      string                   `json:"manifest_kind"`
+	DeclarationPath   string                   `json:"declaration_path"`
+	DeclarationSHA256 string                   `json:"declaration_sha256"`
+	Declaration       json.RawMessage          `json:"declaration"`
+	HashVersion       int                      `json:"hash_version"`
+	ContentSHA256     string                   `json:"content_sha256"`
+	Files             []File                   `json:"files"`
+	FileSelection     *whitelist.FileSelection `json:"file_selection,omitempty"`
+	ContextFiles      []string                 `json:"context_files,omitempty"`
 }
 
 // Entry pairs a manifest with its canonical CCJ-1 digest.
@@ -108,7 +112,18 @@ func (m Manifest) Object() map[string]any {
 		// Validate checks the closed declaration before this projection is used.
 		_ = decoder.Decode(&declaration)
 	}
-	return map[string]any{"schema": m.Schema, "name": m.Name, "source": m.Source, "commit": m.Commit, "state_sha256": m.StateSHA256, "directory": m.Directory, "manifest_kind": m.ManifestKind, "declaration_path": m.DeclarationPath, "declaration_sha256": m.DeclarationSHA256, "declaration": declaration, "hash_version": m.HashVersion, "content_sha256": m.ContentSHA256, "files": files}
+	object := map[string]any{"schema": m.Schema, "name": m.Name, "source": m.Source, "commit": m.Commit, "state_sha256": m.StateSHA256, "directory": m.Directory, "manifest_kind": m.ManifestKind, "declaration_path": m.DeclarationPath, "declaration_sha256": m.DeclarationSHA256, "declaration": declaration, "hash_version": m.HashVersion, "content_sha256": m.ContentSHA256, "files": files}
+	if m.FileSelection != nil {
+		object["file_selection"] = fileSelectionObject(m.FileSelection)
+		object["context_files"] = m.ContextFiles
+	}
+	return object
+}
+
+func fileSelectionObject(selection *whitelist.FileSelection) map[string]any {
+	include := append([]string{}, selection.Include...)
+	exclude := append([]string{}, selection.Exclude...)
+	return map[string]any{"include": include, "exclude": exclude}
 }
 
 // Object projects the entry's admitted JSON domain for canonical encoding.
@@ -121,12 +136,46 @@ type Budget struct {
 	files   int
 	bytes   int64
 	started time.Time
+	elapsed time.Duration
+	paused  bool
 }
 
 // NewBudget starts the shared file, byte and deadline budget for one pass.
 func NewBudget() *Budget { return &Budget{started: time.Now()} }
+
+// Pause excludes source inspection and other work outside integrity capture
+// from the shared verification deadline, while retaining accumulated file and
+// byte limits.
+func (b *Budget) Pause() { b.pauseAt(time.Now()) }
+
+// Resume starts counting integrity time again after a paused interval.
+func (b *Budget) Resume() { b.resumeAt(time.Now()) }
+
+func (b *Budget) pauseAt(now time.Time) {
+	if b.paused {
+		return
+	}
+	b.elapsed += now.Sub(b.started)
+	b.paused = true
+}
+
+func (b *Budget) resumeAt(now time.Time) {
+	if !b.paused {
+		return
+	}
+	b.started = now
+	b.paused = false
+}
+
+func (b *Budget) elapsedAt(now time.Time) time.Duration {
+	if b.paused {
+		return b.elapsed
+	}
+	return b.elapsed + now.Sub(b.started)
+}
+
 func (b *Budget) check(ctx context.Context) error {
-	if ctx.Err() != nil || time.Since(b.started) > VerificationTimeout {
+	if ctx.Err() != nil || b.elapsedAt(time.Now()) > VerificationTimeout {
 		return failure("skill_integrity_unavailable", "verification interrupted or deadline reached")
 	}
 	return nil
@@ -148,13 +197,41 @@ func validDigest(value string) bool {
 	return true
 }
 
+func cloneFileSelection(selection *whitelist.FileSelection) *whitelist.FileSelection {
+	if selection == nil {
+		return nil
+	}
+	clone := &whitelist.FileSelection{
+		Include: append([]string(nil), selection.Include...),
+		Exclude: append([]string(nil), selection.Exclude...),
+	}
+	sort.Strings(clone.Include)
+	sort.Strings(clone.Exclude)
+	return clone
+}
+
+func equalFileSelection(left, right *whitelist.FileSelection) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	left, right = cloneFileSelection(left), cloneFileSelection(right)
+	return slices.Equal(left.Include, right.Include) && slices.Equal(left.Exclude, right.Exclude)
+}
+
 type capture struct {
 	data  map[string][]byte
 	infos map[string]os.FileInfo
 	files []File
 	// Complete describes the initial traversal and reads, before revalidation.
 	// A partial observation cannot establish that an expected file is absent.
-	complete bool
+	complete       bool
+	filtered       bool
+	selection      *whitelist.FileSelection
+	contextFiles   []string
+	includeScripts bool
+	excludeRoots   []string
+	preserveRoots  []string
+	sourceFile     string
 }
 
 func (c *capture) reader(root string) skillspec.Reader {
@@ -192,24 +269,65 @@ func (c *capture) reader(root string) skillspec.Reader {
 // Build uses one bounded capture for both hashing and native metadata parsing.
 // The caller supplies a shared budget for a closure, or nil for one skill.
 func Build(ctx context.Context, root string, identity Identity, budget *Budget) (Entry, error) {
-	return build(ctx, root, identity, budget, nil, nil)
+	return build(ctx, root, identity, budget, nil, nil, nil)
 }
 
 // BuildWithProfileCapabilities synthesizes the same bounded evidence as Build
 // while recording validated capabilities supplied by the containing profile.
 // A nil declaration retains the existing all-none synthetic bytes.
 func BuildWithProfileCapabilities(ctx context.Context, root string, identity Identity, declared *capabilities.Manifest, budget *Budget) (Entry, error) {
-	return build(ctx, root, identity, budget, nil, declared)
+	return build(ctx, root, identity, budget, nil, nil, declared)
 }
 
-func build(ctx context.Context, root string, identity Identity, budget *Budget, expected *Manifest, profileCapabilities *capabilities.Manifest) (Entry, error) {
+// BuildWithProfileSelection captures the exact profile-selected context while
+// retaining declared runtime and build roots in the bounded evidence.
+func BuildWithProfileSelection(ctx context.Context, root string, identity Identity, selection *whitelist.FileSelection, budget *Budget) (Entry, error) {
+	return build(ctx, root, identity, budget, nil, selection, nil)
+}
+
+// BuildWithProfileCapabilitiesAndSelection is BuildWithProfileSelection for a
+// manifestless skill whose capabilities are declared by the containing profile.
+func BuildWithProfileCapabilitiesAndSelection(ctx context.Context, root string, identity Identity, declared *capabilities.Manifest, selection *whitelist.FileSelection, budget *Budget) (Entry, error) {
+	return build(ctx, root, identity, budget, nil, selection, declared)
+}
+
+func build(ctx context.Context, root string, identity Identity, budget *Budget, expected *Manifest, selection *whitelist.FileSelection, profileCapabilities *capabilities.Manifest) (Entry, error) {
 	if budget == nil {
 		budget = NewBudget()
 	}
 	if err := budget.check(ctx); err != nil {
 		return Entry{}, err
 	}
-	c, err := captureTree(ctx, root, budget)
+	if expected != nil {
+		if selection != nil && !equalFileSelection(selection, expected.FileSelection) {
+			return Entry{}, failure("skill_integrity_mismatch", "profile file selection differs from pinned evidence")
+		}
+		selection = cloneFileSelection(expected.FileSelection)
+	}
+	selection = cloneFileSelection(selection)
+	var c *capture
+	var contextFiles []string
+	var err error
+	if selection == nil {
+		c, err = captureTree(ctx, root, budget)
+	} else {
+		if err := whitelist.ValidateFileSelection(selection); err != nil {
+			return Entry{}, failure("profile_skill_files_invalid", "file selection is invalid")
+		}
+		spec, specErr := skillspec.Load(root)
+		if specErr != nil {
+			return Entry{}, failure("skill_integrity_manifest_invalid", "skill declaration is invalid")
+		}
+		excludeRoots := skillContextExcludedRoots(spec)
+		contextFiles, err = whitelist.ContextFiles(root, len(spec.Commands) == 0, excludeRoots, selection)
+		if err != nil {
+			return Entry{}, err
+		}
+		if expected != nil && !slices.Equal(contextFiles, expected.ContextFiles) {
+			return Entry{}, failure("skill_integrity_mismatch", "selected context file set differs from pinned evidence")
+		}
+		c, err = captureSelectedTree(ctx, root, budget, contextFiles, spec, selection)
+	}
 	if err != nil {
 		// A completed per-file mismatch is a failure even if a later read is
 		// unavailable. A completed traversal also establishes missing members;
@@ -257,7 +375,7 @@ func build(ctx context.Context, root string, identity Identity, budget *Budget, 
 			return Entry{}, failure("profile_skill_capability_invalid", "profile capabilities are invalid")
 		}
 	}
-	m := Manifest{Schema: Schema, Identity: identity, HashVersion: 2, ContentSHA256: content, Files: c.files, ManifestKind: "synthesized", Declaration: json.RawMessage(declaration)}
+	m := Manifest{Schema: Schema, Identity: identity, HashVersion: 2, ContentSHA256: content, Files: c.files, ManifestKind: "synthesized", Declaration: json.RawMessage(declaration), FileSelection: cloneFileSelection(selection), ContextFiles: contextFiles}
 	if source := reader.ManifestSourcePath(root); source != "" {
 		m.ManifestKind = "native"
 		m.DeclarationPath = source
@@ -448,6 +566,153 @@ func captureTree(ctx context.Context, root string, budget *Budget) (*capture, er
 	return c, nil
 }
 
+func captureSelectedTree(ctx context.Context, root string, budget *Budget, contextFiles []string, spec *skillspec.Spec, selection *whitelist.FileSelection) (*capture, error) {
+	c := &capture{
+		data:           map[string][]byte{},
+		infos:          map[string]os.FileInfo{},
+		files:          []File{},
+		filtered:       true,
+		selection:      cloneFileSelection(selection),
+		contextFiles:   append([]string(nil), contextFiles...),
+		includeScripts: len(spec.Commands) == 0,
+		excludeRoots:   skillContextExcludedRoots(spec),
+		preserveRoots:  skillContextExcludedRoots(spec),
+		sourceFile:     spec.SourceFile,
+	}
+	selected := make(map[string]bool, len(contextFiles)+1)
+	for _, file := range contextFiles {
+		selected[file] = true
+	}
+	if spec.SourceFile != "" {
+		selected[spec.SourceFile] = true
+	}
+
+	folded := map[string]bool{}
+	var observations []error
+	err := filepath.WalkDir(root, func(pathname string, entry fs.DirEntry, walkErr error) error {
+		if err := budget.check(ctx); err != nil {
+			return err
+		}
+		if walkErr != nil {
+			observations = append(observations, failure("skill_integrity_unavailable", "selected skill paths cannot be observed"))
+			return nil
+		}
+		rel, err := filepath.Rel(root, pathname)
+		if err != nil {
+			return failure("skill_integrity_boundary_invalid", "selected path is not relative to the skill root")
+		}
+		posix := whitelist.CanonicalContextPath(root, filepath.ToSlash(rel))
+		if entry.IsDir() && posix != "." && !relevantSelectionPath(posix, selected, c.preserveRoots) {
+			return filepath.SkipDir
+		}
+		if entry.IsDir() && whitelist.SelectionExcludesDirectory(selection, posix) {
+			if intersectsRoots(posix, c.preserveRoots) {
+				return failure("profile_skill_files_build_source_excluded", "file selection excludes a declared build or runtime root")
+			}
+			return filepath.SkipDir
+		}
+		needed := selected[posix] || isWithinRoots(posix, c.preserveRoots)
+		if !needed && !entry.IsDir() {
+			return nil
+		}
+		info, err := captureEntryInfo(pathname, entry)
+		if err != nil {
+			return err
+		}
+		if _, err := admitEntry(root, pathname, info, folded); err != nil {
+			return err
+		}
+		c.infos[posix] = info
+		if info.IsDir() {
+			return nil
+		}
+		if !needed {
+			return nil
+		}
+		if isWithinRoots(posix, c.preserveRoots) && whitelist.SelectionExcludesFile(selection, posix) {
+			return failure("profile_skill_files_build_source_excluded", "file selection excludes a declared build or runtime input")
+		}
+		if budget.files >= MaxFiles || info.Size() < 0 || info.Size() > MaxBytes-budget.bytes {
+			return failure("skill_integrity_manifest_invalid", "capture budget exceeded")
+		}
+		remaining := MaxBytes - budget.bytes
+		budget.files++
+		budget.bytes += info.Size()
+		data, observed, err := readCapturedFile(pathname, info, remaining)
+		if err != nil {
+			if IsCode(err, "skill_integrity_unavailable") {
+				observations = append(observations, err)
+				return nil
+			}
+			return err
+		}
+		c.data[posix] = data
+		c.infos[posix] = observed
+		c.files = append(c.files, File{Path: posix, Size: int64(len(data)), Executable: observed.Mode().Perm()&0o111 != 0, SHA256: digest(data)})
+		return budget.check(ctx)
+	})
+	if err != nil {
+		observations = append(observations, err)
+	}
+	if err := errors.Join(observations...); err != nil {
+		return c, err
+	}
+	c.complete = true
+	if err := c.revalidate(ctx, root, budget); err != nil {
+		return c, err
+	}
+	sort.Slice(c.files, func(i, j int) bool { return c.files[i].Path < c.files[j].Path })
+	return c, nil
+}
+
+func relevantSelectionPath(path string, selected map[string]bool, roots []string) bool {
+	if selected[path] || isWithinRoots(path, roots) {
+		return true
+	}
+	for selectedPath := range selected {
+		if path == "." || strings.HasPrefix(selectedPath, path+"/") {
+			return true
+		}
+	}
+	for _, root := range roots {
+		if path == "." || strings.HasPrefix(root, path+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func isWithinRoots(path string, roots []string) bool {
+	for _, root := range roots {
+		if path == root || strings.HasPrefix(path, root+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func intersectsRoots(path string, roots []string) bool {
+	if isWithinRoots(path, roots) {
+		return true
+	}
+	for _, root := range roots {
+		if path == "." || strings.HasPrefix(root, path+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func skillContextExcludedRoots(spec *skillspec.Spec) []string {
+	var modules []string
+	for _, command := range spec.Commands {
+		if command.Driver == "go-v1" {
+			modules = append(modules, command.Modules...)
+		}
+	}
+	return whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots, modules)
+}
+
 // admitEntry is the positive path/kind admission used by both passes. A late
 // forbidden entry must remain a hard boundary refusal at every startup level.
 func admitEntry(root, path string, info os.FileInfo, folded map[string]bool) (string, error) {
@@ -512,6 +777,9 @@ func ValidateLegacyBoundary(root string) error {
 }
 
 func (c *capture) revalidate(ctx context.Context, root string, budget *Budget) error {
+	if c.filtered {
+		return c.revalidateFiltered(ctx, root, budget)
+	}
 	seen := map[string]bool{}
 	folded := map[string]bool{}
 	failed, unavailable, complete := false, false, true
@@ -592,6 +860,121 @@ func (c *capture) revalidate(ctx context.Context, root string, budget *Budget) e
 	return errors.Join(results...)
 }
 
+func (c *capture) revalidateFiltered(ctx context.Context, root string, budget *Budget) error {
+	spec, err := skillspec.Load(root)
+	if err != nil {
+		return failure("skill_integrity_unavailable", "selected skill declaration cannot be re-read")
+	}
+	if spec.SourceFile != c.sourceFile || !slices.Equal(skillContextExcludedRoots(spec), c.preserveRoots) {
+		return failure("skill_integrity_mismatch", "declared build or runtime roots changed during capture")
+	}
+	excludeRoots := skillContextExcludedRoots(spec)
+	contextFiles, err := whitelist.ContextFiles(root, c.includeScripts, excludeRoots, c.selection)
+	if err != nil {
+		return err
+	}
+	if !slices.Equal(contextFiles, c.contextFiles) {
+		return failure("skill_integrity_mismatch", "selected context file set changed during capture")
+	}
+	selected := make(map[string]bool, len(contextFiles)+1)
+	for _, file := range contextFiles {
+		selected[file] = true
+	}
+	if spec.SourceFile != "" {
+		selected[spec.SourceFile] = true
+	}
+	current := map[string]os.FileInfo{}
+	folded := map[string]bool{}
+	priorFiles := budget.files - len(c.files)
+	priorBytes := budget.bytes
+	for _, file := range c.files {
+		priorBytes -= file.Size
+	}
+	regular := 0
+	var total int64
+	err = filepath.WalkDir(root, func(pathname string, entry fs.DirEntry, walkErr error) error {
+		if err := budget.check(ctx); err != nil {
+			return err
+		}
+		if walkErr != nil {
+			return failure("skill_integrity_unavailable", "selected skill paths cannot be re-observed")
+		}
+		rel, err := filepath.Rel(root, pathname)
+		if err != nil {
+			return failure("skill_integrity_boundary_invalid", "selected path is not relative to the skill root")
+		}
+		posix := whitelist.CanonicalContextPath(root, filepath.ToSlash(rel))
+		if entry.IsDir() && posix != "." && !relevantSelectionPath(posix, selected, c.preserveRoots) {
+			return filepath.SkipDir
+		}
+		if entry.IsDir() && whitelist.SelectionExcludesDirectory(c.selection, posix) {
+			if intersectsRoots(posix, c.preserveRoots) {
+				return failure("profile_skill_files_build_source_excluded", "file selection excludes a declared build or runtime root")
+			}
+			return filepath.SkipDir
+		}
+		needed := selected[posix] || isWithinRoots(posix, c.preserveRoots)
+		if !needed && !entry.IsDir() {
+			return nil
+		}
+		info, err := captureEntryInfo(pathname, entry)
+		if err != nil {
+			return err
+		}
+		if _, err := admitEntry(root, pathname, info, folded); err != nil {
+			return err
+		}
+		current[posix] = info
+		if !info.IsDir() {
+			regular++
+			if priorFiles+regular > MaxFiles || info.Size() < 0 || info.Size() > MaxBytes-priorBytes-total {
+				return failure("skill_integrity_manifest_invalid", "rechecked closure exceeds capture budget")
+			}
+			total += info.Size()
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	failed, unavailable := false, false
+	for path, before := range c.infos {
+		now, ok := current[path]
+		if !ok {
+			if before.IsDir() {
+				unavailable = true
+			} else {
+				failed = true
+			}
+			continue
+		}
+		if !os.SameFile(before, now) || before.Mode() != now.Mode() || before.Size() != now.Size() || !before.ModTime().Equal(now.ModTime()) {
+			if !now.IsDir() && (before.Size() != now.Size() || before.Mode().Perm()&0o111 != now.Mode().Perm()&0o111) {
+				failed = true
+			} else {
+				unavailable = true
+			}
+		}
+	}
+	for path, now := range current {
+		if _, ok := c.infos[path]; !ok {
+			if now.IsDir() {
+				unavailable = true
+			} else {
+				failed = true
+			}
+		}
+	}
+	var results []error
+	if failed {
+		results = append(results, failure("skill_integrity_mismatch", "selected skill files changed during capture"))
+	}
+	if unavailable {
+		results = append(results, failure("skill_integrity_unavailable", "selected skill paths could not be revalidated"))
+	}
+	return errors.Join(results...)
+}
+
 // Validate binds evidence to its already validated lock identity before I/O.
 func (e Entry) Validate(expected Identity) error {
 	m := e.Manifest
@@ -617,6 +1000,23 @@ func (e Entry) Validate(expected Identity) error {
 		folded[strings.ToLower(file.Path)] = true
 		total += file.Size
 		roster[file.Path] = file
+	}
+	if (m.FileSelection == nil) != (m.ContextFiles == nil) {
+		return invalid()
+	}
+	if m.FileSelection != nil {
+		if whitelist.ValidateFileSelection(m.FileSelection) != nil || whitelist.ValidateFileSet(m.ContextFiles) != nil {
+			return invalid()
+		}
+		canonical := cloneFileSelection(m.FileSelection)
+		if !slices.Equal(canonical.Include, m.FileSelection.Include) || !slices.Equal(canonical.Exclude, m.FileSelection.Exclude) {
+			return invalid()
+		}
+		for _, path := range m.ContextFiles {
+			if _, ok := roster[path]; !ok || whitelist.SelectionExcludesFile(m.FileSelection, path) {
+				return invalid()
+			}
+		}
 	}
 	switch m.ManifestKind {
 	case "native":
@@ -691,7 +1091,7 @@ func Verify(ctx context.Context, root string, expected Identity, e Entry, budget
 	if err := e.Validate(expected); err != nil {
 		return err
 	}
-	actual, err := build(ctx, root, expected, budget, &e.Manifest, nil)
+	actual, err := build(ctx, root, expected, budget, &e.Manifest, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -715,8 +1115,37 @@ func DecodeEntry(raw []byte, expected Identity) (Entry, error) {
 		return invalid()
 	}
 	var m map[string]json.RawMessage
-	if json.Unmarshal(object["manifest"], &m) != nil || !exactKeys(m, "schema", "name", "source", "commit", "state_sha256", "directory", "manifest_kind", "declaration_path", "declaration_sha256", "declaration", "hash_version", "content_sha256", "files") {
+	if json.Unmarshal(object["manifest"], &m) != nil {
 		return invalid()
+	}
+	manifestKeys := []string{"schema", "name", "source", "commit", "state_sha256", "directory", "manifest_kind", "declaration_path", "declaration_sha256", "declaration", "hash_version", "content_sha256", "files"}
+	hasSelection, hasContextFiles := m["file_selection"] != nil, m["context_files"] != nil
+	if hasSelection != hasContextFiles {
+		return invalid()
+	}
+	if hasSelection {
+		manifestKeys = append(manifestKeys, "file_selection", "context_files")
+	}
+	if !exactKeys(m, manifestKeys...) {
+		return invalid()
+	}
+	if hasSelection {
+		var selectionObject map[string]json.RawMessage
+		if json.Unmarshal(m["file_selection"], &selectionObject) != nil || !exactKeys(selectionObject, "include", "exclude") {
+			return invalid()
+		}
+		for _, key := range []string{"include", "exclude"} {
+			if raw, present := selectionObject[key]; present {
+				var list []string
+				if len(bytes.TrimSpace(raw)) == 0 || bytes.TrimSpace(raw)[0] != '[' || json.Unmarshal(raw, &list) != nil || list == nil {
+					return invalid()
+				}
+			}
+		}
+		var contextFiles []string
+		if len(bytes.TrimSpace(m["context_files"])) == 0 || bytes.TrimSpace(m["context_files"])[0] != '[' || json.Unmarshal(m["context_files"], &contextFiles) != nil || contextFiles == nil {
+			return invalid()
+		}
 	}
 	for _, key := range []string{"schema", "name", "source", "commit", "state_sha256", "directory", "manifest_kind", "declaration_path", "declaration_sha256", "content_sha256"} {
 		if value := bytes.TrimSpace(m[key]); len(value) == 0 || value[0] != '"' {
