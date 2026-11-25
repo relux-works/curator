@@ -1,9 +1,11 @@
 package envprofile
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/envregistry"
@@ -12,7 +14,8 @@ import (
 const museProbeFixtureEnv = "CURATOR_ENVPROFILE_MUSE_PROBE_TEST_HELPER"
 
 func init() {
-	if os.Getenv(museProbeFixtureEnv) != "1" || filepath.Base(os.Args[0]) != "muse" {
+	executableName := strings.TrimSuffix(strings.ToLower(filepath.Base(os.Args[0])), ".exe")
+	if os.Getenv(museProbeFixtureEnv) != "1" || executableName != "muse" {
 		return
 	}
 	if len(os.Args) != 2 || os.Args[1] != "--version" {
@@ -31,17 +34,16 @@ func TestMuseReleaseDetectionUsesHarnessProbePolicy(t *testing.T) {
 		t.Fatalf("legacy probe tuple remains: %v", registered.Probe)
 	}
 	t.Run("registered-probe-parses-version", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("the executable alias fixture uses a POSIX symlink")
-		}
 		dir := t.TempDir()
 		executable, err := os.Executable()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Symlink(executable, filepath.Join(dir, "muse")); err != nil {
-			t.Fatal(err)
+		alias := filepath.Join(dir, "muse")
+		if runtime.GOOS == "windows" {
+			alias += ".exe"
 		}
+		copyProbeExecutable(t, executable, alias)
 		t.Setenv(museProbeFixtureEnv, "1")
 		t.Setenv("PATH", dir)
 		if got := detectRelease(registered); got != "9.8.7" {
@@ -54,4 +56,33 @@ func TestMuseReleaseDetectionUsesHarnessProbePolicy(t *testing.T) {
 			t.Fatalf("missing runtime release = %q, want unknown", got)
 		}
 	})
+}
+
+func copyProbeExecutable(t *testing.T, sourcePath, destinationPath string) {
+	t.Helper()
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	destination, err := os.OpenFile(destinationPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(destination, source); err != nil {
+		_ = destination.Close()
+		t.Fatal(err)
+	}
+	if err := destination.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(destinationPath, info.Mode().Perm()); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
