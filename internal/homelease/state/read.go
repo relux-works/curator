@@ -20,17 +20,27 @@ import (
 	"github.com/relux-works/curator/internal/stateread"
 )
 
-func Namespace(home string) string  { return filepath.Join(home, "state", "home-leases", "v1") }
+// Namespace returns the home-lease v1 state directory under home.
+func Namespace(home string) string { return filepath.Join(home, "state", "home-leases", "v1") }
+
+// LedgerPath returns the canonical home-lease ledger path under home.
 func LedgerPath(home string) string { return filepath.Join(Namespace(home), "ledger.json") }
+
+// BindingPath returns the immutable initial-binding document path for lease id.
 func BindingPath(home, id string) string {
 	return filepath.Join(Namespace(home), "bindings", id+".json")
 }
+
+// EventPath returns the immutable terminal-event document path for event id.
 func EventPath(home, id string) string { return filepath.Join(Namespace(home), "events", id+".json") }
 
 var idPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-func ValidID(id string) bool    { return idPattern.MatchString(id) }
+// ValidID reports whether id matches the closed home-lease identifier grammar.
+func ValidID(id string) bool { return idPattern.MatchString(id) }
+
+// ValidDigest reports whether s is a lowercase 64-hex SHA-256 digest.
 func ValidDigest(s string) bool { return digestPattern.MatchString(s) }
 
 // CheckRoute never follows a state symlink, including dangling ancestors. It
@@ -70,6 +80,7 @@ func CheckRoute(home, path string) error {
 	return nil
 }
 
+// Read performs a bounded no-follow read of path after validating its route under home.
 func Read(home, path string) ([]byte, error) {
 	if err := CheckRoute(home, path); err != nil {
 		return nil, err
@@ -93,6 +104,7 @@ func Read(home, path string) ([]byte, error) {
 	return raw, err
 }
 
+// HasState reports whether home-lease state is present or unreadable under home.
 func HasState(home string) bool {
 	for p := Namespace(home); p != home; p = filepath.Dir(p) {
 		observed, err := stateread.Lstat(p)
@@ -106,6 +118,7 @@ func HasState(home string) bool {
 	return false
 }
 
+// Load reads and validates the home-lease ledger under home, returning Empty when proven absent.
 func Load(home string) (*Ledger, error) {
 	raw, err := Read(home, LedgerPath(home))
 	if errors.Is(err, os.ErrNotExist) && !HasState(home) {
@@ -308,6 +321,7 @@ func digest(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToS
 
 func invalid() *Refusal { return Refuse("environment_lease_unreadable", "invalid_record") }
 
+// Records returns all lease records from l in deterministic sorted order.
 func Records(l *Ledger) []Record {
 	rows := make([]Record, 0, len(l.Leases))
 	for _, entry := range l.Leases {

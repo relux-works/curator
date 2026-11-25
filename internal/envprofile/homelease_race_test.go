@@ -150,7 +150,8 @@ func TestHomeLeaseRepairAcquireProcessRace(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	// Drain the test harness's final PASS line before joining the child.
-	for range lines {
+	for line := range lines {
+		_ = line
 	}
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("child PID %d: %v %s", cmd.Process.Pid, err, stderr.String())

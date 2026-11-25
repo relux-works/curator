@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Holder identifies the prepared or bound session manager holding a home lease.
 type Holder struct {
 	Kind                string   `json:"kind"`
 	Launcher            string   `json:"launcher"`
@@ -20,11 +21,13 @@ type Holder struct {
 	Process             *Process `json:"process"`
 }
 
+// Observation records the most recent observed session state for a home lease.
 type Observation struct {
 	State      string  `json:"state"`
 	ObservedAt *string `json:"observed_at"`
 }
 
+// Record is one versioned home-lease projection in the closed home-lease/1 schema.
 type Record struct {
 	Kind          string      `json:"kind"`
 	LeaseID       string      `json:"lease_id"`
@@ -40,10 +43,12 @@ type Record struct {
 	Observation   Observation `json:"observation"`
 }
 
+// Blocking reports whether the lease phase prevents conflicting writers and collection.
 func (r Record) Blocking() bool {
 	return r.Phase == "prepared" || r.Phase == "active" || r.Phase == "unknown"
 }
 
+// Event is an immutable terminal release or break audit record.
 type Event struct {
 	Kind        string `json:"kind"`
 	EventID     string `json:"event_id"`
@@ -55,6 +60,7 @@ type Event struct {
 	RecordedAt  string `json:"recorded_at"`
 }
 
+// Details carries closed refusal metadata, including blocking holders when applicable.
 type Details struct {
 	LeaseID  *string  `json:"lease_id"`
 	Revision *int64   `json:"revision"`
@@ -70,6 +76,7 @@ type Refusal struct {
 	Details Details
 }
 
+// Refuse constructs a typed home-lease refusal with an empty non-nil holder list.
 func Refuse(code, reason string) *Refusal {
 	return &Refusal{Code: code, Reason: reason, Details: Details{Holders: []Record{}}}
 }
@@ -103,6 +110,7 @@ type Admission struct {
 	RuntimeEntries []string `json:"runtime_entries"`
 }
 
+// Entry pairs one lease record with its immutable initial binding and admission roots.
 type Entry struct {
 	Record        Record    `json:"record"`
 	Initial       Record    `json:"initial"`
@@ -112,12 +120,14 @@ type Entry struct {
 	TerminalEvent *string   `json:"terminal_event"`
 }
 
+// Ledger is the closed persisted home-lease state document.
 type Ledger struct {
 	Kind     string            `json:"kind"`
 	Leases   map[string]Entry  `json:"leases"`
 	Requests map[string]string `json:"requests"`
 }
 
+// Empty returns an initialized empty home-lease ledger.
 func Empty() *Ledger {
 	return &Ledger{Kind: "home-lease-state/1", Leases: map[string]Entry{}, Requests: map[string]string{}}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
+// Publication describes one atomic journaled write/removal batch under a home lock.
 type Publication struct {
 	Home, StageDir, TransactionID, Owner, Class string
 	Files                                       map[string][]byte

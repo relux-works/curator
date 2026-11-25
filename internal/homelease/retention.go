@@ -8,6 +8,7 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
+// Roots lists the homes, protected paths, build keys and runtime entries retained by blocking leases.
 type Roots struct{ Homes, Protected, BuildKeys, RuntimeEntries []string }
 
 // ReferencesUnderLock joins the existing collector's mark set. Unknown and

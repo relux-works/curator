@@ -753,8 +753,8 @@ func TestHomeLeaseSelectionAliases(t *testing.T) {
 			if _, err := Resolve(provision); err != nil {
 				t.Fatal(err)
 			}
-			use := func(profile string, clear bool) error {
-				rows, err := UseWithPolicy(fx.home, profile, envregistry.CodexCLI, "", clear, Policy{})
+			use := func(profile string, clearScope bool) error {
+				rows, err := UseWithPolicy(fx.home, profile, envregistry.CodexCLI, "", clearScope, Policy{})
 				if err == nil {
 					if len(rows) != 1 || !rows[0].OK {
 						t.Fatalf("native selection did not complete: %+v", rows)
@@ -1287,7 +1287,7 @@ func TestHomeLeaseInterruptedCustomMigration(t *testing.T) {
 			_, err = ApplyMigration(req)
 			requireHomeLeaseRefusal(t, err, lease.LeaseID)
 			linkCalls := 0
-			recover := func() (*MigrateRecovery, error) {
+			runRecover := func() (*MigrateRecovery, error) {
 				op, err := beginOperationGuarded(fx.home, nil, []string{})
 				if err != nil {
 					return nil, err
@@ -1295,7 +1295,7 @@ func TestHomeLeaseInterruptedCustomMigration(t *testing.T) {
 				defer func() { _ = op.close() }()
 				return recoverMigrationJournal(fx.home, op, nil, func(target, path string) error { linkCalls++; return os.Symlink(target, path) }, os.Rename)
 			}
-			_, err = recover()
+			_, err = runRecover()
 			requireHomeLeaseRefusal(t, err, lease.LeaseID)
 			after, _ := captureFixtureState(t, fx)
 			if linkCalls != 0 || !bytes.Equal(before, after) {
@@ -1314,7 +1314,7 @@ func TestHomeLeaseInterruptedCustomMigration(t *testing.T) {
 				t.Fatal(err)
 			}
 			before, _ = captureFixtureState(t, fx)
-			_, err = recover()
+			_, err = runRecover()
 			if err == nil || !strings.Contains(err.Error(), "recovery found") || !strings.Contains(err.Error(), "regular file") {
 				t.Fatalf("foreign recovery entry not refused: %v", err)
 			}
@@ -1325,7 +1325,7 @@ func TestHomeLeaseInterruptedCustomMigration(t *testing.T) {
 			if err := os.Remove(link); err != nil {
 				t.Fatal(err)
 			}
-			recovered, err := recover()
+			recovered, err := runRecover()
 			if err != nil || recovered == nil || recovered.Plan != plan.Hash || recovered.Done != 1 || recovered.Ops != 1 || linkCalls != 1 {
 				t.Fatalf("actual recovery control: %+v calls=%d %v", recovered, linkCalls, err)
 			}

@@ -95,9 +95,9 @@ func readKernelProcess(pid int64) (state.Process, error) {
 // process too (see procPidTBSDInfoZombieArg).
 func darwinProcBsdInfo(pid int64) ([]byte, error) {
 	buf := make([]byte, procBsdInfoSize)
-	r1, _, errno := unix.RawSyscall6(unix.SYS_PROC_INFO, procInfoCallPidInfo,
+	r1, _, errno := unix.RawSyscall6(unix.SYS_PROC_INFO, procInfoCallPidInfo, //nolint:staticcheck // direct XNU proc_info syscall avoids cgo
 		uintptr(pid), procPidTBSDInfo, procPidTBSDInfoZombieArg,
-		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) // #nosec G103 -- passes caller-owned fixed-size proc_bsdinfo buffer to proc_pidinfo.
 	if errno != 0 {
 		return nil, errno
 	}

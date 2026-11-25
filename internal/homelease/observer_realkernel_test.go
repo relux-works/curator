@@ -80,18 +80,18 @@ func TestRealKernelBindEndToEnd(t *testing.T) {
 		}
 	}()
 	pid := int64(cmd.Process.Pid)
-	real, err := readKernelProcess(pid)
+	observed, err := readKernelProcess(pid)
 	if err != nil {
 		t.Fatalf("production reader on owned child: %v", err)
 	}
-	if real.PID != pid || real.UID != int64(os.Getuid()) {
-		t.Fatalf("production tuple does not name the owned child: %+v", real)
+	if observed.PID != pid || observed.UID != int64(os.Getuid()) {
+		t.Fatalf("production tuple does not name the owned child: %+v", observed)
 	}
 
 	// Positive control: requested, observed and kernel tuples all name the
 	// live child, read by the production kernel reader.
-	f, r, h := realKernelBindSetup(t, cloneProcess(&real))
-	h.Process = cloneProcess(&real)
+	f, r, h := realKernelBindSetup(t, cloneProcess(&observed))
+	h.Process = cloneProcess(&observed)
 	out, reason, err := f.m.Bind(context.Background(), r.LeaseID, 1, h)
 	if err != nil || reason != "bound" || !out.Changed || out.Lease.Revision != 2 {
 		t.Fatalf("real kernel bind control: %+v %s %v", out, reason, err)
@@ -117,7 +117,7 @@ func TestRealKernelBindEndToEnd(t *testing.T) {
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
-			fake := cloneProcess(&real)
+			fake := cloneProcess(&observed)
 			row.mutate(t, fake)
 			f, r, h := realKernelBindSetup(t, cloneProcess(fake))
 			h.Process = fake
@@ -143,8 +143,8 @@ func TestRealKernelBindEndToEnd(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	f, r, h = realKernelBindSetup(t, cloneProcess(&real))
-	h.Process = cloneProcess(&real)
+	f, r, h = realKernelBindSetup(t, cloneProcess(&observed))
+	h.Process = cloneProcess(&observed)
 	before := snapshot(t, f.m.home)
 	_, _, err = f.m.Bind(context.Background(), r.LeaseID, 1, h)
 	requireRefusal(t, err, "environment_lease_authority_refused", "authority_unavailable")
@@ -154,8 +154,8 @@ func TestRealKernelBindEndToEnd(t *testing.T) {
 	// unavailable evidence, never a mismatch cure or a bind.
 	_ = cmd.Wait()
 	reaped = true
-	f, r, h = realKernelBindSetup(t, cloneProcess(&real))
-	h.Process = cloneProcess(&real)
+	f, r, h = realKernelBindSetup(t, cloneProcess(&observed))
+	h.Process = cloneProcess(&observed)
 	before = snapshot(t, f.m.home)
 	_, _, err = f.m.Bind(context.Background(), r.LeaseID, 1, h)
 	requireRefusal(t, err, "environment_lease_authority_refused", "authority_unavailable")

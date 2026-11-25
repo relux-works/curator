@@ -72,6 +72,7 @@ func (m *Manager) verifyBind(ctx context.Context, prepared, requested Holder) er
 	return nil
 }
 
+// Bind transitions a prepared home lease to active after independent bind verification.
 func (m *Manager) Bind(ctx context.Context, id string, revision int64, holder Holder) (out Outcome, reason string, err error) {
 	if !state.ValidID(id) {
 		return out, "", state.Refuse("usage", "invalid_selector")
@@ -140,6 +141,7 @@ func (m *Manager) Bind(ctx context.Context, id string, revision int64, holder Ho
 	return
 }
 
+// Release marks a home lease released once independent observation confirms termination or non-start.
 func (m *Manager) Release(ctx context.Context, id string) (out Outcome, reason string, err error) {
 	if !state.ValidID(id) {
 		return out, "", state.Refuse("usage", "invalid_selector")
@@ -188,6 +190,7 @@ func (m *Manager) Release(ctx context.Context, id string) (out Outcome, reason s
 	return
 }
 
+// Break records an explicit operator-acknowledged break of a blocking home lease.
 func (m *Manager) Break(ctx context.Context, id string, revision int64, operator bool, acknowledgement string) (out Outcome, reason string, err error) {
 	if !operator {
 		return out, "", state.Refuse("usage", "operator_confirmation_required")

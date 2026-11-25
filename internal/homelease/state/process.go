@@ -18,6 +18,7 @@ type StartTime struct {
 	Usec  int64  // darwin-pbi-start: pbi_start_tvusec
 }
 
+// Supported kernel process start-time discriminator values.
 const (
 	StartLinux  = "linux-stat-starttime"
 	StartDarwin = "darwin-pbi-start"
@@ -43,6 +44,7 @@ func LegacyProcess(pid int64, startedAt string) *Process {
 // IsLegacy reports whether this process carries only legacy wall-clock data.
 func (p *Process) IsLegacy() bool { return p != nil && p.legacy }
 
+// MarshalJSON encodes the closed platform-specific start_time object.
 func (s StartTime) MarshalJSON() ([]byte, error) {
 	switch s.Kind {
 	case StartLinux:
@@ -61,6 +63,7 @@ func (s StartTime) MarshalJSON() ([]byte, error) {
 	return nil, fmt.Errorf("unknown start_time kind")
 }
 
+// UnmarshalJSON decodes and checks the closed platform-specific start_time object.
 func (s *StartTime) UnmarshalJSON(raw []byte) error {
 	fields, err := closedObject(raw)
 	if err != nil {
@@ -99,6 +102,7 @@ func (s *StartTime) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
+// MarshalJSON encodes either the bound four-field tuple or the legacy prepared form.
 func (p Process) MarshalJSON() ([]byte, error) {
 	if p.legacy {
 		return json.Marshal(struct {
@@ -114,6 +118,7 @@ func (p Process) MarshalJSON() ([]byte, error) {
 	}{p.PID, p.UID, p.BootID, p.StartTime})
 }
 
+// UnmarshalJSON decodes either the bound four-field tuple or the legacy prepared form.
 func (p *Process) UnmarshalJSON(raw []byte) error {
 	fields, err := closedObject(raw)
 	if err != nil {

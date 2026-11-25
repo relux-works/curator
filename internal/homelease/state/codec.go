@@ -21,6 +21,8 @@ import (
 var schemas embed.FS
 
 const schemaRoot = "https://relux-works.github.io/curator-spec/schemas/home-leases-v1/"
+
+// MaxRecord bounds the byte size of one persisted home-lease JSON document.
 const MaxRecord = 16 << 20
 
 var compiled = sync.OnceValues(func() (map[string]*jsonschema.Schema, error) {
@@ -105,6 +107,7 @@ func Validate(name string, raw []byte) error {
 	return nil
 }
 
+// Canonical encodes value as canonical protocol JSON bytes.
 func Canonical(value any) ([]byte, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
@@ -119,6 +122,7 @@ func Canonical(value any) ([]byte, error) {
 	return protocoljson.MarshalCanonical(domain)
 }
 
+// ParseHolder validates raw JSON against the holder schema and semantic bounds.
 func ParseHolder(raw []byte) (Holder, error) {
 	var h Holder
 	if len(raw) > 8192 || Validate("holder", raw) != nil {

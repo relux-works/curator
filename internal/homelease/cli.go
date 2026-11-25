@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/homelease/state"
 )
 
+// Result is the closed JSON envelope emitted by home-lease CLI subcommands.
 type Result struct {
 	SchemaVersion int            `json:"schema_version"`
 	Operation     string         `json:"operation"`

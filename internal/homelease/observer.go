@@ -83,7 +83,7 @@ func (o sessionManagerObserver) observeV2(ctx context.Context, prepared, request
 	// The producer allows 10s for describe and another 10s for status.
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, o.executable, args...)
+	cmd := exec.CommandContext(ctx, o.executable, args...) // #nosec G204 -- o.executable is configured by Curator and selectors are regex-validated above.
 	cmd.WaitDelay = time.Second
 	var stdout boundedObservation
 	cmd.Stdout, cmd.Stderr = &stdout, io.Discard

@@ -19,9 +19,16 @@ import (
 	"github.com/relux-works/curator/internal/transaction"
 )
 
+// Holder aliases state.Holder for callers of package homelease.
 type Holder = state.Holder
+
+// Record aliases state.Record for callers of package homelease.
 type Record = state.Record
+
+// Admission aliases state.Admission for callers of package homelease.
 type Admission = state.Admission
+
+// Refusal aliases state.Refusal for callers of package homelease.
 type Refusal = state.Refusal
 
 // Authority performs read-only current-home/materialization verification under
@@ -40,10 +47,13 @@ type Evidence struct {
 	DescendantsTerminated bool
 	OwnershipReconciled   bool
 }
+
+// Observer queries an independent session authority for holder liveness and termination.
 type Observer interface {
 	Observe(context.Context, Holder) (Evidence, error)
 }
 
+// Request carries the closed selector and prepared holder for lease acquisition.
 type Request struct {
 	Environment string `json:"environment"`
 	Profile     string `json:"profile"`
@@ -51,10 +61,14 @@ type Request struct {
 	RequestID   string `json:"request_id"`
 	Holder      Holder `json:"holder"`
 }
+
+// Outcome reports whether a lease operation mutated state and the resulting record.
 type Outcome struct {
 	Changed bool    `json:"changed"`
 	Lease   *Record `json:"lease"`
 }
+
+// Manager coordinates home-lease lifecycle transitions for one manager home.
 type Manager struct {
 	home      string
 	authority Authority
@@ -62,6 +76,7 @@ type Manager struct {
 	hooks     transaction.Hooks
 }
 
+// New constructs a Manager bound to the physical manager home identity.
 func New(home string, authority Authority, observer Observer) (*Manager, error) {
 	m, err := managerlock.New(home)
 	if err != nil {
@@ -129,6 +144,7 @@ func (m *Manager) withState(ctx context.Context, fn func(*state.Ledger, *manager
 	return fn(l, lock, e)
 }
 
+// Acquire admits and persists a prepared home lease or replays an identical request.
 func (m *Manager) Acquire(ctx context.Context, req Request) (out Outcome, reason string, err error) {
 	req.Environment = envregistry.NormalizeEnvID(req.Environment)
 	if !state.SupportedEnvironment(req.Environment) {

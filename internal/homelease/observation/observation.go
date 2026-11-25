@@ -21,8 +21,10 @@ import (
 //go:embed schemas/*.json
 var documents embed.FS
 
+// MaxBytes bounds the size of one session-manager observation document.
 const MaxBytes = 64 << 10
 
+// Record is the parsed schema-v1 session-manager observation payload.
 type Record struct {
 	Manager struct {
 		ID           string `json:"id"`

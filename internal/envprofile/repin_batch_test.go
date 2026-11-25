@@ -27,7 +27,7 @@ func TestRepinBatchTakeoverRefusalPreservesState(t *testing.T) {
 	opts := UpdateOptions{RootRequirement: &Requirement{Revision: f.b}}
 	var visitErr error
 	var visitMoved, visited bool
-	batchErr := UpdateProfilesWithOptions(f.home, []string{"repin"}, opts, func(name string, info Info, moved bool, err error) bool {
+	batchErr := UpdateProfilesWithOptions(f.home, []string{"repin"}, opts, func(_ string, _ Info, moved bool, err error) bool {
 		visited, visitMoved, visitErr = true, moved, err
 		return true
 	})
@@ -54,7 +54,7 @@ func TestRepinBatchTakeoverRefusalPreservesState(t *testing.T) {
 	}
 	opts.Policy.Takeover = true
 	visited, visitMoved, visitErr = false, false, nil
-	batchErr = UpdateProfilesWithOptions(f.home, []string{"repin"}, opts, func(name string, info Info, moved bool, err error) bool {
+	batchErr = UpdateProfilesWithOptions(f.home, []string{"repin"}, opts, func(_ string, _ Info, moved bool, err error) bool {
 		visited, visitMoved, visitErr = true, moved, err
 		return true
 	})
@@ -100,7 +100,7 @@ func TestPreparedPlanProbeOnBatchUpdateAndSync(t *testing.T) {
 	defaultAbsent("sync")
 	// The batched CLI update entry must refuse before any visit runs.
 	visited := false
-	batchErr := UpdateProfilesWithOptions(f.home, []string{"profile"}, UpdateOptions{Policy: f.policy}, func(name string, info Info, moved bool, err error) bool {
+	batchErr := UpdateProfilesWithOptions(f.home, []string{"profile"}, UpdateOptions{Policy: f.policy}, func(_ string, _ Info, _ bool, _ error) bool {
 		visited = true
 		return true
 	})

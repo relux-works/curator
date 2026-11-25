@@ -51,6 +51,7 @@ func Guard(home string, held managerlock.Held, targets []string) error {
 	return GuardLedger(l, targets)
 }
 
+// GuardLedger refuses when any blocking lease in l overlaps targets (or any blocking lease exists when targets is nil).
 func GuardLedger(l *Ledger, targets []string) error {
 	blocked := []Record{}
 	for _, record := range Records(l) {

@@ -358,10 +358,7 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 				return false
 			}
 			failed = true
-			if strings.Contains(err.Error(), envprofile.DiagSystemDeltaConfirmationRequired) {
-				return false
-			}
-			return true
+			return !strings.Contains(err.Error(), envprofile.DiagSystemDeltaConfirmationRequired)
 		}
 		if moved {
 			_, _ = fmt.Fprintf(c.stdout, "%s: updated (lock %s)\n", info.Name, info.LockHash)

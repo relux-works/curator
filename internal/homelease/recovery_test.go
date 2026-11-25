@@ -224,7 +224,7 @@ func TestAcquirePublicationFaultRecovery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer lock.Close()
+			defer func() { _ = lock.Close() }()
 			roots, err := ReferencesUnderLock(f.m.home, lock)
 			requireRefusal(t, err, "environment_lease_recovery_required", "pending_mutation")
 			if len(roots.Homes)+len(roots.Protected)+len(roots.BuildKeys)+len(roots.RuntimeEntries) != 0 {

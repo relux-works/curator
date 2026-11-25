@@ -34,6 +34,7 @@ type RecordV2 struct {
 	ProcessObservation bool
 }
 
+// Termination records the v2 session-termination scope and witness proof.
 type Termination struct {
 	Scope   string `json:"scope"`
 	Witness string `json:"witness"`

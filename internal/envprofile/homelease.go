@@ -343,6 +343,7 @@ func homeLeaseMCPPreflight(req ProfileMCPRequest) error {
 	return err
 }
 
+// SetCurrent records the machine current profile under a lease-guarded operation lock.
 func SetCurrent(home, name string) error {
 	op, err := beginOperationSelectedRecovery(home, nil, func() ([]string, error) { return homeLeaseSelectionTargets(home, name, "") }, false)
 	if err != nil {
@@ -352,6 +353,7 @@ func SetCurrent(home, name string) error {
 	return setCurrentDirect(op, home, name)
 }
 
+// SetScoped records or clears a scoped current profile under a lease-guarded operation lock.
 func SetScoped(home, scope, name string, clearScope bool) error {
 	environment, _ := splitScope(scope)
 	op, err := beginOperationSelectedRecovery(home, nil, func() ([]string, error) { return homeLeaseSelectionTargets(home, name, environment) }, false)

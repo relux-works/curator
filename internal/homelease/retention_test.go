@@ -28,7 +28,7 @@ import (
 
 type retentionAuthority struct{ home, runtime, key string }
 
-func (a retentionAuthority) Admit(_ context.Context, held managerlock.Held, environment, profile, digest string) (homelease.Admission, error) {
+func (a retentionAuthority) Admit(_ context.Context, held managerlock.Held, environment, profile, _ string) (homelease.Admission, error) {
 	if err := held.Validate(a.home); err != nil {
 		return homelease.Admission{}, err
 	}
@@ -161,7 +161,7 @@ func TestHomeLeaseCollectorManagerAlias(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer lock.Close()
+			defer func() { _ = lock.Close() }()
 			before := boundarySnapshot(t, home)
 			roots, err := homelease.ReferencesUnderLock(query, lock)
 			if err != nil || !reflect.DeepEqual(roots.RuntimeEntries, []string{retained}) || !reflect.DeepEqual(roots.BuildKeys, []string{key}) {
@@ -284,7 +284,7 @@ func TestHomeLeaseCollectorArtifactUnion(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer lock.Close()
+				defer func() { _ = lock.Close() }()
 				return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, Cache: store, Now: time.Now().Add(48 * time.Hour), Grace: time.Hour})
 			}
 			if phase == "pending-acquire" {
