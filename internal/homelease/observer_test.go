@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/homelease/state"
 )
 
 func observationFixture(t *testing.T) map[string]any {
@@ -43,6 +45,9 @@ func TestProductionObserverBindAndPreparedRelease(t *testing.T) {
 	f := newFixture(t)
 	r := acquire(t, f)
 	h := boundHolder(r.Holder)
+	if nativeStartTimeKind() == state.StartDarwin {
+		h.Process.StartTime = &state.StartTime{Kind: state.StartDarwin, Sec: "1731715200", Usec: 123456}
+	}
 	session := "SES-fixture"
 	h.Session = &session
 	doc := observationFixture(t)

@@ -3,6 +3,7 @@ package homelease
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -105,6 +106,12 @@ func snapshot(t *testing.T, root string) map[string]string {
 			return err
 		}
 		if !d.IsDir() {
+			// Windows byte-range locks forbid a second reader. Normal lock
+			// bookkeeping is observed by name, mode and size, not source bytes.
+			if filepath.Dir(rel) == filepath.Join("state", "locks", "v1") && strings.HasSuffix(rel, ".lock") {
+				out[rel] += fmt.Sprintf(" size=%d", i.Size())
+				return nil
+			}
 			b, err := os.ReadFile(p)
 			out[rel] += string(b)
 			return err
