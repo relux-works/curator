@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -22,6 +23,36 @@ import (
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/stateread"
 )
+
+func TestGCDryRunListsRuntimeWithoutCreatingOrRemovingState(t *testing.T) {
+	home := gcHome(t)
+	manager, err := managerlock.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := manager.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	commit := strings.Repeat("a", 40)
+	runtimeEntry := filepath.Join(home, "runtime", "orphan", commit)
+	writeFile(t, filepath.Join(runtimeEntry, "payload"), "fixture\n")
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"gc", "--dry-run"}, fileConfigSource(filepath.Join(home, "config.json")), &stdout, &stderr)
+	if code != exitOK {
+		t.Fatalf("gc --dry-run exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "would remove runtime orphan/"+commit) {
+		t.Fatalf("dry-run output = %q", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(runtimeEntry, "payload")); err != nil {
+		t.Fatalf("dry-run removed runtime entry: %v", err)
+	}
+}
 
 // TestGCPreservesRuntimeOnUncertainMarks drives run(gc) with production locks
 // and a real launcher. Each uncertainty must survive two maintenance passes;
@@ -401,7 +432,7 @@ func runGC(t *testing.T, home string) int {
 		t.Error(err)
 		return exitFail
 	}
-	_, collectErr := collectUnderLock(home, lock, envprofile.Policy{})
+	_, collectErr := collectUnderLock(home, lock, envprofile.Policy{}, false)
 	closeErr := lock.Close()
 	if collectErr != nil || closeErr != nil {
 		t.Errorf("collect = %v, close = %v", collectErr, closeErr)

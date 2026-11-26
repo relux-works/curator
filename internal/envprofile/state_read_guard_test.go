@@ -163,7 +163,7 @@ func reviewedManagerReadExceptions() map[string]string {
 		"internal/buildcache/collect.go:reserveRetiredName",
 		"internal/buildcache/publish.go:*Store.quarantinePath",
 		"internal/buildcache/publish.go:withdrawnTo",
-		"internal/buildrepo/gc.go:CollectChecked",
+		"internal/buildrepo/gc.go:collectChecked",
 		"internal/buildrepo/gc.go:collectArtifacts",
 		"internal/marker/marker.go:currentBuilds",
 		"internal/runtimestore/runtimestore.go:RemoveStaleShims",

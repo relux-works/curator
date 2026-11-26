@@ -111,6 +111,12 @@ func writeGitStoreFixture(t *testing.T, home, kind, name, source string, files m
 	gitRun(t, repo, "add", "--all")
 	gitRun(t, repo, "commit", "--quiet", "-m", "fixture")
 	commit := fixtureGitOutput(t, repo, "rev-parse", "HEAD")
+	// The one-commit offline fixture models the compact profile cache. It has
+	// no remote by design, so updates can verify its pinned contents without
+	// trying to compact it through a nonexistent origin.
+	if err := os.WriteFile(filepath.Join(repo, ".git", "shallow"), []byte(commit+"\n"), 0o600); err != nil {
+		t.Fatalf("mark one-commit profile cache shallow: %v", err)
+	}
 	if _, err := contextstore.EnsureGit(home, kind, name, repo, commit); err != nil {
 		t.Fatalf("create %s/%s Git snapshot fixture: %v", kind, name, err)
 	}

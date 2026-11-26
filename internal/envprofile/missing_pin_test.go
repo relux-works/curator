@@ -191,9 +191,26 @@ func TestInstallMissingDependencyPin(t *testing.T) {
 			} else if clones != 0 {
 				t.Fatalf("unexpected clone count %d", clones)
 			}
-			if mode == "cached-offline" || mode == "denied" || mode == "malformed" || mode == "fresh" || mode == "probe-failure" || mode == "non-commit" {
+			if mode == "cached-offline" || mode == "denied" || mode == "malformed" || mode == "probe-failure" || mode == "non-commit" {
 				if fetches != 0 {
 					t.Fatalf("unexpected acquisition (%d): %s", fetches, raw)
+				}
+			} else if mode == "fresh" {
+				if fetches != 1 {
+					t.Fatalf("fresh shallow clone ref-refresh fetch count %d, want 1: %s", fetches, raw)
+				}
+				if strings.Contains(string(raw), "--refmap= origin "+pin) {
+					t.Fatalf("fresh clone made a redundant exact-pin fetch: %s", raw)
+				}
+			} else if mode == "still-absent" {
+				if fetches != 2 {
+					t.Fatalf("still-absent ref-refresh and exact-pin fetch count %d, want 2: %s", fetches, raw)
+				}
+				if got := strings.Count(string(raw), "fault plant: built-in: git fetch profile-ref refresh successful without pin"); got != 1 {
+					t.Fatalf("profile ref-refresh fetch count %d, want 1: %s", got, raw)
+				}
+				if got := strings.Count(string(raw), "fault plant: built-in: git fetch exact-pin"); got != 1 {
+					t.Fatalf("exact-pin fetch attempts %d, want 1: %s", got, raw)
 				}
 			} else if fetches != 1 {
 				t.Fatalf("fetch count = %d, want 1: %s", fetches, raw)
@@ -336,7 +353,7 @@ func TestReinstallMissingDependencyPin(t *testing.T) {
 				t.Fatal("warm reinstall cloned an unrelated or replacement source")
 			}
 			if wantFetches == 1 && mode != "still-absent" {
-				want := "built-in: git fetch --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin " + pin
+				want := "built-in: git fetch --depth=1 --no-tags --no-write-fetch-head --no-auto-maintenance --recurse-submodules=no --refmap= origin " + pin
 				if !strings.Contains(string(raw), want) {
 					t.Fatal("acquisition did not use the exact no-ref/no-submodule command")
 				}
@@ -462,16 +479,24 @@ func runMissingPinGit() int {
 	}
 	if len(args) >= 3 && args[2] == "fetch" && mode == "still-absent" {
 		prior, _ := os.ReadFile(config.Trace)
+		marker := "fault plant: built-in: git fetch profile-ref refresh successful without pin"
+		if isExactPinnedGitFetch(args) {
+			marker = "fault plant: built-in: git fetch exact-pin successful without object"
+			if strings.Contains(string(prior), "fault plant: built-in: git fetch exact-pin") {
+				marker = "fault plant: built-in: git fetch exact-pin retry refused"
+			}
+		}
 		f, err := os.OpenFile(config.Trace, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
 			return 98
 		}
-		_, err = fmt.Fprintln(f, "fault plant: built-in: git fetch successful without object")
+		_, err = fmt.Fprintln(f, marker)
 		if closeErr := f.Close(); err != nil || closeErr != nil {
 			return 98
 		}
-		// Bound the known-violation control even if the retry guard mutates.
-		if strings.Contains(string(prior), "fault plant: built-in: git fetch") {
+		// Bound repeated exact-pin acquisition while letting the distinct shallow
+		// ref-refresh fetch complete without supplying the pinned object.
+		if strings.HasPrefix(marker, "fault plant: built-in: git fetch exact-pin retry") {
 			return 96
 		}
 		return 0
@@ -488,6 +513,28 @@ func runMissingPinGit() int {
 		return 99
 	}
 	return 0
+}
+
+func isExactPinnedGitFetch(args []string) bool {
+	if len(args) < 4 || args[2] != "fetch" || len(args[len(args)-1]) != 40 {
+		return false
+	}
+	hasEmptyRefmap := false
+	for _, arg := range args[3:] {
+		if arg == "--refmap=" {
+			hasEmptyRefmap = true
+			break
+		}
+	}
+	if !hasEmptyRefmap {
+		return false
+	}
+	for _, r := range args[len(args)-1] {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func TestMissingPinManagerAttemptBoundAndCacheOnlyDefault(t *testing.T) {

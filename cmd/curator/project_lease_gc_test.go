@@ -83,7 +83,7 @@ func TestGCRecoversProjectLeaseArtifacts(t *testing.T) {
 			if _, err = engine.Prepare(lock, plan); err != nil {
 				t.Fatal(err)
 			}
-			_, err = collectUnderLock(home, lock, envprofile.Policy{})
+			_, err = collectUnderLock(home, lock, envprofile.Policy{}, false)
 			if present {
 				if err != nil {
 					t.Fatal("GC refused intact prepared lease", err)

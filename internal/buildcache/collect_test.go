@@ -136,6 +136,23 @@ func TestSweepRetainsReferencedAndYoungEntries(t *testing.T) {
 	}
 }
 
+func TestSweepDryRunListsStaleEntryWithoutRetiringIt(t *testing.T) {
+	store := newSweepStore(t)
+	stale := publishTestEntry(t, store, "stale-tool", "stale artifact")
+	backdate(t, entryPathOf(store, stale), 30*24*time.Hour)
+
+	result, err := store.Sweep(SweepRequest{DryRun: true}, testHomeLock{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Removed) != 0 || len(result.WouldRemove) != 1 || result.WouldRemove[0] != string(stale) {
+		t.Fatalf("dry-run result = %+v", result)
+	}
+	if !entryExists(t, store, stale) {
+		t.Fatal("dry-run retired a stale build entry")
+	}
+}
+
 // TestSweepUsesTheDocumentedDefaultGrace proves the retention window is the
 // documented constant when the caller sets none.
 func TestSweepUsesTheDocumentedDefaultGrace(t *testing.T) {
