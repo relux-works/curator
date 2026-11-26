@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relux-works.github.io/curator-spec/schemas/home-leases-v1/holder.schema.json",
+  "title": "Home leases v1: holder",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "launcher",
+    "manager_id",
+    "manager_registered_at",
+    "request_id",
+    "werkstatt",
+    "session",
+    "generation",
+    "process"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "prepared",
+        "bound"
+      ]
+    },
+    "launcher": {
+      "const": "curator-run"
+    },
+    "manager_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "manager_registered_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,9})?Z$(?![\\s\\S])"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+    },
+    "werkstatt": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "session": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "generation": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "process": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/process"
+        },
+        {
+          "$ref": "#/$defs/legacy_process"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "prepared"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "session": {
+            "type": "null"
+          },
+          "generation": {
+            "type": "null"
+          },
+          "process": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/legacy_process"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "session": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$(?![\\s\\S])"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "process": {
+            "$ref": "#/$defs/process"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "decimal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^(?:0|[1-9][0-9]{0,19})$(?![\\s\\S])"
+    },
+    "legacy_process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "started_at"
+      ],
+      "properties": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,9})?Z$(?![\\s\\S])"
+        }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "uid",
+        "boot_id",
+        "start_time"
+      ],
+      "properties": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "uid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967294
+        },
+        "boot_id": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])"
+        },
+        "start_time": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "ticks",
+                "hz"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "linux-stat-starttime"
+                },
+                "ticks": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "hz": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100000
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "sec",
+                "usec"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "darwin-pbi-start"
+                },
+                "sec": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "usec": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 999999
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

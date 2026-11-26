@@ -249,6 +249,7 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 		seen[id] = true
 	}
 	sort.Strings(req.Environments)
+	var op *operation
 	validateInputs := func() error {
 		if err := envauthority.Validate(req.Home); err != nil {
 			return err
@@ -259,15 +260,20 @@ func ProfileMCP(req ProfileMCPRequest) (result *ProfileMCPResult, resultErr erro
 				return fmt.Errorf("transaction_input_changed: first-install input changed")
 			}
 		}
+		// Ownership ordering is checked before the lease guard acquires the
+		// operation. Once held, revalidate captured inputs without replanning
+		// against this same operation's partially published postimage.
+		if op == nil {
+			return homeLeaseMCPPreflight(req)
+		}
 		return nil
 	}
 	if err := validateInputs(); err != nil {
 		return result, err
 	}
-	var op *operation
 	if req.Mode != "status" && !req.DryRun {
 		var err error
-		op, err = beginOperationValidated(req.Home, validateInputs, req.transactionOptions...)
+		op, err = beginOperationGuarded(req.Home, validateInputs, homeLeaseProfileTargets(req.Home, req.Profile, ""), req.transactionOptions...)
 		if err != nil {
 			return result, err
 		}

@@ -66,6 +66,9 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 		}
 	}
 	defer closeOperation()
+	if err := homeLeaseGuard(home, op.lock, nil); err != nil {
+		return Info{}, err
+	}
 	if err := op.capture(ProfileDir(home, DefaultProfile), CurrentFile(home)); err != nil {
 		return Info{}, err
 	}
@@ -150,8 +153,7 @@ func globalSkillOperationWithOperation(home string, policy Policy, machine envre
 			return info, globalInPlaceError(fmt.Errorf("%s", result.Detail))
 		}
 	}
-	closeOperation()
-	if _, err := syncManagedProfileWithOperation(home, profile, policy, machine, nativeHomeOf, borrowed); err != nil {
+	if _, err := syncManagedProfileWithOperation(home, profile, policy, machine, nativeHomeOf, op); err != nil {
 		return info, err
 	}
 	return info, nil
@@ -260,10 +262,19 @@ func SyncManagedHomesWithPolicy(home string, policy Policy, machine envregistry.
 	if err := refusePreparedSkillPlanAdoption(home, ""); err != nil {
 		return nil, err
 	}
-	if err := EnsureDefaultWithPolicy(home, policy); err != nil {
+	op, err := beginOperation(home)
+	if err != nil {
 		return nil, err
 	}
-	profiles, err := ListWithPolicy(home, policy)
+	defer func() { _ = op.close() }()
+	return syncManagedHomesWithOperation(op, home, policy, machine)
+}
+
+func syncManagedHomesWithOperation(op *operation, home string, policy Policy, machine envregistry.MachineConfig) ([]EntryResult, error) {
+	if err := ensureDefault(op, home, policy); err != nil {
+		return nil, err
+	}
+	profiles, err := listLocked(op, home, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +286,7 @@ func SyncManagedHomesWithPolicy(home string, policy Policy, machine envregistry.
 	var results []EntryResult
 	var failures []string
 	for _, profile := range profiles {
-		profileResults, syncErr := syncManagedProfile(home, profile.Name, policy, machine, nil)
+		profileResults, syncErr := syncManagedProfileWithOperation(home, profile.Name, policy, machine, nil, op)
 		results = append(results, profileResults...)
 		if syncErr != nil {
 			failures = append(failures, syncErr.Error())

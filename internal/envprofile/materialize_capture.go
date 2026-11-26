@@ -164,6 +164,7 @@ func CaptureMaterialize(req MaterializeCaptureRequest) (result *CapturedMaterial
 	selectInputs := func() (ResolveRequest, error) {
 		selected := req.Resolve
 		selected.strictStartupInput = true
+		selected.borrowedOperation = op
 		selected.Machine, selected.Policy, err = req.ReloadMachine()
 		if err != nil {
 			return ResolveRequest{}, err

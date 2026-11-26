@@ -118,6 +118,12 @@ func publishSkillProjectionWithFiles(op *operation, home string, projection skil
 }
 
 func publishSkillProjectionSelected(op *operation, home string, skill skillOf, files []string, selection *whitelist.FileSelection) (resultErr error) {
+	if err := verifySkillProjection(home, skill); err == nil {
+		return nil
+	}
+	if err := homeLeaseGuard(home, op.lock, []string{skill.root}); err != nil {
+		return err
+	}
 	parent := filepath.Dir(skill.root)
 	if err := privatedir.MakeAll(parent); err != nil {
 		return err

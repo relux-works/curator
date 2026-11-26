@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/homelease/state"
 	"github.com/relux-works/curator/internal/stateread"
 )
 
@@ -384,6 +386,20 @@ func TestStatusUnreadableOrphanInventoryIsNotEmpty(t *testing.T) {
 	}
 	if !hasDiagnostic(status.Diagnostics, root, stateread.DiagUnreadable) || !status.NonCurrent {
 		t.Fatalf("unreadable orphan inventory diagnostics=%+v non_current=%v", status.Diagnostics, status.NonCurrent)
+	}
+}
+
+// Status refuses with the lease contract code when a live home's lease ledger is unreadable, beside its readable control.
+func TestStatusUnreadableLiveLeaseRefuses(t *testing.T) {
+	fx, _, _ := leasedManagedFixture(t)
+	if _, err := StatusOf(statusRequest(fx)); err != nil {
+		t.Fatalf("readable live lease status: %v", err)
+	}
+	makeStateFileUnreadable(t, state.LedgerPath(fx.home))
+	_, err := StatusOf(statusRequest(fx))
+	var refusal *state.Refusal
+	if !errors.As(err, &refusal) || refusal.Code != "environment_lease_unreadable" || refusal.Reason != "state_unreadable" {
+		t.Fatalf("unreadable live lease status error = %v, want environment_lease_unreadable/state_unreadable refusal", err)
 	}
 }
 

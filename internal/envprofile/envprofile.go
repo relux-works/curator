@@ -268,6 +268,14 @@ func ListWithPolicy(home string, _ Policy) ([]Info, error) {
 	return listReadOnly(home)
 }
 
+// listLocked lists under a held operation, initializing the builtin first.
+func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
+	if err := ensureDefault(op, home, policy); err != nil {
+		return nil, err
+	}
+	return listReadOnly(home)
+}
+
 // listReadOnly reports installed records without initializing the builtin.
 func listReadOnly(home string) ([]Info, error) {
 	listing, err := stateread.ReadDir(ProfilesDir(home))
@@ -335,11 +343,17 @@ func Current(home string) (string, error) {
 }
 
 // SetCurrent records the machine current profile.
-func SetCurrent(home, name string) error {
+func setCurrentDirect(op *operation, home, name string) error {
+	if err := op.lock.AssertHeld(); err != nil {
+		return err
+	}
 	if err := skillruntime.RefuseUnadmitted(home); err != nil {
 		return err
 	}
 	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
+	if err := homeLeaseGuardSelection(op, home, name, ""); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(ProfilesDir(home), 0o755); err != nil {
@@ -383,8 +397,15 @@ func ScopedCurrents(home string) (map[string]string, error) {
 }
 
 // SetScoped records (or with clear=true, drops) a scope's current profile.
-func SetScoped(home, scope, name string, clearScope bool) error {
+func setScopedDirect(op *operation, home, scope, name string, clearScope bool) error {
+	if err := op.lock.AssertHeld(); err != nil {
+		return err
+	}
 	if err := envauthority.Validate(home); err != nil {
+		return err
+	}
+	environment, _ := splitScope(scope)
+	if err := homeLeaseGuardSelection(op, home, name, environment); err != nil {
 		return err
 	}
 	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
@@ -734,12 +755,12 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return Info{}, false, false, err
 	}
-	op, err := beginOperationValidated(home, func() error {
+	op, err := beginOperationSelected(home, func() error {
 		if !options.Use {
 			return nil
 		}
 		return requireAdapterRuntimes(home, "", "")
-	})
+	}, func() ([]string, error) { return homeLeaseInstallTargets(home, options) })
 	if err != nil {
 		return Info{}, false, false, err
 	}
@@ -1240,7 +1261,7 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (info Info, mov
 	if err := options.Policy.checkHardenedProfileMutation(); err != nil {
 		return Info{}, false, err
 	}
-	op, err := beginOperation(home)
+	op, err := beginOperationGuarded(home, nil, homeLeaseProfileTargets(home, name, ""))
 	if err != nil {
 		return Info{}, false, err
 	}
@@ -1251,7 +1272,14 @@ func UpdateWithOptions(home, name string, options UpdateOptions) (info Info, mov
 		op.undo = &globalUndo{entries: map[string]*globalImage{}, managerHome: home}
 		defer func() {
 			if resultErr != nil {
-				resultErr = errors.Join(resultErr, op.undo.restore())
+				// Compensation is a writer too: validate the complete
+				// rollback set against the lease guard before restoring
+				// a single surface, as GlobalSkillTransaction does.
+				if guardErr := homeLeaseGuardUndo(op); guardErr != nil {
+					resultErr = errors.Join(resultErr, guardErr)
+				} else {
+					resultErr = errors.Join(resultErr, op.undo.restore())
+				}
 			}
 		}()
 	}
@@ -2109,7 +2137,7 @@ func EnsureDefault(home string) error {
 // machine gates of policy (environments §9.1). The CLI passes the gates of
 // its already-loaded configuration.
 func EnsureDefaultWithPolicy(home string, policy Policy) error {
-	op, err := beginOperation(home)
+	op, err := beginOperationSelected(home, nil, func() ([]string, error) { return homeLeaseDefaultTargets(home) })
 	if err != nil {
 		return err
 	}
@@ -2121,6 +2149,9 @@ func ensureDefault(op *operation, home string, policy Policy) error {
 	if _, err := readSource(home, DefaultProfile); err == nil {
 		return nil
 	} else if !isStateAbsent(err) {
+		return err
+	}
+	if err := homeLeaseGuard(home, op.lock, homeLeaseProfileTargets(home, DefaultProfile, "")); err != nil {
 		return err
 	}
 	staging, err := os.MkdirTemp("", "curator-default-root-*")
