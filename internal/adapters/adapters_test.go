@@ -388,8 +388,13 @@ func TestRegisteredSkillRoutingFallbackAndPathExpansion(t *testing.T) {
 	if _, ported, err := registeredSkills("cursor", harnessapi.ProjectScope); err != nil || !ported {
 		t.Fatalf("registered Cursor adapter did not select its registry declaration: ported=%t err=%v", ported, err)
 	}
-	if _, ported, err := registeredSkills("claude_code", harnessapi.ProjectScope); err != nil || ported {
-		t.Fatalf("unported adapter did not select the explicit legacy fallback: ported=%t err=%v", ported, err)
+	claude, ported, err := registeredSkills("claude_code", harnessapi.ProjectScope)
+	if err != nil || !ported {
+		t.Fatalf("registered Claude adapter did not select its registry declaration: ported=%t err=%v", ported, err)
+	}
+	claudePaths := claude.Paths().Paths()
+	if len(claudePaths) != 1 || claudePaths[0].String() != ".claude/skills" {
+		t.Fatalf("Claude project skill paths = %v, want [.claude/skills]", claudePaths)
 	}
 	if _, ported, err := registeredSkills("unknown", harnessapi.ProjectScope); err != nil || ported {
 		t.Fatalf("unknown adapter changed the legacy empty result: ported=%t err=%v", ported, err)

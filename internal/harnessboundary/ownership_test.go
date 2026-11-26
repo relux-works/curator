@@ -86,7 +86,11 @@ func TestAdapterSurfaceOwnership(t *testing.T) {
 	adapterOwners := map[harnessapi.ID]string{}
 	paths := map[string]bool{}
 	for _, adapter := range ownership.Adapters {
-		if adapterOwners[adapter.ID] != "" || paths[adapter.Owner] || adapter.Owner != "internal/harness/"+string(adapter.ID) || adapter.Status != "staged" {
+		wantStatus := "staged"
+		if adapter.ID == "claude_code" {
+			wantStatus = "partial"
+		}
+		if adapterOwners[adapter.ID] != "" || paths[adapter.Owner] || adapter.Owner != "internal/harness/"+string(adapter.ID) || adapter.Status != wantStatus {
 			t.Fatal("invalid adapter ownership")
 		}
 		adapterOwners[adapter.ID] = adapter.Owner

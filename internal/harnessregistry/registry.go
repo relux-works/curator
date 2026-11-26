@@ -45,7 +45,7 @@ func nativeSkillsAndMCPInspection() harnessapi.CapabilitySet {
 // Probe aliases and arguments are pinned to the original environment catalog;
 // the five-second deadline and empty overrides are the v1 contract policy.
 var entries = [...]registration{
-	{claude_code.ID, 1, probing(), claude_code.New, harnessapi.NewProbeSpec("claude", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
+	{claude_code.ID, 1, claude_code.New().Capabilities(), claude_code.New, harnessapi.NewProbeSpec("claude", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{codex_cli.ID, 1, probing(), codex_cli.New, harnessapi.NewProbeSpec("codex", []string{"--version"}, harnessapi.ProbeTimeoutV1, nil), true},
 	{cursor.ID, 1, skillAndMCPInspection(), cursor.New, harnessapi.ProbeSpec{}, false},
 	{gemini.ID, 1, gemini.Capabilities(), gemini.New, harnessapi.ProbeSpec{}, false},

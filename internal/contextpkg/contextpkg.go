@@ -22,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/startupverification"
 	"github.com/relux-works/curator/internal/stateread"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 // File names fixed by the protocol.
@@ -41,6 +42,10 @@ const StartupVerificationSchemaVersion = 3
 // skills without requiring packages that do not use the field to migrate.
 const SkillCapabilitiesSchemaVersion = 4
 
+// SkillFilesSchemaVersion adds profile-declared context file globs to skill
+// requirements.
+const SkillFilesSchemaVersion = 5
+
 // Diagnostic codes (environments §2.1, §3.1).
 const (
 	DiagManifestInvalid            = "context_manifest_invalid"
@@ -49,6 +54,7 @@ const (
 	DiagModuleBytesInvalid         = "profile_module_bytes_invalid"
 	DiagSelectorUnknownEnvironment = "profile_selector_unknown_environment"
 	DiagSkillCapabilityInvalid     = "profile_skill_capability_invalid"
+	DiagSkillFilesInvalid          = "profile_skill_files_invalid"
 )
 
 // Diagnostic is one protocol-named failure or warning.
@@ -79,6 +85,7 @@ type Requirement struct {
 	Commands            []string
 	Capabilities        capabilities.Manifest
 	CapabilitiesPresent bool
+	Files               *whitelist.FileSelection
 }
 
 // Form names the requirement's declaration form: "range", "tag", or "revision".
@@ -186,7 +193,7 @@ func ParseManifest(payload []byte) (*Manifest, error) {
 		return nil, err
 	}
 	schema, ok := object["schema_version"].(json.Number)
-	if !ok || (schema.String() != "1" && schema.String() != "2" && schema.String() != strconv.Itoa(StartupVerificationSchemaVersion) && schema.String() != strconv.Itoa(SkillCapabilitiesSchemaVersion)) {
+	if !ok || (schema.String() != "1" && schema.String() != "2" && schema.String() != strconv.Itoa(StartupVerificationSchemaVersion) && schema.String() != strconv.Itoa(SkillCapabilitiesSchemaVersion) && schema.String() != strconv.Itoa(SkillFilesSchemaVersion)) {
 		return nil, invalid(DiagManifestInvalid, "unsupported schema_version")
 	}
 	version, _ := strconv.Atoi(schema.String())
@@ -352,6 +359,9 @@ func parseRequirements(raw any, family string, schemaVersion int) (map[string]Re
 			if schemaVersion >= SkillCapabilitiesSchemaVersion {
 				allowed = append(allowed, "capabilities")
 			}
+			if schemaVersion >= SkillFilesSchemaVersion {
+				allowed = append(allowed, "files")
+			}
 		case "mcp":
 			allowed = append(allowed, "directory")
 		}
@@ -427,6 +437,13 @@ func parseRequirements(raw any, family string, schemaVersion int) (map[string]Re
 			requirement.Commands = commands
 		}
 		if family == "skills" {
+			if raw, present := entry["files"]; present {
+				files, err := parseFileSelection(raw, prefix)
+				if err != nil {
+					return nil, err
+				}
+				requirement.Files = files
+			}
 			if raw, present := entry["capabilities"]; present {
 				if _, ok := raw.(map[string]any); !ok {
 					return nil, invalid(DiagSkillCapabilityInvalid, "%scapabilities must be an object", prefix)
@@ -442,6 +459,57 @@ func parseRequirements(raw any, family string, schemaVersion int) (map[string]Re
 		out[name] = requirement
 	}
 	return out, nil
+}
+
+func parseFileSelection(raw any, prefix string) (*whitelist.FileSelection, error) {
+	object, ok := raw.(map[string]any)
+	if !ok {
+		return nil, invalid(DiagSkillFilesInvalid, "%sfiles must be an object", prefix)
+	}
+	if err := requireKeys(object, DiagSkillFilesInvalid, prefix+"files.", "include", "exclude"); err != nil {
+		return nil, err
+	}
+	selection := &whitelist.FileSelection{}
+	if raw, present := object["include"]; present {
+		patterns, err := fileGlobList(raw)
+		if err != nil {
+			return nil, invalid(DiagSkillFilesInvalid, "%sfiles.include must be a list of unique globs", prefix)
+		}
+		selection.Include = patterns
+	}
+	if raw, present := object["exclude"]; present {
+		patterns, err := fileGlobList(raw)
+		if err != nil {
+			return nil, invalid(DiagSkillFilesInvalid, "%sfiles.exclude must be a list of unique globs", prefix)
+		}
+		selection.Exclude = patterns
+	}
+	if err := whitelist.ValidateFileSelection(selection); err != nil {
+		return nil, invalid(DiagSkillFilesInvalid, "%sfiles %v", prefix, err)
+	}
+	if len(selection.Include) == 0 && len(selection.Exclude) == 0 {
+		return nil, nil
+	}
+	return selection, nil
+}
+
+func fileGlobList(raw any) ([]string, error) {
+	values, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("not a list")
+	}
+	seen := map[string]bool{}
+	patterns := make([]string, 0, len(values))
+	for _, value := range values {
+		pattern, ok := value.(string)
+		if !ok || seen[pattern] {
+			return nil, fmt.Errorf("invalid or repeated glob")
+		}
+		seen[pattern] = true
+		patterns = append(patterns, pattern)
+	}
+	sort.Strings(patterns)
+	return patterns, nil
 }
 
 // Server is the server member of agent-mcp.json.

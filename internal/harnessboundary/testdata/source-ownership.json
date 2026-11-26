@@ -25,7 +25,9 @@
       ],
       "sources": [
         "internal/envregistry/envregistry.go",
-        "internal/config/config.go"
+        "internal/config/config.go",
+        "internal/harness/claude_code/adapter.go",
+        "internal/harnessregistry/registry.go"
       ],
       "methods": [
         "ID",
@@ -46,7 +48,8 @@
       "sources": [
         "internal/adapters/adapters.go",
         "internal/adapters/stage.go",
-        "internal/adapters/boundaries.go"
+        "internal/adapters/boundaries.go",
+        "internal/harness/claude_code/adapter.go"
       ],
       "methods": [
         "Skills"
@@ -65,7 +68,8 @@
         "internal/envprofile/managed.go",
         "internal/envprofile/native_home.go",
         "internal/envprofile/repair_native_home.go",
-        "internal/contextmaterialize/referenced.go"
+        "internal/contextmaterialize/referenced.go",
+        "internal/harness/claude_code/adapter.go"
       ],
       "methods": [
         "Home",
@@ -85,7 +89,8 @@
         "internal/config/environments.go",
         "internal/envprofile/claude_settings.go",
         "internal/envprofile/claude_readonly_settings.go",
-        "internal/envprofile/managed.go"
+        "internal/envprofile/managed.go",
+        "internal/harness/claude_code/adapter.go"
       ],
       "methods": [
         "Settings",
@@ -106,7 +111,8 @@
         "internal/envprofile/muse.go",
         "internal/envprofile/managed.go",
         "internal/envprofile/migrate.go",
-        "internal/envprofile/status.go"
+        "internal/envprofile/status.go",
+        "internal/harness/claude_code/adapter.go"
       ],
       "methods": [
         "Credentials",
@@ -130,7 +136,8 @@
         "internal/envprofile/native_skills.go",
         "internal/contextmaterialize/mcp.go",
         "internal/mcpnative/native.go",
-        "internal/mcp/mcp.go"
+        "internal/mcp/mcp.go",
+        "internal/harness/claude_code/adapter.go"
       ],
       "methods": [
         "MCP",
@@ -270,7 +277,7 @@
     {
       "id": "claude_code",
       "owner": "internal/harness/claude_code",
-      "status": "staged"
+      "status": "partial"
     },
     {
       "id": "codex_cli",

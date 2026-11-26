@@ -469,6 +469,37 @@ exists. Project scope refuses shared profile homes. See the
 [writer contract and validation commands](docs/profile-mcp-native-writer.md)
 for paths, journal recovery, Codex base collisions and qualification limits.
 
+## Profile skill context files
+
+A profile skill requirement can add relative include and exclude globs in
+`agent-context.json` schema 5. Includes extend the built-in context roots;
+excludes remove matching files or directory trees. `SKILL.md` is always kept,
+required skill manifests cannot be excluded, and declared build/runtime inputs
+remain in integrity evidence while only context files are projected. Without
+`files`, projection and lock bytes are unchanged. Lock 6 records the selection
+rules and effective context file set; filtering occurs before bounded integrity
+capture.
+
+```json
+{
+  "schema_version": 5,
+  "name": "sample-profile",
+  "version": "1.0.0",
+  "requires": {
+    "skills": {
+      "guide": {
+        "git": "https://example.org/skills/guide.git",
+        "tag": "v1.0.0",
+        "files": {
+          "include": ["extras/guide.json"],
+          "exclude": ["references/private"]
+        }
+      }
+    }
+  }
+}
+```
+
 ## An open protocol
 
 Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).

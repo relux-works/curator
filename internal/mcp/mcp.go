@@ -25,21 +25,56 @@ import (
 
 // projectSources maps agents to project-relative config files (Spec §11.1).
 var projectSources = map[string][]string{
-	"claude_code": {".mcp.json"},
 	"codex_cli":   {".codex/config.toml"},
 	"opencode":    {"opencode.json", "opencode.jsonc"},
 }
 
 // homeSources maps agents to home-relative config files.
 var homeSources = map[string][]string{
-	"claude_code": {".claude.json"},
 	"codex_cli":   {".codex/config.toml"},
 	"opencode":    {".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
 }
 
 // claudeSettings can reject servers declared in .mcp.json; a rejected server
 // never activates, so it counts as not configured.
-var claudeSettings = []string{".claude/settings.json", ".claude/settings.local.json"}
+var claudeSettings []string
+
+func init() {
+	for _, id := range harnessregistry.IDs() {
+		adapter, err := harnessregistry.Lookup(id)
+		if err != nil || !adapter.Capabilities().Has(harnessapi.MCPInspection) {
+			continue
+		}
+		projectContext, err := harnessapi.NewContext(runtime.GOOS, harnessapi.ProjectScope, harnessapi.VerifiedRelease{})
+		if err != nil {
+			continue
+		}
+		project, err := adapter.MCP(projectContext, harnessapi.ProjectScope)
+		if err == nil {
+			for _, path := range project.Paths().Paths() {
+				projectSources[string(id)] = append(projectSources[string(id)], path.String())
+			}
+		}
+		homeContext, err := harnessapi.NewContext(runtime.GOOS, harnessapi.UserScope, harnessapi.VerifiedRelease{})
+		if err != nil {
+			continue
+		}
+		home, err := adapter.MCP(homeContext, harnessapi.UserScope)
+		if err == nil {
+			for _, path := range home.Paths().Paths() {
+				homeSources[string(id)] = append(homeSources[string(id)], path.String())
+			}
+		}
+		if adapter.Capabilities().Has(harnessapi.TrustObservation) {
+			settings, err := adapter.Settings(projectContext)
+			if err == nil {
+				for _, path := range settings.Paths().Paths() {
+					claudeSettings = append(claudeSettings, path.String())
+				}
+			}
+		}
+	}
+}
 
 // Env fixes the filesystem roots for resolution (tests inject temp dirs).
 type Env struct {

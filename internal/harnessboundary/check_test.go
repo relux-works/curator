@@ -85,6 +85,9 @@ func TestNoHarnessBranches(t *testing.T) {
 	}
 	root := filepath.Join("..", "..")
 	production := scan(t, root)
+	gateAccepts := func(findings []Finding, allowances ExceptionSet) bool {
+		return len(findings) == len(allowances.Exceptions) && len(ApplyExceptions(findings, allowances)) == 0
+	}
 	if len(production) != len(active.Exceptions) {
 		t.Errorf("active exception occurrences=%d source occurrences=%d; remove stale allowances", len(active.Exceptions), len(production))
 	}
@@ -93,6 +96,26 @@ func TestNoHarnessBranches(t *testing.T) {
 			t.Error(f.String())
 		}
 	}
+	t.Run("restored-moved-allowance", func(t *testing.T) {
+		removed := Exception{
+			Path:       "internal/adapters/adapters.go",
+			HarnessID:  "claude_code",
+			LineSHA256: "e5c4aa70a3b848187486eea7282e5507096f97438e16f6f76c8eb2fb791e4829",
+		}
+		for _, exception := range active.Exceptions {
+			if key(exception) == key(removed) {
+				t.Fatal("moved allowance is already active")
+			}
+		}
+		restored := active
+		restored.Exceptions = append(append([]Exception(nil), active.Exceptions...), removed)
+		if !gateAccepts(production, active) {
+			t.Fatal("positive source and allowance sets do not match")
+		}
+		if gateAccepts(production, restored) {
+			t.Fatal("restoring one removed Claude allowance did not fail the gate")
+		}
+	})
 	t.Run("future-registry-ID", func(t *testing.T) {
 		root := t.TempDir()
 		policy := vocabulary(t)

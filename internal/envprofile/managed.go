@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -45,6 +46,7 @@ import (
 	"github.com/relux-works/curator/internal/startupverification"
 	"github.com/relux-works/curator/internal/stateread"
 	"github.com/relux-works/curator/internal/transaction"
+	"github.com/relux-works/curator/internal/whitelist"
 )
 
 // Diagnostics for managed homes and resolution (environments §7.7, §8.5,
@@ -312,6 +314,8 @@ type skillOf struct {
 	includeScripts bool
 	excludeRoots   []string
 	version        hashing.Version
+	files          []string
+	selection      *whitelist.FileSelection
 }
 
 // skillsOf plans the lock's skill members as core context projections without
@@ -325,6 +329,7 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
 		return nil, RefuseSkillPlanAdoption()
 	}
 	var skills []skillOf
+	integrityIndex := 0
 	for _, member := range lock.Members {
 		if member.Kind != contextlock.KindSkill {
 			continue
@@ -339,7 +344,29 @@ func skillsOf(home string, manager *gitManager, lock *contextlock.Lock) ([]skill
 		if err := opaquescan.RefuseNULV1(root, lock.ContentHashVersion()); err != nil {
 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
 		}
-		skill, err := projectSkill(home, root, lock.ContentHashVersion())
+		var skill skillOf
+		var err error
+		if lock.SchemaVersion == contextlock.SkillIntegritySchemaVersion {
+			if integrityIndex >= len(lock.SkillIntegrity) {
+				return nil, fmt.Errorf("skill_integrity_evidence_missing: skill evidence is incomplete")
+			}
+			evidence := lock.SkillIntegrity[integrityIndex]
+			integrityIndex++
+			if evidence.Manifest.FileSelection != nil {
+				projection, projectionErr := projectSkillWithFiles(home, root, lock.ContentHashVersion(), evidence.Manifest.FileSelection)
+				if projectionErr != nil {
+					return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, projectionErr)
+				}
+				if !slices.Equal(projection.files, evidence.Manifest.ContextFiles) {
+					return nil, fmt.Errorf("skill_integrity_mismatch: selected context file set changed")
+				}
+				skill = projection.skill
+			} else {
+				skill, err = projectSkill(home, root, lock.ContentHashVersion())
+			}
+		} else {
+			skill, err = projectSkill(home, root, lock.ContentHashVersion())
+		}
 		if err != nil {
 			return nil, fmt.Errorf("%s: member %s %v", DiagRepairFailed, member.Name, err)
 		}

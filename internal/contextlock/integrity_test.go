@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/privatedir"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/skillintegrity"
 )
 
@@ -62,6 +63,42 @@ func TestIntegrityLockRoundTrip(t *testing.T) {
 	if strings.Contains(string(raw), "skill_integrity") || strings.Contains(string(raw), "startup_verification_level") {
 		t.Fatal("legacy serialization acquired new fields")
 	}
+}
+
+func TestIntegrityLockWithoutSelectionMatchesLegacyBytes(t *testing.T) {
+	lock := integrityFixture(t)
+	got, err := lock.Canonical()
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyObject := lock.Object()
+	entry := lock.SkillIntegrity[0]
+	legacyEntry := map[string]any{
+		"manifest":        legacyIntegrityManifestObject(entry.Manifest),
+		"manifest_sha256": entry.ManifestSHA256,
+	}
+	legacyObject["skill_integrity"] = []any{legacyEntry}
+	want, err := protocoljson.MarshalCanonical(legacyObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("lock without selection changed the previous canonical bytes\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func legacyIntegrityManifestObject(m skillintegrity.Manifest) map[string]any {
+	files := make([]any, 0, len(m.Files))
+	for _, file := range m.Files {
+		files = append(files, map[string]any{"path": file.Path, "size": file.Size, "executable": file.Executable, "sha256": file.SHA256})
+	}
+	var declaration any
+	if m.Declaration != nil {
+		decoder := json.NewDecoder(bytes.NewReader(m.Declaration))
+		decoder.UseNumber()
+		_ = decoder.Decode(&declaration)
+	}
+	return map[string]any{"schema": m.Schema, "name": m.Name, "source": m.Source, "commit": m.Commit, "state_sha256": m.StateSHA256, "directory": m.Directory, "manifest_kind": m.ManifestKind, "declaration_path": m.DeclarationPath, "declaration_sha256": m.DeclarationSHA256, "declaration": declaration, "hash_version": m.HashVersion, "content_sha256": m.ContentSHA256, "files": files}
 }
 
 // Missing/extra evidence, mismatched identity/hash, unsupported versions and

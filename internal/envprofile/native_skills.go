@@ -10,6 +10,8 @@ import (
 	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/stateread"
 )
@@ -17,13 +19,20 @@ import (
 // inPlaceSkillsDir preserves opencode staging; only the single-home native
 // adapters participate in the native skills ownership contract.
 func inPlaceSkillsDir(id string) string {
-	switch id {
-	case envregistry.ClaudeCode, envregistry.CodexCLI, envregistry.Pi:
-		adapter, _ := envregistry.ByID(id)
-		return adapter.SkillsDir
-	default:
+	adapter, err := envregistry.ByID(id)
+	if err != nil || adapter.SkillsDir != "skills" {
 		return profileSkillsSurfaceDir
 	}
+	if contract, err := harnessregistry.Lookup(harnessapi.ID(id)); err == nil && contract.Capabilities().Has(harnessapi.SkillProjection) {
+		discovery, err := contract.Skills(harnessapi.Context{}, harnessapi.UserScope)
+		if err == nil {
+			paths := discovery.Paths().Paths()
+			if len(paths) == 1 {
+				return paths[0].String()
+			}
+		}
+	}
+	return adapter.SkillsDir
 }
 
 // inPlaceSkillsLedger checks the parent before reading ownership state. A

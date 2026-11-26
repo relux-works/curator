@@ -49,6 +49,8 @@ import (
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
+	"github.com/relux-works/curator/internal/harnessapi"
+	"github.com/relux-works/curator/internal/harnessregistry"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/opaquescan"
@@ -80,10 +82,38 @@ type Adapter struct {
 
 // Adapters is the closed revision-1 registry.
 var Adapters = []Adapter{
-	{ID: "claude_code", EnvVar: "CLAUDE_CONFIG_DIR", DefaultDir: ".claude", Target: "CLAUDE.md"},
 	{ID: "codex_cli", EnvVar: "CODEX_HOME", DefaultDir: ".codex", Target: "AGENTS.md"},
 	{ID: "opencode", EnvVar: "XDG_CONFIG_HOME", DefaultDir: ".config", Target: "AGENTS.md"},
 	{ID: "pi", EnvVar: "PI_CODING_AGENT_DIR", DefaultDir: ".pi", Target: "AGENTS.md"},
+}
+
+func init() {
+	context := harnessapi.Context{}
+	for _, id := range harnessregistry.IDs() {
+		contract, err := harnessregistry.Lookup(id)
+		if err != nil || !contract.Capabilities().Has(harnessapi.InstructionOutput) {
+			continue
+		}
+		home, err := contract.Home(context)
+		if err != nil {
+			continue
+		}
+		instructions, err := contract.Instructions(context, harnessapi.Monolithic)
+		if err != nil {
+			continue
+		}
+		roots := home.Roots().Paths()
+		targets := instructions.Paths().Paths()
+		if len(roots) == 1 && len(targets) == 1 {
+			Adapters = append(Adapters, Adapter{
+				ID:         string(contract.ID()),
+				EnvVar:     home.EnvironmentVariable(),
+				DefaultDir: roots[0].String(),
+				Target:     targets[0].String(),
+			})
+		}
+	}
+	sort.Slice(Adapters, func(i, j int) bool { return Adapters[i].ID < Adapters[j].ID })
 }
 
 // adapterByID returns the adapter or false for an unregistered identifier.

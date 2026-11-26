@@ -349,12 +349,10 @@ jobs:
 
   go-family-qualification:
     name: Go ${{ matrix.go }} driver (${{ matrix.os }})
-    # Linux entries run on the repository's self-hosted Linux runners when the
-    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
-    # same-repository pull requests. A pull request from a fork always stays on
-    # the hosted image, whatever the variable says. See
-    # docs/self-hosted-runner-setup.md.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    # Linux and macOS entries use their own self-hosted labels when the
+    # corresponding repository variable is true. Fork pull requests stay on
+    # the hosted image for both runner pools.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -598,7 +596,7 @@ jobs:
   unix-test-shards:
     needs: [store-v1-compatibility]
     name: Unix tests (${{ matrix.os }}, shard ${{ matrix.shard }})
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -709,12 +707,10 @@ jobs:
     if: ${{ !cancelled() }}
     needs: [windows-test-shards, unix-test-shards, store-v1-compatibility, native-capture-workflow-contract]
     name: Test (${{ matrix.os }})
-    # Linux entries run on the repository's self-hosted Linux runners when the
-    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
-    # same-repository pull requests. A pull request from a fork always stays on
-    # the hosted image, whatever the variable says. See
-    # docs/self-hosted-runner-setup.md.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    # Linux and macOS entries use their own self-hosted labels when the
+    # corresponding repository variable is true. Fork pull requests stay on
+    # the hosted image for both runner pools.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -1142,7 +1138,7 @@ jobs:
   envprofile-race:
     needs: [store-v1-compatibility]
     name: Envprofile race (${{ matrix.os }}, shard ${{ matrix.shard }})
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -1211,7 +1207,9 @@ jobs:
     # does not. Match Test routing for pushes, dispatches and same-repository
     # pull requests when LINUX_SELF_HOSTED is true; forks stay hosted and
     # their snapshot controls are expected to refuse. See the runner setup doc.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    # macOS entries use their own self-hosted labels when MACOS_SELF_HOSTED is
+    # true; fork pull requests stay hosted.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -1440,12 +1438,10 @@ jobs:
   # behave identically under Git Bash on Windows.
   gate-selftest:
     name: Gate self-test (${{ matrix.os }})
-    # Linux entries run on the repository's self-hosted Linux runners when the
-    # LINUX_SELF_HOSTED repository variable is true, for pushes, dispatches and
-    # same-repository pull requests. A pull request from a fork always stays on
-    # the hosted image, whatever the variable says. See
-    # docs/self-hosted-runner-setup.md.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os }}
+    # Linux and macOS entries use their own self-hosted labels when the
+    # corresponding repository variable is true. Fork pull requests stay on
+    # the hosted image for both runner pools.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.LINUX_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","relux-linux","curator"]') || matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -1549,7 +1545,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' &&
       (inputs.candidate_ref != '' || inputs.candidate_root != '')
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -1811,7 +1807,7 @@ jobs:
   native-executable-cleanup:
     name: Executable cleanup controls (${{ matrix.os }})
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.fixture_isolation_diagnostics }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'macos-latest' && (vars.MACOS_SELF_HOSTED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","macOS","ARM64","relux-mac"]') || matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false

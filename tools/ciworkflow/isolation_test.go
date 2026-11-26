@@ -1,4 +1,4 @@
-// Package ciworkflow tests the Linux CI isolation contract at its workflow entry point.
+// Package ciworkflow tests CI isolation and runner routing at the workflow entry point.
 package ciworkflow
 
 import (
@@ -464,6 +464,127 @@ func TestLinuxRoutingKeepsForksHosted(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Every hosted macOS matrix entry can use the dedicated self-hosted labels for
+// trusted events. Fork pull requests and a disabled variable stay hosted, and
+// the Mac switch cannot redirect Linux or Windows entries.
+func TestMacOSRoutingKeepsForksHosted(t *testing.T) {
+	var wf struct {
+		Jobs map[string]struct {
+			If       string `yaml:"if"`
+			RunsOn   any    `yaml:"runs-on"`
+			Strategy struct {
+				Matrix struct {
+					OS      []string `yaml:"os"`
+					Include []struct {
+						OS string `yaml:"os"`
+					} `yaml:"include"`
+				} `yaml:"matrix"`
+			} `yaml:"strategy"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(workflowBytes(t), &wf); err != nil {
+		t.Fatal(err)
+	}
+
+	const macRunner = `["self-hosted","macOS","ARM64","relux-mac"]`
+	const linuxRunner = `["self-hosted","relux-linux","curator"]`
+	cases := []struct {
+		name, os, event, linuxEnabled, macEnabled string
+		fork, macUnset                            bool
+	}{
+		{name: "trusted_pull_request", os: "macos-latest", event: "pull_request", macEnabled: "true"},
+		{name: "fork_pull_request", os: "macos-latest", event: "pull_request", macEnabled: "true", fork: true},
+		{name: "variable_disabled", os: "macos-latest", event: "pull_request", macEnabled: "false"},
+		{name: "variable_empty", os: "macos-latest", event: "pull_request", macEnabled: ""},
+		{name: "variable_unset", os: "macos-latest", event: "pull_request", macUnset: true},
+		{name: "push", os: "macos-latest", event: "push", macEnabled: "true"},
+		{name: "dispatch", os: "macos-latest", event: "workflow_dispatch", macEnabled: "true"},
+		{name: "linux_unchanged", os: "ubuntu-latest", event: "push", linuxEnabled: "false", macEnabled: "true"},
+		{name: "windows_unchanged", os: "windows-latest", event: "push", linuxEnabled: "false", macEnabled: "true"},
+		{name: "linux_switch_unchanged", os: "ubuntu-latest", event: "push", linuxEnabled: "true", macEnabled: "true"},
+	}
+
+	count := 0
+	for name, job := range wf.Jobs {
+		macOSMatrix := false
+		for _, platform := range job.Strategy.Matrix.OS {
+			macOSMatrix = macOSMatrix || platform == "macos-latest"
+		}
+		for _, row := range job.Strategy.Matrix.Include {
+			macOSMatrix = macOSMatrix || row.OS == "macos-latest"
+		}
+		if !macOSMatrix {
+			continue
+		}
+		count++
+		route, ok := job.RunsOn.(string)
+		if !ok {
+			t.Fatalf("%s: macOS matrix must keep a string runs-on expression", name)
+		}
+		if !strings.Contains(route, "MACOS_SELF_HOSTED") || !strings.Contains(route, "relux-mac") || !strings.Contains(route, "github.event.pull_request.head.repo.full_name == github.repository") {
+			t.Fatalf("%s: missing macOS variable, runner labels, or same-repository pull-request guard", name)
+		}
+
+		contexts := make([]map[string]any, 0, len(cases))
+		for _, tc := range cases {
+			head := "example/repository"
+			if tc.fork {
+				head = "fork/repository"
+			}
+			vars := map[string]string{"LINUX_SELF_HOSTED": tc.linuxEnabled}
+			if !tc.macUnset {
+				vars["MACOS_SELF_HOSTED"] = tc.macEnabled
+			}
+			contexts = append(contexts, map[string]any{
+				"vars":   vars,
+				"matrix": map[string]string{"os": tc.os},
+				"github": map[string]any{"event_name": tc.event, "repository": "example/repository", "event": map[string]any{"pull_request": map[string]any{"head": map[string]any{"repo": map[string]string{"full_name": head}}}}},
+			})
+		}
+		encoded, err := json.Marshal(contexts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(route, "${{"), "}}"))
+		program := "const cases=JSON.parse(process.argv[1]); const expr=process.argv[2]; const fromJSON=JSON.parse; const route=new Function('vars','matrix','github','fromJSON','return ('+expr+')'); console.log(JSON.stringify(cases.map(c=>route(c.vars,c.matrix,c.github,fromJSON))));"
+		out, err := exec.Command("node", "-e", program, string(encoded), expr).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s route evaluation: %v: %s", name, err, out)
+		}
+		var got []json.RawMessage
+		if err := json.Unmarshal(out, &got); err != nil {
+			t.Fatalf("%s route output is invalid JSON: %v: %s", name, err, out)
+		}
+		if len(got) != len(cases) {
+			t.Fatalf("%s evaluated %d cases, want %d", name, len(got), len(cases))
+		}
+		for i, tc := range cases {
+			trusted := tc.event != "pull_request" || !tc.fork
+			want := `"` + tc.os + `"`
+			if tc.os == "macos-latest" && tc.macEnabled == "true" && trusted {
+				want = macRunner
+			}
+			if tc.os == "ubuntu-latest" && strings.Contains(route, "LINUX_SELF_HOSTED") && tc.linuxEnabled == "true" && trusted {
+				want = linuxRunner
+			}
+			if string(got[i]) != want {
+				t.Errorf("%s %s: got %s, want %s", name, tc.name, got[i], want)
+			}
+		}
+	}
+	if count != 8 {
+		t.Fatalf("found %d hosted macOS matrix jobs, want 8", count)
+	}
+
+	roseAir := wf.Jobs["test-self-hosted"]
+	if got := fmt.Sprint(roseAir.RunsOn); got != "[self-hosted macOS ARM64 rose-air]" {
+		t.Fatalf("rose-air runner labels changed: %s", got)
+	}
+	if want := "${{ vars.ROSE_AIR_RUNNER == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}"; roseAir.If != want {
+		t.Fatalf("rose-air condition changed: %s", roseAir.If)
 	}
 }
 

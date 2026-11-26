@@ -90,6 +90,28 @@ func StageGlobalWithOwnership(
 	canonical := filepath.Join(home, "global", "skills")
 	roots := map[string]string{}
 	for _, agent := range agents {
+		if discovery, supported := registeredSkillProjection(agent, harnessapi.UserScope); supported {
+			root := userHome
+			adapter, err := harnessregistry.Lookup(harnessapi.ID(agent))
+			if err != nil {
+				return Mirror{}, fmt.Errorf("lookup harness adapter %q: %w", agent, err)
+			}
+			layout, err := adapter.Home(harnessapi.Context{})
+			if err != nil {
+				var refusal harnessapi.Refusal
+				if !errors.As(err, &refusal) || refusal.Code() != harnessapi.OperationNotPorted {
+					return Mirror{}, fmt.Errorf("read harness home for %q: %w", agent, err)
+				}
+			} else {
+				homeRoots := layout.Roots().Paths()
+				if len(homeRoots) != 1 {
+					return Mirror{}, fmt.Errorf("harness home for %q has %d roots; want one", agent, len(homeRoots))
+				}
+				root = filepath.Join(root, filepath.FromSlash(homeRoots[0].String()))
+			}
+			roots[agent] = filepath.Join(root, filepath.FromSlash(oneSkillPath(agent, discovery.Paths())))
+			continue
+		}
 		discovery, ported, err := registeredSkills(agent, harnessapi.UserScope)
 		if err != nil {
 			return Mirror{}, err
