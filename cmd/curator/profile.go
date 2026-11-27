@@ -35,7 +35,7 @@ func (c cli) cmdProfile(args []string) int {
 		return c.cmdProfileGraph(args[1:])
 	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp|graph|exec> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp|graph|exec> [flags]\n\nUses built-in defaults when no config file exists ("+configNotFoundHint+").\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
@@ -105,10 +105,12 @@ func (c cli) cmdProfileImport(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	if activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+	activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{})
+	if rootErr != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
 		return exitFail
-	} else if activeRoot != nil {
+	}
+	if activeRoot != nil {
 		_, _ = fmt.Fprintf(c.stdout, "materialized command root for %s at %s\n", info.Name, activeRoot.Root)
 	}
 	root, _ := info.Lock.RootMember()
@@ -119,6 +121,14 @@ func (c cli) cmdProfileImport(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintf(c.stdout, "installed and activated profile %s (root %s %s, lock %s)\n", info.Name, root.Name, root.Version, info.LockHash)
 	default:
 		_, _ = fmt.Fprintf(c.stdout, "installed profile %s (root %s %s, lock %s); activate with 'curator profile use %s'\n", info.Name, root.Name, root.Version, info.LockHash, info.Name)
+	}
+	if !updated {
+		_, _ = fmt.Fprintln(c.stdout, "Next: run with this profile:")
+		_, _ = fmt.Fprintf(c.stdout, "  curator profile exec %s --env <env-id> -- <command>\n", info.Name)
+		_, _ = fmt.Fprintf(c.stdout, "  curator run <env-id> --profile %s   (with curator-run installed)\n", info.Name)
+		if activeRoot != nil {
+			_, _ = fmt.Fprintf(c.stdout, "  curator profile exec %s -- <tool>   (run profile tools directly)\n", info.Name)
+		}
 	}
 	return exitOK
 }
@@ -166,10 +176,12 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	if activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+	activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{})
+	if rootErr != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
 		return exitFail
-	} else if activeRoot != nil {
+	}
+	if activeRoot != nil {
 		_, _ = fmt.Fprintf(c.stdout, "materialized command root for %s at %s\n", info.Name, activeRoot.Root)
 	}
 	root, _ := info.Lock.RootMember()
@@ -180,6 +192,14 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintf(c.stdout, "installed and activated profile %s (root %s %s, lock %s)\n", info.Name, root.Name, root.Version, info.LockHash)
 	default:
 		_, _ = fmt.Fprintf(c.stdout, "installed profile %s (root %s %s, lock %s); activate with 'curator profile use %s'\n", info.Name, root.Name, root.Version, info.LockHash, info.Name)
+	}
+	if !updated {
+		_, _ = fmt.Fprintln(c.stdout, "Next: run with this profile:")
+		_, _ = fmt.Fprintf(c.stdout, "  curator profile exec %s --env <env-id> -- <command>\n", info.Name)
+		_, _ = fmt.Fprintf(c.stdout, "  curator run <env-id> --profile %s   (with curator-run installed)\n", info.Name)
+		if activeRoot != nil {
+			_, _ = fmt.Fprintf(c.stdout, "  curator profile exec %s -- <tool>   (run profile tools directly)\n", info.Name)
+		}
 	}
 	return exitOK
 }

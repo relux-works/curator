@@ -316,3 +316,39 @@ func TestMuseHasNoAdmittedRootContextForm(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseVerifiedSemverRanges(t *testing.T) {
+	cases := []struct {
+		id      string
+		version string
+		want    bool
+	}{
+		{CodexCLI, "0.162.1", true},
+		{CodexCLI, "0.171.0", true},
+		{CodexCLI, "0.162.0", false},
+		{CodexCLI, "0.162.1-rc.1", false},
+		{CodexCLI, "1.0.0-alpha.1", false},
+		{CodexCLI, "1.0.0", false},
+		{CodexCLI, "unknown", false},
+		{ClaudeCode, "2.1.261", true},
+		{ClaudeCode, "2.1.332", true},
+		{ClaudeCode, "2.9.0", true},
+		{ClaudeCode, "2.1.260", false},
+		{ClaudeCode, "3.0.0", false},
+		{Muse, "1.4.7", true},
+		{Muse, "1.8.0", true},
+		{Muse, "1.4.6", false},
+		{Muse, "2.0.0", false},
+		{Pi, "0.84.2", true},
+		{Pi, "0.90.0", true},
+		{Pi, "0.84.1", false},
+		{Pi, "1.0.0", false},
+		{OpenCode, "1.0.0", false},
+	}
+	for _, tc := range cases {
+		adapter := mustAdapter(t, tc.id)
+		if got := adapter.ReleaseVerified(tc.version); got != tc.want {
+			t.Errorf("%s.ReleaseVerified(%q) = %v, want %v (recorded=%q)", tc.id, tc.version, got, tc.want, adapter.VerifiedRelease)
+		}
+	}
+}

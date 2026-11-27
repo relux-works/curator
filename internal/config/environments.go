@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -1406,6 +1407,20 @@ func SplitEnvKnob(knob string) ([]string, error) {
 // read-modify-write commands that edit the machine file only.
 func ReadRaw(path string) (map[string]any, error) {
 	return readObject(path)
+}
+
+// ReadRawOrDefault loads the user config file like ReadRaw, returning built-in
+// defaults strictly when the file does not yet exist so configuration-mutating
+// commands can materialize the config lazily on first write.
+func ReadRawOrDefault(path string) (map[string]any, error) {
+	object, err := readObject(path)
+	if err != nil {
+		if errors.Is(err, ErrConfigNotFound) {
+			return DefaultObject(path), nil
+		}
+		return nil, err
+	}
+	return object, nil
 }
 
 // WriteRaw validates the object and stores it atomically.

@@ -525,42 +525,43 @@ func (a Adapter) DefaultIsolation(atOrAbovePinned bool) (string, error) {
 	return a.ResolveIsolation("", atOrAbovePinned)
 }
 
+func parseVersion(release string) ([]int, string, bool) {
+	parts := strings.Split(release, ".")
+	numbers := make([]int, 0, len(parts))
+	for _, part := range parts {
+		digits := part
+		suffix := ""
+		for i := 0; i < len(part); i++ {
+			if part[i] < '0' || part[i] > '9' {
+				digits = part[:i]
+				suffix = part[i:]
+				break
+			}
+		}
+		if digits == "" {
+			return nil, "", false
+		}
+		number, err := strconv.Atoi(digits)
+		if err != nil {
+			return nil, "", false
+		}
+		numbers = append(numbers, number)
+		if suffix != "" {
+			return numbers, suffix, true
+		}
+	}
+	return numbers, "", true
+}
+
 // CompareVersions compares dotted decimal releases: -1, 0, or +1. A
 // non-numeric suffix on a component (2.1.261-beta) compares below the bare
 // component; an unparseable release compares as unknown (0, false).
 func CompareVersions(have, want string) (int, bool) {
-	parse := func(release string) ([]int, string, bool) {
-		parts := strings.Split(release, ".")
-		numbers := make([]int, 0, len(parts))
-		for _, part := range parts {
-			digits := part
-			suffix := ""
-			for i := 0; i < len(part); i++ {
-				if part[i] < '0' || part[i] > '9' {
-					digits = part[:i]
-					suffix = part[i:]
-					break
-				}
-			}
-			if digits == "" {
-				return nil, "", false
-			}
-			number, err := strconv.Atoi(digits)
-			if err != nil {
-				return nil, "", false
-			}
-			numbers = append(numbers, number)
-			if suffix != "" {
-				return numbers, suffix, true
-			}
-		}
-		return numbers, "", true
-	}
-	haveNumbers, haveSuffix, ok := parse(have)
+	haveNumbers, haveSuffix, ok := parseVersion(have)
 	if !ok {
 		return 0, false
 	}
-	wantNumbers, _, ok := parse(want)
+	wantNumbers, _, ok := parseVersion(want)
 	if !ok {
 		return 0, false
 	}
@@ -599,6 +600,28 @@ func (a Adapter) AtOrAbovePinned(detected string) (bool, bool) {
 		return false, false
 	}
 	return comparison >= 0, true
+}
+
+// ReleaseVerified reports whether the detected release falls within the
+// adapter's verified semver compatibility range: at or above VerifiedRelease
+// within the same major version (>= VerifiedRelease, < nextMajor).
+// Pre-releases of the next major version and releases below VerifiedRelease
+// return false. An empty VerifiedRelease or unknown detected release returns
+// false.
+func (a Adapter) ReleaseVerified(detected string) bool {
+	if a.VerifiedRelease == "" || detected == "" || detected == "unknown" {
+		return false
+	}
+	haveNumbers, _, haveOK := parseVersion(detected)
+	wantNumbers, _, wantOK := parseVersion(a.VerifiedRelease)
+	if !haveOK || !wantOK || len(haveNumbers) == 0 || len(wantNumbers) == 0 {
+		return false
+	}
+	if haveNumbers[0] != wantNumbers[0] {
+		return false
+	}
+	comparison, ok := CompareVersions(detected, a.VerifiedRelease)
+	return ok && comparison >= 0
 }
 
 // MachineConfig carries the section 12.1 environments knobs persisted by

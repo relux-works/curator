@@ -128,7 +128,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 		value = rawValue
 	}
 	value = normalizeEnvKnobValue(segments, value)
-	object, err := config.ReadRaw(cfg.Path)
+	object, err := config.ReadRawOrDefault(cfg.Path)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
@@ -181,7 +181,7 @@ func (c cli) cmdEnvConfigUnset(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintf(c.stderr, "curator: environments knob %q is locked by %s; the system value wins\n", knob, cfg.SystemConfigPath)
 		return exitFail
 	}
-	object, err := config.ReadRaw(cfg.Path)
+	object, err := config.ReadRawOrDefault(cfg.Path)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail

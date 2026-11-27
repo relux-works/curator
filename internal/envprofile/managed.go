@@ -2730,18 +2730,17 @@ func (v *verification) checkShadows(plan *homePlan, marker *envmarker.Marker) {
 	}
 }
 
-// checkToolRelease warns when the detected release differs from the
-// recorded one. An undetectable tool reports unknown, never matching.
+// checkToolRelease warns when the detected release falls outside the
+// adapter's verified semver range (>= VerifiedRelease within the same major).
+// An undetectable tool reports unknown, never matching.
 func (v *verification) checkToolRelease(req *ResolveRequest, adapter envregistry.Adapter) {
 	detected := req.detected(adapter)
 	if detected == "unknown" || detected == "" {
 		v.warnings = append(v.warnings, fmt.Sprintf("%s: %s detected release unknown, recorded %s", envregistry.DiagToolVersionUnverifed, adapter.ID, recordedRelease(adapter)))
 		return
 	}
-	if adapter.VerifiedRelease != "" && detected != adapter.VerifiedRelease {
-		if comparison, ok := envregistry.CompareVersions(detected, adapter.VerifiedRelease); !ok || comparison != 0 {
-			v.warnings = append(v.warnings, fmt.Sprintf("%s: %s detected %s, recorded %s", envregistry.DiagToolVersionUnverifed, adapter.ID, detected, adapter.VerifiedRelease))
-		}
+	if adapter.VerifiedRelease != "" && !adapter.ReleaseVerified(detected) {
+		v.warnings = append(v.warnings, fmt.Sprintf("%s: %s detected %s, recorded %s", envregistry.DiagToolVersionUnverifed, adapter.ID, detected, adapter.VerifiedRelease))
 	}
 }
 

@@ -9,11 +9,11 @@ import (
 	"github.com/relux-works/curator/internal/verr"
 )
 
-// Bootstrap writes a minimal schema 1 user configuration. Existing files are
-// preserved unless force is true.
+// Bootstrap writes a minimal user configuration. Existing files are preserved
+// unless force is true. When skillsRoot is empty, DefaultSkillsRoot(path) is used.
 func Bootstrap(path, skillsRoot, preferredLocale string, defaultAgents []string, force bool) error {
 	if skillsRoot == "" {
-		return fmt.Errorf("skills_root must be a non-empty path")
+		skillsRoot = DefaultSkillsRoot(path)
 	}
 	if _, err := os.Stat(path); err == nil && !force {
 		return fmt.Errorf("config already exists at %s; pass --force to overwrite", path)
@@ -51,7 +51,7 @@ func AddProject(path, alias, projectPath string, agents []string) error {
 	if err != nil || !info.IsDir() {
 		return fmt.Errorf("project path does not exist: %s", resolved)
 	}
-	object, err := readObject(path)
+	object, err := ReadRawOrDefault(path)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func SetBuildSSH(path string, credential BuildSSHCredential) (bool, error) {
 	if err := ValidateBuildSSH(credential); err != nil {
 		return false, err
 	}
-	object, err := readObject(path)
+	object, err := ReadRawOrDefault(path)
 	if err != nil {
 		return false, err
 	}
@@ -190,7 +190,7 @@ func SetBuildHTTPS(path string, credential BuildHTTPSCredential) (bool, error) {
 	if err := ValidateBuildHTTPS(credential); err != nil {
 		return false, err
 	}
-	object, err := readObject(path)
+	object, err := ReadRawOrDefault(path)
 	if err != nil {
 		return false, err
 	}

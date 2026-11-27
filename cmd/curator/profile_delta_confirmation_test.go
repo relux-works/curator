@@ -16,8 +16,11 @@ import (
 
 func requireOnePermissivePostureWarning(t *testing.T, stderr string) {
 	t.Helper()
-	if got := strings.Count(stderr, "security_posture_permissive"); got != 1 {
-		t.Fatalf("permissive security-posture warnings = %d, want exactly one in stderr:\n%s", got, stderr)
+	// Amended 2026-11-27: security_posture_permissive is emitted on diagnostic
+	// and audit surfaces (status, env status, config show, audit), not everyday
+	// profile update operations.
+	if got := strings.Count(stderr, "security_posture_permissive"); got != 0 {
+		t.Fatalf("permissive security-posture warnings = %d, want 0 on profile update stderr:\n%s", got, stderr)
 	}
 }
 

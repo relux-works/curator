@@ -72,7 +72,7 @@ func (c cli) cmdEnv(args []string) int {
 		return exitUsage
 	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator env <resolve|status|config|migrate|unmanage> [flags]\n\nUses built-in defaults when no config file exists ("+configNotFoundHint+").\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
@@ -201,6 +201,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env status [--check] [--json]")
 		return exitUsage
 	}
+	c.emitSecurityPostureWarning(cfg)
 	launchDir, _ := os.Getwd()
 	status, err := envprofile.StatusOf(envprofile.StatusRequest{
 		Home:      cfg.Home(),

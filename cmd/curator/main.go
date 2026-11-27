@@ -187,7 +187,7 @@ type fileConfigSource string
 func (source fileConfigSource) Path() string { return string(source) }
 
 func (source fileConfigSource) Load(warn func(string)) (*config.Config, error) {
-	return config.Load(source.Path(), warn)
+	return config.LoadOrDefault(source.Path(), warn)
 }
 
 type cli struct {
@@ -364,30 +364,39 @@ func (c cli) loadConfig() (*config.Config, int) {
 		}
 		return nil, exitFail
 	}
+	return cfg, exitOK
+}
+
+// emitSecurityPostureWarning reports the permissive security-posture notice on
+// diagnostic and audit surfaces (status, env status, config show, audit),
+// deduplicated across a nested process tree.
+func (c cli) emitSecurityPostureWarning(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
 	if warning := cfg.SecurityPostureWarning(); warning != "" {
 		parentWarned := os.Getppid() > 1 && os.Getenv(postureWarnedEnv) == strconv.Itoa(os.Getppid())
 		if parentWarned || (c.posture != nil && c.posture.warned) {
 			if c.posture != nil {
 				c.posture.warned = true
 			}
-			return cfg, exitOK
+			return
 		}
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
 		if c.posture != nil {
 			c.posture.warned = true
 		}
 	}
-	return cfg, exitOK
 }
 
 // configNotFoundHint tells a first-run operator how to create the global
-// config the refused command needs.
-const configNotFoundHint = "run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)"
+// config explicitly when desired.
+const configNotFoundHint = "optional: run `curator bootstrap` to create a config file (see docs/cli.md#bootstrap)"
 
 const globalHelp = `usage: curator global <init|add|remove|list|status|install|adopt|update|upgrade> [flags]
 
-Manage machine-wide skill installations. Requires the global config:
-` + "run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap).\n"
+Manage machine-wide skill installations. Uses built-in defaults when no config file exists (` + configNotFoundHint + `).
+`
 
 // wantsHelp answers group-level help without loading the global config.
 // Subcommand help must reach its own FlagSet with its original exit code.
@@ -551,12 +560,12 @@ func nearestProjectRoot(start string) string {
 
 func (c cli) cmdBootstrap(args []string) int {
 	flags := c.newFlagSet("bootstrap")
-	skillsRoot := flags.String("skills-root", "", "directory containing skill repositories")
+	skillsRoot := flags.String("skills-root", "", "directory containing skill repositories (default: <curator-home>/skills)")
 	preferredLocale := flags.String("preferred-locale", "", "preferred locale")
 	defaultAgents := flags.String("default-agents", "codex_cli", "comma-separated default agents")
 	force := flags.Bool("force", false, "overwrite an existing configuration")
 	ifMissing := flags.Bool("if-missing", false, "create configuration only when absent")
-	nonInteractive := flags.Bool("non-interactive", false, "fail instead of prompting for missing values")
+	_ = flags.Bool("non-interactive", false, "never prompt for missing values (default behavior)")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) > 0 {
 		return exitUsage
@@ -575,17 +584,8 @@ func (c cli) cmdBootstrap(args []string) int {
 			return exitFail
 		}
 	}
-	if *skillsRoot == "" && !*nonInteractive {
-		_, _ = fmt.Fprint(c.stderr, "skills_root: ")
-		reader := bufio.NewReader(os.Stdin)
-		value, readErr := reader.ReadString('\n')
-		if readErr == nil {
-			*skillsRoot = strings.TrimSpace(value)
-		}
-	}
 	if *skillsRoot == "" {
-		_, _ = fmt.Fprintln(c.stderr, "curator: bootstrap requires --skills-root")
-		return exitUsage
+		*skillsRoot = config.DefaultSkillsRoot(path)
 	}
 	if err := config.Bootstrap(path, *skillsRoot, *preferredLocale, splitNonEmpty(*defaultAgents), *force); err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -918,6 +918,7 @@ func (c cli) cmdStatus(args []string) int {
 	if code != exitOK {
 		return code
 	}
+	c.emitSecurityPostureWarning(cfg)
 	securityPostureRows := curatorSecurityPostureRows(cfg)
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
@@ -2252,6 +2253,7 @@ func (c cli) cmdAudit(args []string) int {
 	if code != exitOK {
 		return code
 	}
+	c.emitSecurityPostureWarning(cfg)
 	if allowSupplied {
 		// New pins record the writer framing explicitly (Spec §8): a pin
 		// authorizes only the (version, digest) identity it was issued
@@ -3056,6 +3058,7 @@ func (c cli) cmdConfigShow() int {
 	if code != exitOK {
 		return code
 	}
+	c.emitSecurityPostureWarning(cfg)
 	payload, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)

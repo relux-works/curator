@@ -84,14 +84,14 @@ Flags:
 - `--default-agents string`: comma-separated default agents (default: `codex_cli`).
 - `--force`: overwrite an existing configuration.
 - `--if-missing`: create configuration only when absent.
-- `--non-interactive`: fail instead of prompting for missing values.
+- `--non-interactive`: never prompt for missing values (default behavior).
 - `--preferred-locale string`: preferred locale setting.
-- `--skills-root string`: directory containing skill repositories.
+- `--skills-root string`: directory containing skill repositories (default: `<curator-home>/skills`).
 
-Run bootstrap to create missing machine configuration:
+Running `bootstrap` is optional — commands run directly with built-in defaults when no config file exists, and configuration-mutating commands create the file lazily on first write. To create a machine configuration file explicitly:
 
 ```bash
-curator bootstrap --if-missing --non-interactive --skills-root "$HOME/skills"
+curator bootstrap --if-missing --non-interactive
 ```
 
 The command initializes `$HOME/.curator/config.json` without overwriting existing files. `--non-interactive` requires `--skills-root`; without it bootstrap exits 2 (`bootstrap requires --skills-root`).

@@ -311,6 +311,32 @@ func SystemCandidatePath() string {
 	return candidate
 }
 
+// DefaultSkillsRoot returns the default skills repository directory beneath
+// the machine home holding path.
+func DefaultSkillsRoot(path string) string {
+	if path == "" {
+		path = UserPath()
+	}
+	return filepath.Join(filepath.Dir(path), "skills")
+}
+
+// DefaultObject returns the minimal in-memory schema-2 user configuration used
+// when no operator config file exists yet on disk.
+func DefaultObject(path string) map[string]any {
+	agents := make([]any, 0, len(DefaultAgents))
+	for _, agent := range DefaultAgents {
+		agents = append(agents, agent)
+	}
+	return map[string]any{
+		"schema_version":   float64(SchemaVersion2),
+		"security_posture": SecurityPosturePermissive,
+		"skills_root":      DefaultSkillsRoot(path),
+		"default_agents":   agents,
+		"adapter_mode":     "auto",
+		"projects":         map[string]any{},
+	}
+}
+
 // Load reads the user config, overlays the system config, and parses the
 // result. warn receives locked-key override warnings.
 func Load(path string, warn func(string)) (*Config, error) {
@@ -320,6 +346,33 @@ func Load(path string, warn func(string)) (*Config, error) {
 	userData, err := readObject(path)
 	if err != nil {
 		return nil, err
+	}
+	return loadObject(path, userData, warn)
+}
+
+// LoadOrDefault reads the user config like Load, falling back to in-memory
+// built-in defaults strictly when the user file does not exist (ErrConfigNotFound).
+// Malformed or unreadable user files still fail closed, and any present system
+// configuration file is always overlaid and enforced.
+func LoadOrDefault(path string, warn func(string)) (*Config, error) {
+	if path == "" {
+		path = UserPath()
+	}
+	userData, err := readObject(path)
+	if err != nil {
+		if !errors.Is(err, ErrConfigNotFound) {
+			return nil, err
+		}
+		userData = DefaultObject(path)
+		origWarn := warn
+		warn = func(msg string) {
+			if strings.Contains(msg, `config key "security_posture" is locked`) {
+				return
+			}
+			if origWarn != nil {
+				origWarn(msg)
+			}
+		}
 	}
 	return loadObject(path, userData, warn)
 }
@@ -660,9 +713,16 @@ func parseConfig(data map[string]any, path string, locked map[string]bool, machi
 		return nil, err
 	}
 
-	skillsRoot, ok := data["skills_root"].(string)
-	if !ok || skillsRoot == "" || utf8.RuneCountInString(skillsRoot) > 4096 {
-		return nil, verr.New("skills_root", "requires a non-empty string")
+	var skillsRoot string
+	rawSkillsRoot, skillsRootPresent := data["skills_root"]
+	if !skillsRootPresent && schema >= SchemaVersion2 {
+		skillsRoot = DefaultSkillsRoot(path)
+	} else {
+		var ok bool
+		skillsRoot, ok = rawSkillsRoot.(string)
+		if !ok || skillsRoot == "" || utf8.RuneCountInString(skillsRoot) > 4096 {
+			return nil, verr.New("skills_root", "requires a non-empty string")
+		}
 	}
 
 	defaultAgents := append([]string(nil), DefaultAgents...)

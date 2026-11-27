@@ -99,7 +99,7 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 		}
 		entry["weight"] = float64(parsed)
 	}
-	object, err := config.ReadRaw(cfg.Path)
+	object, err := config.ReadRawOrDefault(cfg.Path)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
@@ -151,7 +151,7 @@ func (c cli) cmdComposeRemove(cfg *config.Config, profile string, args []string)
 		return exitUsage
 	}
 	source := positional[0]
-	object, err := config.ReadRaw(cfg.Path)
+	object, err := config.ReadRawOrDefault(cfg.Path)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail

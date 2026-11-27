@@ -18,8 +18,6 @@ import (
 // the production CLI entry run() — or the built binary for the nested
 // process-tree row — and pins the exact message and exit code.
 
-const wantConfigHint = "curator: run `curator bootstrap --skills-root <dir>` first (see docs/cli.md#bootstrap)"
-
 func runFile(t *testing.T, configPath string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr strings.Builder
@@ -29,26 +27,48 @@ func runFile(t *testing.T, configPath string, args ...string) (int, string, stri
 }
 
 func TestGlobalInitCleanHomeRefusesWithBootstrapHint(t *testing.T) {
+	// Amended 2026-11-27: clean homes operate with in-memory built-in defaults
+	// without requiring prior bootstrap. Read-only commands succeed without
+	// creating config.json; diagnostic surfaces emit security_posture_permissive
+	// while everyday profile commands stay quiet.
 	configPath := filepath.Join(t.TempDir(), "config.json")
-	for _, args := range [][]string{
-		{"global", "init"},
-		{"global", "list"},
-		{"profile", "list"},
-		{"env", "status"},
+	for _, tc := range []struct {
+		args        []string
+		wantPosture bool
+	}{
+		{[]string{"global", "list"}, false},
+		{[]string{"profile", "list"}, false},
+		{[]string{"env", "status"}, true},
+		{[]string{"config", "show"}, true},
 	} {
-		code, stdout, stderr := runFile(t, configPath, args...)
-		want := "curator: global config not found: " + configPath + "\n" + wantConfigHint + "\n"
-		if code != exitFail || stderr != want || stdout != "" {
-			t.Fatalf("%v on a clean home = %d\nstdout %q\nstderr %q\nwant stderr %q", args, code, stdout, stderr, want)
+		code, _, stderr := runFile(t, configPath, tc.args...)
+		if code != exitOK {
+			t.Fatalf("%v on a clean home = %d\nstderr %q", tc.args, code, stderr)
+		}
+		gotPosture := postureWarnings(stderr)
+		wantCount := 0
+		if tc.wantPosture {
+			wantCount = 1
+		}
+		if gotPosture != wantCount {
+			t.Fatalf("%v posture warnings = %d, want %d\nstderr %q", tc.args, gotPosture, wantCount, stderr)
 		}
 	}
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
-		t.Fatalf("the refusal created the config: %v", err)
+		t.Fatalf("read-only commands on clean home created config.json: %v", err)
+	}
+	// Config-mutating commands lazily materialize config.json on first write.
+	code, _, stderr := runFile(t, configPath, "env", "config", "set", "backup_retention", "3")
+	if code != exitOK {
+		t.Fatalf("env config set on clean home = %d\nstderr %q", code, stderr)
+	}
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("env config set did not lazily materialize config.json: %v", err)
 	}
 }
 
-// A malformed config is a failed read, not an absence: it must not get the
-// bootstrap hint that is defined for the missing file.
+// A malformed config is a failed read, not an absence: it must fail closed
+// rather than falling back to defaults.
 func TestGlobalInitMalformedConfigHasNoBootstrapHint(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(configPath, []byte("{"), 0o600); err != nil {
@@ -73,7 +93,7 @@ func TestGlobalInitHelpWithoutConfig(t *testing.T) {
 	} {
 		code, stdout, stderr := runFile(t, configPath, args...)
 		if code != exitOK || stderr != "" || !strings.HasPrefix(stdout, "usage: curator "+args[0]) ||
-			!strings.Contains(stdout, "curator bootstrap --skills-root <dir>") {
+			!strings.Contains(stdout, "curator bootstrap") {
 			t.Fatalf("%v = %d\nstdout %q\nstderr %q", args, code, stdout, stderr)
 		}
 	}
@@ -139,10 +159,12 @@ func TestBootstrapDocsExampleRuns(t *testing.T) {
 	if code != exitOK || !strings.Contains(stdout, "wrote "+configPath) {
 		t.Fatalf("documented example %v = %d\nstdout %q\nstderr %q", args, code, stdout, stderr)
 	}
-	// The old example (no --skills-root) is a usage error.
-	code, _, stderr = runFile(t, filepath.Join(t.TempDir(), "config.json"), "bootstrap", "--if-missing", "--non-interactive")
-	if code != exitUsage || stderr != "curator: bootstrap requires --skills-root\n" {
-		t.Fatalf("bootstrap without --skills-root = %d stderr %q", code, stderr)
+	// Bootstrap without --skills-root succeeds with built-in <home>/skills default.
+	defaultHome := t.TempDir()
+	defaultCfgPath := filepath.Join(defaultHome, "config.json")
+	code, stdout, stderr = runFile(t, defaultCfgPath, "bootstrap", "--if-missing", "--non-interactive")
+	if code != exitOK || stderr != "" || !strings.Contains(stdout, "wrote "+defaultCfgPath) {
+		t.Fatalf("bootstrap without --skills-root = %d stdout %q stderr %q", code, stdout, stderr)
 	}
 	// After bootstrap global init succeeds.
 	if code, _, stderr := runFile(t, configPath, "global", "init"); code != exitOK {
