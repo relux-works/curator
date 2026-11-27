@@ -2828,6 +2828,12 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 			Channels: []envregistry.Channel{*adapter.MCP},
 		}
 	}
+	if cr, binDir, err := LoadVerifiedCommandRoot(req.Home, req.Profile, strings.TrimPrefix(verdict.hash, "sha256:")); err != nil {
+		return nil, err
+	} else if cr != nil {
+		fragment.CommandRoot = cr
+		fragment.PathPrepend = binDir
+	}
 	if err := envfragment.CheckBoundary(adapter, EnvRoot(req.Home), fragment); err != nil {
 		return nil, err
 	}

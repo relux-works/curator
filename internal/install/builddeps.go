@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/toolprov"
 )
 
 func closuregraphID(value string) closuregraph.ID { return closuregraph.ID(value) }
@@ -129,7 +130,7 @@ func (deps BuildDeps) resolve(home string, private *privateRoot, forbidden []str
 		deps.Generation = markerGeneration{}
 	}
 	if deps.Toolchain == nil {
-		deps.Toolchain = &goToolchain{private: private, forbidden: append([]string(nil), forbidden...)}
+		deps.Toolchain = &goToolchain{home: home, private: private, forbidden: append([]string(nil), forbidden...)}
 	}
 	if deps.Builder == nil {
 		deps.Builder = goBuilder{}
@@ -175,12 +176,30 @@ func (markerGeneration) InstalledMarker(installedDir string) (*marker.Marker, er
 // home, the repository, and the runtime store — so neither a probe nor a
 // staging session can write persistent state.
 type goToolchain struct {
+	home      string
 	private   *privateRoot
 	forbidden []string
 }
 
-func (toolchain *goToolchain) config(base string) godriver.Config {
-	return godriver.ConfigFromEnvironment(base, toolchain.forbidden...)
+func (toolchain *goToolchain) config(ctx context.Context, base string, allowProvision bool) (godriver.Config, error) {
+	cfg := godriver.ConfigFromEnvironment(base, toolchain.forbidden...)
+	if cfg.CuratorGo != "" || cfg.GOROOT != "" || toolchain.home == "" {
+		return cfg, nil
+	}
+	goBin, err := toolprov.EnsureGoToolchain(ctx, toolchain.home, toolprov.GoOptions{
+		DisableAutoDownload: !allowProvision,
+	})
+	if err != nil {
+		if !allowProvision {
+			// Dry-run probe falls back to godriver's normal diagnostic without writing state.
+			return cfg, nil
+		}
+		return cfg, err
+	}
+	if goBin != "" {
+		cfg.CuratorGo = goBin
+	}
+	return cfg, nil
 }
 
 func (toolchain *goToolchain) Probe(ctx context.Context) (buildmeta.Target, buildmeta.Toolchain, error) {
@@ -188,7 +207,11 @@ func (toolchain *goToolchain) Probe(ctx context.Context) (buildmeta.Target, buil
 	if err != nil {
 		return buildmeta.Target{}, buildmeta.Toolchain{}, fmt.Errorf("create toolchain probe root: %w", err)
 	}
-	snapshot, probeErr := godriver.Probe(ctx, toolchain.config(base))
+	cfg, cfgErr := toolchain.config(ctx, base, false)
+	if cfgErr != nil {
+		return buildmeta.Target{}, buildmeta.Toolchain{}, errors.Join(cfgErr, os.RemoveAll(base))
+	}
+	snapshot, probeErr := godriver.Probe(ctx, cfg)
 	removeErr := os.RemoveAll(base)
 	if probeErr != nil {
 		return buildmeta.Target{}, buildmeta.Toolchain{}, errors.Join(probeErr, removeErr)
@@ -204,7 +227,11 @@ func (toolchain *goToolchain) Establish(ctx context.Context) (BuildSession, erro
 	if err != nil {
 		return nil, fmt.Errorf("create private build root: %w", err)
 	}
-	session, err := godriver.Establish(ctx, toolchain.config(base))
+	cfg, cfgErr := toolchain.config(ctx, base, true)
+	if cfgErr != nil {
+		return nil, errors.Join(cfgErr, os.RemoveAll(base))
+	}
+	session, err := godriver.Establish(ctx, cfg)
 	if err != nil {
 		return nil, errors.Join(err, os.RemoveAll(base))
 	}

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -19,17 +23,17 @@ func (c cli) profileUseUsage() {
 }
 
 // cmdProfile dispatches the profile family (cli/curator.md): install,
-// import, list, use, update, remove, sync, compose, mcp.
+// import, list, use, update, remove, sync, compose, mcp, exec.
 func (c cli) cmdProfile(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose | mcp | graph")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose | mcp | graph | exec")
 		return exitUsage
 	}
 	if args[0] == "graph" {
 		return c.cmdProfileGraph(args[1:])
 	}
 	if wantsHelp(args) {
-		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp|graph> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
+		_, _ = fmt.Fprint(c.stdout, "usage: curator profile <install|import|list|use|update|remove|sync|compose|mcp|graph|exec> [flags]\n\nRequires the global config: "+configNotFoundHint+".\n")
 		return exitOK
 	}
 	cfg, code := c.loadConfig()
@@ -55,6 +59,8 @@ func (c cli) cmdProfile(args []string) int {
 		return c.cmdProfileSync(cfg, args[1:])
 	case "compose":
 		return c.cmdProfileCompose(cfg, args[1:])
+	case "exec":
+		return c.cmdProfileExec(cfg, args[1:])
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown profile subcommand %q\n", args[0])
 	return exitUsage
@@ -96,6 +102,12 @@ func (c cli) cmdProfileImport(cfg *config.Config, args []string) int {
 		}
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
+	}
+	if activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
+		return exitFail
+	} else if activeRoot != nil {
+		_, _ = fmt.Fprintf(c.stdout, "materialized command root for %s at %s\n", info.Name, activeRoot.Root)
 	}
 	root, _ := info.Lock.RootMember()
 	switch {
@@ -151,6 +163,12 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 		}
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
+	}
+	if activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
+		return exitFail
+	} else if activeRoot != nil {
+		_, _ = fmt.Fprintf(c.stdout, "materialized command root for %s at %s\n", info.Name, activeRoot.Root)
 	}
 	root, _ := info.Lock.RootMember()
 	switch {
@@ -362,6 +380,13 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 			}
 			continue
 		}
+		if activeRoot, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), info.Name, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", info.Name, rootErr)
+			failed = true
+			continue
+		} else if activeRoot != nil {
+			_, _ = fmt.Fprintf(c.stdout, "%s: command root ready (%s)\n", info.Name, activeRoot.Root)
+		}
 		if moved {
 			_, _ = fmt.Fprintf(c.stdout, "%s: updated (lock %s)\n", info.Name, info.LockHash)
 		} else {
@@ -457,5 +482,94 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
+	if profiles, listErr := envprofile.ListWithPolicy(cfg.Home(), policy); listErr == nil {
+		for _, p := range profiles {
+			if _, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), p.Name, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+				_, _ = fmt.Fprintf(c.stderr, "curator: command root sync for %s: %v\n", p.Name, rootErr)
+				return exitFail
+			}
+		}
+	}
 	return exitOK
+}
+
+// cmdProfileExec implements `curator profile exec <profile> -- <command> [args...]`.
+// It verifies (or materializes) the profile's Slice B-a command root, prepends
+// its bin directory to PATH, and runs <command> interactively with inherited
+// stdin/stdout/stderr so operator workflows (such as tool OAuth login) work
+// without installing profile tools onto global PATH.
+func (c cli) cmdProfileExec(cfg *config.Config, args []string) int {
+	sep := -1
+	for i, arg := range args {
+		if arg == "--" {
+			sep = i
+			break
+		}
+	}
+	if sep < 0 || sep != 1 || sep+1 >= len(args) {
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> -- <command> [args...]")
+		return exitUsage
+	}
+	profileName := args[0]
+	cmdName := args[sep+1]
+	cmdArgs := args[sep+2:]
+	if strings.HasPrefix(profileName, "-") || cmdName == "" {
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> -- <command> [args...]")
+		return exitUsage
+	}
+	policy := envprofile.PolicyFromConfig(cfg)
+	active, err := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), profileName, policy, envprofile.CommandRootOptions{})
+	if err != nil {
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
+	if active == nil {
+		_, _ = fmt.Fprintf(c.stderr, "curator: profile %q declares no exported commands or tools\n", profileName)
+		return exitFail
+	}
+
+	env := prependPathEnv(os.Environ(), active.Root)
+	resolvedBin := cmdName
+	if !strings.ContainsRune(cmdName, os.PathSeparator) {
+		candidate := active.Root + string(os.PathSeparator) + cmdName
+		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
+			resolvedBin = candidate
+		}
+	}
+	proc := exec.Command(resolvedBin, cmdArgs...) // #nosec G204 -- explicit operator-invoked command in profile exec
+	proc.Env = env
+	proc.Stdin = os.Stdin
+	proc.Stdout = c.stdout
+	proc.Stderr = c.stderr
+	if err := proc.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
+	return exitOK
+}
+
+func prependPathEnv(base []string, dir string) []string {
+	out := make([]string, 0, len(base)+1)
+	found := false
+	for _, kv := range base {
+		k, v, ok := strings.Cut(kv, "=")
+		if ok && k == "PATH" {
+			found = true
+			if v == "" {
+				out = append(out, "PATH="+dir)
+			} else {
+				out = append(out, "PATH="+dir+string(os.PathListSeparator)+v)
+			}
+			continue
+		}
+		out = append(out, kv)
+	}
+	if !found {
+		out = append(out, "PATH="+dir)
+	}
+	return out
 }

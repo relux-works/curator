@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -26,6 +27,8 @@ var (
 	rangeMarkers        = []string{"^", "~", ">", "<", "*", " "}
 	mcpTransports       = map[string]bool{"stdio": true, "http": true}
 	mcpRequiredIn       = map[string]bool{"any": true, "all": true}
+	toolIDPattern       = regexp.MustCompile(`^(?:aqua/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+|pypi/[A-Za-z0-9][A-Za-z0-9._-]*)$`)
+	toolVersionPattern  = regexp.MustCompile(`^(?:latest|[A-Za-z0-9.=<>^~*, +-]+)$`)
 )
 
 // Load reads the skill spec of a snapshot directory. agent-skill.json is
@@ -197,7 +200,7 @@ func (reader Reader) loadSkillManifest(filePath, sourceFile string) (*Spec, map[
 		}
 	}
 
-	dependencies, requirements, mcpServers, err := parseDependencies(data["dependencies"], schema)
+	dependencies, requirements, mcpServers, tools, err := parseDependencies(data["dependencies"], schema)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -213,6 +216,7 @@ func (reader Reader) loadSkillManifest(filePath, sourceFile string) (*Spec, map[
 		Dependencies:      dependencies,
 		Requirements:      requirements,
 		McpServers:        mcpServers,
+		Tools:             tools,
 	}, data, nil
 }
 
@@ -500,25 +504,28 @@ func validateRepositoryCommands(repositories map[string]BuildRepository, command
 	return nil
 }
 
-func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[string]Requirement, map[string]McpServer, error) {
-	empty := func() (map[string]CommandDependency, map[string]Requirement, map[string]McpServer, error) {
-		return map[string]CommandDependency{}, map[string]Requirement{}, map[string]McpServer{}, nil
+func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[string]Requirement, map[string]McpServer, map[string]ToolDependency, error) {
+	empty := func() (map[string]CommandDependency, map[string]Requirement, map[string]McpServer, map[string]ToolDependency, error) {
+		return map[string]CommandDependency{}, map[string]Requirement{}, map[string]McpServer{}, map[string]ToolDependency{}, nil
 	}
 	if raw == nil {
 		return empty()
 	}
 	if schema < 2 {
-		return nil, nil, nil, verr.New("dependencies", "requires schema_version 2 or newer")
+		return nil, nil, nil, nil, verr.New("dependencies", "requires schema_version 2 or newer")
 	}
 	obj, ok := raw.(map[string]any)
 	if !ok {
-		return nil, nil, nil, verr.New("dependencies", "must be an object")
+		return nil, nil, nil, nil, verr.New("dependencies", "must be an object")
 	}
 	if _, present := obj["skills"]; present && schema < 4 {
-		return nil, nil, nil, verr.New("dependencies.skills", "requires schema_version 4")
+		return nil, nil, nil, nil, verr.New("dependencies.skills", "requires schema_version 4")
 	}
 	if _, present := obj["mcp_servers"]; present && schema < 5 {
-		return nil, nil, nil, verr.New("dependencies.mcp_servers", "requires schema_version 5")
+		return nil, nil, nil, nil, verr.New("dependencies.mcp_servers", "requires schema_version 5")
+	}
+	if _, present := obj["tools"]; present && schema < 10 {
+		return nil, nil, nil, nil, verr.New("dependencies.tools", "requires schema_version 10")
 	}
 	allowed := map[string]bool{"commands": true}
 	if schema >= 4 {
@@ -527,70 +534,117 @@ func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[s
 	if schema >= 5 {
 		allowed["mcp_servers"] = true
 	}
+	if schema >= 10 {
+		allowed["tools"] = true
+	}
 	if err := rejectUnknown(obj, allowed, "dependencies"); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	requirements, err := parseRequirements(obj["skills"], schema)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	mcpServers, err := parseMcpServers(obj["mcp_servers"])
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	tools, err := parseTools(obj["tools"])
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	dependencies := map[string]CommandDependency{}
 	if rawCommands := obj["commands"]; rawCommands != nil {
 		commandsObj, ok := rawCommands.(map[string]any)
 		if !ok {
-			return nil, nil, nil, verr.New("dependencies.commands", "must be an object")
+			return nil, nil, nil, nil, verr.New("dependencies.commands", "must be an object")
 		}
 		for name, rawEntry := range commandsObj {
 			label := "dependencies.commands." + name
 			if name == "" {
-				return nil, nil, nil, verr.New("dependencies.commands", "dependency command names must be non-empty strings")
+				return nil, nil, nil, nil, verr.New("dependencies.commands", "dependency command names must be non-empty strings")
 			}
 			if !identifiers.Valid(name) {
-				return nil, nil, nil, verr.New(label, "dependency command name %s", identifiers.Rule)
+				return nil, nil, nil, nil, verr.New(label, "dependency command name %s", identifiers.Rule)
 			}
 			entry, ok := rawEntry.(map[string]any)
 			if !ok {
-				return nil, nil, nil, verr.New(label, "must be an object")
+				return nil, nil, nil, nil, verr.New(label, "must be an object")
 			}
 			hint, err := optionalString(entry, "hint", label)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			switch entry["type"] {
 			case "system":
 				if err := rejectUnknown(entry, map[string]bool{"type": true, "command": true, "hint": true}, label); err != nil {
-					return nil, nil, nil, err
+					return nil, nil, nil, nil, err
 				}
 				binary, ok := entry["command"].(string)
 				if !ok || binary == "" {
-					return nil, nil, nil, verr.New(label, "system dependency requires non-empty 'command'")
+					return nil, nil, nil, nil, verr.New(label, "system dependency requires non-empty 'command'")
 				}
 				dependencies[name] = CommandDependency{Name: name, Type: "system", Command: binary, Hint: hint}
 			case "skill":
 				if err := rejectUnknown(entry, map[string]bool{"type": true, "skill": true, "command": true, "hint": true}, label); err != nil {
-					return nil, nil, nil, err
+					return nil, nil, nil, nil, err
 				}
 				skill, ok := entry["skill"].(string)
 				if !ok || skill == "" || !identifiers.Valid(skill) {
-					return nil, nil, nil, verr.New(label, "skill dependency requires a valid 'skill' name (%s)", identifiers.Rule)
+					return nil, nil, nil, nil, verr.New(label, "skill dependency requires a valid 'skill' name (%s)", identifiers.Rule)
 				}
 				command, ok := entry["command"].(string)
 				if !ok || command == "" || !identifiers.Valid(command) {
-					return nil, nil, nil, verr.New(label, "skill dependency requires a valid 'command' name (%s)", identifiers.Rule)
+					return nil, nil, nil, nil, verr.New(label, "skill dependency requires a valid 'command' name (%s)", identifiers.Rule)
 				}
 				dependencies[name] = CommandDependency{Name: name, Type: "skill", Skill: skill, Command: command, Hint: hint}
 			default:
-				return nil, nil, nil, verr.New(label, "has unsupported type %v", entry["type"])
+				return nil, nil, nil, nil, verr.New(label, "has unsupported type %v", entry["type"])
 			}
 		}
 	}
-	return dependencies, requirements, mcpServers, nil
+	return dependencies, requirements, mcpServers, tools, nil
+}
+
+func parseTools(raw any) (map[string]ToolDependency, error) {
+	tools := map[string]ToolDependency{}
+	if raw == nil {
+		return tools, nil
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return nil, verr.New("dependencies.tools", "must be an object")
+	}
+	for alias, rawEntry := range obj {
+		label := "dependencies.tools." + alias
+		if alias == "" {
+			return nil, verr.New("dependencies.tools", "tool alias names must be non-empty strings")
+		}
+		if !identifiers.Valid(alias) {
+			return nil, verr.New(label, "tool alias %s", identifiers.Rule)
+		}
+		if strings.HasPrefix(strings.ToLower(alias), "curator-") {
+			return nil, verr.New(label, "tool alias must not use reserved curator- prefix")
+		}
+		entry, ok := rawEntry.(map[string]any)
+		if !ok {
+			return nil, verr.New(label, "must be an object")
+		}
+		if err := rejectUnknown(entry, map[string]bool{"id": true, "version": true}, label); err != nil {
+			return nil, err
+		}
+		id, ok := entry["id"].(string)
+		if !ok || len(id) < 5 || len(id) > 256 || !toolIDPattern.MatchString(id) || strings.Contains(id, "..") {
+			return nil, verr.New(label+".id", "must be a closed catalog id (aqua/<owner>/<repo> or pypi/<package>), never a URL")
+		}
+		version, ok := entry["version"].(string)
+		if !ok || version == "" || len(version) > 128 || !toolVersionPattern.MatchString(version) {
+			return nil, verr.New(label+".version", "must be a non-empty version constraint or 'latest'")
+		}
+		tools[alias] = ToolDependency{Alias: alias, ID: id, Version: version}
+	}
+	return tools, nil
 }
 
 func parseRequirements(raw any, schema int) (map[string]Requirement, error) {

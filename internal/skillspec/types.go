@@ -1,6 +1,6 @@
 // Package skillspec parses and validates the portable skill machine manifest,
-// schemas 1 through 9 (Spec §4), including legacy filename and runtime
-// fallbacks.
+// schemas 1 through 10 (Spec §4, tool-provisioning-v1), including legacy
+// filename and runtime fallbacks.
 package skillspec
 
 import "github.com/relux-works/curator/internal/capabilities"
@@ -15,7 +15,7 @@ const (
 )
 
 // SupportedSchemaVersions is the accepted agent skill manifest schema range.
-var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true}
+var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true, 10: true}
 
 // ScriptExecutionPolicy is the single closed schema-8 script execution policy
 // identity (Spec §4.1.1). It never aliases the compiled `manager-worker-v1`
@@ -104,6 +104,15 @@ type McpServer struct {
 	RequiredIn string // "any" or "all"
 }
 
+// ToolDependency is a schema-10 dependencies.tools entry (CIP-0007 v1 /
+// protocol/tool-provisioning.md). Manifests carry only a closed catalog ID and
+// version constraint — never a fetch URL or checksum.
+type ToolDependency struct {
+	Alias   string
+	ID      string // aqua/<owner>/<repo> or pypi/<package>
+	Version string // semver/PEP440 constraint or "latest"
+}
+
 // Spec is the parsed manifest of one skill snapshot.
 type Spec struct {
 	SchemaVersion     int
@@ -116,4 +125,5 @@ type Spec struct {
 	Dependencies      map[string]CommandDependency
 	Requirements      map[string]Requirement
 	McpServers        map[string]McpServer
+	Tools             map[string]ToolDependency
 }

@@ -27,6 +27,10 @@ const Version = "launch-env-fragment-v2"
 // (CIP-0033).
 const VersionV7 = "launch-env-fragment-v7"
 
+// VersionV9 is the fragment version emitted when an active Slice B-a profile
+// command root is attached to a launch fragment.
+const VersionV9 = "launch-env-fragment-v9"
+
 // Permissions is the resolved per-profile permission policy carried by
 // launch-env-fragment-v2 (environments §10.2).
 type Permissions struct {
@@ -71,8 +75,19 @@ type HomeBinding struct {
 	Transport string
 }
 
-// Fragment is one typed native v2 or Muse v4 object. This resolver omits the
-// optional path_prepend member (environments §10.2).
+// CommandRoot carries the active Slice B-a profile command root metadata
+// (schemas/profile-command-roots-v1/fragment-members.schema.json).
+type CommandRoot struct {
+	LockSHA256      string
+	PlanSHA256      string
+	Generation      string
+	Platform        string
+	ReceiptSHA256   string
+	MarkerSHA256    string
+	InventorySHA256 string
+}
+
+// Fragment is one typed launch fragment (v2, v4, v7, or v9 with active command root).
 type Fragment struct {
 	Environment     string
 	Profile         string
@@ -86,9 +101,14 @@ type Fragment struct {
 	MCP             *MCP
 	CredentialStore *CredentialStore
 	RootContext     *RootContext
+	CommandRoot     *CommandRoot
+	PathPrepend     string
 }
 
 func (f *Fragment) version() string {
+	if f.CommandRoot != nil {
+		return VersionV9
+	}
 	if f.Home != nil {
 		return VersionV7
 	}
@@ -171,6 +191,18 @@ func (f *Fragment) Object() map[string]any {
 			channels = append(channels, channelObject(channel, false))
 		}
 		object["mcp"] = map[string]any{"path": f.MCP.Path, "env_names": names, "channels": channels}
+	}
+	if f.CommandRoot != nil {
+		object["command_root"] = map[string]any{
+			"lock_sha256":      f.CommandRoot.LockSHA256,
+			"plan_sha256":      f.CommandRoot.PlanSHA256,
+			"generation":       f.CommandRoot.Generation,
+			"platform":         f.CommandRoot.Platform,
+			"receipt_sha256":   f.CommandRoot.ReceiptSHA256,
+			"marker_sha256":    f.CommandRoot.MarkerSHA256,
+			"inventory_sha256": f.CommandRoot.InventorySHA256,
+		}
+		object["path_prepend"] = f.PathPrepend
 	}
 	return object
 }
@@ -487,7 +519,7 @@ func CheckBoundary(adapter envregistry.Adapter, envRoot string, fragment *Fragme
 			return err
 		}
 	}
-	return nil
+	return checkCommandRootBoundary(envRoot, fragment)
 }
 
 // checkFlagHomeBoundary enforces the CIP-0033 launch-env-fragment-v7 boundary
@@ -558,5 +590,67 @@ func checkFlagHomeBoundary(adapter envregistry.Adapter, envRoot string, fragment
 			}
 		}
 	}
+	return checkCommandRootBoundary(envRoot, fragment)
+}
+
+var validCommandRootPlatforms = map[string]bool{
+	"darwin-arm64":  true,
+	"darwin-amd64":  true,
+	"linux-arm64":   true,
+	"linux-amd64":   true,
+	"windows-arm64": true,
+	"windows-amd64": true,
+}
+
+func checkCommandRootBoundary(envRoot string, fragment *Fragment) error {
+	if fragment.CommandRoot == nil && fragment.PathPrepend == "" {
+		return nil
+	}
+	if fragment.CommandRoot == nil || fragment.PathPrepend == "" {
+		return fmt.Errorf("fragment command_root and path_prepend must both be set")
+	}
+	cr := fragment.CommandRoot
+	for name, val := range map[string]string{
+		"lock_sha256":      cr.LockSHA256,
+		"plan_sha256":      cr.PlanSHA256,
+		"generation":       cr.Generation,
+		"receipt_sha256":   cr.ReceiptSHA256,
+		"marker_sha256":    cr.MarkerSHA256,
+		"inventory_sha256": cr.InventorySHA256,
+	} {
+		if !isHex64(val) {
+			return fmt.Errorf("fragment command_root.%s must be 64 lowercase hex characters", name)
+		}
+	}
+	if cr.LockSHA256 != fragment.LockSHA256 {
+		return fmt.Errorf("fragment command_root.lock_sha256 does not match profile.lock_sha256")
+	}
+	if !validCommandRootPlatforms[cr.Platform] {
+		return fmt.Errorf("fragment command_root.platform %q is unsupported", cr.Platform)
+	}
+	if !filepath.IsAbs(fragment.PathPrepend) || filepath.Clean(fragment.PathPrepend) != fragment.PathPrepend {
+		return fmt.Errorf("fragment path_prepend %q must be a clean absolute path", fragment.PathPrepend)
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(fragment.PathPrepend), "/") {
+		if seg == ".." {
+			return fmt.Errorf("fragment path_prepend %q carries a .. segment", fragment.PathPrepend)
+		}
+	}
+	expectedRoot := filepath.Join(filepath.Clean(envRoot), fragment.Profile, "commands", cr.Generation, cr.Platform, "bin")
+	if fragment.PathPrepend != expectedRoot {
+		return fmt.Errorf("fragment path_prepend %q must equal %q", fragment.PathPrepend, expectedRoot)
+	}
 	return nil
+}
+
+func isHex64(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
 }

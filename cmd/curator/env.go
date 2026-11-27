@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -155,6 +156,14 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
+	if *repair && !*dryRun && *profile != "" {
+		if hasExports, checkErr := envprofile.ProfileHasExecutableExports(cfg.Home(), *profile, policy); checkErr == nil && hasExports {
+			if _, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), *profile, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+				_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
+				return exitFail
+			}
+		}
+	}
 	result, err := envprofile.Resolve(envprofile.ResolveRequest{
 		Home:         cfg.Home(),
 		Profile:      *profile,
