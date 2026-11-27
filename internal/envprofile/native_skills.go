@@ -24,11 +24,13 @@ func inPlaceSkillsDir(id string) string {
 		return profileSkillsSurfaceDir
 	}
 	if contract, err := harnessregistry.Lookup(harnessapi.ID(id)); err == nil && contract.Capabilities().Has(harnessapi.SkillProjection) {
-		discovery, err := contract.Skills(harnessapi.Context{}, harnessapi.UserScope)
-		if err == nil {
-			paths := discovery.Paths().Paths()
-			if len(paths) == 1 {
-				return paths[0].String()
+		if _, homeErr := contract.Home(harnessapi.Context{}); homeErr == nil {
+			discovery, err := contract.Skills(harnessapi.Context{}, harnessapi.UserScope)
+			if err == nil {
+				paths := discovery.Paths().Paths()
+				if len(paths) == 1 {
+					return paths[0].String()
+				}
 			}
 		}
 	}
