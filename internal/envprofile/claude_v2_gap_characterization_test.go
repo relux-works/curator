@@ -36,7 +36,7 @@ func TestClaudeHarnessV2GapCharacterization(t *testing.T) {
 
 	t.Run("per-home Keychain route", func(t *testing.T) {
 		if runtime.GOOS != "darwin" {
-			t.Skip("Claude per-home Keychain behavior is macOS-specific")
+			t.Skip("Claude's per-home Keychain strategy is supported on macOS")
 		}
 		machine := envregistry.DefaultMachineConfig()
 		machine.Isolation["fixture"] = map[string]string{envregistry.ClaudeCode: envregistry.IsolationIsolated}
