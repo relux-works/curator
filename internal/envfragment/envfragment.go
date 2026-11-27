@@ -271,7 +271,9 @@ func (f *Fragment) EnvFormat(adapter envregistry.Adapter) []byte {
 }
 
 // ShellFormat renders --format shell: one POSIX export NAME='value' line
-// per fragment env member with single-quote escaping. POSIX-only by design;
+// per fragment env member with single-quote escaping. For
+// launch-env-fragment-v9 fragments with an active profile command root, it
+// also appends a POSIX PATH prepend export. POSIX-only by design;
 // automation on Windows or in PowerShell consumes --format json
 // (environments §10.1).
 func (f *Fragment) ShellFormat(adapter envregistry.Adapter) []byte {
@@ -282,6 +284,12 @@ func (f *Fragment) ShellFormat(adapter envregistry.Adapter) []byte {
 		out.WriteString("='")
 		out.WriteString(strings.ReplaceAll(variable[1], "'", `'\''`))
 		out.WriteString("'\n")
+	}
+	if f.CommandRoot != nil && f.PathPrepend != "" {
+		out.WriteString("export PATH='")
+		out.WriteString(strings.ReplaceAll(f.PathPrepend, "'", `'\''`))
+		out.WriteString(`':"$PATH"`)
+		out.WriteByte('\n')
 	}
 	return []byte(out.String())
 }

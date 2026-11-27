@@ -83,7 +83,7 @@ var commandRegistry = []commandSpec{
 	{"profile compose <profile> add", "<source> [--range <range>|--tag <tag>|--revision <ref>] [--directory <dir>] [--weight <n>]", "Add an overlay to a composed profile; an installed profile's lock is rebuilt with it.", "", nil},
 	{"profile compose <profile> remove", "<source>", "Remove an overlay from a composed profile; an installed profile's lock is rebuilt without it.", "", nil},
 	{"profile compose <profile> list", "", "List members of a composed profile.", "", nil},
-	{"profile exec", "<profile> -- <command> [args...]", "Execute a command with the profile's verified command root prepended to PATH.", "", nil},
+	{"profile exec", "<profile> [--env <env-id>] -- <command> [args...]", "Execute a command with the profile's verified command root prepended to PATH and optional managed environment variables.", envAliasUsage + "\n", nil},
 	{"env", "<resolve|status|config|migrate|unmanage> [arguments]", "Inspect and manage environment homes.", "Requires the global config: " + configNotFoundHint + ".\n", cli.cmdEnv},
 	{"env resolve", "<env-id> [--profile <name>] [--repair [--preserve-lock] [--dry-run]] [--takeover] [--format json|env|shell]", "Resolve an environment fragment; --repair provisions or repairs the managed home.", envAliasUsage + "\n", nil},
 	{"env status", "[--check] [--json]", "Report environment home state.", envAliasUsage + "\n", nil},

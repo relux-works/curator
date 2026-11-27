@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -493,11 +495,13 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
 	return exitOK
 }
 
-// cmdProfileExec implements `curator profile exec <profile> -- <command> [args...]`.
-// It verifies (or materializes) the profile's Slice B-a command root, prepends
-// its bin directory to PATH, and runs <command> interactively with inherited
-// stdin/stdout/stderr so operator workflows (such as tool OAuth login) work
-// without installing profile tools onto global PATH.
+// cmdProfileExec implements `curator profile exec <profile> [--env <env-id>] -- <command> [args...]`.
+// Without --env it verifies (or materializes) the profile's Slice B-a command
+// root, prepends its bin directory to PATH, and runs <command> interactively
+// with inherited stdio so operator workflows (such as tool OAuth login) work
+// without installing profile tools onto global PATH. With --env <env-id> it
+// also resolves (with repair) the profile's managed environment home and
+// overlays the fragment's environment variables before executing <command>.
 func (c cli) cmdProfileExec(cfg *config.Config, args []string) int {
 	sep := -1
 	for i, arg := range args {
@@ -506,32 +510,101 @@ func (c cli) cmdProfileExec(cfg *config.Config, args []string) int {
 			break
 		}
 	}
-	if sep < 0 || sep != 1 || sep+1 >= len(args) {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> -- <command> [args...]")
+	if sep < 1 || sep+1 >= len(args) {
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> [--env <env-id>] -- <command> [args...]")
 		return exitUsage
 	}
-	profileName := args[0]
+	flags := c.newFlagSet("profile exec")
+	envFlag := flags.String("env", "", "optional environment id; resolves and applies managed home environment variables")
+	positional, err := parseInterspersed(flags, args[:sep])
+	if err != nil || len(positional) != 1 {
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> [--env <env-id>] -- <command> [args...]")
+		return exitUsage
+	}
+	profileName := positional[0]
 	cmdName := args[sep+1]
 	cmdArgs := args[sep+2:]
 	if strings.HasPrefix(profileName, "-") || cmdName == "" {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> -- <command> [args...]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile exec <profile> [--env <env-id>] -- <command> [args...]")
 		return exitUsage
 	}
+
 	policy := envprofile.PolicyFromConfig(cfg)
-	active, err := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), profileName, policy, envprofile.CommandRootOptions{})
-	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
-		return exitFail
-	}
-	if active == nil {
-		_, _ = fmt.Fprintf(c.stderr, "curator: profile %q declares no exported commands or tools\n", profileName)
-		return exitFail
+	env := os.Environ()
+	var pathPrepend string
+
+	if *envFlag != "" {
+		if hasExports, checkErr := envprofile.ProfileHasExecutableExports(cfg.Home(), profileName, policy); checkErr == nil && hasExports {
+			if _, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), profileName, policy, envprofile.CommandRootOptions{}); rootErr != nil {
+				_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
+				return exitFail
+			}
+		}
+		launchDir, wdErr := os.Getwd()
+		if wdErr != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", wdErr)
+			return exitFail
+		}
+		envID := envregistry.NormalizeEnvID(*envFlag)
+		result, resolveErr := envprofile.Resolve(envprofile.ResolveRequest{
+			Home:      cfg.Home(),
+			Profile:   profileName,
+			EnvID:     envID,
+			LaunchDir: launchDir,
+			Machine:   machineFromConfig(cfg),
+			Repair:    true,
+			Format:    "json",
+			Policy:    policy,
+		})
+		if result != nil {
+			for _, warning := range result.Warnings {
+				_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+			}
+			if result.Notice != "" {
+				_, _ = fmt.Fprintln(c.stderr, result.Notice)
+			}
+		}
+		if resolveErr != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", resolveErr)
+			return exitFail
+		}
+		var frag struct {
+			Env  map[string]string `json:"env"`
+			Home *struct {
+				Path      string `json:"path"`
+				Transport string `json:"transport"`
+			} `json:"home"`
+			PathPrepend string `json:"path_prepend"`
+		}
+		if unmarshalErr := json.Unmarshal(result.Document, &frag); unmarshalErr != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", unmarshalErr)
+			return exitFail
+		}
+		if frag.Home != nil {
+			_, _ = fmt.Fprintf(c.stderr, "curator: %s: %s relocates its managed home via a CLI flag and cannot be applied by profile exec --env; use curator run or curator env resolve --format json\n", envregistry.DiagFlagHomeUnsupported, envID)
+			return exitFail
+		}
+		env = overlayEnv(env, frag.Env)
+		pathPrepend = frag.PathPrepend
+	} else {
+		active, rootErr := envprofile.MaterializeCommandRoot(context.Background(), cfg.Home(), profileName, policy, envprofile.CommandRootOptions{})
+		if rootErr != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", rootErr)
+			return exitFail
+		}
+		if active == nil {
+			_, _ = fmt.Fprintf(c.stderr, "curator: profile %q declares no exported commands or tools\n", profileName)
+			return exitFail
+		}
+		pathPrepend = active.Root
 	}
 
-	env := prependPathEnv(os.Environ(), active.Root)
+	if pathPrepend != "" {
+		env = prependPathEnv(env, pathPrepend)
+	}
 	resolvedBin := cmdName
-	if !strings.ContainsRune(cmdName, os.PathSeparator) {
-		candidate := active.Root + string(os.PathSeparator) + cmdName
+	if pathPrepend != "" && !strings.ContainsRune(cmdName, os.PathSeparator) {
+		candidate := filepath.Join(pathPrepend, cmdName)
 		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
 			resolvedBin = candidate
 		}
@@ -550,6 +623,31 @@ func (c cli) cmdProfileExec(cfg *config.Config, args []string) int {
 		return exitFail
 	}
 	return exitOK
+}
+
+func overlayEnv(base []string, overrides map[string]string) []string {
+	if len(overrides) == 0 {
+		return base
+	}
+	out := make([]string, 0, len(base)+len(overrides))
+	for _, kv := range base {
+		k, _, ok := strings.Cut(kv, "=")
+		if ok {
+			if _, replaced := overrides[k]; replaced {
+				continue
+			}
+		}
+		out = append(out, kv)
+	}
+	keys := make([]string, 0, len(overrides))
+	for k := range overrides {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		out = append(out, k+"="+overrides[k])
+	}
+	return out
 }
 
 func prependPathEnv(base []string, dir string) []string {

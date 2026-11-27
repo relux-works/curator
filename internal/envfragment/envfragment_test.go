@@ -309,3 +309,34 @@ func TestActiveProfileIsWarn(t *testing.T) {
 		t.Fatalf("ActiveS4Profile = %q, want s4-warn first", ActiveS4Profile)
 	}
 }
+
+func TestShellFormatCommandRootV9(t *testing.T) {
+	adapter, err := envregistry.ByID(envregistry.CodexCLI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2 := &Fragment{
+		Environment: envregistry.CodexCLI,
+		Profile:     "default",
+		Env:         map[string]string{"CODEX_HOME": "/home/u/.curator/environments/default/codex_cli"},
+	}
+	gotV2 := string(v2.ShellFormat(adapter))
+	wantV2 := "export CODEX_HOME='/home/u/.curator/environments/default/codex_cli'\n"
+	if gotV2 != wantV2 {
+		t.Fatalf("v2 ShellFormat = %q, want %q", gotV2, wantV2)
+	}
+
+	v9 := &Fragment{
+		Environment: envregistry.CodexCLI,
+		Profile:     "colab",
+		Env:         map[string]string{"CODEX_HOME": "/home/u/.curator/environments/colab/codex_cli"},
+		CommandRoot: &CommandRoot{Generation: "abc"},
+		PathPrepend: "/home/u's/.curator/environments/colab/commands/abc/linux-amd64/bin",
+	}
+	gotV9 := string(v9.ShellFormat(adapter))
+	wantV9 := "export CODEX_HOME='/home/u/.curator/environments/colab/codex_cli'\n" +
+		`export PATH='/home/u'\''s/.curator/environments/colab/commands/abc/linux-amd64/bin':"$PATH"` + "\n"
+	if gotV9 != wantV9 {
+		t.Fatalf("v9 ShellFormat = %q, want %q", gotV9, wantV9)
+	}
+}
