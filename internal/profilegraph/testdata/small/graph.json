@@ -4,7 +4,7 @@
     "name": "curator",
     "version": "dev"
   },
-  "inputs_digest": "afe62b99f111c7e6e52c1b17b9f6cb0f32ae340f97e089d7d95f0610a1057aac",
+  "inputs_digest": "f64020c46a453c6cac7f45c637b417c6682f4d52babbfd3af4649c8ac4084837",
   "scope": {
     "profile": "sample",
     "mode": "installed",
@@ -12,6 +12,7 @@
       "antigravity",
       "claude_code",
       "codex_cli",
+      "kimi_code",
       "muse",
       "opencode",
       "pi"
@@ -63,8 +64,8 @@
     {
       "root": "projection",
       "path": "environments.json",
-      "sha256": "fe67491b74efb297558ae868ef9975005e627d97213d45e3627327f2381f83cb",
-      "bytes": 64
+      "sha256": "d8c4af2e57189624ec3f533684dc4a8410470f912326e8036d01edc73335ddc7",
+      "bytes": 76
     },
     {
       "root": "snapshot/context/sample-nested/48309cf49e429835a2709222767eeeff0f476bd9",
@@ -110,6 +111,91 @@
     }
   ],
   "nodes": [
+    {
+      "id": "n:04503f0ed233b6cc228be2b2b8773380a413374091cd71bbba447f24c38da1ef",
+      "identity": [
+        "generated",
+        "sample",
+        "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+        "chapter",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "kimi_code chapter 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 35,
+        "lines": 3,
+        "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+      },
+      "emissions": [
+        {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 750,
+              "end": 785
+            }
+          ],
+          "bytes": 35,
+          "lines": 3,
+          "sha256": "62d6f670007c30c9b7767c3db9a44bb2fad8aff5eaa7d2aee483c0515bc016bb"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "antigravity",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
     {
       "id": "n:0765a530b586c556821668b53f7ce721495b3966942c1a8b94fd3c0f72a94767",
       "identity": [
@@ -160,6 +246,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -243,6 +336,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
@@ -314,6 +414,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -411,6 +518,18 @@
           "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
         },
         {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
           "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
           "ranges": [
             {
@@ -464,6 +583,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -569,6 +695,18 @@
           "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
         },
         {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
           "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
           "ranges": [
             {
@@ -622,6 +760,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
@@ -700,6 +845,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -796,6 +948,18 @@
           "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
         },
         {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 821,
+              "end": 845
+            }
+          ],
+          "bytes": 24,
+          "lines": 1,
+          "sha256": "1262362c150d1b53320faad8a4b94f3e0613b9fc5f70628f53f819ea794013db"
+        },
+        {
           "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
           "ranges": [
             {
@@ -849,6 +1013,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
@@ -931,6 +1102,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "available",
           "basis": "UNKNOWN",
@@ -1024,6 +1202,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
@@ -1097,6 +1282,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -1190,6 +1382,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -1262,6 +1461,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -1346,6 +1552,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -1356,6 +1569,91 @@
           "environment": "opencode",
           "class": "always",
           "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:5ebfcaa0108c9acfe9e75c1de46cbfbabb4f49f60a680d0535525f969deaf455",
+      "identity": [
+        "generated",
+        "sample",
+        "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+        "separator",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "kimi_code separator 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 749,
+              "end": 750
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "antigravity",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         },
@@ -1418,6 +1716,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -1501,6 +1806,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
@@ -1573,6 +1885,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -1668,6 +1987,13 @@
           "condition": "environments=claude_code"
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": "environments=claude_code"
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -1740,6 +2066,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -1824,6 +2157,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -1896,6 +2236,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -1980,6 +2327,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2056,6 +2410,18 @@
           "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
         },
         {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        },
+        {
           "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
           "ranges": [
             {
@@ -2109,6 +2475,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -2193,6 +2566,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2264,6 +2644,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -2344,6 +2731,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "available",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "available",
           "basis": "UNKNOWN",
@@ -2432,6 +2826,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2504,6 +2905,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -2588,6 +2996,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2662,6 +3077,13 @@
           "environment": "codex_cli",
           "class": "always",
           "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         },
@@ -2744,6 +3166,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2822,6 +3251,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2893,6 +3329,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -2977,6 +3420,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -2995,6 +3445,90 @@
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+      "identity": [
+        "emitted-document",
+        "sample",
+        "kimi_code",
+        "AGENTS.md"
+      ],
+      "kind": "emitted-document",
+      "label": "kimi_code document",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 845,
+        "lines": 21,
+        "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+      },
+      "emissions": [
+        {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 845
+            }
+          ],
+          "bytes": 845,
+          "lines": 21,
+          "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "antigravity",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
           "condition": null
         }
       ]
@@ -3055,9 +3589,101 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "always",
           "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:c2adf438b11f75c44a1c5c20a1081544147415028499328ab77864cb2ca39f46",
+      "identity": [
+        "generated",
+        "sample",
+        "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+        "separator",
+        "1"
+      ],
+      "kind": "generated",
+      "label": "kimi_code separator 1",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 1,
+        "lines": 1,
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "emissions": [
+        {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 785,
+              "end": 786
+            }
+          ],
+          "bytes": 1,
+          "lines": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "antigravity",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         },
@@ -3127,6 +3753,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -3205,6 +3838,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -3301,6 +3941,18 @@
           "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
         },
         {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 786,
+              "end": 845
+            }
+          ],
+          "bytes": 59,
+          "lines": 5,
+          "sha256": "05ebe869b71ce817374754ed395b770c38ac45d34ef2cc0db73c151b91631015"
+        },
+        {
           "document": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
           "ranges": [
             {
@@ -3354,6 +4006,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "always",
           "state": "emitted",
           "basis": "rendering-rule",
@@ -3448,6 +4107,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -3526,6 +4192,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -3597,6 +4270,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -3681,6 +4361,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -3698,6 +4385,91 @@
           "environment": "pi",
           "class": "always",
           "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        }
+      ]
+    },
+    {
+      "id": "n:e1733552524edf9ddf0f676df0a2e6fa6884641a46509cee60dba1735acad0dd",
+      "identity": [
+        "generated",
+        "sample",
+        "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+        "header",
+        "0"
+      ],
+      "kind": "generated",
+      "label": "kimi_code header 0",
+      "source": null,
+      "layer": null,
+      "content": {
+        "status": "text",
+        "bytes": 749,
+        "lines": 11,
+        "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+      },
+      "emissions": [
+        {
+          "document": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+          "ranges": [
+            {
+              "start": 0,
+              "end": 749
+            }
+          ],
+          "bytes": 749,
+          "lines": 11,
+          "sha256": "6959ce2aa83bcabacfa6d21e5e7f388af87b69b38ef7e6b4f552eec958364f25"
+        }
+      ],
+      "loads": [
+        {
+          "environment": "antigravity",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "claude_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
+          "class": "always",
+          "state": "emitted",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "muse",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "opencode",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "pi",
+          "class": "UNKNOWN",
+          "state": "excluded",
           "basis": "rendering-rule",
           "condition": null
         }
@@ -3753,6 +4525,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -3831,6 +4610,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "excluded",
           "basis": "rendering-rule",
@@ -3921,6 +4707,13 @@
         },
         {
           "environment": "codex_cli",
+          "class": "UNKNOWN",
+          "state": "UNKNOWN",
+          "basis": "UNKNOWN",
+          "condition": null
+        },
+        {
+          "environment": "kimi_code",
           "class": "UNKNOWN",
           "state": "UNKNOWN",
           "basis": "UNKNOWN",
@@ -4025,6 +4818,13 @@
           "condition": null
         },
         {
+          "environment": "kimi_code",
+          "class": "UNKNOWN",
+          "state": "excluded",
+          "basis": "rendering-rule",
+          "condition": null
+        },
+        {
           "environment": "muse",
           "class": "UNKNOWN",
           "state": "excluded",
@@ -4059,6 +4859,12 @@
     }
   ],
   "edges": [
+    {
+      "from": "n:04503f0ed233b6cc228be2b2b8773380a413374091cd71bbba447f24c38da1ef",
+      "to": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+      "kind": "contributes",
+      "order": 2
+    },
     {
       "from": "n:0765a530b586c556821668b53f7ce721495b3966942c1a8b94fd3c0f72a94767",
       "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
@@ -4117,6 +4923,12 @@
     },
     {
       "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+      "to": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+      "kind": "contributes",
+      "order": 4
+    },
+    {
+      "from": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
       "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
       "kind": "contributes",
       "order": 4
@@ -4162,6 +4974,12 @@
       "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
       "kind": "contributes",
       "order": 2
+    },
+    {
+      "from": "n:5ebfcaa0108c9acfe9e75c1de46cbfbabb4f49f60a680d0535525f969deaf455",
+      "to": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+      "kind": "contributes",
+      "order": 1
     },
     {
       "from": "n:624a159e22f320bf9c46bf96e3ae8464fafd2af5e0578e977229c5d5594c42e9",
@@ -4231,21 +5049,27 @@
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
+      "to": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
       "kind": "emits",
       "order": 3
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
+      "to": "n:08c929c6aa74acd4e7150271f56f2cdc5dba34608b894b4f0b385bce7df24920",
       "kind": "emits",
       "order": 4
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
-      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "to": "n:d948e50e16a0479a6ba44f1c4ef77db8e05d444a63844c389d47520f5bfec976",
       "kind": "emits",
       "order": 5
+    },
+    {
+      "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
+      "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "kind": "emits",
+      "order": 6
     },
     {
       "from": "n:804f2cdb72802ae038d47ba50a4e0fa73e98d09e160f68d99c3440df1da7c2b8",
@@ -4334,6 +5158,12 @@
       "order": 3
     },
     {
+      "from": "n:c2adf438b11f75c44a1c5c20a1081544147415028499328ab77864cb2ca39f46",
+      "to": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+      "kind": "contributes",
+      "order": 3
+    },
+    {
       "from": "n:c5c809e008e178e32fbf2dbe05009c7331c5a3579481b4b101acc70d242387de",
       "to": "n:65d8fae986f9f2dc58b018c1075ef47c2527c71175e40b8c40ec002148ba051d",
       "kind": "contributes",
@@ -4360,6 +5190,12 @@
     {
       "from": "n:d9c06d32747f450f34b2098a510ecb31651bd5be9b13aa3dd235067e042d05f0",
       "to": "n:b00da0517e21b22f7a0ed4dc193467844372e09563bab33416024381f1c4153d",
+      "kind": "contributes",
+      "order": 0
+    },
+    {
+      "from": "n:e1733552524edf9ddf0f676df0a2e6fa6884641a46509cee60dba1735acad0dd",
+      "to": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
       "kind": "contributes",
       "order": 0
     },
@@ -4541,6 +5377,54 @@
         },
         {
           "node": "n:a6138a5387f6fad2a50f711c4bdef35688245913df28cb679c7df0acdfc2210b",
+          "range": {
+            "start": 785,
+            "end": 786
+          }
+        },
+        {
+          "node": "n:21c012a209ba2470480bc51b2012e4d6c417e3e8e30b857116cebdcd70c3046a",
+          "range": {
+            "start": 786,
+            "end": 845
+          }
+        }
+      ]
+    },
+    {
+      "node": "n:c0878de0b53ac02fdf66019fed3ca7266763a543b182c785374e4d511913fe79",
+      "environment": "kimi_code",
+      "root": "environment/kimi_code",
+      "path": "AGENTS.md",
+      "form": "monolithic",
+      "origin": "rendered",
+      "bytes": 845,
+      "lines": 21,
+      "sha256": "ef656b33b0c5f1ad89e63394bc3d1044e8e61fa11503c0ba6ff900db1f41ecd4",
+      "coverage": [
+        {
+          "node": "n:e1733552524edf9ddf0f676df0a2e6fa6884641a46509cee60dba1735acad0dd",
+          "range": {
+            "start": 0,
+            "end": 749
+          }
+        },
+        {
+          "node": "n:5ebfcaa0108c9acfe9e75c1de46cbfbabb4f49f60a680d0535525f969deaf455",
+          "range": {
+            "start": 749,
+            "end": 750
+          }
+        },
+        {
+          "node": "n:04503f0ed233b6cc228be2b2b8773380a413374091cd71bbba447f24c38da1ef",
+          "range": {
+            "start": 750,
+            "end": 785
+          }
+        },
+        {
+          "node": "n:c2adf438b11f75c44a1c5c20a1081544147415028499328ab77864cb2ca39f46",
           "range": {
             "start": 785,
             "end": 786

@@ -24,16 +24,10 @@ import (
 )
 
 // projectSources maps agents to project-relative config files (Spec §11.1).
-var projectSources = map[string][]string{
-	"codex_cli":   {".codex/config.toml"},
-	"opencode":    {"opencode.json", "opencode.jsonc"},
-}
+var projectSources = map[string][]string{}
 
 // homeSources maps agents to home-relative config files.
-var homeSources = map[string][]string{
-	"codex_cli":   {".codex/config.toml"},
-	"opencode":    {".config/opencode/opencode.json", ".config/opencode/opencode.jsonc"},
-}
+var homeSources = map[string][]string{}
 
 // claudeSettings can reject servers declared in .mcp.json; a rejected server
 // never activates, so it counts as not configured.

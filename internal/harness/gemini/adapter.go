@@ -7,9 +7,14 @@ import (
 	"github.com/relux-works/curator/internal/harnessapi"
 )
 
+// ID is the canonical Curator harness identifier for Gemini.
 const ID harnessapi.ID = "gemini"
 
+// Adapter delegates the Gemini harness adapter type to curator-runtimes.
 type Adapter = gemini.HarnessAdapter
 
+// Capabilities returns the declared Gemini harness capabilities.
 func Capabilities() harnessapi.CapabilitySet { return gemini.HarnessCapabilities() }
-func New() harnessapi.Adapter                { return gemini.NewHarnessAdapter() }
+
+// New constructs the Gemini harness adapter.
+func New() harnessapi.Adapter { return gemini.NewHarnessAdapter() }

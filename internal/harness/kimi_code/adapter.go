@@ -7,9 +7,14 @@ import (
 	"github.com/relux-works/curator/internal/harnessapi"
 )
 
+// ID is the canonical Curator harness identifier for Kimi Code.
 const ID harnessapi.ID = "kimi_code"
 
+// Adapter delegates the Kimi Code harness adapter type to curator-runtimes.
 type Adapter = kimi.HarnessAdapter
 
-func New() harnessapi.Adapter                     { return kimi.NewHarnessAdapter() }
+// New constructs the Kimi Code harness adapter.
+func New() harnessapi.Adapter { return kimi.NewHarnessAdapter() }
+
+// ManagedHomeSpec returns the Kimi Code managed-home specification.
 func ManagedHomeSpec() harnessapi.ManagedHomeSpec { return kimi.ManagedHomeSpec() }

@@ -26,9 +26,7 @@ import (
 // the remaining entries stay in the legacy catalog until their moves.
 var AgentPaths = projectAgentPaths()
 
-var legacyAgentPaths = map[string]string{
-	"codex_cli":   ".codex/skills",
-}
+var legacyAgentPaths = map[string]string{}
 
 func projectAgentPaths() map[string]string {
 	paths := make(map[string]string, len(legacyAgentPaths)+len(harnessregistry.IDs()))
